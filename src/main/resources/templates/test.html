@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Video Preview</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+<h2>Video Preview</h2>
+<video id="video" controls autoplay style="max-width: 80%;"></video>
+
+<script>
+    const video = document.getElementById('video');
+    const playlistUrl = "http://localhost/stream/2b.mp4/preview/master.m3u8"; // replace with your preview URL
+
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Safari: native HLS
+        video.src = playlistUrl;
+    } else if (Hls.isSupported()) {
+        // Chrome/Firefox/Edge: use hls.js
+        const hls = new Hls();
+        hls.loadSource(playlistUrl);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            video.play();
+        });
+    } else {
+        alert("Your browser does not support HLS playback.");
+    }
+</script>
+</body>
+</html>
