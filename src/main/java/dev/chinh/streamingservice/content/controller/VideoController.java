@@ -1,5 +1,7 @@
-package dev.chinh.streamingservice;
+package dev.chinh.streamingservice.content.controller;
 
+import dev.chinh.streamingservice.content.constant.Resolution;
+import dev.chinh.streamingservice.content.service.VideoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,10 +16,10 @@ public class VideoController {
 
     private final VideoService videoService;
 
-    @GetMapping("/original/{object}")
-    public ResponseEntity<String> getVideoUrl(@PathVariable String object) throws Exception {
+    @GetMapping("/original/{videoId}")
+    public ResponseEntity<String> getVideoUrl(@PathVariable String videoId) throws Exception {
         String bucket = "testminio";
-        String url = videoService.getSignedUrlForHostNginx(bucket, object, 300); // 5 minutes
+        String url = videoService.getSignedUrlForHostNginx(bucket, videoId, 300); // 5 minutes
         return ResponseEntity.ok(url);
     }
 

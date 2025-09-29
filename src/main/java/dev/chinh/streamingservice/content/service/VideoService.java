@@ -1,8 +1,7 @@
-package dev.chinh.streamingservice;
+package dev.chinh.streamingservice.content.service;
 
-import io.minio.GetPresignedObjectUrlArgs;
-import io.minio.MinioClient;
-import io.minio.http.Method;
+import dev.chinh.streamingservice.content.constant.Resolution;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
@@ -10,35 +9,22 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class VideoService {
-    private final MinioClient minioClient;
 
-    public VideoService(MinioClient minioClient) {
-        this.minioClient = minioClient;
-    }
+    private final MinIOService minIOService;
 
     // diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://1048576`
 
     public String getSignedUrlForHostNginx(String bucket, String object, int expirySeconds) throws Exception {
-        String signedUrl = getSignedUrl(bucket, object, expirySeconds);
+        String signedUrl = minIOService.getSignedUrl(bucket, object, expirySeconds);
         // Replace the MinIO base URL with your Nginx URL
         return signedUrl.replace("http://localhost:9000", "http://localhost/stream/minio");
     }
 
     public String getSignedUrlForContainerNginx(String bucket, String object, int expirySeconds) throws Exception {
-        String signedUrl = getSignedUrl(bucket, object, expirySeconds);
+        String signedUrl = minIOService.getSignedUrl(bucket, object, expirySeconds);
         return signedUrl.replace("http://localhost:9000", "http://nginx/stream/minio");
-    }
-
-    public String getSignedUrl(String bucket, String object, int expirySeconds) throws Exception {
-       return minioClient.getPresignedObjectUrl(
-                GetPresignedObjectUrlArgs.builder()
-                        .method(Method.GET)
-                        .bucket(bucket)
-                        .object(object)
-                        .expiry(expirySeconds)
-                        .build()
-       );
     }
 
     public String getPreviewVideoUrl(String videoId) throws Exception {

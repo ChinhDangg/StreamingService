@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice;
+package dev.chinh.streamingservice.content.constant;
 
 import lombok.Getter;
 
