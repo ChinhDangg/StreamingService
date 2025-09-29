@@ -18,8 +18,7 @@ public class VideoController {
 
     @GetMapping("/original/{videoId}")
     public ResponseEntity<String> getVideoUrl(@PathVariable String videoId) throws Exception {
-        String bucket = "testminio";
-        String url = videoService.getSignedUrlForHostNginx(bucket, videoId, 300); // 5 minutes
+        String url = videoService.getOriginalVideoUrl(videoId);
         return ResponseEntity.ok(url);
     }
 

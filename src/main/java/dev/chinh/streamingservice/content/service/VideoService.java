@@ -16,21 +16,15 @@ public class VideoService {
 
     // diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://1048576`
 
-    public String getSignedUrlForHostNginx(String bucket, String object, int expirySeconds) throws Exception {
-        String signedUrl = minIOService.getSignedUrl(bucket, object, expirySeconds);
-        // Replace the MinIO base URL with your Nginx URL
-        return signedUrl.replace("http://localhost:9000", "http://localhost/stream/minio");
-    }
-
-    public String getSignedUrlForContainerNginx(String bucket, String object, int expirySeconds) throws Exception {
-        String signedUrl = minIOService.getSignedUrl(bucket, object, expirySeconds);
-        return signedUrl.replace("http://localhost:9000", "http://nginx/stream/minio");
+    public String getOriginalVideoUrl(String videoId) throws Exception {
+        String bucket = "testminio";
+        return minIOService.getSignedUrlForHostNginx(bucket, videoId, 300); // 5 minutes
     }
 
     public String getPreviewVideoUrl(String videoId) throws Exception {
         String bucket = "testminio";
         // 1. Get a presigned URL with container Nginx so ffmpeg can access in container
-        String nginxUrl = getSignedUrlForContainerNginx(bucket, videoId, 300);
+        String nginxUrl = minIOService.getSignedUrlForContainerNginx(bucket, videoId, 300);
         // 1-1. Use stored metadata (hardcode for now: 10m13s = 613s)
         double duration = 613.0;
         System.out.println("Using stored duration: " + duration + " seconds");
@@ -109,7 +103,7 @@ public class VideoService {
 
         // 1. Get a presigned URL with container Nginx so ffmpeg can access in container
         // 2. Rewrite URL to go through Nginx proxy instead of direct MinIO
-        String nginxUrl = getSignedUrlForContainerNginx(bucket, videoId, 300);
+        String nginxUrl = minIOService.getSignedUrlForContainerNginx(bucket, videoId, 300);
 
         // 3. Host vs container paths
         String hostDir = "/Volumes/RAMDISK/" + videoId + "/partial";  // host path
