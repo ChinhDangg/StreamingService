@@ -4,10 +4,7 @@ import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.content.service.VideoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
 @RestController
@@ -16,20 +13,23 @@ public class VideoController {
 
     private final VideoService videoService;
 
-    @GetMapping("/original/{videoId}")
-    public ResponseEntity<String> getVideoUrl(@PathVariable String videoId) throws Exception {
-        String url = videoService.getOriginalVideoUrl(videoId);
+    @GetMapping("/original/{bucket}")
+    public ResponseEntity<String> getVideoUrl(@PathVariable String bucket,
+                                              @RequestParam("id") String videoId) throws Exception {
+        String url = videoService.getOriginalVideoUrl(bucket, videoId);
         return ResponseEntity.ok(url);
     }
 
-    @GetMapping("/preview/{videoId}")
-    public ResponseEntity<String> preview(@PathVariable String videoId) throws Exception {
-        return ResponseEntity.ok(videoService.getPreviewVideoUrl(videoId));
+    @GetMapping("/preview/{bucket}")
+    public ResponseEntity<String> preview(@PathVariable String bucket,
+                                          @RequestParam("id") String videoId) throws Exception {
+        return ResponseEntity.ok(videoService.getPreviewVideoUrl(bucket, videoId));
     }
 
-    @GetMapping("/partial/{videoId}")
-    private ResponseEntity<String> getTranscodeFull(@PathVariable String videoId) throws Exception {
-        return ResponseEntity.ok(videoService.getPartialVideoUrl(videoId, Resolution.p360));
+    @GetMapping("/partial/{bucket}")
+    private ResponseEntity<String> getTranscodeFull(@PathVariable String bucket,
+                                                    @RequestParam("id") String videoId) throws Exception {
+        return ResponseEntity.ok(videoService.getPartialVideoUrl(bucket, videoId, Resolution.p360));
     }
 
 }
