@@ -9,11 +9,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.UriUtils;
 
 import javax.imageio.ImageIO;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -27,14 +29,19 @@ public class ImageService {
     @PostConstruct
     public void init() {
         ImageIO.scanForPlugins();  // ensures WebP plugin is discovered
+
+//        System.out.println("Registered writer formats: " + Arrays.toString(ImageIO.getWriterFormatNames()));
+//        System.out.println("Registered reader formats: " + Arrays.toString(ImageIO.getReaderFormatNames()));
     }
 
     public ResponseEntity<Void> getResizedImageToResponse(String bucket, String key, Resolution res,
                                                           HttpServletRequest request) throws Exception {
-        String acceptHeader = request.getHeader("Accept");
         String originalExtension = key.contains(".") ? key.substring(key.lastIndexOf(".") + 1)
                 .toLowerCase() : "jpg";
-        String format = (acceptHeader != null && acceptHeader.contains("image/webp")) ? "webp" : originalExtension;
+        //String acceptHeader = request.getHeader("Accept");
+        //String format = (acceptHeader != null && acceptHeader.contains("image/webp")) ? "webp" : originalExtension;
+        // sejda doesnt work mac silicon so skipping webp for now
+        String format = originalExtension;
 
         // 2. Build cache path inside RAMDISK: /Volumes/RAMDISK/image-cache/{bucket}/{key}_{res}.{format}
         Path cacheRoot = Paths.get("/Volumes/RAMDISK/image-cache");
@@ -45,6 +52,9 @@ public class ImageService {
         String baseName = key.replaceAll("\\.[^.]+$", ""); // strip extension if present
         String cacheFileName = baseName + "_" + res.getResolution() + "." + format;
         Path cachePath = bucketDir.resolve(cacheFileName);
+
+        // make sure parent dir exist
+        Files.createDirectories(cachePath.getParent());
 
         if (!Files.exists(cachePath)) {
             try (InputStream is = minIOService.getFile(bucket, key);
@@ -58,7 +68,15 @@ public class ImageService {
 
         String cachedImageUrl = "/cache/" + bucket + "/" + cacheFileName;
         HttpHeaders headers = new HttpHeaders();
-        headers.setLocation(URI.create(cachedImageUrl));
+        String encodedPath = UriUtils.encodePath(cachedImageUrl, StandardCharsets.UTF_8);
+        headers.setLocation(URI.create(encodedPath));
+        return new ResponseEntity<>(headers, HttpStatus.FOUND);
+    }
+
+    public ResponseEntity<Void> getOriginalImageURL(String bucket, String key, int expiry) throws Exception {
+        String signedUrl = minIOService.getSignedUrlForHostNginx(bucket, key, expiry);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setLocation(URI.create(signedUrl));
         return new ResponseEntity<>(headers, HttpStatus.FOUND);
     }
 }
