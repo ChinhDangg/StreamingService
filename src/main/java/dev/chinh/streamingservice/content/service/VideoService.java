@@ -16,13 +16,11 @@ public class VideoService {
 
     // diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://1048576`
 
-    public String getOriginalVideoUrl(String videoId) throws Exception {
-        String bucket = "testminio";
+    public String getOriginalVideoUrl(String bucket, String videoId) throws Exception {
         return minIOService.getSignedUrlForHostNginx(bucket, videoId, 300); // 5 minutes
     }
 
-    public String getPreviewVideoUrl(String videoId) throws Exception {
-        String bucket = "testminio";
+    public String getPreviewVideoUrl(String bucket, String videoId) throws Exception {
         // 1. Get a presigned URL with container Nginx so ffmpeg can access in container
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(bucket, videoId, 300);
         // 1-1. Use stored metadata (hardcode for now: 10m13s = 613s)
@@ -98,9 +96,7 @@ public class VideoService {
         return "/stream/" + videoId + "/preview/master.m3u8";
     }
 
-    public String getPartialVideoUrl(String videoId, Resolution res) throws Exception {
-        String bucket = "testminio";
-
+    public String getPartialVideoUrl(String bucket, String videoId, Resolution res) throws Exception {
         // 1. Get a presigned URL with container Nginx so ffmpeg can access in container
         // 2. Rewrite URL to go through Nginx proxy instead of direct MinIO
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(bucket, videoId, 300);
