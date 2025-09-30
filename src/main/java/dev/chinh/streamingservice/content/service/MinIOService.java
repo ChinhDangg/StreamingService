@@ -14,7 +14,7 @@ public class MinIOService {
 
     private final MinioClient minioClient;
 
-    public String getSignedUrl(String bucket, String object, int expirySeconds) throws Exception {
+    private String getSignedUrl(String bucket, String object, int expirySeconds) throws Exception {
         return minioClient.getPresignedObjectUrl(
                 GetPresignedObjectUrlArgs.builder()
                         .method(Method.GET)
@@ -25,12 +25,17 @@ public class MinIOService {
         );
     }
 
+    /**
+     * Get signed URL and replace the MinIO signed base URL with Nginx URL.
+    */
     public String getSignedUrlForHostNginx(String bucket, String object, int expirySeconds) throws Exception {
         String signedUrl = getSignedUrl(bucket, object, expirySeconds);
-        // Replace the MinIO base URL with your Nginx URL
         return signedUrl.replace("http://localhost:9000", "http://localhost/stream/minio");
     }
 
+    /**
+     * Get signed URL and replace the MinIO signed base URL with Nginx container URL.
+     */
     public String getSignedUrlForContainerNginx(String bucket, String object, int expirySeconds) throws Exception {
         String signedUrl = getSignedUrl(bucket, object, expirySeconds);
         return signedUrl.replace("http://localhost:9000", "http://nginx/stream/minio");
