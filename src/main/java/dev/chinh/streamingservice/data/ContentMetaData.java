@@ -10,21 +10,21 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDate;
 import java.util.Arrays;
 
-public class MediaMetaData {
+public class ContentMetaData {
 
+    // Search Fields
+    private String title;
+    private String[] tags;
+    private String[] characters;
+    private String[] universes;
+    private String[] authors;
+
+    // Classification (will also be stored in search for fast information display)
     private String id;
     private String bucket;
     private String parentPath;
     private String key;             // if key exist then is an individual content, otherwise use parentPath for grouping
     private String thumbnail;
-    private String title;
-    private int total;
-
-    // Classification
-    private String[] tags;
-    private String[] characters;
-    private String[] universes;
-    private String[] authors;
 
     // Technical
     private Resolution resolution;
@@ -34,7 +34,7 @@ public class MediaMetaData {
     private LocalDate uploadDate;
     private String absoluteFilePath;
 
-    // Grouping
+    // Grouping (optional so maybe another table)
     private String groupTitle;      // e.g.: the walking dead
     private int groupId;
     private int groupOrder;         // 1 (season 1)
