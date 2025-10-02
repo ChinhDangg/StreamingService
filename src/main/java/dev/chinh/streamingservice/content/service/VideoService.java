@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.content.service;
 
+import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.Resolution;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -7,6 +8,7 @@ import org.springframework.stereotype.Service;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -14,7 +16,20 @@ public class VideoService {
 
     private final MinIOService minIOService;
 
+    // for mac
     // diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://1048576`
+
+    // for window
+    // # Remove old if exists
+    // imdisk -D -m R: 2>$null
+
+    // # Create 1 GB RAM disk at R:
+    // imdisk -a -s 1G -m R:
+
+    // # Format it (quick NTFS)
+    // Start-Process cmd "/c format R: /FS:NTFS /Q /Y" -Verb RunAs -Wait
+
+    private final String RAMDISK = "Volumes/RAMDISK/";
 
     public String getOriginalVideoUrl(String bucket, String videoId) throws Exception {
         return minIOService.getSignedUrlForHostNginx(bucket, videoId, 300); // 5 minutes
@@ -24,27 +39,29 @@ public class VideoService {
         // 1. Get a presigned URL with container Nginx so ffmpeg can access in container
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(bucket, videoId, 300);
         // 1-1. Use stored metadata (hardcode for now: 10m13s = 613s)
-        double duration = 613.0;
+        double duration = 657.0;
         System.out.println("Using stored duration: " + duration + " seconds");
 
         // 2. Calculate preview plan
         int segments = 20; // coverage (how many checkpoints across the video).
         double previewLength = duration * 0.10; // 10% of video (total runtime of the final preview)
-        double clipLength = previewLength / segments; // evenly distributed
+        double clipLength = previewLength / segments; // evenly distributedx
         double interval = duration / segments;        // spacing between starts
 
         List<String> partFiles = new ArrayList<>();
 
-        String hostDir = "/Volumes/RAMDISK/" + videoId + "/preview";   // host path
+        String hostDir = videoId + "/preview";   // host path
         String containerDir = "/chunks/" + videoId + "/preview";       // container path
 
         // Ensure directory exists on host
-        File dir = new File(hostDir);
-        if (!dir.exists()) {
-            if (!dir.mkdirs()) {
-                throw new IOException("Failed to create directory: " + hostDir);
-            }
-        }
+//        File dir = new File(hostDir);
+//        if (!dir.exists()) {
+//            if (!dir.mkdirs()) {
+//                throw new IOException("Failed to create directory: " + hostDir);
+//            }
+//        }
+        if (!OSUtil.createTempDir(hostDir))
+            throw new IOException("Failed to create temporary directory: " + hostDir);
 
         // 3. Extract subclips (ffmpeg writes inside containerDir)
         for (int i = 0; i < segments; i++) {
@@ -63,12 +80,18 @@ public class VideoService {
         }
 
         // 4. Write concat_list.txt on host
-        File concatList = new File(hostDir + "/concat_list.txt");
-        try (PrintWriter pw = new PrintWriter(concatList)) {
-            for (String part : partFiles) {
-                pw.println("file '" + part + "'");
-            }
-        }
+//        File concatList = new File(hostDir + "/concat_list.txt");
+//        try (PrintWriter pw = new PrintWriter(concatList)) {
+//            for (String part : partFiles) {
+//                pw.println("file '" + part + "'");
+//            }
+//        }
+        List<String> fileListText = partFiles.stream()
+                .map(s -> "file '" + s + "'")
+                .toList();
+        if (!OSUtil.createTempTextFile(hostDir + "/concat_list.txt", fileListText))
+            throw new IOException("Failed to create temporary file: " + hostDir + "/concat_list.txt");
+
 
         // 5. Concat inside container (reads concat_list.txt via mounted RAMDISK)
         String previewFile = containerDir + "/preview.mp4";
@@ -102,7 +125,7 @@ public class VideoService {
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(bucket, videoId, 300);
 
         // 3. Host vs container paths
-        String hostDir = "/Volumes/RAMDISK/" + videoId + "/partial";  // host path
+        String hostDir = RAMDISK + videoId + "/partial";  // host path
         String containerDir = "/chunks/" + videoId + "/partial";      // container path
         String outPath = containerDir + "/master.m3u8";
 
@@ -159,12 +182,12 @@ public class VideoService {
 
     private void runAndLog(String[] cmd) throws Exception {
         Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                System.out.println("[ffmpeg] " + line);
-            }
-        }
+//        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+//            String line;
+//            while ((line = br.readLine()) != null) {
+//                System.out.println("[ffmpeg] " + line);
+//            }
+//        }
         int exit = process.waitFor();
         System.out.println("ffmpeg exited with code " + exit);
         if (exit != 0) {
