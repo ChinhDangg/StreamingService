@@ -1,0 +1,72 @@
+services:
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web console
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: admin123
+    volumes:
+      - ./minio-data:/data
+    command: server /data --console-address ":9001"
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - minio
+      - ffmpeg
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /Volumes/RAMDISK:/chunks   # 👈 mount host RAM disk into container
+
+  ffmpeg:
+    image: linuxserver/ffmpeg:latest
+    container_name: ffmpeg
+    depends_on:
+      - minio
+    entrypoint: [ "/bin/sh", "-c" ]   # replace ffmpeg with a shell
+    command: [ "tail -f /dev/null" ]  # keep alive
+    volumes:
+      - /Volumes/RAMDISK:/chunks      # 👈 mount same RAM disk
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.17.10
+    container_name: logstash
+    volumes:
+      - ./pipeline:/usr/share/logstash/pipeline   # mount config files
+      - ./drivers:/usr/share/logstash/drivers     # mount JDBC driver
+    environment:
+      - LS_JAVA_OPTS=-Xms512m -Xmx512m
+    depends_on:
+      - opensearch
+      - postgres
+
+  opensearch:
+    image: opensearchproject/opensearch:2.15.0
+    container_name: opensearch
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+
+  postgres:
+    image: postgres:18
+    container_name: postgres
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: media_db
+    ports:
+      - "5432:5432"

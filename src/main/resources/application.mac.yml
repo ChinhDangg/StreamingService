@@ -1,0 +1,8 @@
+spring:
+  docker:
+    compose:
+      enabled: true
+      file:
+        - compose.mac.yaml
+      profiles:
+        active: mac

@@ -1,0 +1,8 @@
+spring:
+  docker:
+    compose:
+      enabled: true
+      file:
+        - compose.yaml
+      profiles:
+        active: window
