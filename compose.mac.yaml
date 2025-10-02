@@ -34,39 +34,39 @@ services:
     volumes:
       - /Volumes/RAMDISK:/chunks      # 👈 mount same RAM disk
 
-  logstash:
-    image: docker.elastic.co/logstash/logstash:8.17.10
-    container_name: logstash
-    volumes:
-      - ./pipeline:/usr/share/logstash/pipeline   # mount config files
-      - ./drivers:/usr/share/logstash/drivers     # mount JDBC driver
-    environment:
-      - LS_JAVA_OPTS=-Xms512m -Xmx512m
-    depends_on:
-      - opensearch
-      - postgres
-
-  opensearch:
-    image: opensearchproject/opensearch:2.15.0
-    container_name: opensearch
-    environment:
-      - discovery.type=single-node
-      - bootstrap.memory_lock=true
-      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    ports:
-      - "9200:9200"
-      - "9600:9600"
-
-  postgres:
-    image: postgres:18
-    container_name: postgres
-    environment:
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: secret
-      POSTGRES_DB: media_db
-    ports:
-      - "5432:5432"
+#  logstash:
+#    image: docker.elastic.co/logstash/logstash:8.17.10
+#    container_name: logstash
+#    volumes:
+#      - ./pipeline:/usr/share/logstash/pipeline   # mount config files
+#      - ./drivers:/usr/share/logstash/drivers     # mount JDBC driver
+#    environment:
+#      - LS_JAVA_OPTS=-Xms512m -Xmx512m
+#    depends_on:
+#      - opensearch
+#      - postgres
+#
+#  opensearch:
+#    image: opensearchproject/opensearch:2.15.0
+#    container_name: opensearch
+#    environment:
+#      - discovery.type=single-node
+#      - bootstrap.memory_lock=true
+#      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+#    ulimits:
+#      memlock:
+#        soft: -1
+#        hard: -1
+#    ports:
+#      - "9200:9200"
+#      - "9600:9600"
+#
+#  postgres:
+#    image: postgres:18
+#    container_name: postgres
+#    environment:
+#      POSTGRES_USER: myuser
+#      POSTGRES_PASSWORD: secret
+#      POSTGRES_DB: media_db
+#    ports:
+#      - "5432:5432"

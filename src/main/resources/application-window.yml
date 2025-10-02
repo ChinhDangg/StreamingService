@@ -3,6 +3,4 @@ spring:
     compose:
       enabled: true
       file:
-        - compose.mac.yaml
-      profiles:
-        active: mac
+        - compose.window.yaml
