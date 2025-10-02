@@ -1,6 +1,6 @@
 spring:
   docker:
     compose:
-      enabled: true
+      enabled: false
       file:
         - compose.mac.yaml

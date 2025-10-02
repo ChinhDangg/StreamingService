@@ -39,7 +39,7 @@ public class OSUtil {
     private static final String BASE_DIR = "/chunks";
     private static final String CONTAINER = "nginx";
 
-    private static final String MAC_RAMDISK = "Volumes/RAMDISK/";
+    private static final String MAC_RAMDISK = "/Volumes/RAMDISK/";
 
     public static boolean createTempDir(String dir) throws IOException, InterruptedException {
         if (currentOS == OS.WINDOWS) {
