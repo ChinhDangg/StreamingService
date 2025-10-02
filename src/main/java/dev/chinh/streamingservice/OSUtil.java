@@ -42,12 +42,18 @@ public class OSUtil {
     private static final String MAC_RAMDISK = "/Volumes/RAMDISK/";
 
     public static boolean createTempDir(String dir) throws IOException, InterruptedException {
-        if (currentOS == OS.WINDOWS) {
-            return createDirectoryInContainer(dir);
-        } else if (currentOS == OS.MAC) {
+        if (currentOS == OS.MAC) {
             return createPathInRAMDisk(dir);
         }
-        return false;
+        return createDirectoryInContainer(dir);
+    }
+
+    public static boolean checkTempFileExists(String fileName) throws IOException, InterruptedException {
+        if (currentOS == OS.MAC) {
+            File playlist = new File(fileName);
+            return playlist.exists();
+        }
+        return containerFileExists(fileName);
     }
 
     public static boolean createTempTextFile(String relativePath, List<String> lines) throws IOException, InterruptedException {
@@ -87,6 +93,24 @@ public class OSUtil {
             }
         }
         return true;
+    }
+
+    public static void main(String[] args) throws IOException, InterruptedException {
+        System.out.println(containerFileExists("2b.mp4/preview/master.m3u8"));
+    }
+
+    private static boolean containerFileExists(String relativePath) throws IOException, InterruptedException {
+        String targetPath = normalizePath(relativePath);
+
+        ProcessBuilder pb = new ProcessBuilder(
+                "docker", "exec", CONTAINER,
+                "test", "-f", targetPath
+        );
+
+        Process process = pb.start();
+        int exitCode = process.waitFor();
+
+        return exitCode == 0; // 0 = exists, else doesn't
     }
 
     /**
