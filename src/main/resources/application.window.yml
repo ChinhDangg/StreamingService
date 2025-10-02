@@ -3,6 +3,6 @@ spring:
     compose:
       enabled: true
       file:
-        - compose.yaml
+        - compose.window.yaml
       profiles:
         active: window
