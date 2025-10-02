@@ -36,86 +36,66 @@ public class VideoService {
     }
 
     public String getPreviewVideoUrl(String bucket, String videoId) throws Exception {
-        // 1. Get a presigned URL with container Nginx so ffmpeg can access in container
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(bucket, videoId, 300);
-        // 1-1. Use stored metadata (hardcode for now: 10m13s = 613s)
-        double duration = 657.0;
-        System.out.println("Using stored duration: " + duration + " seconds");
 
-        // 2. Calculate preview plan
-        int segments = 20; // coverage (how many checkpoints across the video).
-        double previewLength = duration * 0.10; // 10% of video (total runtime of the final preview)
-        double clipLength = previewLength / segments; // evenly distributedx
-        double interval = duration / segments;        // spacing between starts
+        double duration = 613.0; // TODO: probe real duration
+        int segments = 20;
+        double previewLength = duration * 0.10;
+        double clipLength = previewLength / segments;
+        double interval = duration / segments;
 
-        List<String> partFiles = new ArrayList<>();
+        // === resolution control ===
+        int targetHeight = 360; // change to 720, 1080, etc.
+        // ==========================
 
-        String hostDir = videoId + "/preview";   // host path
-        String containerDir = "/chunks/" + videoId + "/preview";       // container path
-
-        // Ensure directory exists on host
-//        File dir = new File(hostDir);
-//        if (!dir.exists()) {
-//            if (!dir.mkdirs()) {
-//                throw new IOException("Failed to create directory: " + hostDir);
-//            }
-//        }
-        if (!OSUtil.createTempDir(hostDir))
-            throw new IOException("Failed to create temporary directory: " + hostDir);
-
-        // 3. Extract subclips (ffmpeg writes inside containerDir)
+        // Build trim chains
+        StringBuilder fc = new StringBuilder();
+        StringBuilder concatInputs = new StringBuilder();
         for (int i = 0; i < segments; i++) {
             double start = i * interval;
-            String partFile = containerDir + "/part" + i + ".mp4";  // container path
-            partFiles.add(partFile);
+            double end   = start + clipLength;
 
-            String[] cutCmd = {
-                    "docker", "exec", "ffmpeg",
-                    "ffmpeg", "-ss", String.valueOf(start),
-                    "-t", String.valueOf(clipLength),
-                    "-i", nginxUrl,
-                    "-c", "copy", partFile
-            };
-            runAndLog(cutCmd);
+            fc.append(String.format(
+                    "[0:v]trim=start=%.3f:end=%.3f,setpts=PTS-STARTPTS[v%d];" +
+                            "[0:a]atrim=start=%.3f:end=%.3f,asetpts=PTS-STARTPTS[a%d];",
+                    start, end, i, start, end, i
+            ));
+            concatInputs.append(String.format("[v%d][a%d]", i, i));
         }
 
-        // 4. Write concat_list.txt on host
-//        File concatList = new File(hostDir + "/concat_list.txt");
-//        try (PrintWriter pw = new PrintWriter(concatList)) {
-//            for (String part : partFiles) {
-//                pw.println("file '" + part + "'");
-//            }
-//        }
-        List<String> fileListText = partFiles.stream()
-                .map(s -> "file '" + s + "'")
-                .toList();
-        if (!OSUtil.createTempTextFile(hostDir + "/concat_list.txt", fileListText))
-            throw new IOException("Failed to create temporary file: " + hostDir + "/concat_list.txt");
+        // concat -> scale
+        fc.append(String.format(
+                "%sconcat=n=%d:v=1:a=1[vcat][acat];" +      // stitch video+audio
+                        "[vcat]scale=-2:%d[v]",                     // scale once after concat
+                concatInputs, segments, targetHeight
+        ));
 
+        String filterComplex = fc.toString();
 
-        // 5. Concat inside container (reads concat_list.txt via mounted RAMDISK)
-        String previewFile = containerDir + "/preview.mp4";
-        String[] concatCmd = {
-                "docker", "exec", "ffmpeg",
-                "ffmpeg", "-f", "concat", "-safe", "0",
-                "-i", containerDir + "/concat_list.txt",
-                "-c", "copy", previewFile
-        };
-        runAndLog(concatCmd);
-
-        // 6. Encode to HLS (scaled to 360p)
+        String containerDir = "/chunks/" + videoId + "/preview";
         String outPath = containerDir + "/master.m3u8";
+        String hostDir = videoId + "/preview";
+        if (!OSUtil.createTempDir(hostDir)) {
+            throw new IOException("Failed to create temporary directory: " + hostDir);
+        }
+
         String[] hlsCmd = {
                 "docker", "exec", "ffmpeg",
-                "ffmpeg", "-i", previewFile,
-                "-vf", "scale=-2:360",
+                "ffmpeg", "-hide_banner",
+                "-i", nginxUrl,
+                "-filter_complex", filterComplex,
+                "-map", "[v]", "-map", "[acat]",
                 "-c:v", "h264", "-preset", "veryfast",
-                "-c:a", "aac", "-f", "hls",
-                "-hls_time", "4", "-hls_list_size", "0", outPath
+                "-c:a", "aac",
+                // Optional: improve HLS segmenting/keyframes consistency
+                "-g", "48", "-keyint_min", "48", "-sc_threshold", "0",
+                "-f", "hls",
+                "-hls_time", "4",
+                "-hls_list_size", "0",
+                outPath
         };
-        runAndLogAsync(hlsCmd);
 
-        // 7. Return URL for frontend
+        runAndLogAsync(hlsCmd);
         return "/stream/" + videoId + "/preview/master.m3u8";
     }
 
@@ -182,12 +162,12 @@ public class VideoService {
 
     private void runAndLog(String[] cmd) throws Exception {
         Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
-//        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-//            String line;
-//            while ((line = br.readLine()) != null) {
-//                System.out.println("[ffmpeg] " + line);
-//            }
-//        }
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                //System.out.println("[ffmpeg] " + line);
+            }
+        }
         int exit = process.waitFor();
         System.out.println("ffmpeg exited with code " + exit);
         if (exit != 0) {
