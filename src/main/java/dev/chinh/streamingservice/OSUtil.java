@@ -18,6 +18,7 @@ public class OSUtil {
 
     public OSUtil() {
         currentOS = detectOS();
+        RAMDISK = getRAMDISKName();
     }
 
     public static OS detectOS() {
@@ -36,7 +37,18 @@ public class OSUtil {
     private static final String BASE_DIR = "/chunks";
     private static final String CONTAINER = "nginx";
 
-    private static String RAMDISK = "/Volumes/RAMDISK";
+    private static String RAMDISK = "t";
+
+    private String getRAMDISKName() {
+        if (currentOS == OS.WINDOWS) {
+            return "R:/";
+        } else if (currentOS == OS.MAC) {
+            return "/Volumes/RAMDISK";
+        } else if (currentOS == OS.LINUX) {
+            return "/mnt/ramdisk";
+        }
+        throw new RuntimeException("Unsupported OS: " + currentOS);
+    }
 
     public static boolean createRamDisk() throws Exception {
         if (Files.exists(Paths.get(RAMDISK))) {
@@ -44,24 +56,21 @@ public class OSUtil {
             return true;
         }
 
-        String[] command;
-        switch (currentOS) {
-            case OS.MAC:
-                command = new String[]{"/bin/bash", "-c",
-                        "diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://1048576`"};
-                RAMDISK = "/Volumes/RAMDISK/";
-                break;
-            case OS.LINUX:
-                command = new String[]{"/bin/bash", "-c",
+        String[] command = switch (currentOS) {
+            case OS.MAC -> new String[]{"/bin/bash", "-c",
+                    "diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://1048576`"};
+            case OS.LINUX -> new String[]{"/bin/bash", "-c",
                     "mkdir -p /mnt/ramdisk && mount -t tmpfs -o size=512m tmpfs /mnt/ramdisk"};
-                RAMDISK = "/mnt/ramdisk";
-                break;
-            case OS.WINDOWS:
-                command = new String[]{
-                        "OSFMount.com", "-a", "-t", "vm", "-s", "512M", "-m", "R:"};
-                break;
-            default: throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
-        }
+            case OS.WINDOWS -> new String[]{
+                    "OSFMount.com",
+                    "-a",          // add new disk
+                    "-t", "vm",    // type: virtual memory (RAM)
+                    "-s", "512M",  // size
+                    "-m", "R:",    // mount point
+                    "-o", "format:ntfs" // auto-format NTFS
+            }; // to remove: OSFMount.com -d -m R:
+            default -> throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+        };
 
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.redirectErrorStream(true);
