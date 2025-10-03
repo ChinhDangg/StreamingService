@@ -1,0 +1,16 @@
+{
+  "properties": {
+    "title":       { "type": "text" },
+    "tags":        { "type": "keyword" },
+    "characters":  { "type": "keyword" },
+    "universes":   { "type": "keyword"},
+    "authors":     { "type": "keyword" },
+    "uploadDate":  { "type": "date" },
+
+    "id":         { "type": "long" },
+    "bucket":     { "type": "text" },
+    "parentPath": { "type": "text" },
+    "key":        { "type": "text" },
+    "thumbnail":  { "type": "text" }
+  }
+}

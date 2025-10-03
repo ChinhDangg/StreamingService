@@ -34,6 +34,23 @@ services:
     volumes:
       - /Volumes/RAMDISK:/chunks      # 👈 mount same RAM disk
 
+  opensearch:
+    image: opensearchproject/opensearch:2.15.0
+    container_name: opensearch
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+      - plugins.security.disabled=true
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=MyStrongPassword123!
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+
 #  logstash:
 #    image: docker.elastic.co/logstash/logstash:8.17.10
 #    container_name: logstash

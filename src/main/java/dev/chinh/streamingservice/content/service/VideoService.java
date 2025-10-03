@@ -6,9 +6,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -72,11 +69,12 @@ public class VideoService {
 
         String filterComplex = fc.toString();
 
-        String containerDir = "/chunks/" + videoId + "/preview";
-        String outPath = containerDir + "/master.m3u8";
-        String hostDir = videoId + "/preview";
-        if (!OSUtil.createTempDir(hostDir)) {
-            throw new IOException("Failed to create temporary directory: " + hostDir);
+        String masterFileName = "/master.m3u8";
+        String videoDir = videoId + "/preview";
+        String containerDir = "/chunks/" + videoDir;
+        String outPath = containerDir + masterFileName;
+        if (!OSUtil.createTempDir(videoDir)) {
+            throw new IOException("Failed to create temporary directory: " + videoDir);
         }
 
         String[] hlsCmd = {
@@ -94,9 +92,11 @@ public class VideoService {
                 "-hls_list_size", "0",
                 outPath
         };
-
         runAndLogAsync(hlsCmd);
-        return "/stream/" + videoId + "/preview/master.m3u8";
+
+        checkPlaylistCreated(videoDir + masterFileName);
+
+        return "/stream/" + videoId + "/preview" + masterFileName;
     }
 
     public String getPartialVideoUrl(String bucket, String videoId, Resolution res) throws Exception {
@@ -105,16 +105,12 @@ public class VideoService {
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(bucket, videoId, 300);
 
         // 3. Host vs container paths
-        String hostDir = RAMDISK + videoId + "/partial";  // host path
-        String containerDir = "/chunks/" + videoId + "/partial";      // container path
-        String outPath = containerDir + "/master.m3u8";
-
-        // Ensure directory exists on host
-        File dir = new File(hostDir);
-        if (!dir.exists()) {
-            if (!dir.mkdirs()) {
-                throw new IOException("Failed to create directory: " + hostDir);
-            }
+        String masterFileName = "/master.m3u8";
+        String videoDir = videoId + "/preview";
+        String containerDir = "/chunks/" + videoDir;
+        String outPath = containerDir + masterFileName;
+        if (!OSUtil.createTempDir(videoDir)) {
+            throw new IOException("Failed to create temporary directory: " + videoDir);
         }
 
         int width = 1920;
@@ -147,17 +143,21 @@ public class VideoService {
 
         runAndLogAsync(command);
 
-        File playlist = new File(hostDir + "/master.m3u8");
-        int retries = 10;
-        while (!playlist.exists() && retries-- > 0) {
-            Thread.sleep(500); // wait 0.5s
-        }
-        if (!playlist.exists()) {
-            throw new RuntimeException("ffmpeg did not create playlist in time: " + playlist.getAbsolutePath());
-        }
+        // check the master file has been created. maybe check first chunks being created for smoother experience
+        checkPlaylistCreated(videoDir + masterFileName);
 
         // 5. Return playlist URL for browser
-        return "/stream/" + videoId + "/partial/master.m3u8";
+        return "/stream/" + videoId + "/partial" + masterFileName;
+    }
+
+    private void checkPlaylistCreated(String playlist) throws IOException, InterruptedException {
+        int retries = 10;
+        while (!OSUtil.checkTempFileExists(playlist) && retries-- > 0) {
+            Thread.sleep(500); // wait 0.5s
+        }
+        if (!OSUtil.checkTempFileExists(playlist)) {
+            throw new RuntimeException("ffmpeg did not create playlist in time: " + playlist);
+        }
     }
 
     private void runAndLog(String[] cmd) throws Exception {
