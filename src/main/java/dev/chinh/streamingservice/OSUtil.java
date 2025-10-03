@@ -1,12 +1,10 @@
 package dev.chinh.streamingservice;
 
-import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Component;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 
 @Component
@@ -18,12 +16,11 @@ public class OSUtil {
 
     private static OS currentOS;
 
-    @PostConstruct
-    public void init() {
-        currentOS = getOS();
+    public OSUtil() {
+        currentOS = detectOS();
     }
 
-    public static OS getOS() {
+    public static OS detectOS() {
         String osName = System.getProperty("os.name").toLowerCase();
         if (osName.contains("win")) {
             return OS.WINDOWS;
@@ -39,7 +36,68 @@ public class OSUtil {
     private static final String BASE_DIR = "/chunks";
     private static final String CONTAINER = "nginx";
 
-    private static final String MAC_RAMDISK = "/Volumes/RAMDISK/";
+    private static String RAMDISK = "/Volumes/RAMDISK";
+
+    public static boolean createRamDisk() throws Exception {
+        if (Files.exists(Paths.get(RAMDISK))) {
+            System.out.println("Ramdisk already exists");
+            return true;
+        }
+
+        String[] command;
+        switch (currentOS) {
+            case OS.MAC:
+                command = new String[]{"/bin/bash", "-c",
+                        "diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://1048576`"};
+                RAMDISK = "/Volumes/RAMDISK/";
+                break;
+            case OS.LINUX:
+                command = new String[]{"/bin/bash", "-c",
+                    "mkdir -p /mnt/ramdisk && mount -t tmpfs -o size=512m tmpfs /mnt/ramdisk"};
+                RAMDISK = "/mnt/ramdisk";
+                break;
+            case OS.WINDOWS:
+                command = new String[]{
+                        "OSFMount.com", "-a", "-t", "vm", "-s", "512M", "-m", "R:"};
+                break;
+            default: throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+        }
+
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println("[ramdisk] " + line);
+            }
+        }
+
+        int exitCode = process.waitFor();
+        System.out.println("RAMDisk creation finished with exit code: " + exitCode);
+        return exitCode == 0;
+    }
+
+    public static void startDockerCompose() throws IOException, InterruptedException {
+        String composeFile = switch (currentOS) {
+            case OS.MAC -> "compose.mac.yaml";
+            case OS.LINUX -> "compose.linux.yaml";
+            case OS.WINDOWS -> "compose.windows.yaml";
+            default -> "compose.yaml";
+        };
+        ProcessBuilder pb = new ProcessBuilder(
+                "docker", "compose", "-f", composeFile, "up", "-d"
+        );
+        pb.inheritIO();
+        Process process = pb.start();
+        int exit = process.waitFor();
+
+        if (exit != 0) {
+            throw new RuntimeException("docker compose failed with code " + exit);
+        }
+        System.out.println("docker compose finished with exit code: " + exit);
+    }
 
     public static boolean createTempDir(String dir) throws IOException, InterruptedException {
         if (currentOS == OS.WINDOWS) {
@@ -58,8 +116,8 @@ public class OSUtil {
             return writeTextToContainer(relativePath, lines);
         } else if (currentOS == OS.MAC) {
             String targetPath = relativePath.startsWith("/")
-                    ? MAC_RAMDISK + relativePath
-                    : MAC_RAMDISK + "/" + relativePath;
+                    ? RAMDISK + relativePath
+                    : RAMDISK + "/" + relativePath;
             File concatList = new File(targetPath);
             try (PrintWriter pw = new PrintWriter(concatList)) {
                 for (String part : lines) {
@@ -80,7 +138,7 @@ public class OSUtil {
      * @return true, if the path is written, otherwise throw IOException
      */
     private static boolean createPathInRAMDisk(String path) throws IOException {
-        File dir = new File(MAC_RAMDISK + path);
+        File dir = new File(RAMDISK + path);
         if (!dir.exists()) {
             if (!dir.mkdirs()) {
                 throw new IOException("Failed to create path: " + path);

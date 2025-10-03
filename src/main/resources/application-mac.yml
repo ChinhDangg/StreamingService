@@ -1,6 +1,0 @@
-spring:
-  docker:
-    compose:
-      enabled: false
-      file:
-        - compose.mac.yaml
