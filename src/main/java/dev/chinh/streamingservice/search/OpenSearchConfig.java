@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets;
 @Configuration
 public class OpenSearchConfig {
 
-    @Bean
+    @Bean(destroyMethod = "close")
     public static RestHighLevelClient openSearchClient() throws URISyntaxException {
         return new RestHighLevelClient(
                 RestClient.builder(HttpHost.create("http://localhost:9200"))
