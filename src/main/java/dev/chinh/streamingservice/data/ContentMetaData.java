@@ -25,12 +25,12 @@ public class ContentMetaData {
     private String parentPath;
     private String key;             // if key exist then is an individual content, otherwise use parentPath for grouping
     private String thumbnail;
+    private int length;
 
     // Technical
     private Resolution resolution;
     private short frameRate;
     private String format;
-    private int length;
     private LocalDate uploadDate;
     private String absoluteFilePath;
 

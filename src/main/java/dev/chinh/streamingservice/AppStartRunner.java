@@ -9,7 +9,6 @@ public class AppStartRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
-        System.out.println("SOmeting");
         boolean ramCreated = OSUtil.createRamDisk();
 
         if (!ramCreated) {

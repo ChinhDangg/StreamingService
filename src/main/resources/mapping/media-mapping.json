@@ -11,6 +11,7 @@
     "bucket":     { "type": "text" },
     "parentPath": { "type": "text" },
     "key":        { "type": "text" },
-    "thumbnail":  { "type": "text" }
+    "thumbnail":  { "type": "text" },
+    "length":     { "type": "integer"}
   }
 }
