@@ -1,5 +1,7 @@
 package dev.chinh.streamingservice.search;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.action.DocWriteRequest;
 import org.opensearch.action.delete.DeleteRequest;
@@ -26,6 +28,7 @@ import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.script.Script;
 import org.opensearch.script.ScriptType;
+import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.FieldSortBuilder;
 import org.opensearch.search.sort.SortBuilders;
@@ -34,10 +37,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static dev.chinh.streamingservice.search.OpenSearchConfig.loadMapping;
 import static dev.chinh.streamingservice.search.OpenSearchConfig.openSearchClient;
@@ -68,7 +68,7 @@ public class OpenSearchService {
 //        doc.put("length", 2400);
 //        indexDocument(3L, doc);
 
-        //search("Matrix", 0, 10, true, SortOrder.DESC);
+        //System.out.println(search("Matrix", 0, 10, true, SortOrder.DESC));
         //searchMatchByOneField("1999-03-31", "uploadDate", 0, 10, true, SortOrder.DESC);
         //searchTermByOneField(List.of("1999"), "year", 0, 10, true, SortOrder.DESC);
 
@@ -221,7 +221,7 @@ public class OpenSearchService {
         searchWithQueryBuilder(boolQuery, page, size, sortByYear, sortOrder);
     }
 
-    public static void search(String searchString, int page, int size, boolean sortByYear, SortOrder sortOrder) throws IOException, URISyntaxException {
+    public static MediaSearchResult search(String searchString, int page, int size, boolean sortByYear, SortOrder sortOrder) throws IOException, URISyntaxException {
         QueryBuilder q = QueryBuilders
                 .multiMatchQuery(searchString)
                 .field("title", 3.0f)
@@ -233,26 +233,26 @@ public class OpenSearchService {
                 .fuzziness(Fuzziness.AUTO)
                 .type(MultiMatchQueryBuilder.Type.BEST_FIELDS);
 
-        searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
+        return searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
     }
 
-    public static void searchMatchByOneField(String searchString, String field, int page, int size, boolean sortByYear,
+    public static MediaSearchResult searchMatchByOneField(String searchString, String field, int page, int size, boolean sortByYear,
                                              SortOrder sortOrder) throws IOException, URISyntaxException {
         QueryBuilder q = QueryBuilders.matchQuery(field, searchString);
-        searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
+        return searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
     }
 
     /**
      * Search exactly with given search strings by field.
      * Does not work with fields that have text type. Use search match for that.
      */
-    public static void searchTermByOneField(Collection<String> searchStrings, String field, int page, int size,
+    public static MediaSearchResult searchTermByOneField(Collection<String> searchStrings, String field, int page, int size,
                                             boolean sortByYear, SortOrder sortOrder) throws IOException, URISyntaxException {
         QueryBuilder q = QueryBuilders.termsQuery(field, searchStrings);
-        searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
+        return searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
     }
 
-    private static void searchWithQueryBuilder(QueryBuilder queryBuilder, int page, int size, boolean sortByYear,
+    private static MediaSearchResult searchWithQueryBuilder(QueryBuilder queryBuilder, int page, int size, boolean sortByYear,
                                                SortOrder sortOrder) throws IOException, URISyntaxException {
         RestHighLevelClient client = openSearchClient();
 
@@ -275,8 +275,28 @@ public class OpenSearchService {
         }
 
         searchRequest.source(sourceBuilder);
-
         SearchResponse response = client.search(searchRequest, RequestOptions.DEFAULT);
         response.getHits().forEach(hit -> System.out.println(hit.getSourceAsString()));
+
+        return mapResponseToMediaSearchResult(response, page, size);
+    }
+
+    private static MediaSearchResult mapResponseToMediaSearchResult(SearchResponse response, int page, int size) {
+        ObjectMapper mapper = OpenSearchConfig.objectMapper();
+
+        List<MediaSearchItem> items = new ArrayList<>();
+
+        for (SearchHit hit : response.getHits()) {
+            MediaSearchItem searchItem = mapper.convertValue(hit.getSourceAsMap(), MediaSearchItem.class);
+            items.add(searchItem);
+        }
+
+        MediaSearchResult result = new MediaSearchResult(items);
+        result.setPage(page);
+        result.setPageSize(size);
+        result.setTotal(Objects.requireNonNull(response.getHits().getTotalHits()).value());
+        result.setTotalPages((result.getTotal() + size -1) / size);
+
+        return result;
     }
 }
