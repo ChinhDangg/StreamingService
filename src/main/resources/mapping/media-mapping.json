@@ -6,6 +6,7 @@
     "universes":   { "type": "keyword"},
     "authors":     { "type": "keyword" },
     "uploadDate":  { "type": "date" },
+    "year":        { "type": "integer" },
 
     "id":         { "type": "long" },
     "bucket":     { "type": "text" },
