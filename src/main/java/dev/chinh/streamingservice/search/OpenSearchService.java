@@ -20,6 +20,7 @@ import org.opensearch.common.unit.Fuzziness;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.MultiMatchQueryBuilder;
 import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
@@ -51,25 +52,30 @@ public class OpenSearchService {
         //createIndexWithMapping();
 
 //        Map<String, Object> doc = new HashMap<>();
-//        doc.put("title", "The Matrix 3");
+//        doc.put("title", "The Matrix 1");
 //        doc.put("tags", List.of("sci-fi", "action"));
 //        doc.put("characters", List.of("Neo", "Trinity"));
 //        doc.put("universes", List.of("The Matrix"));
 //        doc.put("authors", List.of("Wachowski Sisters"));
-//        doc.put("uploadDate", "1999-03-31");
-//
-//        doc.put("id", 1L);
+//        doc.put("uploadDate", "1997-03-31");
+//        doc.put("year", 1997)
+
+//        doc.put("id", 3L);
 //        doc.put("bucket", "3dvid");
 //        doc.put("parentPath", "");
 //        doc.put("key", "2b.mp4");
 //        doc.put("thumbnail", "");
 //        doc.put("length", 2400);
-//        indexDocument(1L, doc);
+//        indexDocument(3L, doc);
 
         //search("Matrix", 0, 10, true, SortOrder.DESC);
-        //searchMatchByOneField("The Matrix 3", "title", 0, 10, true, SortOrder.DESC);
-        //searchTermByOneField(List.of("The Matrix 3"), "title", 0, 10, true, SortOrder.DESC);
+        //searchMatchByOneField("1999-03-31", "uploadDate", 0, 10, true, SortOrder.DESC);
+        //searchTermByOneField(List.of("1999"), "year", 0, 10, true, SortOrder.DESC);
 
+//        Map<String, Collection<Object>> fieldValues = new HashMap<>();
+//        fieldValues.put("title", List.of("The Matrix"));
+//        fieldValues.put("characters", List.of("Neo"));
+//        advanceSearch(fieldValues, 0, 10, true, SortOrder.DESC);
 
 //        Map<String, Object> updateFields = new HashMap<>();
 //        updateFields.put("tags", List.of("tag1", "tag2"));
@@ -77,7 +83,7 @@ public class OpenSearchService {
 
         //addValueToFieldInDocument(1, "tags", "tag3");
 
-        //updateMapping("length", "integer");
+        //updateMapping("year", "integer");
         //deleteDocument(1);
     }
 
@@ -163,7 +169,7 @@ public class OpenSearchService {
      * Adding new values to one existing field for given document id.
      * @param id the id of the doc.
      */
-    public static void addValueToFieldInDocument(long id, String field, Object values) throws IOException, URISyntaxException {
+    public static void appendValueToFieldInDocument(long id, String field, Object values) throws IOException, URISyntaxException {
         RestHighLevelClient client = openSearchClient();
 
         Map<String, Object> params = new HashMap<>();
@@ -177,6 +183,42 @@ public class OpenSearchService {
 
         UpdateResponse response = client.update(request, RequestOptions.DEFAULT);
         System.out.println("Scripted update done, result: " + response.getResult());
+    }
+
+    public static void advanceSearch(Map<String, Collection<Object>> fieldValues, int page, int size, boolean sortByYear,
+                                     SortOrder sortOrder) throws IOException, URISyntaxException {
+        BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
+
+        for (Map.Entry<String, Collection<Object>> entry : fieldValues.entrySet()) {
+            String field = entry.getKey();
+            Collection<Object> values = entry.getValue();
+
+            if (values == null || values.isEmpty()) {
+                continue;
+            }
+
+            if (values.size() == 1) {
+                Object value = values.iterator().next();
+                if (value instanceof String) {
+                    // text type with keyword type can't use termQuery
+                    boolQuery.must(QueryBuilders.matchQuery(field, value));
+                } else {
+                    boolQuery.must(QueryBuilders.termQuery(field, value));
+                }
+            } else { // Group multiple values for the same field with OR
+                BoolQueryBuilder innerOr = QueryBuilders.boolQuery();
+                for (Object value : values) {
+                    if (value instanceof String) {
+                        innerOr.should(QueryBuilders.matchQuery(field, value));
+                    } else {
+                        innerOr.should(QueryBuilders.termQuery(field, value));
+                    }
+                }
+                boolQuery.must(innerOr); // must match one of the values for this field
+            }
+        }
+
+        searchWithQueryBuilder(boolQuery, page, size, sortByYear, sortOrder);
     }
 
     public static void search(String searchString, int page, int size, boolean sortByYear, SortOrder sortOrder) throws IOException, URISyntaxException {
