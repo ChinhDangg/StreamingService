@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.search;
+package dev.chinh.streamingservice.search.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -8,12 +8,8 @@ import org.opensearch.client.RestClient;
 import org.opensearch.client.RestHighLevelClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 
 @Configuration
 public class OpenSearchConfig {
@@ -25,15 +21,8 @@ public class OpenSearchConfig {
         );
     }
 
-    public static String loadMapping(String path) throws IOException {
-        ClassPathResource resource = new ClassPathResource(path);
-        try (InputStream is = resource.getInputStream()) {
-            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
-        }
-    }
-
     @Bean
-    public static ObjectMapper objectMapper() {
+    public ObjectMapper objectMapper() {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);

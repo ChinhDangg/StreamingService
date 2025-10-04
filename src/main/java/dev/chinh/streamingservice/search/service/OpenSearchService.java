@@ -1,7 +1,8 @@
-package dev.chinh.streamingservice.search;
+package dev.chinh.streamingservice.search.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.chinh.streamingservice.search.MediaSearchItem;
+import dev.chinh.streamingservice.search.MediaSearchResult;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.action.DocWriteRequest;
 import org.opensearch.action.delete.DeleteRequest;
@@ -33,20 +34,21 @@ import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.FieldSortBuilder;
 import org.opensearch.search.sort.SortBuilders;
 import org.opensearch.search.sort.SortOrder;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
-
-import static dev.chinh.streamingservice.search.OpenSearchConfig.loadMapping;
-import static dev.chinh.streamingservice.search.OpenSearchConfig.openSearchClient;
 
 @Service
 @RequiredArgsConstructor
 public class OpenSearchService {
 
-    //private final RestHighLevelClient client;
+    private final RestHighLevelClient client;
+    private final ObjectMapper mapper;
 
     public static void main(String[] args) throws IOException, URISyntaxException {
         //createIndexWithMapping();
@@ -88,9 +90,8 @@ public class OpenSearchService {
     }
 
     // http://localhost:9200/media
-    public static void createIndexWithMapping() throws IOException, URISyntaxException {
+    public void createIndexWithMapping() throws IOException {
         String mappingJson = loadMapping("mapping/media-mapping.json");
-        RestHighLevelClient client = openSearchClient();
 
         CreateIndexRequest request = new CreateIndexRequest("media");
         request.mapping(mappingJson, XContentType.JSON);
@@ -100,8 +101,14 @@ public class OpenSearchService {
         System.out.println("Index created: " + createIndexResponse.index());
     }
 
-    public static void updateMapping(String fieldName, String fieldType) throws IOException, URISyntaxException {
-        RestHighLevelClient client = openSearchClient();
+    private String loadMapping(String path) throws IOException {
+        ClassPathResource resource = new ClassPathResource(path);
+        try (InputStream is = resource.getInputStream()) {
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    public void updateMapping(String fieldName, String fieldType) throws IOException {
 
         // Build JSON mapping programmatically
         XContentBuilder builder = XContentFactory.jsonBuilder();
@@ -124,9 +131,7 @@ public class OpenSearchService {
         System.out.println("Mapping updated? " + response.isAcknowledged());
     }
 
-    public static void deleteDocument(long id) throws IOException, URISyntaxException {
-        RestHighLevelClient client = openSearchClient();
-
+    public void deleteDocument(long id) throws IOException {
         DeleteRequest request = new DeleteRequest("media", String.valueOf(id));
         DeleteResponse response = client.delete(request, RequestOptions.DEFAULT);
         System.out.println("Deleted doc id=" + id + " result=" + response.getResult());
@@ -138,9 +143,7 @@ public class OpenSearchService {
      * Add a new doc to the index with given id.
      * Will only pass if the id doesn't exist yet.
      */
-    public static void indexDocument(long id, Map<String, Object> doc) throws IOException, URISyntaxException {
-        RestHighLevelClient client = openSearchClient();
-
+    public void indexDocument(long id, Map<String, Object> doc) throws IOException {
         IndexRequest request = new IndexRequest("media")
                 .id(String.valueOf(id))
                 .source(doc)
@@ -155,9 +158,7 @@ public class OpenSearchService {
      * Will add new fields if doesn't exist previously.
      * @param updateFields String-name of the field; Object-values
      */
-    public static void partialUpdateDocument(Map<String, Object> updateFields) throws IOException, URISyntaxException {
-        RestHighLevelClient client = openSearchClient();
-
+    public void partialUpdateDocument(Map<String, Object> updateFields) throws IOException {
         UpdateRequest request = new UpdateRequest("media", "1")
                 .doc(updateFields);
 
@@ -169,9 +170,7 @@ public class OpenSearchService {
      * Adding new values to one existing field for given document id.
      * @param id the id of the doc.
      */
-    public static void appendValueToFieldInDocument(long id, String field, Object values) throws IOException, URISyntaxException {
-        RestHighLevelClient client = openSearchClient();
-
+    public void appendValueToFieldInDocument(long id, String field, Object values) throws IOException {
         Map<String, Object> params = new HashMap<>();
         params.put(field, values);
 
@@ -185,8 +184,8 @@ public class OpenSearchService {
         System.out.println("Scripted update done, result: " + response.getResult());
     }
 
-    public static void advanceSearch(Map<String, Collection<Object>> fieldValues, int page, int size, boolean sortByYear,
-                                     SortOrder sortOrder) throws IOException, URISyntaxException {
+    public MediaSearchResult advanceSearch(Map<String, Collection<Object>> fieldValues, int page, int size,
+                              boolean sortByYear, SortOrder sortOrder) throws IOException {
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
 
         for (Map.Entry<String, Collection<Object>> entry : fieldValues.entrySet()) {
@@ -218,12 +217,13 @@ public class OpenSearchService {
             }
         }
 
-        searchWithQueryBuilder(boolQuery, page, size, sortByYear, sortOrder);
+        return searchWithQueryBuilder(boolQuery, page, size, sortByYear, sortOrder);
     }
 
-    public static MediaSearchResult search(String searchString, int page, int size, boolean sortByYear, SortOrder sortOrder) throws IOException, URISyntaxException {
+    public MediaSearchResult search(Object text, int page, int size, boolean sortByYear,
+                                    SortOrder sortOrder) throws IOException {
         QueryBuilder q = QueryBuilders
-                .multiMatchQuery(searchString)
+                .multiMatchQuery(text)
                 .field("title", 3.0f)
                 .field("universes", 2.0f)
                 .field("characters", 2.0f)
@@ -236,9 +236,9 @@ public class OpenSearchService {
         return searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
     }
 
-    public static MediaSearchResult searchMatchByOneField(String searchString, String field, int page, int size, boolean sortByYear,
-                                             SortOrder sortOrder) throws IOException, URISyntaxException {
-        QueryBuilder q = QueryBuilders.matchQuery(field, searchString);
+    public MediaSearchResult searchMatchByOneField(String field, Object text, int page, int size,
+                                                   boolean sortByYear, SortOrder sortOrder) throws IOException {
+        QueryBuilder q = QueryBuilders.matchQuery(field, text);
         return searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
     }
 
@@ -246,15 +246,14 @@ public class OpenSearchService {
      * Search exactly with given search strings by field.
      * Does not work with fields that have text type. Use search match for that.
      */
-    public static MediaSearchResult searchTermByOneField(Collection<String> searchStrings, String field, int page, int size,
-                                            boolean sortByYear, SortOrder sortOrder) throws IOException, URISyntaxException {
-        QueryBuilder q = QueryBuilders.termsQuery(field, searchStrings);
+    public MediaSearchResult searchTermByOneField(String field, Collection<Object> text, int page, int size,
+                                            boolean sortByYear, SortOrder sortOrder) throws IOException {
+        QueryBuilder q = QueryBuilders.termsQuery(field, text);
         return searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
     }
 
-    private static MediaSearchResult searchWithQueryBuilder(QueryBuilder queryBuilder, int page, int size, boolean sortByYear,
-                                               SortOrder sortOrder) throws IOException, URISyntaxException {
-        RestHighLevelClient client = openSearchClient();
+    private MediaSearchResult searchWithQueryBuilder(QueryBuilder queryBuilder, int page, int size, boolean sortByYear,
+                                               SortOrder sortOrder) throws IOException {
 
         SearchRequest searchRequest = new SearchRequest("media");
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
@@ -281,9 +280,7 @@ public class OpenSearchService {
         return mapResponseToMediaSearchResult(response, page, size);
     }
 
-    private static MediaSearchResult mapResponseToMediaSearchResult(SearchResponse response, int page, int size) {
-        ObjectMapper mapper = OpenSearchConfig.objectMapper();
-
+    private MediaSearchResult mapResponseToMediaSearchResult(SearchResponse response, int page, int size) {
         List<MediaSearchItem> items = new ArrayList<>();
 
         for (SearchHit hit : response.getHits()) {
