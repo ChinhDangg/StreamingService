@@ -18,6 +18,8 @@ public class ContentMetaData {
     private String[] characters;
     private String[] universes;
     private String[] authors;
+    private LocalDate uploadDate;
+    private int year;
 
     // Classification (will also be stored in search for fast information display)
     private String id;
@@ -31,7 +33,6 @@ public class ContentMetaData {
     private Resolution resolution;
     private short frameRate;
     private String format;
-    private LocalDate uploadDate;
     private String absoluteFilePath;
 
     // Grouping (optional so maybe another table)
