@@ -41,7 +41,7 @@ public class OSUtil {
 
     private String getRAMDISKName() {
         if (currentOS == OS.WINDOWS) {
-            return "R:/";
+            return "R:";
         } else if (currentOS == OS.MAC) {
             return "/Volumes/RAMDISK";
         } else if (currentOS == OS.LINUX) {
@@ -153,7 +153,7 @@ public class OSUtil {
      * @return true, if the path is written, otherwise throw IOException
      */
     private static boolean createPathInRAMDisk(String path) throws IOException {
-        File dir = new File(RAMDISK + path);
+        File dir = new File(RAMDISK + (path.startsWith("/") ? path : "/"+ path));
         if (!dir.exists()) {
             if (!dir.mkdirs()) {
                 throw new IOException("Failed to create path: " + path);
