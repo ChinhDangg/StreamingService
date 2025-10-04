@@ -51,6 +51,15 @@ services:
       - "9200:9200"
       - "9600:9600"
 
+  redis:
+    image: redis:8.2-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: [ "redis-server", "--save", "", "--appendonly", "no" ]
+
+
 #  opensearch-dashboards:
 #    image: opensearchproject/opensearch-dashboards:2.15.0
 #    ports:
