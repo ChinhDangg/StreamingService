@@ -1,25 +1,12 @@
 package dev.chinh.streamingservice.search;
 
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
-
-import java.time.LocalDate;
-import java.util.List;
+import lombok.*;
 
 @Getter
 @Setter
 @ToString
-public class MediaSearchItem {
-
-    // Search fields
-    private String title;
-    private List<String> tags;
-    private List<String> characters;
-    private List<String> universes;
-    private List<String> authors;
-    private LocalDate uploadDate;
-    private int year;
+@NoArgsConstructor
+public class MediaSearchItem extends MediaSearchRequest {
 
     // Classification (will also be stored in search for fast information display)
     private String id;
