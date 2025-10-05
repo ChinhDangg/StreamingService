@@ -2,16 +2,17 @@ package dev.chinh.streamingservice.content.service;
 
 import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.Resolution;
-import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
 
 @Service
-@RequiredArgsConstructor
-public class VideoService {
+public class VideoService extends MediaService {
 
-    private final MinIOService minIOService;
+    public VideoService(RedisTemplate<String, Object> redisTemplate, MinIOService minIOService) {
+        super(redisTemplate, minIOService);
+    }
 
     // for mac
     // diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://1048576`

@@ -3,8 +3,8 @@ package dev.chinh.streamingservice.content.service;
 import dev.chinh.streamingservice.content.constant.Resolution;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
 import net.coobird.thumbnailator.Thumbnails;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,15 +21,15 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 @Service
-@RequiredArgsConstructor
-public class ImageService {
+public class ImageService extends MediaService {
 
-    private final MinIOService minIOService;
+    public ImageService(RedisTemplate<String, Object> redisTemplate, MinIOService minIOService) {
+        super(redisTemplate, minIOService);
+    }
 
     @PostConstruct
     public void init() {
         ImageIO.scanForPlugins();  // ensures WebP plugin is discovered
-
 //        System.out.println("Registered writer formats: " + Arrays.toString(ImageIO.getWriterFormatNames()));
 //        System.out.println("Registered reader formats: " + Arrays.toString(ImageIO.getReaderFormatNames()));
     }
