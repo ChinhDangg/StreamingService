@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.search;
+package dev.chinh.streamingservice.search.data;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +13,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MediaSearchResult {
 
-    private final List<MediaSearchItem> searchItems;
+    private final List<MediaSearchItemResponse> searchItems;
 
     // Page info
     private int page;
