@@ -1,8 +1,5 @@
 package dev.chinh.streamingservice.search.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.chinh.streamingservice.search.MediaSearchItem;
-import dev.chinh.streamingservice.search.MediaSearchResult;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.action.DocWriteRequest;
 import org.opensearch.action.delete.DeleteRequest;
@@ -29,7 +26,6 @@ import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.script.Script;
 import org.opensearch.script.ScriptType;
-import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.FieldSortBuilder;
 import org.opensearch.search.sort.SortBuilders;
@@ -48,7 +44,6 @@ import java.util.*;
 public class OpenSearchService {
 
     private final RestHighLevelClient client;
-    private final ObjectMapper mapper;
 
     public static void main(String[] args) throws IOException, URISyntaxException {
         //createIndexWithMapping();
@@ -184,7 +179,7 @@ public class OpenSearchService {
         System.out.println("Scripted update done, result: " + response.getResult());
     }
 
-    public MediaSearchResult advanceSearch(Map<String, Collection<Object>> fieldValues, int page, int size,
+    public SearchResponse advanceSearch(Map<String, Collection<Object>> fieldValues, int page, int size,
                               boolean sortByYear, SortOrder sortOrder) throws IOException {
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
 
@@ -220,7 +215,7 @@ public class OpenSearchService {
         return searchWithQueryBuilder(boolQuery, page, size, sortByYear, sortOrder);
     }
 
-    public MediaSearchResult search(Object text, int page, int size, boolean sortByYear,
+    public SearchResponse search(Object text, int page, int size, boolean sortByYear,
                                     SortOrder sortOrder) throws IOException {
         QueryBuilder q = QueryBuilders
                 .multiMatchQuery(text)
@@ -236,7 +231,7 @@ public class OpenSearchService {
         return searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
     }
 
-    public MediaSearchResult searchMatchByOneField(String field, Object text, int page, int size,
+    public SearchResponse searchMatchByOneField(String field, Collection<Object> text, int page, int size,
                                                    boolean sortByYear, SortOrder sortOrder) throws IOException {
         QueryBuilder q = QueryBuilders.matchQuery(field, text);
         return searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
@@ -246,13 +241,13 @@ public class OpenSearchService {
      * Search exactly with given search strings by field.
      * Does not work with fields that have text type. Use search match for that.
      */
-    public MediaSearchResult searchTermByOneField(String field, Collection<Object> text, int page, int size,
+    public SearchResponse searchTermByOneField(String field, Collection<Object> text, int page, int size,
                                             boolean sortByYear, SortOrder sortOrder) throws IOException {
         QueryBuilder q = QueryBuilders.termsQuery(field, text);
         return searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
     }
 
-    private MediaSearchResult searchWithQueryBuilder(QueryBuilder queryBuilder, int page, int size, boolean sortByYear,
+    private SearchResponse searchWithQueryBuilder(QueryBuilder queryBuilder, int page, int size, boolean sortByYear,
                                                SortOrder sortOrder) throws IOException {
 
         SearchRequest searchRequest = new SearchRequest("media");
@@ -277,23 +272,6 @@ public class OpenSearchService {
         SearchResponse response = client.search(searchRequest, RequestOptions.DEFAULT);
         response.getHits().forEach(hit -> System.out.println(hit.getSourceAsString()));
 
-        return mapResponseToMediaSearchResult(response, page, size);
-    }
-
-    private MediaSearchResult mapResponseToMediaSearchResult(SearchResponse response, int page, int size) {
-        List<MediaSearchItem> items = new ArrayList<>();
-
-        for (SearchHit hit : response.getHits()) {
-            MediaSearchItem searchItem = mapper.convertValue(hit.getSourceAsMap(), MediaSearchItem.class);
-            items.add(searchItem);
-        }
-
-        MediaSearchResult result = new MediaSearchResult(items);
-        result.setPage(page);
-        result.setPageSize(size);
-        result.setTotal(Objects.requireNonNull(response.getHits().getTotalHits()).value());
-        result.setTotalPages((result.getTotal() + size -1) / size);
-
-        return result;
+        return response;
     }
 }
