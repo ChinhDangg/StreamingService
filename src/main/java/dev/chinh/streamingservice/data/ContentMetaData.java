@@ -20,6 +20,7 @@ public class ContentMetaData {
     private String[] authors;
     private LocalDate uploadDate;
     private int year;
+    private int length;
 
     // Classification (will also be stored in search for fast information display)
     private String id;
@@ -27,7 +28,23 @@ public class ContentMetaData {
     private String parentPath;
     private String key;             // if key exist then is an individual content, otherwise use parentPath for grouping
     private String thumbnail;
-    private int length;
+
+    // Fields to use to ensure correct naming
+    // Search
+    public static final String TITLE = "title";
+    public static final String TAGS = "tags";
+    public static final String CHARACTERS = "characters";
+    public static final String UNIVERSES = "universes";
+    public static final String AUTHORS = "authors";
+    public static final String UPLOAD_DATE = "uploadDate";
+    public static final String YEAR = "year";
+    // Classification
+    public static final String ID = "id";
+    public static final String BUCKET = "bucket";
+    public static final String PARENT_PATH = "parentPath";
+    public static final String KEY = "key";
+    public static final String THUMBNAIL = "thumbnail";
+    public static final String LENGTH = "length";
 
     // Technical
     private Resolution resolution;

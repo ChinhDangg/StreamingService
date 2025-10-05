@@ -1,5 +1,7 @@
 package dev.chinh.streamingservice.search.data;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import dev.chinh.streamingservice.data.ContentMetaData;
 import lombok.*;
 
 import java.lang.reflect.Field;
@@ -13,16 +15,25 @@ import java.util.List;
 public class MediaSearchRequest {
 
     // Search fields
-    protected String title;
-    protected List<String> tags;
-    protected List<String> characters;
-    protected List<String> universes;
-    protected List<String> authors;
-    protected Integer year;
+    @JsonProperty(ContentMetaData.TITLE)
+    private String title;
+    @JsonProperty(ContentMetaData.TAGS)
+    private List<String> tags;
+    @JsonProperty(ContentMetaData.CHARACTERS)
+    private List<String> characters;
+    @JsonProperty(ContentMetaData.UNIVERSES)
+    private List<String> universes;
+    @JsonProperty(ContentMetaData.AUTHORS)
+    private List<String> authors;
+    @JsonProperty(ContentMetaData.YEAR)
+    private Integer year;
+    @JsonProperty(ContentMetaData.LENGTH)
+    private Integer length;
 
     public void validate() {
         boolean hasAny =
                 (validateSearchString(title)) ||
+                (length != null) ||
                 (tags != null && !tags.isEmpty()) ||
                 (characters != null && !characters.isEmpty()) ||
                 (universes != null && !universes.isEmpty()) ||

@@ -1,16 +1,30 @@
 package dev.chinh.streamingservice.search.data;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import dev.chinh.streamingservice.data.ContentMetaData;
 import lombok.*;
+
+import java.time.LocalDate;
 
 @Getter
 @Setter
 @ToString
 @NoArgsConstructor
-public class MediaSearchItem extends MediaSearchItemResponse {
+public class MediaSearchItem extends MediaSearchRequest {
+
+    @JsonProperty(ContentMetaData.ID)
+    private String id;
+    @JsonProperty(ContentMetaData.THUMBNAIL)
+    private String thumbnail;
+    @JsonProperty(ContentMetaData.UPLOAD_DATE)
+    private LocalDate uploadDate;
 
     // Classification (will also be stored in search for fast information display)
+    @JsonProperty(ContentMetaData.BUCKET)
     private String bucket;
+    @JsonProperty(ContentMetaData.PARENT_PATH)
     private String parentPath;
+    @JsonProperty(ContentMetaData.KEY)
     private String key;  // if key exist then is an individual content item, otherwise use parentPath for grouping
 
     public String getPath() {

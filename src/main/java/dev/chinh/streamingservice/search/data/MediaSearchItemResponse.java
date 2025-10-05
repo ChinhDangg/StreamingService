@@ -1,6 +1,8 @@
 package dev.chinh.streamingservice.search.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import dev.chinh.streamingservice.data.ContentMetaData;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -11,10 +13,16 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class MediaSearchItemResponse extends MediaSearchRequest {
+public class MediaSearchItemResponse {
 
-    protected String id;
-    protected String thumbnail;
-    protected int length;
-    protected LocalDate uploadDate;
+    @JsonProperty(ContentMetaData.ID)
+    private String id;
+    @JsonProperty(ContentMetaData.TITLE)
+    private String title;
+    @JsonProperty(ContentMetaData.THUMBNAIL)
+    private String thumbnail;
+    @JsonProperty(ContentMetaData.UPLOAD_DATE)
+    private LocalDate uploadDate;
+    @JsonProperty(ContentMetaData.LENGTH)
+    private Integer length;
 }
