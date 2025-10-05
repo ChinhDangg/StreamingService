@@ -1,9 +1,8 @@
-package dev.chinh.streamingservice.search;
+package dev.chinh.streamingservice.search.data;
 
 import lombok.*;
 
 import java.lang.reflect.Field;
-import java.time.LocalDate;
 import java.util.List;
 
 @Getter
@@ -19,22 +18,24 @@ public class MediaSearchRequest {
     protected List<String> characters;
     protected List<String> universes;
     protected List<String> authors;
-    protected LocalDate uploadDate;
     protected Integer year;
 
     public void validate() {
         boolean hasAny =
-                (title != null && !title.isBlank()) ||
+                (validateSearchString(title)) ||
                 (tags != null && !tags.isEmpty()) ||
                 (characters != null && !characters.isEmpty()) ||
                 (universes != null && !universes.isEmpty()) ||
                 (authors != null && !authors.isEmpty()) ||
-                (uploadDate != null) ||
                 (year != null);
 
         if (!hasAny) {
             throw new IllegalArgumentException("At least one search field must be provided");
         }
+    }
+
+    public static boolean validateSearchString(String string) {
+        return string != null && !string.isBlank() && string.length() >= 2 && string.length() <= 100;
     }
 
     public static void validateFieldName(String fieldName) {
