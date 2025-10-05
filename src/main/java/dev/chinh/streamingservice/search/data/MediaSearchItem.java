@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.search;
+package dev.chinh.streamingservice.search.data;
 
 import lombok.*;
 
@@ -6,15 +6,12 @@ import lombok.*;
 @Setter
 @ToString
 @NoArgsConstructor
-public class MediaSearchItem extends MediaSearchRequest {
+public class MediaSearchItem extends MediaSearchItemResponse {
 
     // Classification (will also be stored in search for fast information display)
-    private String id;
     private String bucket;
     private String parentPath;
-    private String key;             // if key exist then is an individual content item, otherwise use parentPath for grouping
-    private String thumbnail;
-    private int length;
+    private String key;  // if key exist then is an individual content item, otherwise use parentPath for grouping
 
     public String getPath() {
         return parentPath + (key == null ? "" : ('/' + key));
