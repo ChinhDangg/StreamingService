@@ -1,16 +1,20 @@
 package dev.chinh.streamingservice.search.data;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.data.ContentMetaData;
+import dev.chinh.streamingservice.data.entity.MediaDescriptor;
 import lombok.*;
 
 import java.time.LocalDate;
 
 @Getter
 @Setter
-@ToString
+@ToString(callSuper = true)
 @NoArgsConstructor
-public class MediaSearchItem extends MediaSearchRequest {
+@AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class MediaSearchItem extends MediaSearchRequest implements MediaDescriptor {
 
     @JsonProperty(ContentMetaData.ID)
     private String id;
@@ -26,6 +30,10 @@ public class MediaSearchItem extends MediaSearchRequest {
     private String parentPath;
     @JsonProperty(ContentMetaData.KEY)
     private String key;  // if key exist then is an individual content item, otherwise use parentPath for grouping
+    @JsonProperty(ContentMetaData.WIDTH)
+    private Integer width;
+    @JsonProperty(ContentMetaData.HEIGHT)
+    private Integer height;
 
     public String getPath() {
         return parentPath + (key == null ? "" : ('/' + key));
