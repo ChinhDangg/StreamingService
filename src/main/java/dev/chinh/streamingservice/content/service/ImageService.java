@@ -1,6 +1,8 @@
 package dev.chinh.streamingservice.content.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.content.constant.Resolution;
+import dev.chinh.streamingservice.data.MediaMetaDataRepository;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import net.coobird.thumbnailator.Thumbnails;
@@ -23,8 +25,9 @@ import java.nio.file.Paths;
 @Service
 public class ImageService extends MediaService {
 
-    public ImageService(RedisTemplate<String, Object> redisTemplate, MinIOService minIOService) {
-        super(redisTemplate, minIOService);
+    public ImageService(RedisTemplate<String, Object> redisTemplate, MinIOService minIOService,
+                        ObjectMapper objectMapper, MediaMetaDataRepository mediaRepository) {
+        super(redisTemplate, minIOService, objectMapper, mediaRepository);
     }
 
     @PostConstruct
