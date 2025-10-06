@@ -1,7 +1,10 @@
 package dev.chinh.streamingservice.content.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.Resolution;
+import dev.chinh.streamingservice.data.MediaMetaDataRepository;
+import dev.chinh.streamingservice.data.entity.MediaDescriptor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -10,41 +13,32 @@ import java.io.*;
 @Service
 public class VideoService extends MediaService {
 
-    public VideoService(RedisTemplate<String, Object> redisTemplate, MinIOService minIOService) {
-        super(redisTemplate, minIOService);
+    public VideoService(RedisTemplate<String, Object> redisTemplate, MinIOService minIOService,
+                        ObjectMapper objectMapper, MediaMetaDataRepository mediaRepository) {
+        super(redisTemplate, minIOService, objectMapper, mediaRepository);
     }
 
-    // for mac
-    // diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://1048576`
+    private final int extraExpireSeconds = 30 * 60; // 30 minutes
 
-    // for window
-    // # Remove old if exists
-    // imdisk -D -m R: 2>$null
-
-    // # Create 1 GB RAM disk at R:
-    // imdisk -a -s 1G -m R:
-
-    // # Format it (quick NTFS)
-    // Start-Process cmd "/c format R: /FS:NTFS /Q /Y" -Verb RunAs -Wait
-
-    private final String RAMDISK = "Volumes/RAMDISK/";
-
-    public String getOriginalVideoUrl(String bucket, String videoId) throws Exception {
-        return minIOService.getSignedUrlForHostNginx(bucket, videoId, 300); // 5 minutes
+    public String getOriginalVideoUrl(Long videoId) throws Exception {
+        MediaDescriptor mediaDescriptor = getMediaDescriptor(videoId);
+        return minIOService.getSignedUrlForHostNginx(mediaDescriptor.getBucket(), mediaDescriptor.getPath(),
+                mediaDescriptor.getLength() + extraExpireSeconds); // video duration + 30 minutes extra
     }
 
-    public String getPreviewVideoUrl(String bucket, String videoId) throws Exception {
-        String nginxUrl = minIOService.getSignedUrlForContainerNginx(bucket, videoId, 300);
+    public String getPreviewVideoUrl(Long videoId) throws Exception {
+        MediaDescriptor mediaDescriptor = getMediaDescriptor(videoId);
+        String nginxUrl = minIOService.getSignedUrlForContainerNginx(
+                mediaDescriptor.getBucket(), mediaDescriptor.getPath(), mediaDescriptor.getLength() + extraExpireSeconds);
 
-        double duration = 613.0; // TODO: probe real duration
+        double duration = mediaDescriptor.getLength();
         int segments = 20;
         double previewLength = duration * 0.10;
         double clipLength = previewLength / segments;
         double interval = duration / segments;
 
         // === resolution control ===
-        int targetHeight = 360; // change to 720, 1080, etc.
-        // ==========================
+        final int resolution = Resolution.p360.getResolution();
 
         // Build trim chains
         StringBuilder fc = new StringBuilder();
@@ -61,12 +55,14 @@ public class VideoService extends MediaService {
             concatInputs.append(String.format("[v%d][a%d]", i, i));
         }
 
+        String scale = getFfmpegScaleString(mediaDescriptor.getWidth(), mediaDescriptor.getHeight(), resolution);
+
         // concat -> scale
         fc.append(String.format(
                 "%sconcat=n=%d:v=1:a=1[vcat][acat];" +      // stitch video+audio
-                        "[vcat]scale=-2:%d[v]",                     // scale once after concat
-                concatInputs, segments, targetHeight
-        ));
+                        "[vcat]%s[v]",                     // scale once after concat
+                concatInputs, segments, scale
+        )); // scale=-2:%d[v]
 
         String filterComplex = fc.toString();
 
@@ -100,10 +96,12 @@ public class VideoService extends MediaService {
         return "/stream/" + videoId + "/preview" + masterFileName;
     }
 
-    public String getPartialVideoUrl(String bucket, String videoId, Resolution res) throws Exception {
+    public String getPartialVideoUrl(Long videoId, Resolution res) throws Exception {
         // 1. Get a presigned URL with container Nginx so ffmpeg can access in container
         // 2. Rewrite URL to go through Nginx proxy instead of direct MinIO
-        String nginxUrl = minIOService.getSignedUrlForContainerNginx(bucket, videoId, 300);
+        MediaDescriptor mediaDescriptor = getMediaDescriptor(videoId);
+        String nginxUrl = minIOService.getSignedUrlForContainerNginx(mediaDescriptor.getBucket(),
+                mediaDescriptor.getPath(), mediaDescriptor.getLength() + extraExpireSeconds);
 
         // 3. Host vs container paths
         String masterFileName = "/master.m3u8";
@@ -114,16 +112,8 @@ public class VideoService extends MediaService {
             throw new IOException("Failed to create temporary directory: " + videoDir);
         }
 
-        int width = 1920;
-        int height = 1080;
-        int target = res.getResolution();
-
-        String scale;
-        if (width >= height) { // Landscape → fix height
-            scale = "scale=-2:" + target;
-        } else { // Portrait → fix width
-            scale = "scale=" + target + ":-2";
-        }
+        String scale = getFfmpegScaleString(
+                mediaDescriptor.getWidth(), mediaDescriptor.getHeight(), res.getResolution());
 
         // 4. ffmpeg command (no mkdir -p needed, dir already exists)
         String[] command = {
@@ -140,8 +130,6 @@ public class VideoService extends MediaService {
                 outPath                       // output playlist path: /chunks/<videoId>/partial/master.m3u8
         };
 
-        System.out.println("Running ffmpeg command: " + String.join(" ", command));
-
         runAndLogAsync(command);
 
         // check the master file has been created. maybe check first chunks being created for smoother experience
@@ -149,6 +137,16 @@ public class VideoService extends MediaService {
 
         // 5. Return playlist URL for browser
         return "/stream/" + videoId + "/partial" + masterFileName;
+    }
+
+    private MediaDescriptor getMediaDescriptor(Long videoId) {
+        MediaDescriptor mediaDescriptor = getCachedMediaSearchItem(videoId);
+        if (mediaDescriptor == null) {
+            mediaDescriptor = findMediaMetaDataAllInfo(videoId);
+        }
+        if (!mediaDescriptor.hasKey())
+            throw new IllegalStateException("Requested video media does not has key with id: " + videoId);
+        return mediaDescriptor;
     }
 
     private void checkPlaylistCreated(String playlist) throws IOException, InterruptedException {
@@ -159,6 +157,10 @@ public class VideoService extends MediaService {
         if (!OSUtil.checkTempFileExists(playlist)) {
             throw new RuntimeException("ffmpeg did not create playlist in time: " + playlist);
         }
+    }
+
+    private String getFfmpegScaleString(int width, int height, int target) {
+        return (width >= height) ? "scale=-2:" + target : "scale=" + target + ":-2";
     }
 
     private void runAndLog(String[] cmd) throws Exception {
