@@ -25,4 +25,8 @@ public class MediaSearchItemResponse {
     private LocalDate uploadDate;
     @JsonProperty(ContentMetaData.LENGTH)
     private Integer length;
+    @JsonProperty(ContentMetaData.WIDTH)
+    private Integer width;
+    @JsonProperty(ContentMetaData.HEIGHT)
+    private Integer height;
 }
