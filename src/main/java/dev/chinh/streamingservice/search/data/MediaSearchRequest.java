@@ -16,19 +16,19 @@ public class MediaSearchRequest {
 
     // Search fields
     @JsonProperty(ContentMetaData.TITLE)
-    private String title;
+    protected String title;
     @JsonProperty(ContentMetaData.TAGS)
-    private List<String> tags;
+    protected List<String> tags;
     @JsonProperty(ContentMetaData.CHARACTERS)
-    private List<String> characters;
+    protected List<String> characters;
     @JsonProperty(ContentMetaData.UNIVERSES)
-    private List<String> universes;
+    protected List<String> universes;
     @JsonProperty(ContentMetaData.AUTHORS)
-    private List<String> authors;
+    protected List<String> authors;
     @JsonProperty(ContentMetaData.YEAR)
-    private Integer year;
+    protected Integer year;
     @JsonProperty(ContentMetaData.LENGTH)
-    private Integer length;
+    protected Integer length;
 
     public void validate() {
         boolean hasAny =
