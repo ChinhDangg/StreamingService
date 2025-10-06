@@ -117,7 +117,7 @@ public class OSUtil {
 
     public static boolean checkTempFileExists(String fileName) throws IOException, InterruptedException {
         if (currentOS == OS.MAC) {
-            File playlist = new File(fileName);
+            File playlist = new File(normalizePath(RAMDISK, fileName));
             return playlist.exists();
         }
         return containerFileExists(fileName);
@@ -130,9 +130,7 @@ public class OSUtil {
         if (currentOS == OS.WINDOWS) {
             return writeTextToContainer(relativePath, lines);
         } else if (currentOS == OS.MAC) {
-            String targetPath = relativePath.startsWith("/")
-                    ? RAMDISK + relativePath
-                    : RAMDISK + "/" + relativePath;
+            String targetPath = normalizePath(RAMDISK, relativePath);
             File concatList = new File(targetPath);
             try (PrintWriter pw = new PrintWriter(concatList)) {
                 for (String part : lines) {
@@ -153,7 +151,7 @@ public class OSUtil {
      * @return true, if the path is written, otherwise throw IOException
      */
     private static boolean createPathInRAMDisk(String path) throws IOException {
-        File dir = new File(RAMDISK + (path.startsWith("/") ? path : "/"+ path));
+        File dir = new File(normalizePath(RAMDISK, path));
         if (!dir.exists()) {
             if (!dir.mkdirs()) {
                 throw new IOException("Failed to create path: " + path);
@@ -163,11 +161,11 @@ public class OSUtil {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {
-        System.out.println(containerFileExists("2b.mp4/preview/master.m3u8"));
+        System.out.println(checkTempFileExists("2b.mp4/preview/master.m3u8"));
     }
 
     private static boolean containerFileExists(String relativePath) throws IOException, InterruptedException {
-        String targetPath = normalizePath(relativePath);
+        String targetPath = normalizePath(BASE_DIR, relativePath);
 
         ProcessBuilder pb = new ProcessBuilder(
                 "docker", "exec", CONTAINER,
@@ -184,17 +182,17 @@ public class OSUtil {
      * Create a directory directly inside the container under /chunks.
      */
     private static boolean createDirectoryInContainer(String relativeDir) throws IOException, InterruptedException {
-        String dirPath = normalizePath(relativeDir);
+        String dirPath = normalizePath(BASE_DIR, relativeDir);
 
         return runCommand(List.of("docker", "exec", CONTAINER, "mkdir", "-p", dirPath),
                 "Created directory in container: " + dirPath);
     }
 
-    private static String normalizePath(String relativePath) {
+    private static String normalizePath(String baseDir, String relativePath) {
         if (relativePath.startsWith("/")) {
-            return BASE_DIR + relativePath; // e.g. "/dir1" → "/chunks/dir1"
+            return baseDir + relativePath; // e.g. "/dir1" → "/chunks/dir1"
         }
-        return BASE_DIR + "/" + relativePath; // e.g. "dir1" → "/chunks/dir1"
+        return baseDir + "/" + relativePath; // e.g. "dir1" → "/chunks/dir1"
     }
 
     private static boolean runCommand(List<String> command, String successMsg)
@@ -220,7 +218,7 @@ public class OSUtil {
             throws IOException, InterruptedException {
 
         // Normalize target path inside /chunks
-        String targetPath = normalizePath(relativePath);
+        String targetPath = normalizePath(BASE_DIR, relativePath);
 
         String parentDir = targetPath.substring(0, targetPath.lastIndexOf('/'));
         if (!parentDir.equals(BASE_DIR)) {
