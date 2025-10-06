@@ -7,6 +7,8 @@
     "authors":     { "type": "keyword" },
     "uploadDate":  { "type": "date" },
     "year":        { "type": "integer" },
+    "width":       { "type": "integer" },
+    "height":      { "type": "integer" },
 
     "id":         { "type": "long" },
     "bucket":     { "type": "text" },

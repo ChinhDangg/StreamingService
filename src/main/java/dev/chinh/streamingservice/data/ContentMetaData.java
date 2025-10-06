@@ -1,33 +1,14 @@
 package dev.chinh.streamingservice.data;
 
-import dev.chinh.streamingservice.content.constant.Resolution;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.time.LocalDate;
 import java.util.Arrays;
 
 public class ContentMetaData {
-
-    // Search Fields
-    private String title;
-    private String[] tags;
-    private String[] characters;
-    private String[] universes;
-    private String[] authors;
-    private LocalDate uploadDate;
-    private int year;
-    private int length;
-
-    // Classification (will also be stored in search for fast information display)
-    private String id;
-    private String bucket;
-    private String parentPath;
-    private String key;             // if key exist then is an individual content, otherwise use parentPath for grouping
-    private String thumbnail;
 
     // Fields to use to ensure correct naming
     // Search
@@ -38,6 +19,8 @@ public class ContentMetaData {
     public static final String AUTHORS = "authors";
     public static final String UPLOAD_DATE = "uploadDate";
     public static final String YEAR = "year";
+    public static final String WIDTH = "width";
+    public static final String HEIGHT = "height";
     // Classification
     public static final String ID = "id";
     public static final String BUCKET = "bucket";
@@ -47,7 +30,6 @@ public class ContentMetaData {
     public static final String LENGTH = "length";
 
     // Technical
-    private Resolution resolution;
     private short frameRate;
     private String format;
     private String absoluteFilePath;
@@ -58,14 +40,6 @@ public class ContentMetaData {
     private int groupOrder;         // 1 (season 1)
     private String seriesTitle;     // the walking dead season 1
     private int chapter;            // 1 (episode 1)
-
-    public String getBucketAbsolutePath() {
-        return bucket + "/" + parentPath + "/" + key;
-    }
-
-    public String getTopParentPath() {
-        return bucket + "/" + parentPath;
-    }
 
     public boolean hasGroup() {
         return groupTitle != null;
