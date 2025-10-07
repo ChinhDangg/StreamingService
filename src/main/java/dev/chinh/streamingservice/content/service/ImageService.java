@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.content.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.data.MediaMetaDataRepository;
 import jakarta.annotation.PostConstruct;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriUtils;
 
 import javax.imageio.ImageIO;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
@@ -37,8 +39,10 @@ public class ImageService extends MediaService {
 //        System.out.println("Registered reader formats: " + Arrays.toString(ImageIO.getReaderFormatNames()));
     }
 
-    public ResponseEntity<Void> getResizedImageToResponse(String bucket, String key, Resolution res,
-                                                          HttpServletRequest request) throws Exception {
+
+
+    public ResponseEntity<Void> getResizedImageURL(String bucket, String key, Resolution res,
+                                                   HttpServletRequest request) throws Exception {
         String originalExtension = key.contains(".") ? key.substring(key.lastIndexOf(".") + 1)
                 .toLowerCase() : "jpg";
         //String acceptHeader = request.getHeader("Accept");
@@ -47,19 +51,22 @@ public class ImageService extends MediaService {
         String format = originalExtension;
 
         // 2. Build cache path inside RAMDISK: /Volumes/RAMDISK/image-cache/{bucket}/{key}_{res}.{format}
-        Path cacheRoot = Paths.get("/Volumes/RAMDISK/image-cache");
+        Path cacheRoot = Paths.get("/image-cache");
         Path bucketDir = cacheRoot.resolve(bucket);
-        Files.createDirectories(bucketDir);
+        if (!OSUtil.createTempDir(bucketDir.toString())) {
+            throw new IOException("Failed to create temporary directory: " + bucketDir);
+        }
 
         // Append resolution + format to the file name
         String baseName = key.replaceAll("\\.[^.]+$", ""); // strip extension if present
         String cacheFileName = baseName + "_" + res.getResolution() + "." + format;
         Path cachePath = bucketDir.resolve(cacheFileName);
 
-        // make sure parent dir exist
-        Files.createDirectories(cachePath.getParent());
-
-        if (!Files.exists(cachePath)) {
+        if (!OSUtil.checkTempFileExists(cachePath.toString())) {
+            // make sure parent dir exist
+            if (!OSUtil.createTempDir(cachePath.getParent().toString())) {
+                throw new IOException("Failed to create temporary directory: " + bucketDir);
+            }
             try (InputStream is = minIOService.getFile(bucket, key);
                 OutputStream os = Files.newOutputStream(cachePath)) {
                 Thumbnails.of(is)

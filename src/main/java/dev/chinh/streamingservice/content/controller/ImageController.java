@@ -24,6 +24,6 @@ public class ImageController {
     public ResponseEntity<Void> getResizedImage(@PathVariable String bucket,
                                           @RequestParam Resolution res, @RequestParam(name = "imageId") String imageId,
                                           HttpServletRequest request) throws Exception {
-        return imageService.getResizedImageToResponse(bucket, imageId, res, request);
+        return imageService.getResizedImageURL(bucket, imageId, res, request);
     }
 }
