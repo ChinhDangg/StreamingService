@@ -109,7 +109,7 @@ public class MediaMetaData implements MediaDescriptor {
     private String absoluteFilePath;
 
     // Grouping (optional)
-    @ManyToOne(fetch = FetchType.LAZY)
+    @OneToOne(fetch = FetchType.LAZY)
     private MediaGroupMetaData groupMetaData;
 
     public String getPath() {
