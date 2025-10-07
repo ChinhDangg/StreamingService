@@ -140,7 +140,7 @@ public class VideoService extends MediaService {
     }
 
     private MediaDescriptor getMediaDescriptor(Long videoId) {
-        MediaDescriptor mediaDescriptor = getCachedMediaSearchItem(videoId);
+        MediaDescriptor mediaDescriptor = getCachedMediaSearchItem(String.valueOf(videoId));
         if (mediaDescriptor == null) {
             mediaDescriptor = findMediaMetaDataAllInfo(videoId);
         }

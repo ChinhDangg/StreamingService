@@ -15,7 +15,7 @@ public abstract class MediaService {
     private final ObjectMapper objectMapper;
     private final MediaMetaDataRepository mediaRepository;
 
-    protected MediaSearchItem getCachedMediaSearchItem(long id) {
+    protected MediaSearchItem getCachedMediaSearchItem(String id) {
         return objectMapper.convertValue(redisTemplate.opsForValue().get("media::" + id), MediaSearchItem.class);
     }
 
