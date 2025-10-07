@@ -13,23 +13,20 @@ public class VideoController {
 
     private final VideoService videoService;
 
-    @GetMapping("/original/{bucket}")
-    public ResponseEntity<String> getVideoUrl(@PathVariable String bucket,
-                                              @RequestParam("id") String videoId) throws Exception {
-        String url = videoService.getOriginalVideoUrl(bucket, videoId);
+    @GetMapping("/original/{id}")
+    public ResponseEntity<String> getVideoUrl(@PathVariable Long id) throws Exception {
+        String url = videoService.getOriginalVideoUrl(id);
         return ResponseEntity.ok(url);
     }
 
-    @GetMapping("/preview/{bucket}")
-    public ResponseEntity<String> preview(@PathVariable String bucket,
-                                          @RequestParam("id") String videoId) throws Exception {
-        return ResponseEntity.ok(videoService.getPreviewVideoUrl(bucket, videoId));
+    @GetMapping("/preview/{id}")
+    public ResponseEntity<String> preview(@PathVariable Long id) throws Exception {
+        return ResponseEntity.ok(videoService.getPreviewVideoUrl(id));
     }
 
-    @GetMapping("/partial/{bucket}")
-    private ResponseEntity<String> getTranscodeFull(@PathVariable String bucket,
-                                                    @RequestParam("id") String videoId) throws Exception {
-        return ResponseEntity.ok(videoService.getPartialVideoUrl(bucket, videoId, Resolution.p360));
+    @GetMapping("/partial/{id}")
+    private ResponseEntity<String> getTranscodeFull(@PathVariable Long id) throws Exception {
+        return ResponseEntity.ok(videoService.getPartialVideoUrl(id, Resolution.p360));
     }
 
 }
