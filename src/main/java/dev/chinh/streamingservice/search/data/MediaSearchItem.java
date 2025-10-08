@@ -35,6 +35,7 @@ public class MediaSearchItem extends MediaSearchRequest implements MediaDescript
     @JsonProperty(ContentMetaData.HEIGHT)
     private Integer height;
 
+    @Override
     public String getPath() {
         return parentPath + (key == null ? "" : ('/' + key));
     }
@@ -43,10 +44,17 @@ public class MediaSearchItem extends MediaSearchRequest implements MediaDescript
      * If media have key then it is path to an individual item.
      * Else, the path is the parent path to list of items.
      */
+    @Override
     public boolean hasKey() {
         return key != null && !key.isEmpty();
     }
 
+    @Override
+    public String getThumbnail() {
+        return thumbnail;
+    }
+
+    @Override
     public boolean hasThumbnail() {
         return thumbnail != null && !thumbnail.isEmpty();
     }

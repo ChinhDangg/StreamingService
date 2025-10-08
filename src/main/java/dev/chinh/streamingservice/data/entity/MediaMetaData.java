@@ -31,7 +31,7 @@ public class MediaMetaData implements MediaDescriptor {
     private String parentPath;
 
     @JsonProperty(ContentMetaData.KEY)
-    private String key;        // if key exist then is an individual content, otherwise use parentPath for grouping
+    private String key;        // if key exist then is an individual content, otherwise use parentPath for album
 
     @JsonProperty(ContentMetaData.THUMBNAIL)
     @Column(nullable = false)
@@ -112,14 +112,22 @@ public class MediaMetaData implements MediaDescriptor {
     @OneToOne(fetch = FetchType.LAZY)
     private MediaGroupMetaData groupMetaData;
 
+    @Override
     public String getPath() {
         return parentPath + (key == null ? "" : ('/' + key));
     }
 
+    @Override
     public boolean hasKey() {
         return key != null && !key.isEmpty();
     }
 
+    @Override
+    public String getThumbnail() {
+        return thumbnail;
+    }
+
+    @Override
     public boolean hasThumbnail() {
         return thumbnail != null && !thumbnail.isEmpty();
     }

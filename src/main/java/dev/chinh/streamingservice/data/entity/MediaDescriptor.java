@@ -7,6 +7,7 @@ public interface MediaDescriptor {
     Integer getLength();
     Integer getWidth();
     Integer getHeight();
+    String getThumbnail();
     boolean hasKey();
     boolean hasThumbnail();
 }

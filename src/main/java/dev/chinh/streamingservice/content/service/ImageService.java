@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.data.MediaMetaDataRepository;
+import dev.chinh.streamingservice.data.entity.MediaDescriptor;
+import io.minio.Result;
+import io.minio.messages.Item;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import net.coobird.thumbnailator.Thumbnails;
@@ -23,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 
 @Service
 public class ImageService extends MediaService {
@@ -39,7 +43,23 @@ public class ImageService extends MediaService {
 //        System.out.println("Registered reader formats: " + Arrays.toString(ImageIO.getReaderFormatNames()));
     }
 
+    public record ImageInfo(String bucket, String parentPath) {}
 
+    public List<String> getAllMediaInAnAlbum(Long albumId) {
+        MediaDescriptor mediaDescriptor = getMediaDescriptor(albumId);
+        Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaDescriptor.getBucket(), mediaDescriptor.getPath());
+        return null;
+    }
+
+    private MediaDescriptor getMediaDescriptor(Long albumId) {
+        MediaDescriptor mediaDescriptor = getCachedMediaSearchItem(String.valueOf(albumId));
+        if (mediaDescriptor == null) {
+            mediaDescriptor = findMediaMetaDataAllInfo(albumId);
+        }
+        if (mediaDescriptor.hasKey())
+            throw new IllegalStateException("Not an album, individual media found: " + albumId);
+        return mediaDescriptor;
+    }
 
     public ResponseEntity<Void> getResizedImageURL(String bucket, String key, Resolution res,
                                                    HttpServletRequest request) throws Exception {
