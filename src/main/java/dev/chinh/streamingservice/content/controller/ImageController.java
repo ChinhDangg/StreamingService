@@ -19,15 +19,17 @@ public class ImageController {
         return ResponseEntity.ok().body(imageService.getAllMediaInAnAlbum(id, resolution));
     }
 
-    @GetMapping("/original/{bucket}")
-    public ResponseEntity<Void> getOriginalUrl(@PathVariable String bucket, @RequestParam(name = "key") String imagePath) throws Exception {
-        return imageService.getOriginalImageURL(bucket, imagePath, 300);
+    @GetMapping("/original/{id}")
+    public ResponseEntity<Void> getOriginalUrl(@PathVariable Long id,
+                                               @RequestParam(name = "key") String imagePath) throws Exception {
+        return imageService.getOriginalImageURL(id, imagePath, 30 * 60);
     }
 
-    @GetMapping("/resize/{bucket}")
-    public ResponseEntity<Void> getResizedImage(@PathVariable String bucket,
-                                          @RequestParam Resolution res, @RequestParam(name = "key") String imagePath,
-                                          HttpServletRequest request) throws Exception {
-        return imageService.getResizedImageURL(bucket, imagePath, res, request);
+    @GetMapping("/resize/{id}")
+    public ResponseEntity<Void> getResizedImage(@PathVariable Long id,
+                                                @RequestParam Resolution res,
+                                                @RequestParam(name = "key") String imagePath,
+                                                HttpServletRequest request) throws Exception {
+        return imageService.getResizedImageURL(id, imagePath, res, request);
     }
 }
