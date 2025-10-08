@@ -2,10 +2,12 @@ package dev.chinh.streamingservice.content.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.OSUtil;
+import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.data.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescriptor;
 import io.minio.Result;
+import io.minio.errors.*;
 import io.minio.messages.Item;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,6 +28,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -43,12 +48,27 @@ public class ImageService extends MediaService {
 //        System.out.println("Registered reader formats: " + Arrays.toString(ImageIO.getReaderFormatNames()));
     }
 
-    public record ImageInfo(String bucket, String parentPath) {}
+    public record MediaUrl(MediaType type, String url) {}
 
-    public List<String> getAllMediaInAnAlbum(Long albumId) {
+    public List<MediaUrl> getAllMediaInAnAlbum(Long albumId, Resolution resolution) throws ServerException, InsufficientDataException, ErrorResponseException, IOException, NoSuchAlgorithmException, InvalidKeyException, InvalidResponseException, XmlParserException, InternalException {
         MediaDescriptor mediaDescriptor = getMediaDescriptor(albumId);
         Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaDescriptor.getBucket(), mediaDescriptor.getPath());
-        return null;
+        List<MediaUrl> imageUrls = new ArrayList<>();
+        for (Result<Item> result : results) {
+            Item item = result.get();
+            if (resolution == Resolution.original) {
+                imageUrls.add(new MediaUrl(
+                        MediaType.detectMediaType(item.objectName()),
+                        String.format("/original/%s?key=%s", mediaDescriptor.getBucket(), item.objectName())
+                ));
+            } else {
+                imageUrls.add(new MediaUrl(
+                        MediaType.detectMediaType(item.objectName()),
+                        String.format("/resize/%s?res=%s&key=%s", mediaDescriptor.getBucket(), Resolution.p1080, item.objectName())
+                ));
+            }
+        }
+        return imageUrls;
     }
 
     private MediaDescriptor getMediaDescriptor(Long albumId) {
