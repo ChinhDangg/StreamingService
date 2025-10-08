@@ -7,6 +7,8 @@ import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 
+import java.time.Duration;
+
 @RequiredArgsConstructor
 public abstract class MediaService {
 
@@ -20,7 +22,14 @@ public abstract class MediaService {
     }
 
     protected MediaMetaData findMediaMetaDataAllInfo(long id) {
-        return mediaRepository.findByIdWithAllInfo(id).orElseThrow(() ->
+        MediaMetaData mediaMetaData = mediaRepository.findByIdWithAllInfo(id).orElseThrow(() ->
                 new IllegalArgumentException("Media not found with id " + id));
+        cacheMediaSearchItem(objectMapper.convertValue(mediaMetaData, MediaSearchItem.class));
+        return mediaMetaData;
+    }
+
+    private void cacheMediaSearchItem(MediaSearchItem item) {
+        String id = "media::" + item.getId();
+        redisTemplate.opsForValue().set(id, item, Duration.ofHours(1));
     }
 }
