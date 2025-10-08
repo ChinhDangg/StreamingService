@@ -6,12 +6,11 @@ import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.data.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescriptor;
+import dev.chinh.streamingservice.exception.ResourceNotFoundException;
 import io.minio.Result;
 import io.minio.errors.*;
 import io.minio.messages.Item;
-import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
-import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -19,13 +18,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriUtils;
 
-import javax.imageio.ImageIO;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.InvalidKeyException;
@@ -41,13 +36,6 @@ public class ImageService extends MediaService {
         super(redisTemplate, minIOService, objectMapper, mediaRepository);
     }
 
-    @PostConstruct
-    public void init() {
-        ImageIO.scanForPlugins();  // ensures WebP plugin is discovered
-//        System.out.println("Registered writer formats: " + Arrays.toString(ImageIO.getWriterFormatNames()));
-//        System.out.println("Registered reader formats: " + Arrays.toString(ImageIO.getReaderFormatNames()));
-    }
-
     public record MediaUrl(MediaType type, String url) {}
 
     public List<MediaUrl> getAllMediaInAnAlbum(Long albumId, Resolution resolution) throws ServerException, InsufficientDataException, ErrorResponseException, IOException, NoSuchAlgorithmException, InvalidKeyException, InvalidResponseException, XmlParserException, InternalException {
@@ -59,12 +47,12 @@ public class ImageService extends MediaService {
             if (resolution == Resolution.original) {
                 imageUrls.add(new MediaUrl(
                         MediaType.detectMediaType(item.objectName()),
-                        String.format("/original/%s?key=%s", mediaDescriptor.getBucket(), item.objectName())
+                        String.format("/original/%s?key=%s", mediaDescriptor.getBucket(), item.objectName().replace(mediaDescriptor.getPath(), ""))
                 ));
             } else {
                 imageUrls.add(new MediaUrl(
                         MediaType.detectMediaType(item.objectName()),
-                        String.format("/resize/%s?res=%s&key=%s", mediaDescriptor.getBucket(), Resolution.p1080, item.objectName())
+                        String.format("/resize/%s?res=%s&key=%s", mediaDescriptor.getBucket(), Resolution.p1080, item.objectName().replace(mediaDescriptor.getPath(), ""))
                 ));
             }
         }
@@ -81,52 +69,96 @@ public class ImageService extends MediaService {
         return mediaDescriptor;
     }
 
-    public ResponseEntity<Void> getResizedImageURL(String bucket, String key, Resolution res,
+    public ResponseEntity<Void> getResizedImageURL(Long albumId, String key, Resolution res,
                                                    HttpServletRequest request) throws Exception {
+        MediaDescriptor mediaDescriptor = getMediaDescriptor(albumId);
+
         String originalExtension = key.contains(".") ? key.substring(key.lastIndexOf(".") + 1)
                 .toLowerCase() : "jpg";
-        //String acceptHeader = request.getHeader("Accept");
-        //String format = (acceptHeader != null && acceptHeader.contains("image/webp")) ? "webp" : originalExtension;
-        // sejda doesnt work mac silicon so skipping webp for now
-        String format = originalExtension;
+        String acceptHeader = request.getHeader("Accept");
+        String format = (acceptHeader != null && acceptHeader.contains("image/webp")) ? "webp" : originalExtension;
 
-        // 2. Build cache path inside RAMDISK: /Volumes/RAMDISK/image-cache/{bucket}/{key}_{res}.{format}
-        Path cacheRoot = Paths.get("/image-cache");
-        Path bucketDir = cacheRoot.resolve(bucket);
-        if (!OSUtil.createTempDir(bucketDir.toString())) {
-            throw new IOException("Failed to create temporary directory: " + bucketDir);
+        Path mediaPath = Paths.get(mediaDescriptor.getPath(), key);
+        if (!minIOService.objectExists(mediaDescriptor.getBucket(), mediaPath.toString())) {
+            throw new ResourceNotFoundException("Object not found: " + key);
         }
+
+        String nginxUrl = minIOService.getSignedUrlForContainerNginx(
+                mediaDescriptor.getBucket(), mediaPath.toString(), 30 * 60);
+
+        // 2️⃣ Probe image dimensions via ffprobe inside the ffmpeg container
+        String[] probeCmd = {
+                "docker", "exec", "ffmpeg",
+                "ffprobe", "-v", "error",
+                "-show_entries", "stream=width,height",
+                "-of", "csv=p=0:s=x",
+                nginxUrl
+        };
+        String dimensions = runAndLog(probeCmd);
+        String[] parts = dimensions.split("x");
+        int width = Integer.parseInt(parts[0]);
+        int height = Integer.parseInt(parts[1]);
+        System.out.printf("📏 Original: %dx%d%n", width, height);
+
+        // 3️⃣ Decide scaling direction automatically
+        String scale;
+        boolean isLandscape = false;
+        if (width >= height) { // Landscape → limit by height 1080
+            scale = "-1:" + res.getResolution();
+            isLandscape = true;
+        } else { // Portrait → limit by width 1080
+            scale = res.getResolution() + ":-1";
+        }
+        System.out.println("🧮 Orientation scale: " + scale);
+        // return original if original is less or equal to scale already
+        if ((isLandscape && height <= res.getResolution()) || (!isLandscape && width <= res.getResolution())) {
+            return getUrlAsRedirectResponse(nginxUrl);
+        }
+
+        // 2. Build cache path {temp dir}/image-cache/{bucket}/{key}_{res}.{format}
+        Path cacheRoot = Paths.get("/image-cache");
+        Path bucketDir = cacheRoot.resolve(mediaDescriptor.getBucket());
+        Path albumDir = bucketDir.resolve(mediaDescriptor.getPath());
 
         // Append resolution + format to the file name
         String baseName = key.replaceAll("\\.[^.]+$", ""); // strip extension if present
         String cacheFileName = baseName + "_" + res.getResolution() + "." + format;
-        Path cachePath = bucketDir.resolve(cacheFileName);
+        Path cachePath = albumDir.resolve(cacheFileName);
 
         if (!OSUtil.checkTempFileExists(cachePath.toString())) {
             // make sure parent dir exist
             if (!OSUtil.createTempDir(cachePath.getParent().toString())) {
-                throw new IOException("Failed to create temporary directory: " + bucketDir);
+                throw new IOException("Failed to create temporary directory: " + cachePath.getParent());
             }
-            try (InputStream is = minIOService.getFile(bucket, key);
-                OutputStream os = Files.newOutputStream(cachePath)) {
-                Thumbnails.of(is)
-                        .size(res.getResolution(), res.getResolution())
-                        .outputFormat(format)
-                        .toOutputStream(os);
-            }
+
+            String outputPath = "/chunks/" + cachePath;
+            String ffmpegCmd = String.format(
+                    "ffmpeg -y -hide_banner -loglevel info " +
+                            "-i \"%s\" -vf scale=%s -q:v 2 \"%s\"",
+                    nginxUrl, scale, outputPath
+            );
+            String[] dockerCmd = {
+                    "docker", "exec", "ffmpeg",
+                    "bash", "-c", ffmpegCmd
+            };
+            runAndLog(dockerCmd);
         }
 
-        String cachedImageUrl = "/cache/" + bucket + "/" + cacheFileName;
-        HttpHeaders headers = new HttpHeaders();
-        String encodedPath = UriUtils.encodePath(cachedImageUrl, StandardCharsets.UTF_8);
-        headers.setLocation(URI.create(encodedPath));
-        return new ResponseEntity<>(headers, HttpStatus.FOUND);
+        String cachedImageUrl = "/cache/" + mediaDescriptor.getBucket() + "/" + mediaDescriptor.getPath() + "/" + cacheFileName;
+        return getUrlAsRedirectResponse(cachedImageUrl);
     }
 
-    public ResponseEntity<Void> getOriginalImageURL(String bucket, String key, int expiry) throws Exception {
-        String signedUrl = minIOService.getSignedUrlForHostNginx(bucket, key, expiry);
+    public ResponseEntity<Void> getOriginalImageURL(Long albumId, String key, int expiry) throws Exception {
+        MediaDescriptor mediaDescriptor = getMediaDescriptor(albumId);
+        String signedUrl = minIOService.getSignedUrlForHostNginx(mediaDescriptor.getBucket(),
+                Paths.get(mediaDescriptor.getPath(), key).toString(), expiry);
+        return getUrlAsRedirectResponse(signedUrl);
+    }
+
+    private ResponseEntity<Void> getUrlAsRedirectResponse(String signedUrl) {
+        String encodedPath = UriUtils.encodePath(signedUrl, StandardCharsets.UTF_8);
         HttpHeaders headers = new HttpHeaders();
-        headers.setLocation(URI.create(signedUrl));
+        headers.setLocation(URI.create(encodedPath));
         return new ResponseEntity<>(headers, HttpStatus.FOUND);
     }
 }
