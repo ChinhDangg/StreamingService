@@ -7,6 +7,8 @@ import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.time.Duration;
 
 @RequiredArgsConstructor
@@ -31,5 +33,22 @@ public abstract class MediaService {
     private void cacheMediaSearchItem(MediaSearchItem item) {
         String id = "media::" + item.getId();
         redisTemplate.opsForValue().set(id, item, Duration.ofHours(1));
+    }
+
+    protected String runAndLog(String[] cmd) throws Exception {
+        Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
+        String line, lastLine = null;
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            while ((line = br.readLine()) != null) {
+                //System.out.println("[ffmpeg] " + line);
+                lastLine = line;
+            }
+        }
+        int exit = process.waitFor();
+        System.out.println("ffmpeg exited with code " + exit);
+        if (exit != 0) {
+            throw new RuntimeException("Command failed with code " + exit);
+        }
+        return lastLine;
     }
 }
