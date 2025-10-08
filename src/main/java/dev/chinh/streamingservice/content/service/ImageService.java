@@ -112,7 +112,7 @@ public class ImageService extends MediaService {
         System.out.println("🧮 Orientation scale: " + scale);
         // return original if original is less or equal to scale already
         if ((isLandscape && height <= res.getResolution()) || (!isLandscape && width <= res.getResolution())) {
-            return getUrlAsRedirectResponse(nginxUrl);
+            return getUrlAsRedirectResponse(nginxUrl, false);
         }
 
         // 2. Build cache path {temp dir}/image-cache/{bucket}/{key}_{res}.{format}
@@ -145,18 +145,18 @@ public class ImageService extends MediaService {
         }
 
         String cachedImageUrl = "/cache/" + mediaDescriptor.getBucket() + "/" + mediaDescriptor.getPath() + "/" + cacheFileName;
-        return getUrlAsRedirectResponse(cachedImageUrl);
+        return getUrlAsRedirectResponse(cachedImageUrl, true);
     }
 
     public ResponseEntity<Void> getOriginalImageURL(Long albumId, String key, int expiry) throws Exception {
         MediaDescriptor mediaDescriptor = getMediaDescriptor(albumId);
         String signedUrl = minIOService.getSignedUrlForHostNginx(mediaDescriptor.getBucket(),
                 Paths.get(mediaDescriptor.getPath(), key).toString(), expiry);
-        return getUrlAsRedirectResponse(signedUrl);
+        return getUrlAsRedirectResponse(signedUrl, false);
     }
 
-    private ResponseEntity<Void> getUrlAsRedirectResponse(String signedUrl) {
-        String encodedPath = UriUtils.encodePath(signedUrl, StandardCharsets.UTF_8);
+    private ResponseEntity<Void> getUrlAsRedirectResponse(String signedUrl, boolean encodePath) {
+        String encodedPath = encodePath ? UriUtils.encodePath(signedUrl, StandardCharsets.UTF_8) : signedUrl;
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(URI.create(encodedPath));
         return new ResponseEntity<>(headers, HttpStatus.FOUND);
