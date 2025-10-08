@@ -163,21 +163,6 @@ public class VideoService extends MediaService {
         return (width >= height) ? "scale=-2:" + target : "scale=" + target + ":-2";
     }
 
-    private void runAndLog(String[] cmd) throws Exception {
-        Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                //System.out.println("[ffmpeg] " + line);
-            }
-        }
-        int exit = process.waitFor();
-        System.out.println("ffmpeg exited with code " + exit);
-        if (exit != 0) {
-            throw new RuntimeException("Command failed with code " + exit);
-        }
-    }
-
     private void runAndLogAsync(String[] cmd) throws Exception {
         Process process = new ProcessBuilder(cmd)
                 .redirectErrorStream(true)
