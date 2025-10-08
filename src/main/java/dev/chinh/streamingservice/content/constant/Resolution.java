@@ -4,6 +4,7 @@ import lombok.Getter;
 
 @Getter
 public enum Resolution {
+    original(-1),
     p2160(2160),
     p1440(1440),
     p1080(1080),
