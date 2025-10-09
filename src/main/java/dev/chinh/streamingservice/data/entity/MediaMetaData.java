@@ -15,52 +15,12 @@ import java.util.List;
 @NoArgsConstructor
 @Entity
 @Table(name = "media")
-public class MediaMetaData implements MediaDescriptor {
+public class MediaMetaData extends MediaDescription {
 
     // Classification (will also be stored in search for fast information display)
     @JsonProperty(ContentMetaData.ID)
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @JsonProperty(ContentMetaData.BUCKET)
-    @Column(nullable = false)
-    private String bucket;
-
-    @JsonProperty(ContentMetaData.PARENT_PATH)
-    @Column(nullable = false)
-    private String parentPath;
-
-    @JsonProperty(ContentMetaData.KEY)
-    private String key;        // if key exist then is an individual content, otherwise use parentPath for album
-
-    @JsonProperty(ContentMetaData.THUMBNAIL)
-    @Column(nullable = false)
-    private String thumbnail;
-
-    @JsonProperty(ContentMetaData.WIDTH)
-    @Column(nullable = false)
-    private Integer width;
-
-    @JsonProperty(ContentMetaData.HEIGHT)
-    @Column(nullable = false)
-    private Integer height;
-
-    // Search Fields
-    @JsonProperty(ContentMetaData.TITLE)
-    @Column(nullable = false)
-    private String title;
-
-    @JsonProperty(ContentMetaData.UPLOAD_DATE)
-    @Column(nullable = false)
-    private LocalDate uploadDate;
-
-    @JsonProperty(ContentMetaData.YEAR)
-    @Column(nullable = false)
-    private Integer year;
-
-    @JsonProperty(ContentMetaData.LENGTH)
-    @Column(nullable = false)
-    private Integer length;
 
     @JsonProperty(ContentMetaData.TAGS)
     @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE }, fetch = FetchType.LAZY)
@@ -111,24 +71,4 @@ public class MediaMetaData implements MediaDescriptor {
     // Grouping (optional)
     @OneToOne(fetch = FetchType.LAZY)
     private MediaGroupMetaData groupMetaData;
-
-    @Override
-    public String getPath() {
-        return parentPath + (key == null ? "" : ('/' + key));
-    }
-
-    @Override
-    public boolean hasKey() {
-        return key != null && !key.isEmpty();
-    }
-
-    @Override
-    public String getThumbnail() {
-        return thumbnail;
-    }
-
-    @Override
-    public boolean hasThumbnail() {
-        return thumbnail != null && !thumbnail.isEmpty();
-    }
 }

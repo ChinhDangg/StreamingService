@@ -5,7 +5,7 @@ import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.data.MediaMetaDataRepository;
-import dev.chinh.streamingservice.data.entity.MediaDescriptor;
+import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.exception.ResourceNotFoundException;
 import io.minio.Result;
 import io.minio.errors.*;
@@ -39,52 +39,50 @@ public class ImageService extends MediaService {
     public record MediaUrl(MediaType type, String url) {}
 
     public List<MediaUrl> getAllMediaInAnAlbum(Long albumId, Resolution resolution) throws ServerException, InsufficientDataException, ErrorResponseException, IOException, NoSuchAlgorithmException, InvalidKeyException, InvalidResponseException, XmlParserException, InternalException {
-        MediaDescriptor mediaDescriptor = getMediaDescriptor(albumId);
-        Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaDescriptor.getBucket(), mediaDescriptor.getPath());
+        MediaDescription mediaDescription = getMediaDescription(albumId);
+        Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaDescription.getBucket(), mediaDescription.getPath());
         List<MediaUrl> imageUrls = new ArrayList<>();
         for (Result<Item> result : results) {
             Item item = result.get();
             if (resolution == Resolution.original) {
                 imageUrls.add(new MediaUrl(
                         MediaType.detectMediaType(item.objectName()),
-                        String.format("/original/%s?key=%s", mediaDescriptor.getBucket(), item.objectName().replace(mediaDescriptor.getPath(), ""))
+                        String.format("/original/%s?key=%s", mediaDescription.getBucket(), item.objectName().replace(mediaDescription.getPath(), ""))
                 ));
             } else {
                 imageUrls.add(new MediaUrl(
                         MediaType.detectMediaType(item.objectName()),
-                        String.format("/resize/%s?res=%s&key=%s", mediaDescriptor.getBucket(), Resolution.p1080, item.objectName().replace(mediaDescriptor.getPath(), ""))
+                        String.format("/resize/%s?res=%s&key=%s", mediaDescription.getBucket(), Resolution.p1080, item.objectName().replace(mediaDescription.getPath(), ""))
                 ));
             }
         }
         return imageUrls;
     }
 
-    private MediaDescriptor getMediaDescriptor(Long albumId) {
-        MediaDescriptor mediaDescriptor = getCachedMediaSearchItem(String.valueOf(albumId));
-        if (mediaDescriptor == null) {
-            mediaDescriptor = findMediaMetaDataAllInfo(albumId);
-        }
-        if (mediaDescriptor.hasKey())
+    @Override
+    protected MediaDescription getMediaDescription(long albumId) {
+        MediaDescription mediaDescription = super.getMediaDescription(albumId);
+        if (mediaDescription.hasKey())
             throw new IllegalStateException("Not an album, individual media found: " + albumId);
-        return mediaDescriptor;
+        return mediaDescription;
     }
 
     public ResponseEntity<Void> getResizedImageURL(Long albumId, String key, Resolution res,
                                                    HttpServletRequest request) throws Exception {
-        MediaDescriptor mediaDescriptor = getMediaDescriptor(albumId);
+        MediaDescription mediaDescription = getMediaDescription(albumId);
 
         String originalExtension = key.contains(".") ? key.substring(key.lastIndexOf(".") + 1)
                 .toLowerCase() : "jpg";
         String acceptHeader = request.getHeader("Accept");
         String format = (acceptHeader != null && acceptHeader.contains("image/webp")) ? "webp" : originalExtension;
 
-        Path mediaPath = Paths.get(mediaDescriptor.getPath(), key);
-        if (!minIOService.objectExists(mediaDescriptor.getBucket(), mediaPath.toString())) {
+        Path mediaPath = Paths.get(mediaDescription.getPath(), key);
+        if (!minIOService.objectExists(mediaDescription.getBucket(), mediaPath.toString())) {
             throw new ResourceNotFoundException("Object not found: " + key);
         }
 
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(
-                mediaDescriptor.getBucket(), mediaPath.toString(), 30 * 60);
+                mediaDescription.getBucket(), mediaPath.toString(), 30 * 60);
 
         // 2️⃣ Probe image dimensions via ffprobe inside the ffmpeg container
         String[] probeCmd = {
@@ -117,8 +115,8 @@ public class ImageService extends MediaService {
 
         // 2. Build cache path {temp dir}/image-cache/{bucket}/{key}_{res}.{format}
         Path cacheRoot = Paths.get("/image-cache");
-        Path bucketDir = cacheRoot.resolve(mediaDescriptor.getBucket());
-        Path albumDir = bucketDir.resolve(mediaDescriptor.getPath());
+        Path bucketDir = cacheRoot.resolve(mediaDescription.getBucket());
+        Path albumDir = bucketDir.resolve(mediaDescription.getPath());
 
         // Append resolution + format to the file name
         String baseName = key.replaceAll("\\.[^.]+$", ""); // strip extension if present
@@ -144,14 +142,14 @@ public class ImageService extends MediaService {
             runAndLog(dockerCmd);
         }
 
-        String cachedImageUrl = "/cache/" + mediaDescriptor.getBucket() + "/" + mediaDescriptor.getPath() + "/" + cacheFileName;
+        String cachedImageUrl = "/cache/" + mediaDescription.getBucket() + "/" + mediaDescription.getPath() + "/" + cacheFileName;
         return getUrlAsRedirectResponse(cachedImageUrl, true);
     }
 
     public ResponseEntity<Void> getOriginalImageURL(Long albumId, String key, int expiry) throws Exception {
-        MediaDescriptor mediaDescriptor = getMediaDescriptor(albumId);
-        String signedUrl = minIOService.getSignedUrlForHostNginx(mediaDescriptor.getBucket(),
-                Paths.get(mediaDescriptor.getPath(), key).toString(), expiry);
+        MediaDescription mediaDescription = getMediaDescription(albumId);
+        String signedUrl = minIOService.getSignedUrlForHostNginx(mediaDescription.getBucket(),
+                Paths.get(mediaDescription.getPath(), key).toString(), expiry);
         return getUrlAsRedirectResponse(signedUrl, false);
     }
 

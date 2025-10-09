@@ -2,6 +2,7 @@ package dev.chinh.streamingservice.content.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.data.MediaMetaDataRepository;
+import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,13 @@ public abstract class MediaService {
     protected final MinIOService minIOService;
     private final ObjectMapper objectMapper;
     private final MediaMetaDataRepository mediaRepository;
+
+    protected MediaDescription getMediaDescription(long mediaId) {
+        MediaDescription mediaDescription  = getCachedMediaSearchItem(String.valueOf(mediaId));
+        if (mediaDescription == null)
+            mediaDescription = findMediaMetaDataAllInfo(mediaId);
+        return mediaDescription;
+    }
 
     protected MediaSearchItem getCachedMediaSearchItem(String id) {
         return objectMapper.convertValue(redisTemplate.opsForValue().get("media::" + id), MediaSearchItem.class);

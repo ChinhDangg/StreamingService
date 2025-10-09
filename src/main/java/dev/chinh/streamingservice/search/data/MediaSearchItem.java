@@ -3,10 +3,10 @@ package dev.chinh.streamingservice.search.data;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.data.ContentMetaData;
-import dev.chinh.streamingservice.data.entity.MediaDescriptor;
+import dev.chinh.streamingservice.data.entity.MediaDescription;
 import lombok.*;
 
-import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Setter
@@ -14,48 +14,18 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class MediaSearchItem extends MediaSearchRequest implements MediaDescriptor {
+public class MediaSearchItem extends MediaDescription {
 
     @JsonProperty(ContentMetaData.ID)
     private String id;
-    @JsonProperty(ContentMetaData.THUMBNAIL)
-    private String thumbnail;
-    @JsonProperty(ContentMetaData.UPLOAD_DATE)
-    private LocalDate uploadDate;
 
-    // Classification (will also be stored in search for fast information display)
-    @JsonProperty(ContentMetaData.BUCKET)
-    private String bucket;
-    @JsonProperty(ContentMetaData.PARENT_PATH)
-    private String parentPath;
-    @JsonProperty(ContentMetaData.KEY)
-    private String key;  // if key exist then is an individual content item, otherwise use parentPath for grouping
-    @JsonProperty(ContentMetaData.WIDTH)
-    private Integer width;
-    @JsonProperty(ContentMetaData.HEIGHT)
-    private Integer height;
+    @JsonProperty(ContentMetaData.TAGS)
+    private List<String> tags;
+    @JsonProperty(ContentMetaData.CHARACTERS)
+    private List<String> characters;
+    @JsonProperty(ContentMetaData.UNIVERSES)
+    private List<String> universes;
+    @JsonProperty(ContentMetaData.AUTHORS)
+    private List<String> authors;
 
-    @Override
-    public String getPath() {
-        return parentPath + (key == null ? "" : ('/' + key));
-    }
-
-    /**
-     * If media have key then it is path to an individual item.
-     * Else, the path is the parent path to list of items.
-     */
-    @Override
-    public boolean hasKey() {
-        return key != null && !key.isEmpty();
-    }
-
-    @Override
-    public String getThumbnail() {
-        return thumbnail;
-    }
-
-    @Override
-    public boolean hasThumbnail() {
-        return thumbnail != null && !thumbnail.isEmpty();
-    }
 }

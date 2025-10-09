@@ -4,11 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.data.MediaMetaDataRepository;
-import dev.chinh.streamingservice.data.entity.MediaDescriptor;
+import dev.chinh.streamingservice.data.entity.MediaDescription;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
+import java.util.UUID;
 
 @Service
 public class VideoService extends MediaService {
@@ -21,17 +22,17 @@ public class VideoService extends MediaService {
     private final int extraExpireSeconds = 30 * 60; // 30 minutes
 
     public String getOriginalVideoUrl(Long videoId) throws Exception {
-        MediaDescriptor mediaDescriptor = getMediaDescriptor(videoId);
-        return minIOService.getSignedUrlForHostNginx(mediaDescriptor.getBucket(), mediaDescriptor.getPath(),
-                mediaDescriptor.getLength() + extraExpireSeconds); // video duration + 30 minutes extra
+        MediaDescription mediaDescription = getMediaDescription(videoId);
+        return minIOService.getSignedUrlForHostNginx(mediaDescription.getBucket(), mediaDescription.getPath(),
+                mediaDescription.getLength() + extraExpireSeconds); // video duration + 30 minutes extra
     }
 
     public String getPreviewVideoUrl(Long videoId) throws Exception {
-        MediaDescriptor mediaDescriptor = getMediaDescriptor(videoId);
+        MediaDescription mediaDescription = getMediaDescription(videoId);
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(
-                mediaDescriptor.getBucket(), mediaDescriptor.getPath(), mediaDescriptor.getLength() + extraExpireSeconds);
+                mediaDescription.getBucket(), mediaDescription.getPath(), mediaDescription.getLength() + extraExpireSeconds);
 
-        double duration = mediaDescriptor.getLength();
+        double duration = mediaDescription.getLength();
         int segments = 20;
         double previewLength = duration * 0.10;
         double clipLength = previewLength / segments;
@@ -55,7 +56,7 @@ public class VideoService extends MediaService {
             concatInputs.append(String.format("[v%d][a%d]", i, i));
         }
 
-        String scale = getFfmpegScaleString(mediaDescriptor.getWidth(), mediaDescriptor.getHeight(), resolution);
+        String scale = getFfmpegScaleString(mediaDescription.getWidth(), mediaDescription.getHeight(), resolution);
 
         // concat -> scale
         fc.append(String.format(
@@ -96,16 +97,22 @@ public class VideoService extends MediaService {
         return "/stream/" + videoId + "/preview" + masterFileName;
     }
 
+    private String currentPartialVideoJobId = null;
+
     public String getPartialVideoUrl(Long videoId, Resolution res) throws Exception {
+//        if (currentPartialVideoPid != null) {
+//            OSUtil.stopProcessWithPid(currentPartialVideoPid);
+//        }
+
         // 1. Get a presigned URL with container Nginx so ffmpeg can access in container
         // 2. Rewrite URL to go through Nginx proxy instead of direct MinIO
-        MediaDescriptor mediaDescriptor = getMediaDescriptor(videoId);
-        String nginxUrl = minIOService.getSignedUrlForContainerNginx(mediaDescriptor.getBucket(),
-                mediaDescriptor.getPath(), mediaDescriptor.getLength() + extraExpireSeconds);
+        MediaDescription mediaDescription = getMediaDescription(videoId);
+        String nginxUrl = minIOService.getSignedUrlForContainerNginx(mediaDescription.getBucket(),
+                mediaDescription.getPath(), mediaDescription.getLength() + extraExpireSeconds);
 
         // 3. Host vs container paths
         String masterFileName = "/master.m3u8";
-        String videoDir = videoId + "/preview";
+        String videoDir = videoId + "/partial";
         String containerDir = "/chunks/" + videoDir;
         String outPath = containerDir + masterFileName;
         if (!OSUtil.createTempDir(videoDir)) {
@@ -113,8 +120,9 @@ public class VideoService extends MediaService {
         }
 
         String scale = getFfmpegScaleString(
-                mediaDescriptor.getWidth(), mediaDescriptor.getHeight(), res.getResolution());
+                mediaDescription.getWidth(), mediaDescription.getHeight(), res.getResolution());
 
+        currentPartialVideoJobId = UUID.randomUUID().toString();
         // 4. ffmpeg command (no mkdir -p needed, dir already exists)
         String[] command = {
                 "docker", "exec", "ffmpeg",   // run inside ffmpeg container
@@ -124,13 +132,22 @@ public class VideoService extends MediaService {
                 "-c:v", "h264",               // encode video with H.264 codec
                 "-preset", "veryfast",        // encoder speed/efficiency tradeoff: "veryfast" = low CPU, larger file
                 "-c:a", "aac",                // encode audio with AAC codec
+                "-metadata", "job_id=" + currentPartialVideoJobId,   // unique tag
                 "-f", "hls",                  // output format = HTTP Live Streaming (HLS)
                 "-hls_time", "4",             // segment duration: ~4 seconds per .ts file
                 "-hls_list_size", "0",        // keep ALL segments in playlist (0 = unlimited)
                 outPath                       // output playlist path: /chunks/<videoId>/partial/master.m3u8
         };
 
-        runAndLogAsync(command);
+        //runAndLogAsync(command);
+
+        Thread.sleep(1000);
+        runAndLog(
+                new String[] {
+                        "docker", "exec", "ffmpeg",
+                        "pkill", "-f", "job_id=" + currentPartialVideoJobId
+                }
+        );
 
         // check the master file has been created. maybe check first chunks being created for smoother experience
         checkPlaylistCreated(videoDir + masterFileName);
@@ -139,14 +156,16 @@ public class VideoService extends MediaService {
         return "/stream/" + videoId + "/partial" + masterFileName;
     }
 
-    private MediaDescriptor getMediaDescriptor(Long videoId) {
-        MediaDescriptor mediaDescriptor = getCachedMediaSearchItem(String.valueOf(videoId));
-        if (mediaDescriptor == null) {
-            mediaDescriptor = findMediaMetaDataAllInfo(videoId);
-        }
-        if (!mediaDescriptor.hasKey())
+    private void cacheTempVideoMetadata() {
+
+    }
+
+    @Override
+    protected MediaDescription getMediaDescription(long videoId) {
+        MediaDescription mediaDescription = super.getMediaDescription(videoId);
+        if (!mediaDescription.hasKey())
             throw new IllegalStateException("Requested video media does not has key with id: " + videoId);
-        return mediaDescriptor;
+        return mediaDescription;
     }
 
     private void checkPlaylistCreated(String playlist) throws IOException, InterruptedException {
@@ -176,7 +195,7 @@ public class VideoService extends MediaService {
                     System.out.println("[ffmpeg] " + line);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                throw new RuntimeException(e);
             }
             try {
                 int exit = process.waitFor();
