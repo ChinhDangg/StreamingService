@@ -45,45 +45,6 @@ public class OpenSearchService {
 
     private final RestHighLevelClient client;
 
-    public static void main(String[] args) throws IOException, URISyntaxException {
-        //createIndexWithMapping();
-
-//        Map<String, Object> doc = new HashMap<>();
-//        doc.put("title", "The Matrix 1");
-//        doc.put("tags", List.of("sci-fi", "action"));
-//        doc.put("characters", List.of("Neo", "Trinity"));
-//        doc.put("universes", List.of("The Matrix"));
-//        doc.put("authors", List.of("Wachowski Sisters"));
-//        doc.put("uploadDate", "1997-03-31");
-//        doc.put("year", 1997)
-
-//        doc.put("id", 3L);
-//        doc.put("bucket", "3dvid");
-//        doc.put("parentPath", "");
-//        doc.put("key", "2b.mp4");
-//        doc.put("thumbnail", "");
-//        doc.put("length", 2400);
-//        indexDocument(3L, doc);
-
-        //System.out.println(search("Matrix", 0, 10, true, SortOrder.DESC));
-        //searchMatchByOneField("1999-03-31", "uploadDate", 0, 10, true, SortOrder.DESC);
-        //searchTermByOneField(List.of("1999"), "year", 0, 10, true, SortOrder.DESC);
-
-//        Map<String, Collection<Object>> fieldValues = new HashMap<>();
-//        fieldValues.put("title", List.of("The Matrix"));
-//        fieldValues.put("characters", List.of("Neo"));
-//        advanceSearch(fieldValues, 0, 10, true, SortOrder.DESC);
-
-//        Map<String, Object> updateFields = new HashMap<>();
-//        updateFields.put("tags", List.of("tag1", "tag2"));
-//        partialUpdateDocument(updateFields);
-
-        //addValueToFieldInDocument(1, "tags", "tag3");
-
-        //updateMapping("year", "integer");
-        //deleteDocument(1);
-    }
-
     // http://localhost:9200/media
     public void createIndexWithMapping() throws IOException {
         String mappingJson = loadMapping("mapping/media-mapping.json");
@@ -153,8 +114,8 @@ public class OpenSearchService {
      * Will add new fields if doesn't exist previously.
      * @param updateFields String-name of the field; Object-values
      */
-    public void partialUpdateDocument(Map<String, Object> updateFields) throws IOException {
-        UpdateRequest request = new UpdateRequest("media", "1")
+    public void partialUpdateDocument(long id, Map<String, Object> updateFields) throws IOException {
+        UpdateRequest request = new UpdateRequest("media", String.valueOf(id))
                 .doc(updateFields);
 
         UpdateResponse response = client.update(request, RequestOptions.DEFAULT);
