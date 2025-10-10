@@ -179,10 +179,6 @@ public class VideoService extends MediaService {
         }
     }
 
-    private String getFfmpegScaleString(int width, int height, int target) {
-        return (width >= height) ? "scale=-2:" + target : "scale=" + target + ":-2";
-    }
-
     private void runAndLogAsync(String[] cmd) throws Exception {
         Process process = new ProcessBuilder(cmd)
                 .redirectErrorStream(true)

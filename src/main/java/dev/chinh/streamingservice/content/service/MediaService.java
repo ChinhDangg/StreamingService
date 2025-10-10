@@ -44,6 +44,18 @@ public abstract class MediaService {
         redisTemplate.opsForValue().set(id, item, Duration.ofHours(1));
     }
 
+    protected String getFfmpegScaleString(int width, int height, int target) {
+        return (width >= height) ? "scale=-2:" + target : "scale=" + target + ":-2";
+    }
+
+    protected boolean checkSrcSmallerThanTarget(int width, int height, int target) {
+        if (width >= height) { // Landscape
+            return height <= target;
+        } else { // Portrait
+            return width <= target;
+        }
+    }
+
     protected String runAndLog(String[] cmd, List<Integer> acceptableCode) throws Exception {
         Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
         String line, lastLine = null;

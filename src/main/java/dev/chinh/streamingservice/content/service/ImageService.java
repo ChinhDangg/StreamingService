@@ -84,7 +84,7 @@ public class ImageService extends MediaService {
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(
                 mediaDescription.getBucket(), mediaPath.toString(), 30 * 60);
 
-        // 2️⃣ Probe image dimensions via ffprobe inside the ffmpeg container
+        // Probe image dimensions via ffprobe inside the ffmpeg container
         String[] probeCmd = {
                 "docker", "exec", "ffmpeg",
                 "ffprobe", "-v", "error",
@@ -98,18 +98,9 @@ public class ImageService extends MediaService {
         int height = Integer.parseInt(parts[1]);
         System.out.printf("📏 Original: %dx%d%n", width, height);
 
-        // 3️⃣ Decide scaling direction automatically
-        String scale;
-        boolean isLandscape = false;
-        if (width >= height) { // Landscape → limit by height 1080
-            scale = "-1:" + res.getResolution();
-            isLandscape = true;
-        } else { // Portrait → limit by width 1080
-            scale = res.getResolution() + ":-1";
-        }
-        System.out.println("🧮 Orientation scale: " + scale);
+        String scale = getFfmpegScaleString(width, height, res.getResolution());
         // return original if original is less or equal to scale already
-        if ((isLandscape && height <= res.getResolution()) || (!isLandscape && width <= res.getResolution())) {
+        if (checkSrcSmallerThanTarget(width, height, res.getResolution())) {
             return getUrlAsRedirectResponse(nginxUrl, false);
         }
 
@@ -132,7 +123,7 @@ public class ImageService extends MediaService {
             String outputPath = "/chunks/" + cachePath;
             String ffmpegCmd = String.format(
                     "ffmpeg -y -hide_banner -loglevel info " +
-                            "-i \"%s\" -vf scale=%s -q:v 2 \"%s\"",
+                            "-i \"%s\" -vf %s -q:v 2 \"%s\"",
                     nginxUrl, scale, outputPath
             );
             String[] dockerCmd = {
