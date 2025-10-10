@@ -101,17 +101,20 @@ public class VideoService extends MediaService {
     private String currentPartialVideoJobId = null;
 
     public String getPartialVideoUrl(Long videoId, Resolution res) throws Exception {
+        MediaDescription mediaDescription = getMediaDescription(videoId);
+        if (checkSrcSmallerThanTarget(mediaDescription.getWidth(), mediaDescription.getHeight(), res.getResolution()))
+            return getOriginalVideoUrl(videoId);
+
         if (currentPartialVideoJobId != null) {
             stopFfmpegJob(currentPartialVideoJobId);
         }
 
         // 1. Get a presigned URL with container Nginx so ffmpeg can access in container
         // 2. Rewrite URL to go through Nginx proxy instead of direct MinIO
-        MediaDescription mediaDescription = getMediaDescription(videoId);
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(mediaDescription.getBucket(),
                 mediaDescription.getPath(), mediaDescription.getLength() + extraExpireSeconds);
 
-        // 3. Host vs container paths
+        // 3. container paths
         String masterFileName = "/master.m3u8";
         String videoDir = videoId + "/partial";
         String containerDir = "/chunks/" + videoDir;

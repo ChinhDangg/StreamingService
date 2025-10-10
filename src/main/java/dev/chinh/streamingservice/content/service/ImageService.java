@@ -59,14 +59,6 @@ public class ImageService extends MediaService {
         return imageUrls;
     }
 
-    @Override
-    protected MediaDescription getMediaDescription(long albumId) {
-        MediaDescription mediaDescription = super.getMediaDescription(albumId);
-        if (mediaDescription.hasKey())
-            throw new IllegalStateException("Not an album, individual media found: " + albumId);
-        return mediaDescription;
-    }
-
     public ResponseEntity<Void> getResizedImageURL(Long albumId, String key, Resolution res,
                                                    HttpServletRequest request) throws Exception {
         MediaDescription mediaDescription = getMediaDescription(albumId);
@@ -135,6 +127,14 @@ public class ImageService extends MediaService {
 
         String cachedImageUrl = "/cache/" + mediaDescription.getBucket() + "/" + mediaDescription.getPath() + "/" + cacheFileName;
         return getUrlAsRedirectResponse(cachedImageUrl, true);
+    }
+
+    @Override
+    protected MediaDescription getMediaDescription(long albumId) {
+        MediaDescription mediaDescription = super.getMediaDescription(albumId);
+        if (mediaDescription.hasKey())
+            throw new IllegalStateException("Not an album, individual media found: " + albumId);
+        return mediaDescription;
     }
 
     public ResponseEntity<Void> getOriginalImageURL(Long albumId, String key, int expiry) throws Exception {
