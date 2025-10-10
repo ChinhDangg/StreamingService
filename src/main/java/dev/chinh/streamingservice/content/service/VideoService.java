@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.content.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.Resolution;
@@ -9,7 +10,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -114,7 +114,7 @@ public class VideoService extends MediaService {
 
         // 1. container paths
         String masterFileName = "/master.m3u8";
-        String videoDir = videoId + "/partial";
+        String videoDir = videoId + "/" + res + "/partial";
         String containerDir = "/chunks/" + videoDir;
         String outPath = containerDir + masterFileName;
         if (!OSUtil.createTempDir(videoDir)) {
@@ -152,7 +152,7 @@ public class VideoService extends MediaService {
         checkPlaylistCreated(videoDir + masterFileName);
 
         // 5. Return playlist URL for browser
-        return "/stream/" + videoId + "/partial" + masterFileName;
+        return "/stream/" + videoId + "/" + res + "/partial" + masterFileName;
     }
 
     private void cacheTempVideoWorkCount(String id, String jobId) {
@@ -161,8 +161,23 @@ public class VideoService extends MediaService {
         redisTemplate.opsForValue().set(id, Map.of(jobId, count));
     }
 
+    @SuppressWarnings("unchecked")
     private HashMap<String, Integer> getCacheTempVideoWorkCount(String id) {
-        return redisTemplate.opsForValue().get(id);
+        Object value = redisTemplate.opsForValue().get(id);
+        if (value == null) return null;
+
+        try {
+            if (value instanceof Map<?, ?> map) {
+                return (HashMap<String, Integer>) map; // just one entry, cast directly
+            } else if (value instanceof String str) {
+                ObjectMapper mapper = new ObjectMapper();
+                return mapper.readValue(str, new TypeReference<>() {});
+            } else {
+                throw new IllegalArgumentException("Unexpected Redis value type: " + value.getClass());
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to convert Redis value for key: " + id, e);
+        }
     }
 
     private void stopFfmpegJob(String jobId) throws Exception {
