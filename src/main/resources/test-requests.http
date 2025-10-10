@@ -1,0 +1,12 @@
+###
+POST http://localhost/api/search?
+    searchString=Nier Automata&
+    page=0&
+    sortByYear=false&
+    sortOrder=DESC
+
+###
+GET http://localhost/api/videos/preview/1
+
+###
+GET http://localhost/api/videos/partial/1/p360
