@@ -9,7 +9,10 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
+import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -109,12 +112,7 @@ public class VideoService extends MediaService {
             stopFfmpegJob(currentPartialVideoJobId);
         }
 
-        // 1. Get a presigned URL with container Nginx so ffmpeg can access in container
-        // 2. Rewrite URL to go through Nginx proxy instead of direct MinIO
-        String nginxUrl = minIOService.getSignedUrlForContainerNginx(mediaDescription.getBucket(),
-                mediaDescription.getPath(), mediaDescription.getLength() + extraExpireSeconds);
-
-        // 3. container paths
+        // 1. container paths
         String masterFileName = "/master.m3u8";
         String videoDir = videoId + "/partial";
         String containerDir = "/chunks/" + videoDir;
@@ -122,6 +120,11 @@ public class VideoService extends MediaService {
         if (!OSUtil.createTempDir(videoDir)) {
             throw new IOException("Failed to create temporary directory: " + videoDir);
         }
+
+        // 2. Get a presigned URL with container Nginx so ffmpeg can access in container
+        // 3. Rewrite URL to go through Nginx proxy instead of direct MinIO
+        String nginxUrl = minIOService.getSignedUrlForContainerNginx(mediaDescription.getBucket(),
+                mediaDescription.getPath(), mediaDescription.getLength() + extraExpireSeconds);
 
         String scale = getFfmpegScaleString(
                 mediaDescription.getWidth(), mediaDescription.getHeight(), res.getResolution());
@@ -152,8 +155,14 @@ public class VideoService extends MediaService {
         return "/stream/" + videoId + "/partial" + masterFileName;
     }
 
-    private void cacheTempVideoMetadata() {
+    private void cacheTempVideoWorkCount(String id, String jobId) {
+        Integer prevCount = (Integer) redisTemplate.opsForValue().get(id);
+        int count = prevCount == null ? 1 : prevCount + 1;
+        redisTemplate.opsForValue().set(id, Map.of(jobId, count));
+    }
 
+    private HashMap<String, Integer> getCacheTempVideoWorkCount(String id) {
+        return redisTemplate.opsForValue().get(id);
     }
 
     private void stopFfmpegJob(String jobId) throws Exception {
