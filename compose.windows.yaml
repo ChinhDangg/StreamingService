@@ -23,7 +23,7 @@ services:
       - chunks:/chunks   # use shared tmpfs volume
 
   nginx:
-    image: nginx:latest
+    image: openresty/openresty:latest
     container_name: nginx
     ports:
       - "80:80"
@@ -31,8 +31,9 @@ services:
       - minio
       - ffmpeg
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - chunks:/chunks   # mount same tmpfs volume
+      - ./nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - chunks:/chunks
+    # docker exec -it nginx nginx -V #check for config being applied or not - --config-path=
 
   opensearch:
     image: opensearchproject/opensearch:2.15.0
