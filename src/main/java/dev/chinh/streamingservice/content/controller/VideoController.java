@@ -24,9 +24,10 @@ public class VideoController {
         return ResponseEntity.ok(videoService.getPreviewVideoUrl(id));
     }
 
-    @GetMapping("/partial/{id}")
-    private ResponseEntity<String> getTranscodeFull(@PathVariable Long id) throws Exception {
-        return ResponseEntity.ok(videoService.getPartialVideoUrl(id, Resolution.p360));
+    @GetMapping("/partial/{id}/{resolution}")
+    private ResponseEntity<String> getTranscodeFull(@PathVariable Long id,
+                                                    @PathVariable Resolution resolution) throws Exception {
+        return ResponseEntity.ok(videoService.getPartialVideoUrl(id, resolution));
     }
 
 }
