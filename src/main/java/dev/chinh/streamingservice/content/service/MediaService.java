@@ -11,6 +11,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.Duration;
+import java.util.List;
 
 @RequiredArgsConstructor
 public abstract class MediaService {
@@ -43,7 +44,7 @@ public abstract class MediaService {
         redisTemplate.opsForValue().set(id, item, Duration.ofHours(1));
     }
 
-    protected String runAndLog(String[] cmd) throws Exception {
+    protected String runAndLog(String[] cmd, List<Integer> acceptableCode) throws Exception {
         Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
         String line, lastLine = null;
         try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
@@ -54,7 +55,7 @@ public abstract class MediaService {
         }
         int exit = process.waitFor();
         System.out.println("ffmpeg exited with code " + exit);
-        if (exit != 0) {
+        if (exit != 0 && (acceptableCode != null && !acceptableCode.contains(exit))) {
             throw new RuntimeException("Command failed with code " + exit);
         }
         return lastLine;

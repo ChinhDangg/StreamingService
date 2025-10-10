@@ -92,7 +92,7 @@ public class ImageService extends MediaService {
                 "-of", "csv=p=0:s=x",
                 nginxUrl
         };
-        String dimensions = runAndLog(probeCmd);
+        String dimensions = runAndLog(probeCmd, null);
         String[] parts = dimensions.split("x");
         int width = Integer.parseInt(parts[0]);
         int height = Integer.parseInt(parts[1]);
@@ -139,7 +139,7 @@ public class ImageService extends MediaService {
                     "docker", "exec", "ffmpeg",
                     "bash", "-c", ffmpegCmd
             };
-            runAndLog(dockerCmd);
+            runAndLog(dockerCmd, null);
         }
 
         String cachedImageUrl = "/cache/" + mediaDescription.getBucket() + "/" + mediaDescription.getPath() + "/" + cacheFileName;

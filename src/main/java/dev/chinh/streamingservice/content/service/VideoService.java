@@ -9,6 +9,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -100,9 +101,9 @@ public class VideoService extends MediaService {
     private String currentPartialVideoJobId = null;
 
     public String getPartialVideoUrl(Long videoId, Resolution res) throws Exception {
-//        if (currentPartialVideoPid != null) {
-//            OSUtil.stopProcessWithPid(currentPartialVideoPid);
-//        }
+        if (currentPartialVideoJobId != null) {
+            stopFfmpegJob(currentPartialVideoJobId);
+        }
 
         // 1. Get a presigned URL with container Nginx so ffmpeg can access in container
         // 2. Rewrite URL to go through Nginx proxy instead of direct MinIO
@@ -139,15 +140,7 @@ public class VideoService extends MediaService {
                 outPath                       // output playlist path: /chunks/<videoId>/partial/master.m3u8
         };
 
-        //runAndLogAsync(command);
-
-        Thread.sleep(1000);
-        runAndLog(
-                new String[] {
-                        "docker", "exec", "ffmpeg",
-                        "pkill", "-f", "job_id=" + currentPartialVideoJobId
-                }
-        );
+        runAndLogAsync(command);
 
         // check the master file has been created. maybe check first chunks being created for smoother experience
         checkPlaylistCreated(videoDir + masterFileName);
@@ -158,6 +151,14 @@ public class VideoService extends MediaService {
 
     private void cacheTempVideoMetadata() {
 
+    }
+
+    private void stopFfmpegJob(String jobId) throws Exception {
+        runAndLog(new String[] {
+                        "docker", "exec", "ffmpeg",
+                        "pkill", "-f", "job_id=" + jobId
+                }, List.of(1)
+        );
     }
 
     @Override
@@ -200,6 +201,7 @@ public class VideoService extends MediaService {
             try {
                 int exit = process.waitFor();
                 System.out.println("ffmpeg exited with code " + exit);
+                currentPartialVideoJobId = null;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
