@@ -114,6 +114,14 @@ public class VideoService extends MediaService {
             throw new IOException("Failed to create temporary directory: " + videoDir);
         }
 
+        String cacheJobId = getCachePartialJobId(videoId, res);
+        Map<Object, Object> cachedJob = getCacheTempVideoProcess(cacheJobId);
+
+        if (!cachedJob.isEmpty()) {
+            System.out.println("cachedJob: " + cachedJob);
+            return "/stream/" + videoId + "/" + res + "/partial" + masterFileName;
+        }
+
         // 2. Get a presigned URL with container Nginx so ffmpeg can access in container
         // 3. Rewrite URL to go through Nginx proxy instead of direct MinIO
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(mediaDescription.getBucket(),
@@ -139,8 +147,6 @@ public class VideoService extends MediaService {
                 outPath                       // output playlist path: /chunks/<videoId>/partial/master.m3u8
         };
 
-        String cacheJobId = getCachePartialJobId(videoId, res);
-
         runAndLogAsync(command, cacheJobId);
 
         cacheTempVideoProcess(cacheJobId, partialVideoJobId, MediaJobStatus.RUNNING);
@@ -153,7 +159,8 @@ public class VideoService extends MediaService {
     }
 
     private void cacheTempVideoProcess(String id, String jobId, MediaJobStatus status) {
-        redisTemplate.opsForHash().put(id, "jobId", jobId);
+        if (jobId != null)
+            redisTemplate.opsForHash().put(id, "jobId", jobId);
         redisTemplate.opsForHash().put(id, "status", status);
     }
 
@@ -163,6 +170,10 @@ public class VideoService extends MediaService {
 
     private String getCachePartialJobId(long videoId, Resolution res) {
         return "partial:" + videoId + ":" + res;
+    }
+
+    private String getCachePreviewJobId(long videoId, Resolution res) {
+        return "preview:" + videoId + ":" + res;
     }
 
     private void stopFfmpegJob(String jobId) throws Exception {
@@ -209,7 +220,7 @@ public class VideoService extends MediaService {
             try {
                 int exit = process.waitFor();
                 System.out.println("ffmpeg exited with code " + exit);
-                // mark as completed, jobId can be set to null as no longer needed for finished job
+                // mark as completed
                 if (videoId != null)
                     cacheTempVideoProcess(videoId, null, MediaJobStatus.COMPLETED);
             } catch (InterruptedException e) {
