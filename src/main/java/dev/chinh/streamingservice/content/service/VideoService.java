@@ -1,8 +1,8 @@
 package dev.chinh.streamingservice.content.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.OSUtil;
+import dev.chinh.streamingservice.content.constant.MediaJobStatus;
 import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.data.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
@@ -10,7 +10,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -94,23 +93,17 @@ public class VideoService extends MediaService {
                 "-hls_list_size", "0",
                 outPath
         };
-        runAndLogAsync(hlsCmd);
+        runAndLogAsync(hlsCmd, null);
 
         checkPlaylistCreated(videoDir + masterFileName);
 
         return "/stream/" + videoId + "/preview" + masterFileName;
     }
 
-    private String currentPartialVideoJobId = null;
-
     public String getPartialVideoUrl(Long videoId, Resolution res) throws Exception {
         MediaDescription mediaDescription = getMediaDescription(videoId);
         if (checkSrcSmallerThanTarget(mediaDescription.getWidth(), mediaDescription.getHeight(), res.getResolution()))
             return getOriginalVideoUrl(videoId);
-
-        if (currentPartialVideoJobId != null) {
-            stopFfmpegJob(currentPartialVideoJobId);
-        }
 
         // 1. container paths
         String masterFileName = "/master.m3u8";
@@ -129,7 +122,7 @@ public class VideoService extends MediaService {
         String scale = getFfmpegScaleString(
                 mediaDescription.getWidth(), mediaDescription.getHeight(), res.getResolution());
 
-        currentPartialVideoJobId = UUID.randomUUID().toString();
+        String partialVideoJobId = UUID.randomUUID().toString();
         // 4. ffmpeg command (no mkdir -p needed, dir already exists)
         String[] command = {
                 "docker", "exec", "ffmpeg",   // run inside ffmpeg container
@@ -139,14 +132,18 @@ public class VideoService extends MediaService {
                 "-c:v", "h264",               // encode video with H.264 codec
                 "-preset", "veryfast",        // encoder speed/efficiency tradeoff: "veryfast" = low CPU, larger file
                 "-c:a", "aac",                // encode audio with AAC codec
-                "-metadata", "job_id=" + currentPartialVideoJobId,   // unique tag
+                "-metadata", "job_id=" + partialVideoJobId,   // unique tag
                 "-f", "hls",                  // output format = HTTP Live Streaming (HLS)
                 "-hls_time", "4",             // segment duration: ~4 seconds per .ts file
                 "-hls_list_size", "0",        // keep ALL segments in playlist (0 = unlimited)
                 outPath                       // output playlist path: /chunks/<videoId>/partial/master.m3u8
         };
 
-        runAndLogAsync(command);
+        String cacheJobId = getCachePartialJobId(videoId, res);
+
+        runAndLogAsync(command, cacheJobId);
+
+        cacheTempVideoProcess(cacheJobId, partialVideoJobId, MediaJobStatus.RUNNING);
 
         // check the master file has been created. maybe check first chunks being created for smoother experience
         checkPlaylistCreated(videoDir + masterFileName);
@@ -155,29 +152,17 @@ public class VideoService extends MediaService {
         return "/stream/" + videoId + "/" + res + "/partial" + masterFileName;
     }
 
-    private void cacheTempVideoWorkCount(String id, String jobId) {
-        Integer prevCount = (Integer) redisTemplate.opsForValue().get(id);
-        int count = prevCount == null ? 1 : prevCount + 1;
-        redisTemplate.opsForValue().set(id, Map.of(jobId, count));
+    private void cacheTempVideoProcess(String id, String jobId, MediaJobStatus status) {
+        redisTemplate.opsForHash().put(id, "jobId", jobId);
+        redisTemplate.opsForHash().put(id, "status", status);
     }
 
-    @SuppressWarnings("unchecked")
-    private HashMap<String, Integer> getCacheTempVideoWorkCount(String id) {
-        Object value = redisTemplate.opsForValue().get(id);
-        if (value == null) return null;
+    private Map<Object, Object> getCacheTempVideoProcess(String id) {
+        return redisTemplate.opsForHash().entries(id);
+    }
 
-        try {
-            if (value instanceof Map<?, ?> map) {
-                return (HashMap<String, Integer>) map; // just one entry, cast directly
-            } else if (value instanceof String str) {
-                ObjectMapper mapper = new ObjectMapper();
-                return mapper.readValue(str, new TypeReference<>() {});
-            } else {
-                throw new IllegalArgumentException("Unexpected Redis value type: " + value.getClass());
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to convert Redis value for key: " + id, e);
-        }
+    private String getCachePartialJobId(long videoId, Resolution res) {
+        return "partial:" + videoId + ":" + res;
     }
 
     private void stopFfmpegJob(String jobId) throws Exception {
@@ -206,7 +191,7 @@ public class VideoService extends MediaService {
         }
     }
 
-    private void runAndLogAsync(String[] cmd) throws Exception {
+    private void runAndLogAsync(String[] cmd, String videoId) throws Exception {
         Process process = new ProcessBuilder(cmd)
                 .redirectErrorStream(true)
                 .start();
@@ -224,7 +209,9 @@ public class VideoService extends MediaService {
             try {
                 int exit = process.waitFor();
                 System.out.println("ffmpeg exited with code " + exit);
-                currentPartialVideoJobId = null;
+                // mark as completed, jobId can be set to null as no longer needed for finished job
+                if (videoId != null)
+                    cacheTempVideoProcess(videoId, null, MediaJobStatus.COMPLETED);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }

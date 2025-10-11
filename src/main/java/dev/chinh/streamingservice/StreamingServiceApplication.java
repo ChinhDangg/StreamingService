@@ -34,6 +34,8 @@ public class StreamingServiceApplication {
             document.put("height", 1080);
             document.put("id", 1);
             //openSearchService.indexDocument(1, document);
+
+            //openSearchService.createIndexWithMapping();
         };
     }
 }

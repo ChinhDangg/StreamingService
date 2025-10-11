@@ -6,6 +6,30 @@ POST http://localhost/api/search?
     sortOrder=DESC
 
 ###
+POST http://localhost/api/search/keyword?
+    page=0&
+    sortByYear=false&
+    sortOrder=DESC
+Content-Type: application/json
+
+{
+  "field": "universes",
+  "text": ["Nier Automata"]
+}
+
+###
+POST http://localhost/api/search/match?
+    page=0&
+    sortByYear=false&
+    sortOrder=DESC
+Content-Type: application/json
+
+{
+  "field": "universes",
+  "text": ["Nier Automata"]
+}
+
+###
 GET http://localhost/api/videos/preview/1
 
 ###
