@@ -22,7 +22,7 @@ services:
       - ffmpeg
     volumes:
       - ./nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
-      - chunks:/chunks
+      - /Volumes/RAMDISK:/chunks
     # docker exec -it nginx nginx -V #check for config being applied or not - --config-path=
 
   ffmpeg:
@@ -70,21 +70,6 @@ services:
 #    depends_on:
 #      - opensearch
 #      - postgres
-#
-#  opensearch:
-#    image: opensearchproject/opensearch:2.15.0
-#    container_name: opensearch
-#    environment:
-#      - discovery.type=single-node
-#      - bootstrap.memory_lock=true
-#      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
-#    ulimits:
-#      memlock:
-#        soft: -1
-#        hard: -1
-#    ports:
-#      - "9200:9200"
-#      - "9600:9600"
 #
 #  postgres:
 #    image: postgres:18
