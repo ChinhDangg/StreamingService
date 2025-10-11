@@ -31,18 +31,31 @@ public class VideoService extends MediaService {
     }
 
     public String getPreviewVideoUrl(Long videoId) throws Exception {
+        String masterFileName = "/master.m3u8";
+        String videoDir = videoId + "/preview";
+        String containerDir = "/chunks/" + videoDir;
+        String outPath = containerDir + masterFileName;
+
+        // === resolution control ===
+        final Resolution resolution = Resolution.p360;
+
+        String cacheJobId = getCachePreviewJobId(videoId, resolution);
+        var cachedJob = getCacheTempVideoProcess(cacheJobId);
+        if (!cachedJob.isEmpty()) {
+            return "/stream/" + videoId + "/preview" + masterFileName;
+        }
+
+        if (!OSUtil.createTempDir(videoDir)) {
+            throw new IOException("Failed to create temporary directory: " + videoDir);
+        }
+
         MediaDescription mediaDescription = getMediaDescription(videoId);
-        String nginxUrl = minIOService.getSignedUrlForContainerNginx(
-                mediaDescription.getBucket(), mediaDescription.getPath(), mediaDescription.getLength() + extraExpireSeconds);
 
         double duration = mediaDescription.getLength();
         int segments = 20;
         double previewLength = duration * 0.10;
         double clipLength = previewLength / segments;
         double interval = duration / segments;
-
-        // === resolution control ===
-        final int resolution = Resolution.p360.getResolution();
 
         // Build trim chains
         StringBuilder fc = new StringBuilder();
@@ -59,7 +72,7 @@ public class VideoService extends MediaService {
             concatInputs.append(String.format("[v%d][a%d]", i, i));
         }
 
-        String scale = getFfmpegScaleString(mediaDescription.getWidth(), mediaDescription.getHeight(), resolution);
+        String scale = getFfmpegScaleString(mediaDescription.getWidth(), mediaDescription.getHeight(), resolution.getResolution());
 
         // concat -> scale
         fc.append(String.format(
@@ -67,16 +80,10 @@ public class VideoService extends MediaService {
                         "[vcat]%s[v]",                     // scale once after concat
                 concatInputs, segments, scale
         )); // scale=-2:%d[v]
-
         String filterComplex = fc.toString();
 
-        String masterFileName = "/master.m3u8";
-        String videoDir = videoId + "/preview";
-        String containerDir = "/chunks/" + videoDir;
-        String outPath = containerDir + masterFileName;
-        if (!OSUtil.createTempDir(videoDir)) {
-            throw new IOException("Failed to create temporary directory: " + videoDir);
-        }
+        String nginxUrl = minIOService.getSignedUrlForContainerNginx(
+                mediaDescription.getBucket(), mediaDescription.getPath(), mediaDescription.getLength() + extraExpireSeconds);
 
         String[] hlsCmd = {
                 "docker", "exec", "ffmpeg",
@@ -93,7 +100,9 @@ public class VideoService extends MediaService {
                 "-hls_list_size", "0",
                 outPath
         };
-        runAndLogAsync(hlsCmd, null);
+        runAndLogAsync(hlsCmd, cacheJobId);
+
+        cacheTempVideoProcess(cacheJobId, null, MediaJobStatus.RUNNING);
 
         checkPlaylistCreated(videoDir + masterFileName);
 
@@ -101,25 +110,25 @@ public class VideoService extends MediaService {
     }
 
     public String getPartialVideoUrl(Long videoId, Resolution res) throws Exception {
-        MediaDescription mediaDescription = getMediaDescription(videoId);
-        if (checkSrcSmallerThanTarget(mediaDescription.getWidth(), mediaDescription.getHeight(), res.getResolution()))
-            return getOriginalVideoUrl(videoId);
-
         // 1. container paths
         String masterFileName = "/master.m3u8";
         String videoDir = videoId + "/" + res + "/partial";
         String containerDir = "/chunks/" + videoDir;
         String outPath = containerDir + masterFileName;
-        if (!OSUtil.createTempDir(videoDir)) {
-            throw new IOException("Failed to create temporary directory: " + videoDir);
-        }
 
         String cacheJobId = getCachePartialJobId(videoId, res);
         Map<Object, Object> cachedJob = getCacheTempVideoProcess(cacheJobId);
-
         if (!cachedJob.isEmpty()) {
             System.out.println("cachedJob: " + cachedJob);
             return "/stream/" + videoId + "/" + res + "/partial" + masterFileName;
+        }
+
+        MediaDescription mediaDescription = getMediaDescription(videoId);
+        if (checkSrcSmallerThanTarget(mediaDescription.getWidth(), mediaDescription.getHeight(), res.getResolution()))
+            return getOriginalVideoUrl(videoId);
+
+        if (!OSUtil.createTempDir(videoDir)) {
+            throw new IOException("Failed to create temporary directory: " + videoDir);
         }
 
         // 2. Get a presigned URL with container Nginx so ffmpeg can access in container
