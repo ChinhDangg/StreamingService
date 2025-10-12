@@ -10,9 +10,12 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class VideoService extends MediaService {
@@ -118,9 +121,12 @@ public class VideoService extends MediaService {
 
         String cacheJobId = getCachePartialJobId(videoId, res);
         Map<Object, Object> cachedJob = getCacheTempVideoProcess(cacheJobId);
+        boolean prevJobStopped = false;
         if (!cachedJob.isEmpty()) {
-            System.out.println("cachedJob: " + cachedJob);
-            return "/stream/" + videoId + "/" + res + "/partial" + masterFileName;
+            MediaJobStatus status = (MediaJobStatus) cachedJob.get("status");
+            if (status != MediaJobStatus.STOPPED)
+                return "/stream/" + videoId + "/" + res + "/partial" + masterFileName;
+            prevJobStopped = true;
         }
 
         MediaDescription mediaDescription = getMediaDescription(videoId);
@@ -139,9 +145,10 @@ public class VideoService extends MediaService {
         String scale = getFfmpegScaleString(
                 mediaDescription.getWidth(), mediaDescription.getHeight(), res.getResolution());
 
+        int segmentDuration = 4;
         String partialVideoJobId = UUID.randomUUID().toString();
         // 4. ffmpeg command (no mkdir -p needed, dir already exists)
-        String[] command = {
+        List<String> command = new ArrayList<>(List.of(
                 "docker", "exec", "ffmpeg",   // run inside ffmpeg container
                 "ffmpeg", "-y",               // call ffmpeg, overwrite outputs if they exist
                 "-i", nginxUrl,               // input: presigned video URL via Nginx proxy
@@ -149,14 +156,27 @@ public class VideoService extends MediaService {
                 "-c:v", "h264",               // encode video with H.264 codec
                 "-preset", "veryfast",        // encoder speed/efficiency tradeoff: "veryfast" = low CPU, larger file
                 "-c:a", "aac",                // encode audio with AAC codec
-                "-metadata", "job_id=" + partialVideoJobId,   // unique tag
+                "-metadata", "job_id=" + partialVideoJobId,    // unique tag
                 "-f", "hls",                  // output format = HTTP Live Streaming (HLS)
-                "-hls_time", "4",             // segment duration: ~4 seconds per .ts file
+                "-hls_time", String.valueOf(segmentDuration),  // segment duration: ~4 seconds per .ts file
                 "-hls_list_size", "0",        // keep ALL segments in playlist (0 = unlimited)
+                "-hls_flags", "append_list+omit_endlist", // append to existing and don't write ENDLIST to continue later
                 outPath                       // output playlist path: /chunks/<videoId>/partial/master.m3u8
-        };
+        ));
 
-        runAndLogAsync(command, cacheJobId);
+        if (prevJobStopped) {
+            String playListLines = OSUtil.readPlayListFromTempDir(videoDir);
+            if (playListLines != null && !playListLines.isEmpty()) {
+                int lastSegment = findLastSegmentFromPlayList(playListLines);
+                if (lastSegment > 0) {
+                    double resumeAt = lastSegment * segmentDuration;
+                    command.addAll(List.of("-ss", String.valueOf(resumeAt)));
+                    command.addAll(List.of("-start_number", String.valueOf(lastSegment)));
+                }
+            }
+        }
+
+        runAndLogAsync(command.toArray(new String[0]), cacheJobId);
 
         cacheTempVideoProcess(cacheJobId, partialVideoJobId, MediaJobStatus.RUNNING);
 
@@ -164,7 +184,7 @@ public class VideoService extends MediaService {
         checkPlaylistCreated(videoDir + masterFileName);
 
         // 5. Return playlist URL for browser
-        return "/stream/" + videoId + "/" + res + "/partial" + masterFileName;
+        return "/stream/" + videoDir + masterFileName;
     }
 
     private void cacheTempVideoProcess(String id, String jobId, MediaJobStatus status) {
@@ -186,11 +206,23 @@ public class VideoService extends MediaService {
     }
 
     private void stopFfmpegJob(String jobId) throws Exception {
-        runAndLog(new String[] {
-                        "docker", "exec", "ffmpeg",
-                        "pkill", "-f", "job_id=" + jobId
-                }, List.of(1)
-        );
+        runAndLog(new String[]{
+                "docker", "exec", "ffmpeg",
+                "pkill", "-INT", "-f", "job_id=" + jobId
+        }, List.of(1));
+    }
+
+    private int findLastSegmentFromPlayList(String lines) {
+        Pattern pattern = Pattern.compile("master(\\d+)\\.ts");
+        int lastIndex = 0;
+        for (String line : lines.split("\n")) {
+            Matcher matcher = pattern.matcher(line);
+            if (matcher.find()) {
+                int num =  Integer.parseInt(matcher.group(1));
+                if (num > lastIndex) lastIndex = num;
+            }
+        }
+        return lastIndex;
     }
 
     @Override
@@ -230,7 +262,7 @@ public class VideoService extends MediaService {
                 int exit = process.waitFor();
                 System.out.println("ffmpeg exited with code " + exit);
                 // mark as completed
-                if (videoId != null)
+                if (videoId != null && exit == 0)
                     cacheTempVideoProcess(videoId, null, MediaJobStatus.COMPLETED);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
