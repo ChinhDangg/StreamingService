@@ -4,7 +4,10 @@ import org.springframework.stereotype.Component;
 
 import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 
 @Component
@@ -162,6 +165,56 @@ public class OSUtil {
 
     public static void main(String[] args) throws IOException, InterruptedException {
         System.out.println(checkTempFileExists("2b.mp4/preview/master.m3u8"));
+    }
+
+    public static String readPlayListFromTempDir(String videoDir) throws IOException, InterruptedException {
+        if  (currentOS == OS.WINDOWS) {
+            return readPlaylistFromContainer(videoDir);
+        } else if (currentOS == OS.MAC) {
+            return readPlaylistFromRAMDisk(videoDir);
+        }
+        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+    }
+
+    private static String readPlaylistFromRAMDisk(String videoDir) throws IOException {
+        // Base directory for macOS RAMDISK mount — adjust if needed
+        Path playlistPath = Paths.get(RAMDISK, videoDir, "master.m3u8");
+        if (!Files.exists(playlistPath)) {
+            return null;
+        }
+
+        // Efficient tail: only keep last 2 lines
+        Deque<String> lastLines = new ArrayDeque<>(2);
+        try (BufferedReader br = Files.newBufferedReader(playlistPath)) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (lastLines.size() == 2) lastLines.removeFirst();
+                lastLines.addLast(line);
+            }
+        }
+        return String.join("\n", lastLines);
+    }
+
+    private static String readPlaylistFromContainer(String videoDir) throws IOException, InterruptedException {
+        Process process = new ProcessBuilder(
+                "docker", "exec", CONTAINER, "cat", "/chunks/" + videoDir + "/master.m3u8"
+        ).redirectErrorStream(true).start();
+
+        // Only keep the last 2 lines
+        Deque<String> lastLines = new ArrayDeque<>(2);
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (lastLines.size() == 2) lastLines.removeFirst(); // drop oldest
+                lastLines.addLast(line);
+            }
+        }
+        process.waitFor();
+        if (lastLines.isEmpty()) {
+            return null;
+        }
+        // Join the two last lines into a single string
+        return String.join("\n", lastLines);
     }
 
     private static boolean containerFileExists(String relativePath) throws IOException, InterruptedException {
