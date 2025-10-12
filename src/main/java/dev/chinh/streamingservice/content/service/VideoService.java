@@ -105,7 +105,7 @@ public class VideoService extends MediaService {
         };
         runAndLogAsync(hlsCmd, cacheJobId);
 
-        cacheTempVideoProcess(cacheJobId, null, MediaJobStatus.RUNNING);
+        addCacheTempVideoProcess(cacheJobId, null, MediaJobStatus.RUNNING);
 
         checkPlaylistCreated(videoDir + masterFileName);
 
@@ -147,21 +147,10 @@ public class VideoService extends MediaService {
 
         int segmentDuration = 4;
         String partialVideoJobId = UUID.randomUUID().toString();
-        // 4. ffmpeg command (no mkdir -p needed, dir already exists)
+        // 4. ffmpeg command
         List<String> command = new ArrayList<>(List.of(
-                "docker", "exec", "ffmpeg",   // run inside ffmpeg container
-                "ffmpeg", "-y",               // call ffmpeg, overwrite outputs if they exist
-                "-i", nginxUrl,               // input: presigned video URL via Nginx proxy
-                "-vf", scale,                 // video filter: resize to 360p height, keep aspect ratio
-                "-c:v", "h264",               // encode video with H.264 codec
-                "-preset", "veryfast",        // encoder speed/efficiency tradeoff: "veryfast" = low CPU, larger file
-                "-c:a", "aac",                // encode audio with AAC codec
-                "-metadata", "job_id=" + partialVideoJobId,    // unique tag
-                "-f", "hls",                  // output format = HTTP Live Streaming (HLS)
-                "-hls_time", String.valueOf(segmentDuration),  // segment duration: ~4 seconds per .ts file
-                "-hls_list_size", "0",        // keep ALL segments in playlist (0 = unlimited)
-                "-hls_flags", "append_list+omit_endlist", // append to existing and don't write ENDLIST to continue later
-                outPath                       // output playlist path: /chunks/<videoId>/partial/master.m3u8
+                "docker", "exec", "ffmpeg",     // run inside ffmpeg container
+                "ffmpeg", "-y"                  // call ffmpeg, overwrite outputs if they exist
         ));
 
         if (prevJobStopped) {
@@ -171,14 +160,27 @@ public class VideoService extends MediaService {
                 if (lastSegment > 0) {
                     double resumeAt = lastSegment * segmentDuration;
                     command.addAll(List.of("-ss", String.valueOf(resumeAt)));
-                    command.addAll(List.of("-start_number", String.valueOf(lastSegment)));
                 }
             }
         }
 
+        command.addAll(List.of(
+                "-i", nginxUrl,     // input: presigned video URL via Nginx proxy
+                "-vf", scale,                 // video filter: resize to 360p height, keep aspect ratio
+                "-c:v", "h264",               // encode video with H.264 codec
+                "-preset", "veryfast",        // encoder speed/efficiency tradeoff: "veryfast" = low CPU, larger file
+                "-c:a", "aac",                // encode audio with AAC codec
+                "-metadata", "job_id=" + partialVideoJobId,    // unique tag
+                "-f", "hls",                  // output format = HTTP Live Streaming (HLS)
+                "-hls_time", String.valueOf(segmentDuration),  // segment duration: ~4 seconds per .ts file
+                "-hls_list_size", "0",        // keep ALL segments in playlist (0 = unlimited)
+                "-hls_flags", "append_list+omit_endlist", // append to existing with starting from last index written and don't write ENDLIST to continue later
+                outPath                       // output playlist path: /chunks/<videoId>/<resolution>/partial/master.m3u8)
+        ));
+
         runAndLogAsync(command.toArray(new String[0]), cacheJobId);
 
-        cacheTempVideoProcess(cacheJobId, partialVideoJobId, MediaJobStatus.RUNNING);
+        addCacheTempVideoProcess(cacheJobId, partialVideoJobId, MediaJobStatus.RUNNING);
 
         // check the master file has been created. maybe check first chunks being created for smoother experience
         checkPlaylistCreated(videoDir + masterFileName);
@@ -187,7 +189,7 @@ public class VideoService extends MediaService {
         return "/stream/" + videoDir + masterFileName;
     }
 
-    private void cacheTempVideoProcess(String id, String jobId, MediaJobStatus status) {
+    private void addCacheTempVideoProcess(String id, String jobId, MediaJobStatus status) {
         if (jobId != null)
             redisTemplate.opsForHash().put(id, "jobId", jobId);
         redisTemplate.opsForHash().put(id, "status", status);
@@ -205,11 +207,11 @@ public class VideoService extends MediaService {
         return "preview:" + videoId + ":" + res;
     }
 
-    private void stopFfmpegJob(String jobId) throws Exception {
+    public void stopFfmpegJob(String jobId) throws Exception {
         runAndLog(new String[]{
                 "docker", "exec", "ffmpeg",
                 "pkill", "-INT", "-f", "job_id=" + jobId
-        }, List.of(1));
+        }, List.of(0));
     }
 
     private int findLastSegmentFromPlayList(String lines) {
@@ -263,7 +265,7 @@ public class VideoService extends MediaService {
                 System.out.println("ffmpeg exited with code " + exit);
                 // mark as completed
                 if (videoId != null && exit == 0)
-                    cacheTempVideoProcess(videoId, null, MediaJobStatus.COMPLETED);
+                    addCacheTempVideoProcess(videoId, null, MediaJobStatus.COMPLETED);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
