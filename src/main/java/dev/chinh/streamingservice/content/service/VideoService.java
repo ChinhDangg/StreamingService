@@ -120,10 +120,10 @@ public class VideoService extends MediaService {
         String outPath = containerDir + masterFileName;
 
         String cacheJobId = getCachePartialJobId(videoId, res);
-        Map<Object, Object> cachedJob = getCacheTempVideoProcess(cacheJobId);
+        Map<Object, Object> cachedJobStatus = getCacheTempVideoProcess(cacheJobId);
         boolean prevJobStopped = false;
-        if (!cachedJob.isEmpty()) {
-            MediaJobStatus status = (MediaJobStatus) cachedJob.get("status");
+        if (!cachedJobStatus.isEmpty()) {
+            MediaJobStatus status = (MediaJobStatus) cachedJobStatus.get("status");
             if (status != MediaJobStatus.STOPPED)
                 return "/stream/" + videoId + "/" + res + "/partial" + masterFileName;
             prevJobStopped = true;
@@ -189,22 +189,22 @@ public class VideoService extends MediaService {
         return "/stream/" + videoDir + masterFileName;
     }
 
-    private void addCacheTempVideoProcess(String id, String jobId, MediaJobStatus status) {
+    public void addCacheTempVideoProcess(String id, String jobId, MediaJobStatus status) {
         if (jobId != null)
             redisTemplate.opsForHash().put(id, "jobId", jobId);
         redisTemplate.opsForHash().put(id, "status", status);
     }
 
-    private Map<Object, Object> getCacheTempVideoProcess(String id) {
+    public Map<Object, Object> getCacheTempVideoProcess(String id) {
         return redisTemplate.opsForHash().entries(id);
     }
 
-    private String getCachePartialJobId(long videoId, Resolution res) {
-        return "partial:" + videoId + ":" + res;
+    public String getCachePartialJobId(long videoId, Resolution res) {
+        return "partial:" + videoId + "::" + res;
     }
 
     private String getCachePreviewJobId(long videoId, Resolution res) {
-        return "preview:" + videoId + ":" + res;
+        return "preview:" + videoId + "::" + res;
     }
 
     public void stopFfmpegJob(String jobId) throws Exception {
