@@ -7,6 +7,7 @@ import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.content.service.VideoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -25,7 +26,12 @@ public class ScheduleService {
 
     private final String nginxBaseUrl = "http://localhost";
 
-    private void stopNonViewingPartialVideoRunningJob() throws Exception {
+    @Scheduled(fixedRate = 60_000)
+    public void scheduled() throws Exception {
+        stopNonViewingPartialVideoRunningJob(60_000);
+    }
+
+    private void stopNonViewingPartialVideoRunningJob(long expiryTimeInMillisecond) throws Exception {
         Map<String, Double> activeVideos = getActiveWatchers();
         boolean cleaned = false;
         for (Map.Entry<String, Double> activeVideo : activeVideos.entrySet()) {
@@ -38,7 +44,7 @@ public class ScheduleService {
 
             long millisPassed = (long) (System.currentTimeMillis() - (activeVideo.getValue() * 1000));
             System.out.println(millisPassed);
-            if (millisPassed < 60_000) {
+            if (millisPassed < expiryTimeInMillisecond) {
                 continue;
             }
             cleaned = true;
@@ -52,7 +58,7 @@ public class ScheduleService {
             videoService.addCacheTempVideoProcess(partialJobId, null, MediaJobStatus.STOPPED);
         }
         if (cleaned)
-            System.out.println(cleanupInactiveWatchers(62));
+            System.out.println(cleanupInactiveWatchers((expiryTimeInMillisecond / 1000) + 2));
     }
 
     /**
@@ -76,7 +82,7 @@ public class ScheduleService {
      * Request Nginx to cleanup inactive watchers (older than timeout seconds)
      * Returns list of keys removed.
      */
-    private List<String> cleanupInactiveWatchers(int timeoutSeconds) {
+    private List<String> cleanupInactiveWatchers(long timeoutSeconds) {
         String url = String.format("%s/internal/cleanup_watchers?timeout=%d", nginxBaseUrl, timeoutSeconds);
         try {
             String json = restTemplate.getForObject(url, String.class);
