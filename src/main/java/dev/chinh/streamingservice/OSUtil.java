@@ -3,10 +3,12 @@ package dev.chinh.streamingservice;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
 
@@ -17,11 +19,17 @@ public class OSUtil {
         WINDOWS, MAC, LINUX, OTHER
     }
 
-    private static OS currentOS;
+    private static final String BASE_DIR = "/chunks";
+    private static final String CONTAINER = "nginx";
 
-    public OSUtil() {
+    private static OS currentOS;
+    private static String RAMDISK = "nuLL";
+    public static long MEMORY_TOTAL = 0;
+
+    public OSUtil() throws IOException, InterruptedException {
         currentOS = detectOS();
         RAMDISK = getRAMDISKName();
+        MEMORY_TOTAL = getMemoryTotalSpace();
     }
 
     public static OS detectOS() {
@@ -36,11 +44,6 @@ public class OSUtil {
             return OS.OTHER;
         }
     }
-
-    private static final String BASE_DIR = "/chunks";
-    private static final String CONTAINER = "nginx";
-
-    private static String RAMDISK = "t";
 
     private String getRAMDISKName() {
         if (currentOS == OS.WINDOWS) {
@@ -145,6 +148,69 @@ public class OSUtil {
         return false;
     }
 
+    public static void main(String[] args) throws IOException, InterruptedException {
+        System.out.println(checkTempFileExists("2b.mp4/preview/master.m3u8"));
+    }
+
+    public static long getMemoryUsableSpace() throws IOException, InterruptedException {
+        if (currentOS == OS.WINDOWS) {
+            return getRAMUsableSpaceFromContainer();
+        }  else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
+            return getRAMUsableSpaceFromRAMDisk();
+        }
+        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+    }
+
+    private static long getMemoryTotalSpace() throws IOException, InterruptedException {
+        if  (currentOS == OS.WINDOWS) {
+            return getRAMTotalFromContainer();
+        } else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
+            return getRAMTotalFromRAMDisk();
+        }
+        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+    }
+
+    private static long getRAMUsableSpaceFromRAMDisk() throws IOException {
+        FileStore store = Files.getFileStore(Paths.get(RAMDISK));
+        return store.getUsableSpace();
+    }
+
+    private static long getRAMTotalFromRAMDisk() throws IOException {
+        FileStore store = Files.getFileStore(Paths.get(RAMDISK));
+        return store.getTotalSpace();
+    }
+
+    private static long getRAMTotalFromContainer() throws InterruptedException, IOException {
+        Process process = new ProcessBuilder("docker", "exec", "nginx", "df", "-B1", "/chunks")
+                .start();
+        String output = new String(process.getInputStream().readAllBytes());
+        process.waitFor();
+
+        String[] lines = output.split("\n");
+        System.out.println(Arrays.toString(lines));
+        if (lines.length >= 2) {
+            String[] parts = lines[1].trim().split("\\s+");
+            return Long.parseLong(parts[0]);
+        }
+        throw new RuntimeException("Unable to get RAM total from container");
+    }
+
+    private static long getRAMUsableSpaceFromContainer() throws IOException, InterruptedException {
+        ProcessBuilder pb = new ProcessBuilder("docker", "exec", "nginx", "df", "-B1", "/chunks");
+        Process process = pb.start();
+        String output = new String(process.getInputStream().readAllBytes());
+        process.waitFor();
+
+        // Filesystem   1B-blocks      Used Available Use% Mounted on
+        String[] lines = output.split("\n");
+        System.out.println(Arrays.toString(lines));
+        if (lines.length >= 2) {
+            String[] parts = lines[1].trim().split("\\s+");
+            return Long.parseLong(parts[3]);
+        }
+        throw new RuntimeException("Unable to get RAM usable space from container");
+    }
+
     /**
      * Create a path inside Mac RAMDISK located at Volumes/RAMDISK/ since Mac RAMDISK can be mounted
      * as volume for docker. Making this write as simple as a normal file write.
@@ -161,10 +227,6 @@ public class OSUtil {
             }
         }
         return true;
-    }
-
-    public static void main(String[] args) throws IOException, InterruptedException {
-        System.out.println(checkTempFileExists("2b.mp4/preview/master.m3u8"));
     }
 
     public static String readPlayListFromTempDir(String videoDir) throws IOException, InterruptedException {
