@@ -15,6 +15,7 @@
     "parentPath": { "type": "text" },
     "key":        { "type": "text" },
     "thumbnail":  { "type": "text" },
-    "length":     { "type": "integer"}
+    "length":     { "type": "integer"},
+    "size":       { "type": "long"}
   }
 }

@@ -39,6 +39,10 @@ public abstract class MediaDescription {
     @Column(nullable = false)
     protected Integer length;
 
+    @JsonProperty(ContentMetaData.SIZE)
+    @Column(nullable = false)
+    protected Long size;
+
     @JsonProperty(ContentMetaData.WIDTH)
     @Column(nullable = false)
     protected Integer width;
