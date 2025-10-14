@@ -114,6 +114,9 @@ public class OSUtil {
         System.out.println("docker compose finished with exit code: " + exit);
     }
 
+    public static void main(String[] args) throws IOException, InterruptedException {
+    }
+
     public static boolean createTempDir(String dir) throws IOException, InterruptedException {
         if (currentOS == OS.MAC) {
             return createPathInRAMDisk(dir);
@@ -148,10 +151,6 @@ public class OSUtil {
         return false;
     }
 
-    public static void main(String[] args) throws IOException, InterruptedException {
-        System.out.println(checkTempFileExists("2b.mp4/preview/master.m3u8"));
-    }
-
     public static long getMemoryUsableSpace() throws IOException, InterruptedException {
         if (currentOS == OS.WINDOWS) {
             return getRAMUsableSpaceFromContainer();
@@ -159,6 +158,57 @@ public class OSUtil {
             return getRAMUsableSpaceFromRAMDisk();
         }
         throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+    }
+
+    public static void deleteForceMemoryDirectory(String dir) throws IOException, InterruptedException {
+        if (currentOS == OS.WINDOWS) {
+            deleteForceDirectoryInContainer(dir);
+            return;
+        } else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
+            deleteForceDirectoryForRAMDisk(dir);
+            return;
+        }
+        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+    }
+
+    private static void deleteForceDirectoryForRAMDisk(String dir) {
+        try {
+            dir = normalizePath(RAMDISK, dir);
+            if (!Files.exists(Paths.get(dir))) {
+                System.out.println("RAM disk does not exist to delete: " + dir);
+                return;
+            }
+
+            String[] cmd = new String[]{"rm", "-rf", dir};
+            Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
+            int code = process.waitFor();
+
+            if (code != 0) {
+                String out = new String(process.getInputStream().readAllBytes());
+                System.err.println("Deletion failed for " + dir + ": " + out);
+            } else {
+                System.out.println("RAM disk successfully deleted: " + dir);
+            }
+        } catch (Exception e) {
+            System.err.println("Error deleting " + dir + ": " + e.getMessage());
+        }
+    }
+
+    private static void deleteForceDirectoryInContainer(String path) throws IOException, InterruptedException {
+        path = normalizePath(BASE_DIR, path);
+        String[] cmd = {"docker", "exec", CONTAINER, "rm", "-rf", path};
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.redirectErrorStream(true);
+        Process p = pb.start();
+
+        String output = new String(p.getInputStream().readAllBytes());
+        int code = p.waitFor();
+
+        if (code != 0) {
+            System.err.println("Failed to delete in container: " + output);
+        } else {
+            System.out.println("Deleted " + path + " in container");
+        }
     }
 
     private static long getMemoryTotalSpace() throws IOException, InterruptedException {
