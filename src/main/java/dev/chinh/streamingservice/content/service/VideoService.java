@@ -200,11 +200,11 @@ public class VideoService extends MediaService {
     }
 
     public String getCachePartialJobId(long videoId, Resolution res) {
-        return "partial:" + videoId + "::" + res;
+        return videoId + ":" + res + ":partial";
     }
 
     private String getCachePreviewJobId(long videoId, Resolution res) {
-        return "preview:" + videoId + "::" + res;
+        return videoId + ":" + res + ":preview:";
     }
 
     public void stopFfmpegJob(String jobId) throws Exception {
