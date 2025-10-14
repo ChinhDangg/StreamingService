@@ -26,9 +26,12 @@ public class OSUtil {
     private static String RAMDISK = "nuLL";
     public static long MEMORY_TOTAL = 0;
 
-    public OSUtil() throws IOException, InterruptedException {
+    public OSUtil() throws Exception {
         currentOS = detectOS();
         RAMDISK = getRAMDISKName();
+        if (!OSUtil.createRamDisk()) {
+            throw new Exception("Fail to create RAM DISK");
+        }
         MEMORY_TOTAL = getMemoryTotalSpace();
     }
 
