@@ -1,17 +1,23 @@
 package dev.chinh.streamingservice.content.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.chinh.streamingservice.OSUtil;
+import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.data.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.compress.MemoryLimitException;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 
 @RequiredArgsConstructor
 public abstract class MediaService {
@@ -20,6 +26,71 @@ public abstract class MediaService {
     protected final MinIOService minIOService;
     private final ObjectMapper objectMapper;
     private final MediaMetaDataRepository mediaRepository;
+
+    public boolean makeMemorySpaceForSize(long size) throws IOException, InterruptedException {
+        if (OSUtil.getMemoryUsableSpace() >= size)
+            return true;
+        if (size > OSUtil.MEMORY_TOTAL)
+            throw new MemoryLimitException(size / 1000, (int) OSUtil.MEMORY_TOTAL / 1000);
+
+        long headRoom = (long) (OSUtil.MEMORY_TOTAL * 0.1);
+        long neededSpace = size + headRoom;
+        neededSpace = (neededSpace > OSUtil.MEMORY_TOTAL) ? size : neededSpace;
+
+        long now = System.currentTimeMillis();
+        Set<ZSetOperations.TypedTuple<Object>> lastAccessMediaJobIds = getAllCacheLastAccessId(now);
+        for (ZSetOperations.TypedTuple<Object> mediaJobId : lastAccessMediaJobIds) {
+
+            long millisPassed = (long) (System.currentTimeMillis() - (mediaJobId.getScore() * 1000));
+            if (millisPassed < 60_000) {
+                // zset is already sort, so if one found still being accessed - then the rest after is the same
+                if (neededSpace - headRoom > 0) {
+                    System.out.println("Most content is still being active, can't remove enough memory");
+                    System.out.println("Serve original size from disk instead or wait");
+                }
+                return false;
+            }
+
+            String[] infoParts = mediaJobId.getValue().toString().split(":");
+            String mediaId = infoParts[0];
+            MediaDescription mediaDescription = getMediaDescription(Long.parseLong(mediaId));
+
+            neededSpace = neededSpace - mediaDescription.getSize();
+            String mediaMemoryPath = String.join("/", infoParts);
+
+            OSUtil.deleteForceMemoryDirectory(mediaMemoryPath);
+            redisTemplate.opsForZSet().remove("cache:lastAccess", mediaJobId);
+            redisTemplate.delete(mediaJobId.toString()); // delete the hash info
+            if (neededSpace <= 0) {
+                break;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param mediaWorkId: specific media content saved to memory e.g. 1:p360
+     */
+    public void addCacheLastAccess(String mediaWorkId) {
+        redisTemplate.opsForZSet().add("cache:lastAccess", mediaWorkId, System.currentTimeMillis());
+    }
+
+    public Double getCacheLastAccess(String mediaWorkId) {
+        return redisTemplate.opsForZSet().score("cache:lastAccess", mediaWorkId);
+    }
+
+    /**
+     * Already sorted by default. Get oldest one first
+     * @return mediaJobId in batch of 50.
+     */
+    private Set<ZSetOperations.TypedTuple<Object>> getAllCacheLastAccessId(long max) {
+        return redisTemplate.opsForZSet()
+                .rangeByScoreWithScores("cache:lastAccess", 0, max, 0, 50);
+    }
+
+    public String getCachePartialJobId(long mediaId, Resolution res) {
+        return mediaId + ":" + res;
+    }
 
     protected MediaDescription getMediaDescription(long mediaId) {
         MediaDescription mediaDescription  = getCachedMediaSearchItem(String.valueOf(mediaId));
