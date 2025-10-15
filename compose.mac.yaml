@@ -13,7 +13,7 @@ services:
     command: server /data --console-address ":9001"
 
   nginx:
-    image: openresty/openresty:latest
+    build: ./nginx
     container_name: nginx
     ports:
       - "80:80"
@@ -21,8 +21,10 @@ services:
       - minio
       - ffmpeg
     volumes:
-      - ./nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - ./nginx/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
       - /Volumes/RAMDISK:/chunks
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # docker exec -it nginx nginx -V #check for config being applied or not - --config-path=
 
   ffmpeg:
