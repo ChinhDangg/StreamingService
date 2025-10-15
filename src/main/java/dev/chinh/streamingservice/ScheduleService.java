@@ -35,7 +35,7 @@ public class ScheduleService {
 
             var cachedJobStatus = videoService.getCacheTempVideoJobStatus(partialJobId);
             if (cachedJobStatus.get("status") != MediaJobStatus.RUNNING) {
-                // running job probably completed - remove running cache
+                // running job probably completed or removed for space - remove running cache
                 videoService.removeCacheRunningJob(partialJobId);
                 continue;
             }
