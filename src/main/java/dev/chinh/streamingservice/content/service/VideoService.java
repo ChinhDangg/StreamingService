@@ -38,7 +38,7 @@ public class VideoService extends MediaService {
 
         String cacheJobId = getCachePreviewJobId(videoId);
 
-        addCacheLastAccess(cacheJobId);
+        addCacheLastAccess(cacheJobId, null);
 
         var cachedJobStatus = getCacheTempVideoJobStatus(cacheJobId);
         boolean prevJobStopped = false;
@@ -143,7 +143,7 @@ public class VideoService extends MediaService {
 
         String cacheJobId = getCachePartialJobId(videoId, res);
 
-        addCacheLastAccess(cacheJobId);
+        addCacheLastAccess(cacheJobId, null);
 
         Map<Object, Object> cachedJobStatus = getCacheTempVideoJobStatus(cacheJobId);
         boolean prevJobStopped = false;
