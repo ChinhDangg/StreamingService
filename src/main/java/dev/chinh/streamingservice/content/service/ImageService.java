@@ -38,7 +38,7 @@ public class ImageService extends MediaService {
 
     public record MediaUrl(MediaType type, String url) {}
 
-    public List<MediaUrl> getAllMediaInAnAlbum(Long albumId, Resolution resolution) throws ServerException, InsufficientDataException, ErrorResponseException, IOException, NoSuchAlgorithmException, InvalidKeyException, InvalidResponseException, XmlParserException, InternalException {
+    public List<MediaUrl> getAllMediaInAnAlbum(Long albumId, Resolution resolution) throws Exception {
         MediaDescription mediaDescription = getMediaDescription(albumId);
         Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaDescription.getBucket(), mediaDescription.getPath());
         List<MediaUrl> imageUrls = new ArrayList<>();
@@ -47,12 +47,14 @@ public class ImageService extends MediaService {
             if (resolution == Resolution.original) {
                 imageUrls.add(new MediaUrl(
                         MediaType.detectMediaType(item.objectName()),
-                        String.format("/original/%s?key=%s", mediaDescription.getBucket(), item.objectName().replace(mediaDescription.getPath(), ""))
+                        String.format("/original/%s?key=%s", albumId,
+                                item.objectName().replace(mediaDescription.getPath() + "/", ""))
                 ));
             } else {
                 imageUrls.add(new MediaUrl(
                         MediaType.detectMediaType(item.objectName()),
-                        String.format("/resize/%s?res=%s&key=%s", mediaDescription.getBucket(), Resolution.p1080, item.objectName().replace(mediaDescription.getPath(), ""))
+                        String.format("/resize/%s?res=%s&key=%s", albumId, Resolution.p1080,
+                                item.objectName().replace(mediaDescription.getPath() + "/", ""))
                 ));
             }
         }
@@ -93,7 +95,7 @@ public class ImageService extends MediaService {
         String scale = getFfmpegScaleString(width, height, res.getResolution());
         // return original if original is less or equal to scale already
         if (checkSrcSmallerThanTarget(width, height, res.getResolution())) {
-            return getUrlAsRedirectResponse(nginxUrl, false);
+            return getOriginalImageURL(albumId, key, 30 * 60);
         }
 
         // 2. Build cache path {temp dir}/image-cache/{bucket}/{key}_{res}.{format}
