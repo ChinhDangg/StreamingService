@@ -41,7 +41,7 @@ public abstract class MediaService {
         Set<ZSetOperations.TypedTuple<Object>> lastAccessMediaJobIds = getAllCacheLastAccessId(now);
         for (ZSetOperations.TypedTuple<Object> mediaJobId : lastAccessMediaJobIds) {
 
-            long millisPassed = (long) (System.currentTimeMillis() - (mediaJobId.getScore() * 1000));
+            long millisPassed = (long) (System.currentTimeMillis() - mediaJobId.getScore());
             if (millisPassed < 60_000) {
                 // zset is already sort, so if one found still being accessed - then the rest after is the same
                 if (neededSpace - headRoom > 0) {
@@ -60,9 +60,9 @@ public abstract class MediaService {
 
             OSUtil.deleteForceMemoryDirectory(mediaMemoryPath);
             redisTemplate.opsForZSet().remove("cache:lastAccess", mediaJobId);
-            redisTemplate.delete(mediaJobId.toString()); // delete the hash info
+            redisTemplate.delete(mediaJobId.toString()); // delete the hash info for video or value info for album
             if (neededSpace <= 0) {
-                break;
+                return true;
             }
         }
         return false;
@@ -71,8 +71,9 @@ public abstract class MediaService {
     /**
      * @param mediaWorkId: specific media content saved to memory e.g. 1:p360
      */
-    public void addCacheLastAccess(String mediaWorkId) {
-        redisTemplate.opsForZSet().add("cache:lastAccess", mediaWorkId, System.currentTimeMillis());
+    public void addCacheLastAccess(String mediaWorkId, Long expiry) {
+        expiry = expiry == null ? System.currentTimeMillis() : expiry;
+        redisTemplate.opsForZSet().add("cache:lastAccess", mediaWorkId, expiry);
     }
 
     public Double getCacheLastAccess(String mediaWorkId) {
