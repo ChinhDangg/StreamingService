@@ -28,7 +28,7 @@ public class ScheduleService {
 
             String partialJobId = (String) runningVideoJob;
             double lastAccess = videoService.getCacheLastAccess(partialJobId);
-            long millisPassed = (long) (System.currentTimeMillis() - (lastAccess * 1000));
+            long millisPassed = (long) (System.currentTimeMillis() - lastAccess);
             if (millisPassed < 60_000) {
                 continue;
             }
