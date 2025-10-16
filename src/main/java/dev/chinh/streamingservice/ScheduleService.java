@@ -18,30 +18,30 @@ public class ScheduleService {
 
     @Scheduled(fixedRate = 60_000)
     public void scheduled() throws Exception {
-        stopNonViewingPartialVideoRunningJob();
+        stopNonViewingVideoRunningJob();
     }
 
-    private void stopNonViewingPartialVideoRunningJob() throws Exception {
+    private void stopNonViewingVideoRunningJob() throws Exception {
         Set<Object> runningVideoJobs = videoService.getCacheRunningJobs(System.currentTimeMillis());
 
         for (Object runningVideoJob : runningVideoJobs) {
 
-            String partialJobId = (String) runningVideoJob;
-            double lastAccess = videoService.getCacheLastAccess(partialJobId);
+            String videoJobId = (String) runningVideoJob;
+            double lastAccess = videoService.getCacheLastAccess(videoJobId);
             long millisPassed = (long) (System.currentTimeMillis() - lastAccess);
             if (millisPassed < 60_000) {
                 continue;
             }
 
-            var cachedJobStatus = videoService.getCacheTempVideoJobStatus(partialJobId);
+            var cachedJobStatus = videoService.getCacheTempVideoJobStatus(videoJobId);
             if (cachedJobStatus.get("status") != MediaJobStatus.RUNNING) {
                 // running job probably completed or removed for space - remove running cache
-                videoService.removeCacheRunningJob(partialJobId);
+                videoService.removeCacheRunningJob(videoJobId);
                 continue;
             }
             String jobId = cachedJobStatus.get("jobId").toString(); // UUID
             videoService.stopFfmpegJob(jobId);
-            videoService.addCacheTempVideoJobStatus(partialJobId, null, MediaJobStatus.STOPPED);
+            videoService.addCacheTempVideoJobStatus(videoJobId, null, MediaJobStatus.STOPPED);
         }
     }
 }
