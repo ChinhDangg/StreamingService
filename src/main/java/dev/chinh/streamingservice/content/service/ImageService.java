@@ -58,6 +58,7 @@ public class ImageService extends MediaService {
                 ));
             }
         }
+        addCacheLastAccess(albumId + ":" + resolution, System.currentTimeMillis() + 60 * 60 * 1000);
         return imageUrls;
     }
 
