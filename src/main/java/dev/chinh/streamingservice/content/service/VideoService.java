@@ -37,9 +37,16 @@ public class VideoService extends MediaService {
         String outPath = containerDir + masterFileName;
 
         String cacheJobId = getCachePreviewJobId(videoId);
-        var cachedJob = getCacheTempVideoJobStatus(cacheJobId);
-        if (!cachedJob.isEmpty()) {
-            return "/stream/" + videoId + "/preview" + masterFileName;
+
+        addCacheLastAccess(cacheJobId);
+
+        var cachedJobStatus = getCacheTempVideoJobStatus(cacheJobId);
+        boolean prevJobStopped = false;
+        if (!cachedJobStatus.isEmpty()) {
+            MediaJobStatus status = (MediaJobStatus) cachedJobStatus.get("status");
+            if (status != MediaJobStatus.STOPPED)
+                return "/stream/" + videoDir + masterFileName;
+            prevJobStopped = true;
         }
 
         if (!OSUtil.createTempDir(videoDir)) {
@@ -84,28 +91,47 @@ public class VideoService extends MediaService {
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(
                 mediaDescription.getBucket(), mediaDescription.getPath(), mediaDescription.getLength() + extraExpireSeconds);
 
-        String[] hlsCmd = {
+        int segmentDuration = 4;
+        String partialVideoJobId = UUID.randomUUID().toString();
+        List<String> command = new ArrayList<>(List.of(
                 "docker", "exec", "ffmpeg",
-                "ffmpeg", "-hide_banner",
+                "ffmpeg", "-y", "-hide_banner"
+        ));
+
+        if (prevJobStopped) {
+            String playListLines = OSUtil.readPlayListFromTempDir(videoDir);
+            if (playListLines != null && !playListLines.isEmpty()) {
+                int lastSegment = findLastSegmentFromPlayList(playListLines);
+                if (lastSegment > 0) {
+                    double resumeAt = lastSegment * segmentDuration;
+                    command.addAll(List.of("-ss", String.valueOf(resumeAt)));
+                }
+            }
+        }
+
+        command.addAll(List.of(
                 "-i", nginxUrl,
                 "-filter_complex", filterComplex,
                 "-map", "[v]", "-map", "[acat]",
                 "-c:v", "h264", "-preset", "veryfast",
                 "-c:a", "aac",
+                "-metadata", "job_id=" + partialVideoJobId,
                 // Optional: improve HLS segmenting/keyframes consistency
                 "-g", "48", "-keyint_min", "48", "-sc_threshold", "0",
                 "-f", "hls",
-                "-hls_time", "4",
+                "-hls_time", String.valueOf(segmentDuration),
                 "-hls_list_size", "0",
+                "-hls_flags", "append_list+omit_endlist",
                 outPath
-        };
-        runAndLogAsync(hlsCmd, cacheJobId);
+        ));
+        runAndLogAsync(command.toArray(new String[0]), cacheJobId);
 
         addCacheTempVideoJobStatus(cacheJobId, null, MediaJobStatus.RUNNING);
+        addCacheRunningJob(cacheJobId);
 
         checkPlaylistCreated(videoDir + masterFileName);
 
-        return "/stream/" + videoId + "/preview" + masterFileName;
+        return "/stream/" + videoDir + masterFileName;
     }
 
     public String getPartialVideoUrl(Long videoId, Resolution res) throws Exception {
@@ -116,6 +142,9 @@ public class VideoService extends MediaService {
         String outPath = containerDir + masterFileName;
 
         String cacheJobId = getCachePartialJobId(videoId, res);
+
+        addCacheLastAccess(cacheJobId);
+
         Map<Object, Object> cachedJobStatus = getCacheTempVideoJobStatus(cacheJobId);
         boolean prevJobStopped = false;
         if (!cachedJobStatus.isEmpty()) {
