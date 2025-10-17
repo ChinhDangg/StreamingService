@@ -11,6 +11,7 @@ import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 public class OSUtil {
@@ -25,6 +26,7 @@ public class OSUtil {
     private static OS currentOS;
     private static String RAMDISK = "nuLL";
     public static long MEMORY_TOTAL = 0;
+    public static AtomicLong MEMORY_USABLE;
 
     public OSUtil() throws Exception {
         currentOS = detectOS();
@@ -33,6 +35,7 @@ public class OSUtil {
             throw new Exception("Fail to create RAM DISK");
         }
         MEMORY_TOTAL = getMemoryTotalSpace();
+        MEMORY_USABLE = new AtomicLong(getActualMemoryUsableSpace());
     }
 
     public static OS detectOS() {
@@ -154,13 +157,46 @@ public class OSUtil {
         return false;
     }
 
-    public static long getMemoryUsableSpace() throws IOException, InterruptedException {
+    public static long getUsableMemory() {
+        return MEMORY_USABLE.get();
+    }
+
+    public static void updateUsableMemory(long used) {
+        MEMORY_USABLE.addAndGet(used);
+    }
+
+    public static void refreshUsableMemory() throws IOException, InterruptedException {
+        MEMORY_USABLE.set(getActualMemoryUsableSpace());
+    }
+
+    public static long getActualMemoryUsableSpace() throws IOException, InterruptedException {
         if (currentOS == OS.WINDOWS) {
-            return getRAMUsableSpaceFromContainer();
+            return getActualMemoryUsableSpaceFromContainer();
         }  else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
-            return getRAMUsableSpaceFromRAMDisk();
+            return getActualMemoryUsableSpaceFromRAMDisk();
         }
         throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+    }
+
+    private static long getActualMemoryUsableSpaceFromRAMDisk() throws IOException {
+        FileStore store = Files.getFileStore(Paths.get(RAMDISK));
+        return store.getUsableSpace();
+    }
+
+    private static long getActualMemoryUsableSpaceFromContainer() throws IOException, InterruptedException {
+        ProcessBuilder pb = new ProcessBuilder("docker", "exec", "nginx", "df", "-B1", "/chunks");
+        Process process = pb.start();
+        String output = new String(process.getInputStream().readAllBytes());
+        process.waitFor();
+
+        // Filesystem   1B-blocks      Used Available Use% Mounted on
+        String[] lines = output.split("\n");
+        System.out.println(Arrays.toString(lines));
+        if (lines.length >= 2) {
+            String[] parts = lines[1].trim().split("\\s+");
+            return Long.parseLong(parts[3]);
+        }
+        throw new RuntimeException("Unable to get RAM usable space from container");
     }
 
     public static void deleteForceMemoryDirectory(String dir) throws IOException, InterruptedException {
@@ -216,24 +252,19 @@ public class OSUtil {
 
     private static long getMemoryTotalSpace() throws IOException, InterruptedException {
         if  (currentOS == OS.WINDOWS) {
-            return getRAMTotalFromContainer();
+            return getMemoryTotalFromContainer();
         } else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
-            return getRAMTotalFromRAMDisk();
+            return getMemoryTotalFromRAMDisk();
         }
         throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
     }
 
-    private static long getRAMUsableSpaceFromRAMDisk() throws IOException {
-        FileStore store = Files.getFileStore(Paths.get(RAMDISK));
-        return store.getUsableSpace();
-    }
-
-    private static long getRAMTotalFromRAMDisk() throws IOException {
+    private static long getMemoryTotalFromRAMDisk() throws IOException {
         FileStore store = Files.getFileStore(Paths.get(RAMDISK));
         return store.getTotalSpace();
     }
 
-    private static long getRAMTotalFromContainer() throws InterruptedException, IOException {
+    private static long getMemoryTotalFromContainer() throws InterruptedException, IOException {
         Process process = new ProcessBuilder("docker", "exec", "nginx", "df", "-B1", "/chunks")
                 .start();
         String output = new String(process.getInputStream().readAllBytes());
@@ -246,22 +277,6 @@ public class OSUtil {
             return Long.parseLong(parts[0]);
         }
         throw new RuntimeException("Unable to get RAM total from container");
-    }
-
-    private static long getRAMUsableSpaceFromContainer() throws IOException, InterruptedException {
-        ProcessBuilder pb = new ProcessBuilder("docker", "exec", "nginx", "df", "-B1", "/chunks");
-        Process process = pb.start();
-        String output = new String(process.getInputStream().readAllBytes());
-        process.waitFor();
-
-        // Filesystem   1B-blocks      Used Available Use% Mounted on
-        String[] lines = output.split("\n");
-        System.out.println(Arrays.toString(lines));
-        if (lines.length >= 2) {
-            String[] parts = lines[1].trim().split("\\s+");
-            return Long.parseLong(parts[3]);
-        }
-        throw new RuntimeException("Unable to get RAM usable space from container");
     }
 
     /**
