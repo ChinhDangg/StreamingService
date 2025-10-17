@@ -16,7 +16,7 @@ public class ScheduleService {
 
     private final VideoService videoService;
 
-    @Scheduled(fixedRate = 60_000)
+    @Scheduled(fixedRate = 60_000, initialDelay = 60_000)
     public void scheduled() throws Exception {
         stopNonViewingVideoRunningJob();
     }
