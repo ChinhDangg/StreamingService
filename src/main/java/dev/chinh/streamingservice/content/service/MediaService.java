@@ -24,7 +24,7 @@ public abstract class MediaService {
 
     protected final RedisTemplate<String, Object> redisTemplate;
     protected final MinIOService minIOService;
-    private final ObjectMapper objectMapper;
+    protected final ObjectMapper objectMapper;
     private final MediaMetaDataRepository mediaRepository;
 
     public boolean makeMemorySpaceForSize(long size) throws IOException, InterruptedException {

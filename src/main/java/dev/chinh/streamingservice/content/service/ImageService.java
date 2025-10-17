@@ -1,5 +1,7 @@
 package dev.chinh.streamingservice.content.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.MediaType;
@@ -23,8 +25,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,6 +40,12 @@ public class ImageService extends MediaService {
     public record MediaUrl(MediaType type, String url) {}
 
     public List<MediaUrl> getAllMediaInAnAlbum(Long albumId, Resolution resolution) throws Exception {
+        String albumCreationId = albumId + ":" + resolution;
+        var cacheUrls = getCacheAlbumCreation(albumCreationId);
+        if (cacheUrls != null) {
+            return cacheUrls;
+        }
+
         MediaDescription mediaDescription = getMediaDescription(albumId);
         Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaDescription.getBucket(), mediaDescription.getPath());
         List<MediaUrl> imageUrls = new ArrayList<>();
@@ -58,8 +65,21 @@ public class ImageService extends MediaService {
                 ));
             }
         }
-        addCacheLastAccess(albumId + ":" + resolution, System.currentTimeMillis() + 60 * 60 * 1000);
+        addCacheLastAccess(albumCreationId, System.currentTimeMillis() + 60 * 60 * 1000);
+        addCacheAlbumCreation(albumCreationId, imageUrls);
         return imageUrls;
+    }
+
+    private void addCacheAlbumCreation(String albumCreateId, List<MediaUrl> imageUrls) throws JsonProcessingException {
+        String json = objectMapper.writeValueAsString(imageUrls);
+        redisTemplate.opsForValue().set(albumCreateId, json, Duration.ofHours(1));
+    }
+
+    private List<MediaUrl> getCacheAlbumCreation(String albumCreateId) throws JsonProcessingException {
+        Object value = redisTemplate.opsForValue().get(albumCreateId);
+        if (value == null)
+            return null;
+        return objectMapper.readValue((String) value, new TypeReference<>() {});
     }
 
     public ResponseEntity<Void> getResizedImageURL(Long albumId, String key, Resolution res,
