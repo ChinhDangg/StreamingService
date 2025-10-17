@@ -19,6 +19,7 @@ public class ScheduleService {
     @Scheduled(fixedRate = 60_000, initialDelay = 60_000)
     public void scheduled() throws Exception {
         stopNonViewingVideoRunningJob();
+        OSUtil.refreshUsableMemory();
     }
 
     private void stopNonViewingVideoRunningJob() throws Exception {
