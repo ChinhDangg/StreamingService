@@ -49,17 +49,18 @@ public class VideoService extends MediaService {
             prevJobStopped = true;
         }
 
-        if (!OSUtil.createTempDir(videoDir)) {
-            throw new IOException("Failed to create temporary directory: " + videoDir);
-        }
-
         // === resolution control ===
         final Resolution resolution = Resolution.p360;
 
         MediaDescription mediaDescription = getMediaDescription(videoId);
 
-        makeMemorySpaceForSize(Resolution.getEstimatedSize(
-                mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight(), resolution));
+        long estimatedSize = Resolution.getEstimatedSize(
+                mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight(), resolution);
+        makeMemorySpaceForSize(estimatedSize);
+
+        if (!OSUtil.createTempDir(videoDir)) {
+            throw new IOException("Failed to create temporary directory: " + videoDir);
+        }
 
         double duration = mediaDescription.getLength();
         int segments = 10;
@@ -130,7 +131,7 @@ public class VideoService extends MediaService {
         ));
         runAndLogAsync(command.toArray(new String[0]), cacheJobId);
 
-        addCacheTempVideoJobStatus(cacheJobId, null, MediaJobStatus.RUNNING);
+        addCacheTempVideoJobStatus(cacheJobId, null, estimatedSize, MediaJobStatus.RUNNING);
         addCacheRunningJob(cacheJobId);
 
         checkPlaylistCreated(videoDir + masterFileName);
@@ -162,14 +163,15 @@ public class VideoService extends MediaService {
         if (checkSrcSmallerThanTarget(mediaDescription.getWidth(), mediaDescription.getHeight(), res.getResolution()))
             return getOriginalVideoUrl(videoId);
 
+        long estimatedSize = Resolution.getEstimatedSize(
+                mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight(), res);
+        boolean enoughSpace = makeMemorySpaceForSize(estimatedSize);
+        if (!enoughSpace)
+            return getOriginalVideoUrl(videoId);
+
         if (!OSUtil.createTempDir(videoDir)) {
             throw new IOException("Failed to create temporary directory: " + videoDir);
         }
-
-        boolean enoughSpace = makeMemorySpaceForSize(Resolution.getEstimatedSize(
-                mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight(), res));
-        if (!enoughSpace)
-            return getOriginalVideoUrl(videoId);
 
         // 2. Get a presigned URL with container Nginx so ffmpeg can access in container
         // 3. Rewrite URL to go through Nginx proxy instead of direct MinIO
@@ -214,7 +216,7 @@ public class VideoService extends MediaService {
 
         runAndLogAsync(command.toArray(new String[0]), cacheJobId);
 
-        addCacheTempVideoJobStatus(cacheJobId, partialVideoJobId, MediaJobStatus.RUNNING);
+        addCacheTempVideoJobStatus(cacheJobId, partialVideoJobId, estimatedSize, MediaJobStatus.RUNNING);
         addCacheRunningJob(cacheJobId);
 
         // check the master file has been created. maybe check first chunks being created for smoother experience
@@ -224,14 +226,13 @@ public class VideoService extends MediaService {
         return "/stream/" + videoDir + masterFileName;
     }
 
-    public void addCacheTempVideoJobStatus(String id, String jobId, MediaJobStatus status) {
+    public void addCacheTempVideoJobStatus(String id, String jobId, Long size, MediaJobStatus status) {
         if (jobId != null)
             redisTemplate.opsForHash().put(id, "jobId", jobId);
+        if (size != null) {
+            redisTemplate.opsForHash().put(id, "size", size);
+        }
         redisTemplate.opsForHash().put(id, "status", status);
-    }
-
-    public Map<Object, Object> getCacheTempVideoJobStatus(String id) {
-        return redisTemplate.opsForHash().entries(id);
     }
 
     private void addCacheRunningJob(String jobId) {
@@ -309,7 +310,7 @@ public class VideoService extends MediaService {
                 System.out.println("ffmpeg exited with code " + exit);
                 // mark as completed
                 if (videoId != null && exit == 0)
-                    addCacheTempVideoJobStatus(videoId, null, MediaJobStatus.COMPLETED);
+                    addCacheTempVideoJobStatus(videoId, null, null, MediaJobStatus.COMPLETED);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }

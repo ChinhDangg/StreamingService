@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @RequiredArgsConstructor
@@ -30,14 +31,13 @@ public abstract class MediaService {
     public boolean makeMemorySpaceForSize(long size) throws IOException, InterruptedException {
         if (OSUtil.getUsableMemory() >= size) {
             OSUtil.updateUsableMemory(-size);
-            System.out.println(OSUtil.getUsableMemory());
             return true;
         }
         if (size > OSUtil.MEMORY_TOTAL)
             throw new MemoryLimitException(size / 1000, (int) OSUtil.MEMORY_TOTAL / 1000);
 
         long headRoom = (long) (OSUtil.MEMORY_TOTAL * 0.1);
-        long neededSpace = size + headRoom;
+        long neededSpace = size + headRoom - OSUtil.getUsableMemory();
         neededSpace = (neededSpace > OSUtil.MEMORY_TOTAL) ? size : neededSpace;
 
         long removingSpace = neededSpace;
@@ -62,21 +62,23 @@ public abstract class MediaService {
             }
 
             String mediaJobId = mediaJob.getValue().toString();
-            String[] infoParts = mediaJobId.split(":");
-            String mediaId = infoParts[0];
-            MediaDescription mediaDescription = getMediaDescription(Long.parseLong(mediaId));
-
-            removingSpace = removingSpace - mediaDescription.getSize();
-            String mediaMemoryPath = String.join("/", infoParts);
+            long estimatedSize = (long) getCacheTempVideoJobStatus(mediaJobId).get("size");
+            removingSpace = removingSpace - estimatedSize;
+            String mediaMemoryPath = mediaJobId.replace(":", "/");
 
             System.out.println("Removing: " + mediaJobId);
             OSUtil.deleteForceMemoryDirectory(mediaMemoryPath);
             redisTemplate.opsForZSet().remove("cache:lastAccess", mediaJobId);
             redisTemplate.delete(mediaJobId); // delete the hash info for video or value info for album
         }
+        if (!enough && removingSpace - headRoom <= 0)
+            enough = true;
         OSUtil.updateUsableMemory(neededSpace - removingSpace); // removingSpace is negative or 0
-        System.out.println(OSUtil.MEMORY_USABLE);
         return enough;
+    }
+
+    public Map<Object, Object> getCacheTempVideoJobStatus(String id) {
+        return redisTemplate.opsForHash().entries(id);
     }
 
     /**
