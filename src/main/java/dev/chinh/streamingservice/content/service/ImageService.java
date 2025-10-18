@@ -99,26 +99,6 @@ public class ImageService extends MediaService {
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(
                 mediaDescription.getBucket(), mediaPath.toString(), 30 * 60);
 
-        // Probe image dimensions via ffprobe inside the ffmpeg container
-        String[] probeCmd = {
-                "docker", "exec", "ffmpeg",
-                "ffprobe", "-v", "error",
-                "-show_entries", "stream=width,height",
-                "-of", "csv=p=0:s=x",
-                nginxUrl
-        };
-        String dimensions = runAndLog(probeCmd, null);
-        String[] parts = dimensions.split("x");
-        int width = Integer.parseInt(parts[0]);
-        int height = Integer.parseInt(parts[1]);
-        System.out.printf("📏 Original: %dx%d%n", width, height);
-
-        String scale = getFfmpegScaleString(width, height, res.getResolution());
-        // return original if original is less or equal to scale already
-        if (checkSrcSmallerThanTarget(width, height, res.getResolution())) {
-            return getOriginalImageURL(albumId, key, 30 * 60);
-        }
-
         // 2. Build cache path {temp dir}/image-cache/{bucket}/{key}_{res}.{format}
         Path cacheRoot = Paths.get("/image-cache");
         Path bucketDir = cacheRoot.resolve(mediaDescription.getBucket());
@@ -129,13 +109,15 @@ public class ImageService extends MediaService {
         String cacheFileName = baseName + "_" + res.getResolution() + "." + format;
         Path cachePath = albumDir.resolve(cacheFileName);
 
+        String scale = String.format("\"scale='if(gt(iw,ih),-2,min(ih,%d))':'if(gt(ih,iw),-2,min(iw,%d))'\"",
+                res.getResolution(), res.getResolution());
         if (!OSUtil.checkTempFileExists(cachePath.toString())) {
             // make sure parent dir exist
             if (!OSUtil.createTempDir(cachePath.getParent().toString())) {
                 throw new IOException("Failed to create temporary directory: " + cachePath.getParent());
             }
 
-            String outputPath = "/chunks/" + cachePath;
+            String outputPath = "/chunks" + cachePath;
             String ffmpegCmd = String.format(
                     "ffmpeg -y -hide_banner -loglevel info " +
                             "-i \"%s\" -vf %s -q:v 2 \"%s\"",
