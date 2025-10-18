@@ -28,8 +28,11 @@ public abstract class MediaService {
     private final MediaMetaDataRepository mediaRepository;
 
     public boolean makeMemorySpaceForSize(long size) throws IOException, InterruptedException {
-        if (OSUtil.getUsableMemory() >= size)
+        if (OSUtil.getUsableMemory() >= size) {
+            OSUtil.updateUsableMemory(-size);
+            System.out.println(OSUtil.getUsableMemory());
             return true;
+        }
         if (size > OSUtil.MEMORY_TOTAL)
             throw new MemoryLimitException(size / 1000, (int) OSUtil.MEMORY_TOTAL / 1000);
 
@@ -41,14 +44,14 @@ public abstract class MediaService {
         boolean enough = false;
 
         long now = System.currentTimeMillis();
-        Set<ZSetOperations.TypedTuple<Object>> lastAccessMediaJobIds = getAllCacheLastAccessId(now);
-        for (ZSetOperations.TypedTuple<Object> mediaJobId : lastAccessMediaJobIds) {
+        Set<ZSetOperations.TypedTuple<Object>> lastAccessMediaJob = getAllCacheLastAccess(now);
+        for (ZSetOperations.TypedTuple<Object> mediaJob : lastAccessMediaJob) {
             if (removingSpace <= 0) {
                 enough = true;
                 break;
             }
 
-            long millisPassed = (long) (System.currentTimeMillis() - mediaJobId.getScore());
+            long millisPassed = (long) (System.currentTimeMillis() - mediaJob.getScore());
             if (millisPassed < 60_000) {
                 // zset is already sort, so if one found still being active - then the rest after is the same
                 if (removingSpace - headRoom > 0) {
@@ -58,18 +61,21 @@ public abstract class MediaService {
                 break;
             }
 
-            String[] infoParts = mediaJobId.getValue().toString().split(":");
+            String mediaJobId = mediaJob.getValue().toString();
+            String[] infoParts = mediaJobId.split(":");
             String mediaId = infoParts[0];
             MediaDescription mediaDescription = getMediaDescription(Long.parseLong(mediaId));
 
             removingSpace = removingSpace - mediaDescription.getSize();
             String mediaMemoryPath = String.join("/", infoParts);
 
+            System.out.println("Removing: " + mediaJobId);
             OSUtil.deleteForceMemoryDirectory(mediaMemoryPath);
             redisTemplate.opsForZSet().remove("cache:lastAccess", mediaJobId);
-            redisTemplate.delete(mediaJobId.toString()); // delete the hash info for video or value info for album
+            redisTemplate.delete(mediaJobId); // delete the hash info for video or value info for album
         }
         OSUtil.updateUsableMemory(neededSpace - removingSpace); // removingSpace is negative or 0
+        System.out.println(OSUtil.MEMORY_USABLE);
         return enough;
     }
 
@@ -89,7 +95,7 @@ public abstract class MediaService {
      * Already sorted by default. Get oldest one first
      * @return mediaJobId in batch of 50.
      */
-    private Set<ZSetOperations.TypedTuple<Object>> getAllCacheLastAccessId(long max) {
+    private Set<ZSetOperations.TypedTuple<Object>> getAllCacheLastAccess(long max) {
         return redisTemplate.opsForZSet()
                 .rangeByScoreWithScores("cache:lastAccess", 0, max, 0, 50);
     }
