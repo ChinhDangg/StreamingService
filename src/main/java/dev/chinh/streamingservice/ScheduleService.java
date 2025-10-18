@@ -42,7 +42,7 @@ public class ScheduleService {
             }
             String jobId = cachedJobStatus.get("jobId").toString(); // UUID
             videoService.stopFfmpegJob(jobId);
-            videoService.addCacheTempVideoJobStatus(videoJobId, null, MediaJobStatus.STOPPED);
+            videoService.addCacheTempVideoJobStatus(videoJobId, null, null, MediaJobStatus.STOPPED);
         }
     }
 }
