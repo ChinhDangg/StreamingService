@@ -21,6 +21,7 @@ public enum Resolution {
 
     public static long getEstimatedSize(long size, int width, int height, Resolution target) {
         double percent = (getSecondDimension(target) * target.getResolution()) / (double) (width * height);
+        percent += percent * 0.1;
         return (long) (size * percent);
     }
 
