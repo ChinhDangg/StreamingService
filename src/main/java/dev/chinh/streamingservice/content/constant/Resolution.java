@@ -18,4 +18,27 @@ public enum Resolution {
     Resolution(int resolution) {
         this.resolution = resolution;
     }
+
+    public static long getEstimatedSize(long size, int width, int height, Resolution target) {
+        double percent = (getSecondDimension(target) * target.getResolution()) / (double) (width * height);
+        return (long) (size * percent);
+    }
+
+    public static int getSecondDimension(Resolution resolution) {
+        if (resolution == Resolution.p2160)
+            return 3860;
+        else if (resolution == Resolution.p1440)
+            return 2560;
+        else if (resolution == Resolution.p1080)
+            return 1920;
+        else if (resolution == Resolution.p720)
+            return 1280;
+        else if (resolution == Resolution.p480)
+            return 854;
+        else if (resolution == Resolution.p360)
+            return 640;
+        else if (resolution == Resolution.p240)
+            return 426;
+        return -1;
+    }
 }
