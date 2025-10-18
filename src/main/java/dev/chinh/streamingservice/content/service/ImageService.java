@@ -99,10 +99,10 @@ public class ImageService extends MediaService {
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(
                 mediaDescription.getBucket(), mediaPath.toString(), 30 * 60);
 
-        // 2. Build cache path {temp dir}/image-cache/{bucket}/{key}_{res}.{format}
-        Path cacheRoot = Paths.get("/image-cache");
-        Path bucketDir = cacheRoot.resolve(mediaDescription.getBucket());
-        Path albumDir = bucketDir.resolve(mediaDescription.getPath());
+        // 2. Build cache path {temp dir}/album-cache/{res}/{key}_{res}.{format}
+        Path cacheRoot = Paths.get("/album-cache");
+        Path albumIdDir = cacheRoot.resolve(String.valueOf(albumId));
+        Path albumDir = albumIdDir.resolve(res.name());
 
         // Append resolution + format to the file name
         String baseName = key.replaceAll("\\.[^.]+$", ""); // strip extension if present
@@ -130,7 +130,7 @@ public class ImageService extends MediaService {
             runAndLog(dockerCmd, null);
         }
 
-        String cachedImageUrl = "/cache/" + mediaDescription.getBucket() + "/" + mediaDescription.getPath() + "/" + cacheFileName;
+        String cachedImageUrl = String.valueOf(cachePath);
         return getUrlAsRedirectResponse(cachedImageUrl, true);
     }
 
