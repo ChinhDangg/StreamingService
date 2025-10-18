@@ -53,10 +53,16 @@ public class VideoService extends MediaService {
             throw new IOException("Failed to create temporary directory: " + videoDir);
         }
 
+        // === resolution control ===
+        final Resolution resolution = Resolution.p360;
+
         MediaDescription mediaDescription = getMediaDescription(videoId);
 
+        makeMemorySpaceForSize(Resolution.getEstimatedSize(
+                mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight(), resolution));
+
         double duration = mediaDescription.getLength();
-        int segments = 20;
+        int segments = 10;
         double previewLength = duration * 0.10;
         double clipLength = previewLength / segments;
         double interval = duration / segments;
@@ -76,9 +82,7 @@ public class VideoService extends MediaService {
             concatInputs.append(String.format("[v%d][a%d]", i, i));
         }
 
-        // === resolution control ===
-        final int resolution = Resolution.p360.getResolution();
-        String scale = getFfmpegScaleString(mediaDescription.getWidth(), mediaDescription.getHeight(), resolution);
+        String scale = getFfmpegScaleString(mediaDescription.getWidth(), mediaDescription.getHeight(), resolution.getResolution());
 
         // concat -> scale
         fc.append(String.format(
@@ -162,6 +166,11 @@ public class VideoService extends MediaService {
             throw new IOException("Failed to create temporary directory: " + videoDir);
         }
 
+        boolean enoughSpace = makeMemorySpaceForSize(Resolution.getEstimatedSize(
+                mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight(), res));
+        if (!enoughSpace)
+            return getOriginalVideoUrl(videoId);
+
         // 2. Get a presigned URL with container Nginx so ffmpeg can access in container
         // 3. Rewrite URL to go through Nginx proxy instead of direct MinIO
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(mediaDescription.getBucket(),
@@ -193,7 +202,7 @@ public class VideoService extends MediaService {
                 "-i", nginxUrl,     // input: presigned video URL via Nginx proxy
                 "-vf", scale,                 // video filter: resize to 360p height, keep aspect ratio
                 "-c:v", "h264",               // encode video with H.264 codec
-                "-preset", "veryfast",        // encoder speed/efficiency tradeoff: "veryfast" = low CPU, larger file
+                "-preset", "superfast",        // encoder speed/efficiency tradeoff: "veryfast" = low CPU, larger file
                 "-c:a", "aac",                // encode audio with AAC codec
                 "-metadata", "job_id=" + partialVideoJobId,    // unique tag
                 "-f", "hls",                  // output format = HTTP Live Streaming (HLS)
@@ -271,7 +280,7 @@ public class VideoService extends MediaService {
     }
 
     private void checkPlaylistCreated(String playlist) throws IOException, InterruptedException {
-        int retries = 10;
+        int retries = 20;
         while (!OSUtil.checkTempFileExists(playlist) && retries-- > 0) {
             Thread.sleep(500); // wait 0.5s
         }
