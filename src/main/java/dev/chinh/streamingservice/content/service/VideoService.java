@@ -59,8 +59,8 @@ public class VideoService extends MediaService {
         MediaDescription mediaDescription = getMediaDescription(videoId);
 
         double duration = mediaDescription.getLength();
-        int segments = 10;
-        double previewLength = duration * 0.10;
+        int segments = Math.min(Math.toIntExact(Math.round(duration / 60 / 5 * 10)), 20);
+        double previewLength = Math.min(duration, 60);
         double clipLength = previewLength / segments;
         double interval = duration / segments;
 
@@ -205,7 +205,7 @@ public class VideoService extends MediaService {
                 "-i", nginxUrl,     // input: presigned video URL via Nginx proxy
                 "-vf", scale,                 // video filter: resize to 360p height, keep aspect ratio
                 "-c:v", "h264",               // encode video with H.264 codec
-                "-preset", "superfast",        // encoder speed/efficiency tradeoff: "veryfast" = low CPU, larger file
+                "-preset", "veryfast",        // encoder speed/efficiency tradeoff: "veryfast" = low CPU, larger file
                 "-c:a", "aac",                // encode audio with AAC codec
                 "-metadata", "job_id=" + partialVideoJobId,    // unique tag
                 "-f", "hls",                  // output format = HTTP Live Streaming (HLS)
