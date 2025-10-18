@@ -49,24 +49,25 @@ public class VideoService extends MediaService {
             prevJobStopped = true;
         }
 
+        if (!OSUtil.createTempDir(videoDir)) {
+            throw new IOException("Failed to create temporary directory: " + videoDir);
+        }
+
         // === resolution control ===
         final Resolution resolution = Resolution.p360;
 
         MediaDescription mediaDescription = getMediaDescription(videoId);
-
-        long estimatedSize = Resolution.getEstimatedSize(
-                mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight(), resolution);
-        makeMemorySpaceForSize(estimatedSize);
-
-        if (!OSUtil.createTempDir(videoDir)) {
-            throw new IOException("Failed to create temporary directory: " + videoDir);
-        }
 
         double duration = mediaDescription.getLength();
         int segments = 10;
         double previewLength = duration * 0.10;
         double clipLength = previewLength / segments;
         double interval = duration / segments;
+
+        long estimatedSize = Resolution.getEstimatedSize(
+                mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight(), resolution)
+                / 10;
+        makeMemorySpaceForSize(estimatedSize);
 
         // Build trim chains
         StringBuilder fc = new StringBuilder();
