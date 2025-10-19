@@ -22,7 +22,7 @@ public class ImageController {
     @GetMapping("/original/{id}")
     public ResponseEntity<Void> getOriginalUrl(@PathVariable Long id,
                                                @RequestParam(name = "key") String imagePath) throws Exception {
-        return imageService.getOriginalImageURL(id, imagePath, 30 * 60);
+        return imageService.getOriginalImageURLAsRedirectResponse(id, imagePath, 30 * 60);
     }
 
     @GetMapping("/resize/{id}")
@@ -30,6 +30,6 @@ public class ImageController {
                                                 @RequestParam Resolution res,
                                                 @RequestParam(name = "key") String imagePath,
                                                 HttpServletRequest request) throws Exception {
-        return imageService.getResizedImageURL(id, imagePath, res, request);
+        return imageService.getResizedImageURLAsRedirectResponse(id, imagePath, res, request);
     }
 }
