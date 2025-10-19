@@ -182,7 +182,21 @@ public class VideoService extends MediaService {
         String scale = getFfmpegScaleString(
                 mediaDescription.getWidth(), mediaDescription.getHeight(), res.getResolution());
 
-        int segmentDuration = 4;
+        String partialVideoJobId = createPartialVideo(nginxUrl, scale, videoDir, outPath, prevJobStopped, cacheJobId);
+
+        addCacheTempVideoJobStatus(cacheJobId, partialVideoJobId, estimatedSize, MediaJobStatus.RUNNING);
+        addCacheRunningJob(cacheJobId);
+
+        // check the master file has been created. maybe check first chunks being created for smoother experience
+        checkPlaylistCreated(videoDir + masterFileName);
+
+        // 5. Return playlist URL for browser
+        return "/stream/" + videoDir + masterFileName;
+    }
+
+    private String createPartialVideo(String inputUrl, String scale, String videoDir, String outPath,
+                                      boolean prevJobStopped, String cacheJobId) throws Exception {
+        final int segmentDuration = 4;
         String partialVideoJobId = UUID.randomUUID().toString();
         // 4. ffmpeg command
         List<String> command = new ArrayList<>(List.of(
@@ -202,7 +216,7 @@ public class VideoService extends MediaService {
         }
 
         command.addAll(List.of(
-                "-i", nginxUrl,     // input: presigned video URL via Nginx proxy
+                "-i", inputUrl,     // input: presigned video URL via Nginx proxy
                 "-vf", scale,                 // video filter: resize to 360p height, keep aspect ratio
                 "-c:v", "h264",               // encode video with H.264 codec
                 "-preset", "veryfast",        // encoder speed/efficiency tradeoff: "veryfast" = low CPU, larger file
@@ -216,15 +230,7 @@ public class VideoService extends MediaService {
         ));
 
         runAndLogAsync(command.toArray(new String[0]), cacheJobId);
-
-        addCacheTempVideoJobStatus(cacheJobId, partialVideoJobId, estimatedSize, MediaJobStatus.RUNNING);
-        addCacheRunningJob(cacheJobId);
-
-        // check the master file has been created. maybe check first chunks being created for smoother experience
-        checkPlaylistCreated(videoDir + masterFileName);
-
-        // 5. Return playlist URL for browser
-        return "/stream/" + videoDir + masterFileName;
+        return partialVideoJobId;
     }
 
     public void addCacheTempVideoJobStatus(String id, String jobId, Long size, MediaJobStatus status) {
