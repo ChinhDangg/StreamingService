@@ -1,7 +1,7 @@
 package dev.chinh.streamingservice.content.controller;
 
 import dev.chinh.streamingservice.content.constant.Resolution;
-import dev.chinh.streamingservice.content.service.ImageService;
+import dev.chinh.streamingservice.content.service.AlbumService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,17 +12,19 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/image")
 public class ImageController {
 
-    private final ImageService imageService;
+    private final AlbumService albumService;
 
     @GetMapping("/album/{id}/{resolution}")
-    public ResponseEntity<?> getAlbum(@PathVariable Long id, @PathVariable Resolution resolution) throws Exception {
-        return ResponseEntity.ok().body(imageService.getAllMediaInAnAlbum(id, resolution));
+    public ResponseEntity<?> getAlbum(@PathVariable Long id,
+                                      @PathVariable Resolution resolution,
+                                      HttpServletRequest request) throws Exception {
+        return ResponseEntity.ok().body(albumService.getAllMediaInAnAlbum(id, resolution, request));
     }
 
     @GetMapping("/original/{id}")
     public ResponseEntity<Void> getOriginalUrl(@PathVariable Long id,
                                                @RequestParam(name = "key") String imagePath) throws Exception {
-        return imageService.getOriginalImageURLAsRedirectResponse(id, imagePath, 30 * 60);
+        return albumService.getOriginalImageURLAsRedirectResponse(id, imagePath, 30 * 60);
     }
 
     @GetMapping("/resize/{id}")
@@ -30,6 +32,6 @@ public class ImageController {
                                                 @RequestParam Resolution res,
                                                 @RequestParam(name = "key") String imagePath,
                                                 HttpServletRequest request) throws Exception {
-        return imageService.getResizedImageURLAsRedirectResponse(id, imagePath, res, request);
+        return albumService.processResizedImageURLAsRedirectResponse(id, imagePath, res, request);
     }
 }
