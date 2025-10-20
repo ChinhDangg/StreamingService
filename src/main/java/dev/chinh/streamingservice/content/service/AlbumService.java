@@ -37,7 +37,7 @@ public class AlbumService extends MediaService {
         super(redisTemplate, minIOService, objectMapper, mediaRepository);
     }
 
-    public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, String bucket, Resolution resolution, List<String> pathList) {}
+    public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, List<String> buckets, Resolution resolution, List<String> pathList) {}
     public record MediaUrl(MediaType type, String url) {}
 
     public List<MediaUrl> getAllMediaInAnAlbum(Long albumId, Resolution resolution, HttpServletRequest request) throws Exception {
@@ -108,7 +108,7 @@ public class AlbumService extends MediaService {
             Path cachePath = albumDir.resolve(cacheFileName);
             albumUrlList.add(new MediaUrl(mediaType, cachePath.toString()));
         }
-        return new AlbumUrlInfo(albumUrlList, mediaDescription.getBucket(), res, pathList);
+        return new AlbumUrlInfo(albumUrlList, List.of(mediaDescription.getBucket()), res, pathList);
     }
 
     private AlbumUrlInfo getAlbumOriginalUrls(MediaDescription mediaDescription, Iterable<Result<Item>> results) throws Exception {
@@ -121,19 +121,25 @@ public class AlbumService extends MediaService {
                     item.objectName(), 60 * 60);
             albumUrls.add(new MediaUrl(mediaType, originalVideoUrl));
         }
-        return new AlbumUrlInfo(albumUrls, mediaDescription.getBucket(), null, null);
+        return new AlbumUrlInfo(albumUrls, List.of(mediaDescription.getBucket()), null, null);
     }
 
-    public void processResizedImagesInBatch(long albumId, Resolution resolution, int offset, int batch) throws InterruptedException, IOException {
+    public void processResizedAlbumImages(long albumId, Resolution resolution, int offset, int batch) throws IOException, InterruptedException {
         String albumCreationId = getAlbumCacheCreationIdString(albumId, resolution);
         AlbumUrlInfo albumUrlInfo = getCacheAlbumCreation(albumCreationId);
 
         if (albumUrlInfo == null)
             throw new RuntimeException("No cache found with albumId " + albumCreationId);
+        boolean processed = processResizedImagesInBatch(albumUrlInfo, offset, batch, true);
 
+        if (processed)
+            addCacheAlbumCreation(albumCreationId, albumUrlInfo);
+    }
+
+    public boolean processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, int offset, int batch, boolean isAlbum) throws InterruptedException, IOException {
         int size = albumUrlInfo.mediaUrlList.size();
         if (offset > size)
-            return;
+            return false;
 
         int stop = Math.min(size, offset + batch);
         Map<Integer, String> notResized = new HashMap<>();
@@ -143,13 +149,16 @@ public class AlbumService extends MediaService {
             if (output.indexOf("/chunks/") == 0) { // will use /chunks/ at start to check whether url is resized
                 continue;
             }
+            if (currentMediaUrl.type != MediaType.IMAGE) {
+                continue;
+            }
             output = "/chunks" + output;
             albumUrlInfo.mediaUrlList.set(i, new MediaUrl(currentMediaUrl.type, output));
             notResized.put(i, output);
         }
 
         if (notResized.isEmpty())
-            return;
+            return false;
 
         // Start one persistent bash session inside ffmpeg container
         ProcessBuilder pb = new ProcessBuilder("docker", "exec", "-i", "ffmpeg", "bash").redirectErrorStream(true);
@@ -166,7 +175,8 @@ public class AlbumService extends MediaService {
             String scale = getFfmpegScaleString(albumUrlInfo.resolution);
             //int stop = Math.min(size, offset + batch);
             for (int i = offset; i < stop; i++) {
-                String input = minIOService.getSignedUrlForContainerNginx(albumUrlInfo.bucket, albumUrlInfo.pathList.get(i),
+                String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(i);
+                String input = minIOService.getSignedUrlForContainerNginx(bucket, albumUrlInfo.pathList.get(i),
                         60 * 60);
                 String output = notResized.get(i);
                 if (output == null) {
@@ -181,9 +191,6 @@ public class AlbumService extends MediaService {
                 writer.write(ffmpegCmd + "\n");
                 writer.flush();
             }
-
-            // processed - update cache
-            addCacheAlbumCreation(albumCreationId, albumUrlInfo);
 
             // close stdin to end the bash session
             writer.write("exit\n");
@@ -202,6 +209,7 @@ public class AlbumService extends MediaService {
 
         int exit = process.waitFor();
         System.out.println("ffmpeg exited with code " + exit);
+        return true;
     }
 
     public ResponseEntity<Void> processResizedImageURLAsRedirectResponse(Long albumId, String key, Resolution res,
