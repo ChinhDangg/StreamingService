@@ -167,7 +167,7 @@ public class AlbumService extends MediaService {
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8))) {
 
-            Path path = Paths.get(albumUrlInfo.mediaUrlList.getFirst().url);
+            Path path = Paths.get(albumUrlInfo.mediaUrlList.getFirst().url.replaceFirst("/chunks", ""));
             if (!OSUtil.createTempDir(path.getParent().toString())) {
                 throw new IOException("Failed to create temporary directory: " + path.getParent());
             }
