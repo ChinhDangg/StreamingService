@@ -25,7 +25,7 @@ public class ImageController {
     public ResponseEntity<Void> checkResizedImage(@PathVariable Long id,
                                                   @PathVariable Resolution resolution,
                                                   @PathVariable Integer offset) throws Exception {
-        albumService.processResizedImagesInBatch(id, resolution, offset, 5);
+        albumService.processResizedAlbumImages(id, resolution, offset, 5);
         return ResponseEntity.ok().build();
     }
 
