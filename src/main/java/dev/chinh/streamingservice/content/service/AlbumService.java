@@ -134,6 +134,13 @@ public class ImageService extends MediaService {
         return getUrlAsRedirectResponse(cachedImageUrl, true);
     }
 
+    private String getFfmpegScaleString(Resolution resolution) {
+        return String.format(
+                "\"scale='if(gte(iw,ih),-2,min(iw,%1$d))':'if(gte(ih,iw),-2,min(ih,%1$d))'\"",
+                resolution.getResolution()
+        );
+    }
+
     @Override
     protected MediaDescription getMediaDescription(long albumId) {
         MediaDescription mediaDescription = super.getMediaDescription(albumId);
