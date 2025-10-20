@@ -27,6 +27,7 @@ public abstract class MediaService {
     protected final MinIOService minIOService;
     protected final ObjectMapper objectMapper;
     private final MediaMetaDataRepository mediaRepository;
+    protected final String masterFileName = "/master.m3u8";
 
     public boolean makeMemorySpaceForSize(long size) throws IOException, InterruptedException {
         if (OSUtil.getUsableMemory() >= size) {
@@ -106,6 +107,10 @@ public abstract class MediaService {
         return mediaId + ":" + res;
     }
 
+    protected String getNginxVideoStreamUrl(String videoDir) {
+        return "/stream/" + videoDir + masterFileName;
+    }
+
     protected MediaDescription getMediaDescription(long mediaId) {
         MediaDescription mediaDescription  = getCachedMediaSearchItem(String.valueOf(mediaId));
         if (mediaDescription == null)
@@ -141,20 +146,18 @@ public abstract class MediaService {
         }
     }
 
-    protected String runAndLog(String[] cmd, List<Integer> acceptableCode) throws Exception {
+    protected void runAndLog(String[] cmd, List<Integer> acceptableCode) throws Exception {
         Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
-        String line, lastLine = null;
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            while ((line = br.readLine()) != null) {
-                //System.out.println("[ffmpeg] " + line);
-                lastLine = line;
-            }
-        }
+//        String line;
+//        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+//            while ((line = br.readLine()) != null) {
+//                //System.out.println("[ffmpeg] " + line);
+//            }
+//        }
         int exit = process.waitFor();
         System.out.println("ffmpeg exited with code " + exit);
         if (exit != 0 && (acceptableCode != null && !acceptableCode.contains(exit))) {
             throw new RuntimeException("Command failed with code " + exit);
         }
-        return lastLine;
     }
 }
