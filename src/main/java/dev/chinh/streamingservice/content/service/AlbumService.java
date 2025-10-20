@@ -25,7 +25,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class AlbumService extends MediaService {
@@ -133,6 +135,22 @@ public class AlbumService extends MediaService {
         if (offset > size)
             return;
 
+        int stop = Math.min(size, offset + batch);
+        Map<Integer, String> notResized = new HashMap<>();
+        for (int i = offset; i < stop; i++) {
+            MediaUrl currentMediaUrl = albumUrlInfo.mediaUrlList.get(i);
+            String output = currentMediaUrl.url;
+            if (output.indexOf("/chunks/") == 0) { // will use /chunks/ at start to check whether url is resized
+                continue;
+            }
+            output = "/chunks" + output;
+            albumUrlInfo.mediaUrlList.set(i, new MediaUrl(currentMediaUrl.type, output));
+            notResized.put(i, output);
+        }
+
+        if (notResized.isEmpty())
+            return;
+
         // Start one persistent bash session inside ffmpeg container
         ProcessBuilder pb = new ProcessBuilder("docker", "exec", "-i", "ffmpeg", "bash").redirectErrorStream(true);
         Process process = pb.start();
@@ -145,20 +163,15 @@ public class AlbumService extends MediaService {
                 throw new IOException("Failed to create temporary directory: " + path.getParent());
             }
 
-            boolean processed = false;
             String scale = getFfmpegScaleString(albumUrlInfo.resolution);
-            int stop = Math.min(size, offset + batch);
+            //int stop = Math.min(size, offset + batch);
             for (int i = offset; i < stop; i++) {
                 String input = minIOService.getSignedUrlForContainerNginx(albumUrlInfo.bucket, albumUrlInfo.pathList.get(i),
                         60 * 60);
-                MediaUrl currentMediaUrl = albumUrlInfo.mediaUrlList.get(i);
-                String output = currentMediaUrl.url;
-                if (output.indexOf("/chunks/") == 0) { // will use /chunks/ at start to check whether url is resized
+                String output = notResized.get(i);
+                if (output == null) {
                     continue;
                 }
-                output = "/chunks" + output;
-                processed = true;
-                albumUrlInfo.mediaUrlList.set(i, new MediaUrl(currentMediaUrl.type, output));
 
                 String ffmpegCmd = String.format(
                         "ffmpeg -n -hide_banner -loglevel info " +
@@ -169,8 +182,8 @@ public class AlbumService extends MediaService {
                 writer.flush();
             }
 
-            if (processed)
-                addCacheAlbumCreation(albumCreationId, albumUrlInfo);
+            // processed - update cache
+            addCacheAlbumCreation(albumCreationId, albumUrlInfo);
 
             // close stdin to end the bash session
             writer.write("exit\n");
