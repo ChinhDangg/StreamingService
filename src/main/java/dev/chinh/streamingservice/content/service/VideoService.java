@@ -31,7 +31,6 @@ public class VideoService extends MediaService {
     }
 
     public String getPreviewVideoUrl(Long videoId) throws Exception {
-        String masterFileName = "/master.m3u8";
         String videoDir = videoId + "/preview";
         String containerDir = "/chunks/" + videoDir;
         String outPath = containerDir + masterFileName;
@@ -137,12 +136,11 @@ public class VideoService extends MediaService {
 
         checkPlaylistCreated(videoDir + masterFileName);
 
-        return "/stream/" + videoDir + masterFileName;
+        return getNginxVideoStreamUrl(videoDir);
     }
 
     public String getPartialVideoUrl(Long videoId, Resolution res) throws Exception {
         // 1. container paths
-        String masterFileName = "/master.m3u8";
         String videoDir = videoId + "/" + res;
         String containerDir = "/chunks/" + videoDir;
         String outPath = containerDir + masterFileName;
@@ -191,10 +189,10 @@ public class VideoService extends MediaService {
         checkPlaylistCreated(videoDir + masterFileName);
 
         // 5. Return playlist URL for browser
-        return "/stream/" + videoDir + masterFileName;
+        return getNginxVideoStreamUrl(videoDir);
     }
 
-    private String createPartialVideo(String inputUrl, String scale, String videoDir, String outPath,
+    public String createPartialVideo(String inputUrl, String scale, String videoDir, String outPath,
                                       boolean prevJobStopped, String cacheJobId) throws Exception {
         final int segmentDuration = 4;
         String partialVideoJobId = UUID.randomUUID().toString();
