@@ -24,7 +24,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,11 +35,11 @@ public class AlbumService extends MediaService {
         super(redisTemplate, minIOService, objectMapper, mediaRepository);
     }
 
-    public record MediaUrlPairs(List<MediaUrl> mediaUrlList, String bucket, List<String> pathList) {}
+    public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, String bucket, Resolution resolution, List<String> pathList) {}
     public record MediaUrl(MediaType type, String url) {}
 
     public List<MediaUrl> getAllMediaInAnAlbum(Long albumId, Resolution resolution, HttpServletRequest request) throws Exception {
-        String albumCreationId = albumId + ":" + resolution;
+        String albumCreationId = getAlbumCacheCreationIdString(albumId, resolution);
         var cacheUrls = getCacheAlbumCreation(albumCreationId);
         if (cacheUrls != null) {
             return cacheUrls.mediaUrlList;
@@ -48,21 +47,25 @@ public class AlbumService extends MediaService {
 
         MediaDescription mediaDescription = getMediaDescription(albumId);
         Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaDescription.getBucket(), mediaDescription.getPath());
-        MediaUrlPairs mediaUrlPairs = (resolution == Resolution.original) ?
+        AlbumUrlInfo albumUrlInfo = (resolution == Resolution.original) ?
                 getAlbumOriginalUrls(mediaDescription, results) :
                 getAlbumResizedUrls(mediaDescription, albumId, resolution, results, request);
 
         addCacheLastAccess(albumCreationId, System.currentTimeMillis() + 60 * 60 * 1000);
-        addCacheAlbumCreation(albumCreationId, mediaUrlPairs);
-        return mediaUrlPairs.mediaUrlList;
+        addCacheAlbumCreation(albumCreationId, albumUrlInfo);
+        return albumUrlInfo.mediaUrlList;
     }
 
-    private void addCacheAlbumCreation(String albumCreateId, MediaUrlPairs mediaUrlPairs) throws JsonProcessingException {
-        String json = objectMapper.writeValueAsString(mediaUrlPairs);
-        redisTemplate.opsForValue().set(albumCreateId, json, Duration.ofHours(1));
+    private String getAlbumCacheCreationIdString(long albumId, Resolution resolution) {
+        return albumId + ":" + resolution;
     }
 
-    public MediaUrlPairs getCacheAlbumCreation(String albumCreateId) throws JsonProcessingException {
+    private void addCacheAlbumCreation(String albumCreateId, AlbumUrlInfo albumUrlInfo) throws JsonProcessingException {
+        String json = objectMapper.writeValueAsString(albumUrlInfo);
+        redisTemplate.opsForValue().set(albumCreateId, json);
+    }
+
+    public AlbumUrlInfo getCacheAlbumCreation(String albumCreateId) throws JsonProcessingException {
         Object value = redisTemplate.opsForValue().get(albumCreateId);
         if (value == null)
             return null;
@@ -73,8 +76,8 @@ public class AlbumService extends MediaService {
      * Return nginx urls for resized image - may not have actual image.
      * Get the url list first then call for actual images or videos resize later.
      */
-    private MediaUrlPairs getAlbumResizedUrls(MediaDescription mediaDescription, long albumId, Resolution res,
-                                               Iterable<Result<Item>> results, HttpServletRequest request) throws Exception {
+    private AlbumUrlInfo getAlbumResizedUrls(MediaDescription mediaDescription, long albumId, Resolution res,
+                                             Iterable<Result<Item>> results, HttpServletRequest request) throws Exception {
         Path albumDir = Paths.get("/album-cache" + "/" + albumId + "/" + res.name());
         String acceptHeader = request.getHeader("Accept");
 
@@ -103,10 +106,10 @@ public class AlbumService extends MediaService {
             Path cachePath = albumDir.resolve(cacheFileName);
             albumUrlList.add(new MediaUrl(mediaType, cachePath.toString()));
         }
-        return new MediaUrlPairs(albumUrlList, mediaDescription.getBucket(), pathList);
+        return new AlbumUrlInfo(albumUrlList, mediaDescription.getBucket(), res, pathList);
     }
 
-    private MediaUrlPairs getAlbumOriginalUrls(MediaDescription mediaDescription, Iterable<Result<Item>> results) throws Exception {
+    private AlbumUrlInfo getAlbumOriginalUrls(MediaDescription mediaDescription, Iterable<Result<Item>> results) throws Exception {
         List<MediaUrl> albumUrls = new ArrayList<>();
         for (Result<Item> result : results) {
             Item item = result.get();
@@ -116,11 +119,17 @@ public class AlbumService extends MediaService {
                     item.objectName(), 60 * 60);
             albumUrls.add(new MediaUrl(mediaType, originalVideoUrl));
         }
-        return new MediaUrlPairs(albumUrls, mediaDescription.getBucket(), null);
+        return new AlbumUrlInfo(albumUrls, mediaDescription.getBucket(), null, null);
     }
 
-    public void processResizedImagesInBatch(Resolution resolution, MediaUrlPairs mediaUrlPairs, int offset, int batch) throws InterruptedException, IOException {
-        int size = mediaUrlPairs.mediaUrlList.size();
+    public void processResizedImagesInBatch(long albumId, Resolution resolution, int offset, int batch) throws InterruptedException, IOException {
+        String albumCreationId = getAlbumCacheCreationIdString(albumId, resolution);
+        AlbumUrlInfo albumUrlInfo = getCacheAlbumCreation(albumCreationId);
+
+        if (albumUrlInfo == null)
+            throw new RuntimeException("No cache found with albumId " + albumCreationId);
+
+        int size = albumUrlInfo.mediaUrlList.size();
         if (offset > size)
             return;
 
@@ -131,25 +140,37 @@ public class AlbumService extends MediaService {
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8))) {
 
-            Path path = Paths.get(mediaUrlPairs.mediaUrlList.getFirst().url);
+            Path path = Paths.get(albumUrlInfo.mediaUrlList.getFirst().url);
             if (!OSUtil.createTempDir(path.getParent().toString())) {
                 throw new IOException("Failed to create temporary directory: " + path.getParent());
             }
 
-            String scale = getFfmpegScaleString(resolution);
+            boolean processed = false;
+            String scale = getFfmpegScaleString(albumUrlInfo.resolution);
             int stop = Math.min(size, offset + batch);
             for (int i = offset; i < stop; i++) {
-                String input = minIOService.getSignedUrlForContainerNginx(mediaUrlPairs.bucket, mediaUrlPairs.pathList.get(i),
+                String input = minIOService.getSignedUrlForContainerNginx(albumUrlInfo.bucket, albumUrlInfo.pathList.get(i),
                         60 * 60);
-                String output = "/chunks" + mediaUrlPairs.mediaUrlList.get(i).url;
+                MediaUrl currentMediaUrl = albumUrlInfo.mediaUrlList.get(i);
+                String output = currentMediaUrl.url;
+                if (output.indexOf("/chunks/") == 0) { // will use /chunks/ at start to check whether url is resized
+                    continue;
+                }
+                output = "/chunks" + output;
+                processed = true;
+                albumUrlInfo.mediaUrlList.set(i, new MediaUrl(currentMediaUrl.type, output));
+
                 String ffmpegCmd = String.format(
-                        "ffmpeg -y -hide_banner -loglevel info " +
+                        "ffmpeg -n -hide_banner -loglevel info " +
                                 "-i \"%s\" -vf %s -q:v 2 \"%s\"",
                         input, scale, output
                 );
                 writer.write(ffmpegCmd + "\n");
                 writer.flush();
             }
+
+            if (processed)
+                addCacheAlbumCreation(albumCreationId, albumUrlInfo);
 
             // close stdin to end the bash session
             writer.write("exit\n");
@@ -159,12 +180,12 @@ public class AlbumService extends MediaService {
         }
 
         // Capture ffmpeg combined logs
-//        try (BufferedReader reader = new BufferedReader(
-//                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-//            reader.lines().forEach(System.out::println);
-//        } catch (IOException e) {
-//            throw new RuntimeException(e);
-//        }
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            reader.lines().forEach(System.out::println);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
         int exit = process.waitFor();
         System.out.println("ffmpeg exited with code " + exit);
