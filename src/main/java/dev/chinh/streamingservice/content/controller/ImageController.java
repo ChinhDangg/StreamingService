@@ -21,6 +21,14 @@ public class ImageController {
         return ResponseEntity.ok().body(albumService.getAllMediaInAnAlbum(id, resolution, request));
     }
 
+    @PostMapping("/album/{id}/{resolution}/{offset}/check-resized")
+    public ResponseEntity<Void> checkResizedImage(@PathVariable Long id,
+                                                  @PathVariable Resolution resolution,
+                                                  @PathVariable Integer offset) throws Exception {
+        albumService.processResizedImagesInBatch(id, resolution, offset, 5);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/original/{id}")
     public ResponseEntity<Void> getOriginalUrl(@PathVariable Long id,
                                                @RequestParam(name = "key") String imagePath) throws Exception {
