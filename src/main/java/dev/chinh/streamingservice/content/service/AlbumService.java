@@ -60,7 +60,7 @@ public class AlbumService extends MediaService {
                 getAlbumResizedUrls(mediaDescription, albumId, resolution, results, request);
 
         addCacheLastAccess(albumCreationId, System.currentTimeMillis() + 60 * 60 * 1000);
-        addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo);
+        addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo, true);
         processResizedAlbumImages(albumId, resolution, 0, 5);
         return albumUrlInfo.mediaUrlList;
     }
@@ -70,17 +70,19 @@ public class AlbumService extends MediaService {
     }
 
     // cautious as modifying albumUrlInfo list inside
-    private void addCacheAlbumCreationInfo(long albumId, String albumCreateId, AlbumUrlInfo albumUrlInfo) throws JsonProcessingException {
+    private void addCacheAlbumCreationInfo(long albumId, String albumCreateId, AlbumUrlInfo albumUrlInfo, boolean isInitial) throws JsonProcessingException {
         String albumHashId = getAlbumCacheHashId(albumId);
 
-        String bucketJson = objectMapper.writeValueAsString(albumUrlInfo.buckets);
+        if (isInitial) {
+            String bucketJson = objectMapper.writeValueAsString(albumUrlInfo.buckets);
+            redisTemplate.opsForHash().put(albumHashId, "buckets", bucketJson);
+        }
         albumUrlInfo.buckets.clear();
-        redisTemplate.opsForHash().put(albumHashId, "buckets", bucketJson);
 
-        if (albumUrlInfo.pathList != null) {
+        if (isInitial && albumUrlInfo.pathList != null) {
             String pathListJson = objectMapper.writeValueAsString(albumUrlInfo.pathList);
-            albumUrlInfo.pathList.clear();
             redisTemplate.opsForHash().put(albumHashId, "pathList", pathListJson);
+            albumUrlInfo.pathList.clear();
         }
 
         String json = objectMapper.writeValueAsString(albumUrlInfo);
@@ -186,9 +188,12 @@ public class AlbumService extends MediaService {
         boolean processed = processResizedImagesInBatch(albumUrlInfo, offset, batch, true);
 
         if (processed)
-            addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo);
+            addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo, false);
     }
 
+    /**
+     * Will modify the albumUrlInfo mediaUrlList in place to cache what image is already resized.
+     */
     public boolean processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, int offset, int batch, boolean isAlbum) throws InterruptedException, IOException {
         int size = albumUrlInfo.mediaUrlList.size();
         if (offset > size)
