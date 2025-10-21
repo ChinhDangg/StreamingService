@@ -133,7 +133,7 @@ public class AlbumService extends MediaService {
         boolean processed = processResizedImagesInBatch(albumUrlInfo, offset, batch, true);
 
         if (processed)
-            addCacheAlbumCreation(albumCreationId, albumUrlInfo);
+            addCacheAlbumCreationInfo(albumCreationId, albumUrlInfo);
     }
 
     public boolean processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, int offset, int batch, boolean isAlbum) throws InterruptedException, IOException {
