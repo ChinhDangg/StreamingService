@@ -9,24 +9,31 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/image")
-public class ImageController {
+@RequestMapping("/api/album")
+public class AlbumController {
 
     private final AlbumService albumService;
 
-    @GetMapping("/album/{id}/{resolution}")
+    @GetMapping("/{id}/{resolution}")
     public ResponseEntity<?> getAlbum(@PathVariable Long id,
                                       @PathVariable Resolution resolution,
                                       HttpServletRequest request) throws Exception {
         return ResponseEntity.ok().body(albumService.getAllMediaInAnAlbum(id, resolution, request));
     }
 
-    @PostMapping("/album/{id}/{resolution}/{offset}/check-resized")
+    @PostMapping("/{id}/{resolution}/{offset}/check-resized")
     public ResponseEntity<Void> checkResizedImage(@PathVariable Long id,
                                                   @PathVariable Resolution resolution,
                                                   @PathVariable Integer offset) throws Exception {
         albumService.processResizedAlbumImages(id, resolution, offset, 5);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{albumId}/vid/{vidNum}/{resolution}")
+    public ResponseEntity<String> getAlbumVideoUrl(@PathVariable long albumId,
+                                                   @PathVariable int vidNum,
+                                                   @PathVariable Resolution resolution) throws Exception {
+        return ResponseEntity.ok().body(albumService.getAlbumPartialVideoUrl(albumId, vidNum, resolution));
     }
 
     @GetMapping("/original/{id}")
