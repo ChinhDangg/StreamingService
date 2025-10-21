@@ -125,8 +125,8 @@ public class AlbumService extends MediaService {
     }
 
     public void processResizedAlbumImages(long albumId, Resolution resolution, int offset, int batch) throws IOException, InterruptedException {
-        String albumCreationId = getAlbumCacheCreationIdString(albumId, resolution);
-        AlbumUrlInfo albumUrlInfo = getCacheAlbumCreation(albumCreationId);
+        String albumCreationId = getCacheMediaJobId(albumId, resolution);
+        AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumCreationId);
 
         if (albumUrlInfo == null)
             throw new RuntimeException("No cache found with albumId " + albumCreationId);
