@@ -225,7 +225,7 @@ public class AlbumService extends MediaService {
                 throw new IOException("Failed to create temporary directory: " + path.getParent());
             }
 
-            String scale = getFfmpegScaleString(albumUrlInfo.resolution);
+            String scale = getFfmpegScaleString(albumUrlInfo.resolution, true);
             //int stop = Math.min(size, offset + batch);
             for (int i = offset; i < stop; i++) {
                 String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(i);
@@ -306,7 +306,7 @@ public class AlbumService extends MediaService {
         String containerDir = "/chunks/" + videoDir;
         String outPath = containerDir + masterFileName;
 
-        String scale = getFfmpegScaleString(res);
+        String scale = getFfmpegScaleString(res, true);
         String partialVideoJobId = videoService.createPartialVideo(input, scale, videoDir, outPath, prevJobStopped, albumVidCacheJobId);
 
         long objectSize = minIOService.getObjectSize(bucket, videoPath);
@@ -345,7 +345,7 @@ public class AlbumService extends MediaService {
         String cacheFileName = baseName + "_" + res.getResolution() + "." + format;
         Path cachePath = albumDir.resolve(cacheFileName);
 
-        String scale = getFfmpegScaleString(res);
+        String scale = getFfmpegScaleString(res, false);
         if (!OSUtil.checkTempFileExists(cachePath.toString())) {
             // make sure parent dir exist
             if (!OSUtil.createTempDir(cachePath.getParent().toString())) {
@@ -369,11 +369,12 @@ public class AlbumService extends MediaService {
         return getUrlAsRedirectResponse(cachedImageUrl, true);
     }
 
-    private String getFfmpegScaleString(Resolution resolution) {
-//        return String.format(
-//                "\"scale='if(gte(iw,ih),-2,min(iw,%1$d))':'if(gte(ih,iw),-2,min(ih,%1$d))'\"",
-//                resolution.getResolution()
-//        );
+    private String getFfmpegScaleString(Resolution resolution, boolean wrapInDoubleQuotes) {
+        if (wrapInDoubleQuotes)
+            return String.format(
+                    "\"scale='if(gte(iw,ih),-2,min(iw,%1$d))':'if(gte(ih,iw),-2,min(ih,%1$d))'\"",
+                    resolution.getResolution()
+            );
         return String.format(
                 "scale='if(gte(iw,ih),-2,min(iw,%1$d))':'if(gte(ih,iw),-2,min(ih,%1$d))'",
                 resolution.getResolution()
