@@ -39,13 +39,13 @@ public class VideoService extends MediaService {
 
         addCacheLastAccess(cacheJobId, null);
 
-        var cachedJobStatus = getCacheTempVideoJobStatus(cacheJobId);
+        MediaJobStatus mediaJobStatus = getJobStatus(cacheJobId);
         boolean prevJobStopped = false;
-        if (!cachedJobStatus.isEmpty()) {
-            MediaJobStatus status = (MediaJobStatus) cachedJobStatus.get("status");
-            if (status != MediaJobStatus.STOPPED)
+        if (mediaJobStatus != null) {
+            if (!mediaJobStatus.equals(MediaJobStatus.STOPPED))
                 return "/stream/" + videoDir + masterFileName;
-            prevJobStopped = true;
+            else
+                prevJobStopped = true;
         }
 
         if (!OSUtil.createTempDir(videoDir)) {
@@ -142,20 +142,18 @@ public class VideoService extends MediaService {
     public String getPartialVideoUrl(Long videoId, Resolution res) throws Exception {
         // 1. container paths
         String videoDir = videoId + "/" + res;
-        String containerDir = "/chunks/" + videoDir;
-        String outPath = containerDir + masterFileName;
 
-        String cacheJobId = getCachePartialJobId(videoId, res);
+        String cacheJobId = getCacheMediaJobId(videoId, res);
 
         addCacheLastAccess(cacheJobId, null);
 
-        Map<Object, Object> cachedJobStatus = getCacheTempVideoJobStatus(cacheJobId);
+        MediaJobStatus mediaJobStatus = getJobStatus(cacheJobId);
         boolean prevJobStopped = false;
-        if (!cachedJobStatus.isEmpty()) {
-            MediaJobStatus status = (MediaJobStatus) cachedJobStatus.get("status");
-            if (status != MediaJobStatus.STOPPED)
+        if (mediaJobStatus != null) {
+            if (!mediaJobStatus.equals(MediaJobStatus.STOPPED))
                 return "/stream/" + videoDir + masterFileName;
-            prevJobStopped = true;
+            else
+                prevJobStopped = true;
         }
 
         MediaDescription mediaDescription = getMediaDescription(videoId);
@@ -180,6 +178,8 @@ public class VideoService extends MediaService {
         String scale = getFfmpegScaleString(
                 mediaDescription.getWidth(), mediaDescription.getHeight(), res.getResolution());
 
+        String containerDir = "/chunks/" + videoDir;
+        String outPath = containerDir + masterFileName;
         String partialVideoJobId = createPartialVideo(nginxUrl, scale, videoDir, outPath, prevJobStopped, cacheJobId);
 
         addCacheTempVideoJobStatus(cacheJobId, partialVideoJobId, estimatedSize, MediaJobStatus.RUNNING);
@@ -240,7 +240,7 @@ public class VideoService extends MediaService {
         redisTemplate.opsForHash().put(id, "status", status);
     }
 
-    private void addCacheRunningJob(String jobId) {
+    public void addCacheRunningJob(String jobId) {
         redisTemplate.opsForZSet().add("video:running", jobId, System.currentTimeMillis());
     }
 
@@ -285,7 +285,7 @@ public class VideoService extends MediaService {
         return mediaDescription;
     }
 
-    private void checkPlaylistCreated(String playlist) throws IOException, InterruptedException {
+    public void checkPlaylistCreated(String playlist) throws IOException, InterruptedException {
         int retries = 20;
         while (!OSUtil.checkTempFileExists(playlist) && retries-- > 0) {
             Thread.sleep(500); // wait 0.5s

@@ -2,6 +2,7 @@ package dev.chinh.streamingservice.content.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.OSUtil;
+import dev.chinh.streamingservice.content.constant.MediaJobStatus;
 import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.data.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
@@ -12,9 +13,7 @@ import org.apache.commons.compress.MemoryLimitException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -103,12 +102,19 @@ public abstract class MediaService {
                 .rangeByScoreWithScores("cache:lastAccess", 0, max, 0, 50);
     }
 
-    public String getCachePartialJobId(long mediaId, Resolution res) {
+    public String getCacheMediaJobId(long mediaId, Resolution res) {
         return mediaId + ":" + res;
     }
 
     protected String getNginxVideoStreamUrl(String videoDir) {
         return "/stream/" + videoDir + masterFileName;
+    }
+
+    protected MediaJobStatus getJobStatus(String cacheJobId) {
+        Map<Object, Object> cachedJobStatus = getCacheTempVideoJobStatus(cacheJobId);
+        if (!cachedJobStatus.isEmpty())
+            return (MediaJobStatus) cachedJobStatus.get("status");
+        return null;
     }
 
     protected MediaDescription getMediaDescription(long mediaId) {
