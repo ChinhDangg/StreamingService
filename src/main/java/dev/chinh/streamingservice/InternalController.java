@@ -16,6 +16,6 @@ public class InternalController {
     @PostMapping("/partial/{mediaId}/{resolution}")
     public void cacheMediaLastAccess(@PathVariable long mediaId, @PathVariable Resolution resolution) {
         System.out.println(mediaId + "\t" + resolution);
-        videoService.addCacheLastAccess(videoService.getCachePartialJobId(mediaId, resolution), null);
+        videoService.addCacheLastAccess(videoService.getCacheMediaJobId(mediaId, resolution), null);
     }
 }
