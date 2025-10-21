@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.OSUtil;
+import dev.chinh.streamingservice.content.constant.MediaJobStatus;
 import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.data.MediaMetaDataRepository;
@@ -12,6 +13,7 @@ import dev.chinh.streamingservice.exception.ResourceNotFoundException;
 import io.minio.Result;
 import io.minio.messages.Item;
 import jakarta.servlet.http.HttpServletRequest;
+import org.apache.coyote.BadRequestException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -32,17 +34,21 @@ import java.util.Map;
 @Service
 public class AlbumService extends MediaService {
 
+    private final VideoService videoService;
+
     public AlbumService(RedisTemplate<String, Object> redisTemplate, MinIOService minIOService,
-                        ObjectMapper objectMapper, MediaMetaDataRepository mediaRepository) {
+                        ObjectMapper objectMapper, MediaMetaDataRepository mediaRepository,
+                        VideoService videoService) {
         super(redisTemplate, minIOService, objectMapper, mediaRepository);
+        this.videoService = videoService;
     }
 
     public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, List<String> buckets, Resolution resolution, List<String> pathList) {}
     public record MediaUrl(MediaType type, String url) {}
 
     public List<MediaUrl> getAllMediaInAnAlbum(Long albumId, Resolution resolution, HttpServletRequest request) throws Exception {
-        String albumCreationId = getAlbumCacheCreationIdString(albumId, resolution);
-        var cacheUrls = getCacheAlbumCreation(albumCreationId);
+        String albumCreationId = getCacheMediaJobId(albumId, resolution);
+        var cacheUrls = getCacheAlbumCreationInfo(albumCreationId);
         if (cacheUrls != null) {
             return cacheUrls.mediaUrlList;
         }
@@ -54,20 +60,17 @@ public class AlbumService extends MediaService {
                 getAlbumResizedUrls(mediaDescription, albumId, resolution, results, request);
 
         addCacheLastAccess(albumCreationId, System.currentTimeMillis() + 60 * 60 * 1000);
-        addCacheAlbumCreation(albumCreationId, albumUrlInfo);
+        addCacheAlbumCreationInfo(albumCreationId, albumUrlInfo);
+        processResizedAlbumImages(albumId, resolution, 0, 5);
         return albumUrlInfo.mediaUrlList;
     }
 
-    private String getAlbumCacheCreationIdString(long albumId, Resolution resolution) {
-        return albumId + ":" + resolution;
-    }
-
-    private void addCacheAlbumCreation(String albumCreateId, AlbumUrlInfo albumUrlInfo) throws JsonProcessingException {
+    private void addCacheAlbumCreationInfo(String albumCreateId, AlbumUrlInfo albumUrlInfo) throws JsonProcessingException {
         String json = objectMapper.writeValueAsString(albumUrlInfo);
         redisTemplate.opsForValue().set(albumCreateId, json);
     }
 
-    public AlbumUrlInfo getCacheAlbumCreation(String albumCreateId) throws JsonProcessingException {
+    public AlbumUrlInfo getCacheAlbumCreationInfo(String albumCreateId) throws JsonProcessingException {
         Object value = redisTemplate.opsForValue().get(albumCreateId);
         if (value == null)
             return null;
@@ -83,6 +86,7 @@ public class AlbumService extends MediaService {
         Path albumDir = Paths.get("/album-cache" + "/" + albumId + "/" + res.name());
         String acceptHeader = request.getHeader("Accept");
 
+        int vidCount = 0;
         List<String> pathList = new ArrayList<>(); // to get actual minio path for later resize
         List<MediaUrl> albumUrlList = new ArrayList<>();
         for (Result<Item> result : results) {
@@ -94,21 +98,25 @@ public class AlbumService extends MediaService {
             MediaType mediaType = MediaType.detectMediaType(key);
 
             if (mediaType == MediaType.VIDEO) {
-                String videoDir = albumId + "/" + key + "/" + Resolution.p720;
+                String videoDir = "/api/videos/album-vid/" + albumId + "/vid/" + ++vidCount;
                 albumUrlList.add(new MediaUrl(mediaType, getNginxVideoStreamUrl(videoDir)));
                 continue;
             }
 
-            // Append resolution + format to the file name
-            String originalExtension = key.contains(".") ? key.substring(key.lastIndexOf(".") + 1)
-                    .toLowerCase() : "jpg";
-            String baseName = key.replaceAll("\\.[^.]+$", ""); // strip extension if present
-            String format = (acceptHeader != null && acceptHeader.contains("image/webp")) ? "webp" : originalExtension;
-            String cacheFileName = baseName + "_" + res.getResolution() + "." + format;
-            Path cachePath = albumDir.resolve(cacheFileName);
+            Path cachePath = getFileUrlPath(key, acceptHeader, res, albumDir);
             albumUrlList.add(new MediaUrl(mediaType, cachePath.toString()));
         }
         return new AlbumUrlInfo(albumUrlList, List.of(mediaDescription.getBucket()), res, pathList);
+    }
+
+    private Path getFileUrlPath(String key, String acceptHeader, Resolution res, Path albumDir) {
+        // Append resolution + format to the file name
+        String originalExtension = key.contains(".") ? key.substring(key.lastIndexOf(".") + 1)
+                .toLowerCase() : "jpg";
+        String baseName = key.replaceAll("\\.[^.]+$", ""); // strip extension if present
+        String format = (acceptHeader != null && acceptHeader.contains("image/webp")) ? "webp" : originalExtension;
+        String cacheFileName = baseName + "_" + res.getResolution() + "." + format;
+        return albumDir.resolve(cacheFileName);
     }
 
     private AlbumUrlInfo getAlbumOriginalUrls(MediaDescription mediaDescription, Iterable<Result<Item>> results) throws Exception {
@@ -227,6 +235,55 @@ public class AlbumService extends MediaService {
         int exit = process.waitFor();
         System.out.println("ffmpeg exited with code " + exit);
         return true;
+    }
+
+    public String getAlbumPartialVideoUrl(long albumId, int vidNum, Resolution res) throws Exception {
+        final String albumCreationId = getCacheMediaJobId(albumId, res);
+        AlbumService.AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumCreationId);
+        if (albumUrlInfo == null)
+            throw new RuntimeException("No cache found with albumId " + albumCreationId);
+
+        final String albumVidCacheJobId = albumId + ":" + vidNum + ":" + res;
+
+        String videoPath = albumUrlInfo.pathList.get(vidNum);
+        if (MediaType.detectMediaType(videoPath) != MediaType.VIDEO)
+            throw new BadRequestException("Invalid video path: " + albumVidCacheJobId);
+
+        long now = System.currentTimeMillis();
+        addCacheLastAccess(albumVidCacheJobId, now);
+        addCacheLastAccess(albumCreationId, now);
+
+        final String videoDir = albumVidCacheJobId.replace(":", "/");
+
+        MediaJobStatus mediaJobStatus = getJobStatus(albumVidCacheJobId);
+        boolean prevJobStopped = false;
+        if (mediaJobStatus != null) {
+            if (!mediaJobStatus.equals(MediaJobStatus.STOPPED))
+                return "/stream/" + videoDir + masterFileName;
+            else
+                prevJobStopped = true;
+        }
+
+        String bucket = albumUrlInfo.buckets.getFirst();
+        String input = minIOService.getSignedUrlForContainerNginx(bucket, videoPath, 60 * 60);
+
+        if (!OSUtil.createTempDir(videoDir)) {
+            throw new IOException("Failed to create temporary directory: " + videoDir);
+        }
+
+        String containerDir = "/chunks/" + videoDir;
+        String outPath = containerDir + masterFileName;
+
+        String scale = getFfmpegScaleString(res);
+        String partialVideoJobId = videoService.createPartialVideo(input, scale, videoDir, outPath, prevJobStopped, albumVidCacheJobId);
+
+        long objectSize = minIOService.getObjectSize(bucket, videoPath);
+        videoService.addCacheTempVideoJobStatus(albumVidCacheJobId, partialVideoJobId, objectSize, MediaJobStatus.RUNNING);
+        videoService.addCacheRunningJob(albumVidCacheJobId);
+
+        videoService.checkPlaylistCreated(videoDir + masterFileName);
+
+        return getNginxVideoStreamUrl(videoDir);
     }
 
     public ResponseEntity<Void> processResizedImageURLAsRedirectResponse(Long albumId, String key, Resolution res,
