@@ -80,4 +80,18 @@ public class MinIOService {
         }
     }
 
+    public long getObjectSize(String bucket, String object) {
+        try {
+            StatObjectResponse response = minioClient.statObject(
+                    StatObjectArgs.builder()
+                            .bucket(bucket)
+                            .object(object)
+                            .build()
+            );
+            return response.size();
+        } catch (Exception e) {
+            throw new RuntimeException("Error checking object existence", e);
+        }
+    }
+
 }
