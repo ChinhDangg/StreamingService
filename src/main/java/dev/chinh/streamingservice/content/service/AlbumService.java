@@ -253,13 +253,13 @@ public class AlbumService extends MediaService {
         addCacheLastAccess(albumVidCacheJobId, now);
         addCacheLastAccess(albumCreationId, now);
 
-        final String videoDir = albumVidCacheJobId.replace(":", "/");
+        final String videoDir = "album-cache/" + albumVidCacheJobId.replace(":", "/");
 
         MediaJobStatus mediaJobStatus = getJobStatus(albumVidCacheJobId);
         boolean prevJobStopped = false;
         if (mediaJobStatus != null) {
             if (!mediaJobStatus.equals(MediaJobStatus.STOPPED))
-                return "/stream/" + videoDir + masterFileName;
+                return getNginxVideoStreamUrl(videoDir);
             else
                 prevJobStopped = true;
         }

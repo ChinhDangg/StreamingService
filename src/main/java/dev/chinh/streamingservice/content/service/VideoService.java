@@ -43,7 +43,7 @@ public class VideoService extends MediaService {
         boolean prevJobStopped = false;
         if (mediaJobStatus != null) {
             if (!mediaJobStatus.equals(MediaJobStatus.STOPPED))
-                return "/stream/" + videoDir + masterFileName;
+                return getNginxVideoStreamUrl(videoDir);
             else
                 prevJobStopped = true;
         }
@@ -151,7 +151,7 @@ public class VideoService extends MediaService {
         boolean prevJobStopped = false;
         if (mediaJobStatus != null) {
             if (!mediaJobStatus.equals(MediaJobStatus.STOPPED))
-                return "/stream/" + videoDir + masterFileName;
+                return getNginxVideoStreamUrl(videoDir);
             else
                 prevJobStopped = true;
         }
