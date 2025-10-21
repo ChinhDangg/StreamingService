@@ -124,6 +124,23 @@ public class AlbumService extends MediaService {
         return new AlbumUrlInfo(albumUrls, List.of(mediaDescription.getBucket()), null, null);
     }
 
+    private AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList, Resolution resolution,
+                                                          String acceptHeader) {
+        Path albumDir = Paths.get("/thumbnail-cache/" + resolution.name());
+
+        List<String> pathList = new ArrayList<>();
+        List<MediaUrl> albumUrlList = new ArrayList<>();
+        List<String> bucketList = new ArrayList<>();
+        for (MediaDescription mediaDescription : mediaDescriptionList) {
+            bucketList.add(mediaDescription.getBucket());
+            pathList.add(mediaDescription.getThumbnail());
+
+            Path cachePath = getFileUrlPath(String.valueOf(mediaDescription.getId()), acceptHeader, resolution, albumDir);
+            albumUrlList.add(new MediaUrl(MediaType.IMAGE, cachePath.toString()));
+        }
+        return new AlbumUrlInfo(albumUrlList, bucketList, resolution, pathList);
+    }
+
     public void processResizedAlbumImages(long albumId, Resolution resolution, int offset, int batch) throws IOException, InterruptedException {
         String albumCreationId = getCacheMediaJobId(albumId, resolution);
         AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumCreationId);
