@@ -18,10 +18,6 @@ import java.util.List;
 public class MediaMetaData extends MediaDescription {
 
     // Classification (will also be stored in search for fast information display)
-    @JsonProperty(ContentMetaData.ID)
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
     @JsonProperty(ContentMetaData.TAGS)
     @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE }, fetch = FetchType.LAZY)
     @JoinTable(

@@ -2,8 +2,7 @@ package dev.chinh.streamingservice.data.entity;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.data.ContentMetaData;
-import jakarta.persistence.Column;
-import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -15,6 +14,10 @@ import java.time.LocalDate;
 @ToString
 @MappedSuperclass
 public abstract class MediaDescription {
+
+    @JsonProperty(ContentMetaData.ID)
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @JsonProperty(ContentMetaData.TITLE)
     @Column(nullable = false)

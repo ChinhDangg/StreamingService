@@ -16,9 +16,6 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class MediaSearchItem extends MediaDescription {
 
-    @JsonProperty(ContentMetaData.ID)
-    private String id;
-
     @JsonProperty(ContentMetaData.TAGS)
     private List<String> tags;
     @JsonProperty(ContentMetaData.CHARACTERS)
