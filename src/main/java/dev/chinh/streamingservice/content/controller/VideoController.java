@@ -25,7 +25,7 @@ public class VideoController {
     }
 
     @GetMapping("/partial/{id}/{resolution}")
-    private ResponseEntity<String> getTranscodeFull(@PathVariable Long id,
+    public ResponseEntity<String> getVideoAtDifferentResolutionUrl(@PathVariable Long id,
                                                     @PathVariable Resolution resolution) throws Exception {
         return ResponseEntity.ok(videoService.getPartialVideoUrl(id, resolution));
     }
