@@ -48,7 +48,7 @@ public class AlbumService extends MediaService {
 
     public List<MediaUrl> getAllMediaInAnAlbum(Long albumId, Resolution resolution, HttpServletRequest request) throws Exception {
         String albumCreationId = getCacheMediaJobId(albumId, resolution);
-        var cacheUrls = getCacheAlbumCreationInfo(albumCreationId);
+        var cacheUrls = getCacheAlbumCreationInfo(albumId, albumCreationId);
         if (cacheUrls != null) {
             return cacheUrls.mediaUrlList;
         }
@@ -60,21 +60,50 @@ public class AlbumService extends MediaService {
                 getAlbumResizedUrls(mediaDescription, albumId, resolution, results, request);
 
         addCacheLastAccess(albumCreationId, System.currentTimeMillis() + 60 * 60 * 1000);
-        addCacheAlbumCreationInfo(albumCreationId, albumUrlInfo);
+        addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo);
         processResizedAlbumImages(albumId, resolution, 0, 5);
         return albumUrlInfo.mediaUrlList;
     }
 
-    private void addCacheAlbumCreationInfo(String albumCreateId, AlbumUrlInfo albumUrlInfo) throws JsonProcessingException {
-        String json = objectMapper.writeValueAsString(albumUrlInfo);
-        redisTemplate.opsForValue().set(albumCreateId, json);
+    private String getAlbumCacheHashId(long albumId) {
+        return albumId + ":album";
     }
 
-    public AlbumUrlInfo getCacheAlbumCreationInfo(String albumCreateId) throws JsonProcessingException {
-        Object value = redisTemplate.opsForValue().get(albumCreateId);
+    // cautious as modifying albumUrlInfo list inside
+    private void addCacheAlbumCreationInfo(long albumId, String albumCreateId, AlbumUrlInfo albumUrlInfo) throws JsonProcessingException {
+        String albumHashId = getAlbumCacheHashId(albumId);
+
+        String bucketJson = objectMapper.writeValueAsString(albumUrlInfo.buckets);
+        albumUrlInfo.buckets.clear();
+        redisTemplate.opsForHash().put(albumHashId, "buckets", bucketJson);
+
+        if (albumUrlInfo.pathList != null) {
+            String pathListJson = objectMapper.writeValueAsString(albumUrlInfo.pathList);
+            albumUrlInfo.pathList.clear();
+            redisTemplate.opsForHash().put(albumHashId, "pathList", pathListJson);
+        }
+
+        String json = objectMapper.writeValueAsString(albumUrlInfo);
+        redisTemplate.opsForHash().put(albumHashId, albumCreateId, json);
+    }
+
+    public AlbumUrlInfo getCacheAlbumCreationInfo(long albumId, String albumCreateId) throws JsonProcessingException {
+        String albumHashId = getAlbumCacheHashId(albumId);
+        Object value = redisTemplate.opsForHash().get(albumHashId, albumCreateId);
         if (value == null)
             return null;
-        return objectMapper.readValue((String) value, new TypeReference<>() {});
+
+        AlbumUrlInfo albumUrlInfo = objectMapper.readValue((String) value, new TypeReference<>() {});
+        List<String> bucketList = objectMapper.readValue(
+                (String) redisTemplate.opsForHash().get(albumHashId, "buckets"), new TypeReference<>() {}
+        );
+        List<String> pathList = objectMapper.readValue(
+                (String) redisTemplate.opsForHash().get(albumHashId, "pathList"), new TypeReference<>() {}
+        );
+        albumUrlInfo.buckets.addAll(bucketList);
+        albumUrlInfo.pathList.addAll(pathList);
+
+        return albumUrlInfo;
     }
 
     /**
@@ -86,7 +115,6 @@ public class AlbumService extends MediaService {
         Path albumDir = Paths.get("/album-cache" + "/" + albumId + "/" + res.name());
         String acceptHeader = request.getHeader("Accept");
 
-        int vidCount = 0;
         List<String> pathList = new ArrayList<>(); // to get actual minio path for later resize
         List<MediaUrl> albumUrlList = new ArrayList<>();
         for (Result<Item> result : results) {
@@ -98,15 +126,15 @@ public class AlbumService extends MediaService {
             MediaType mediaType = MediaType.detectMediaType(key);
 
             if (mediaType == MediaType.VIDEO) {
-                String videoDir = "/api/videos/album-vid/" + albumId + "/vid/" + ++vidCount;
-                albumUrlList.add(new MediaUrl(mediaType, getNginxVideoStreamUrl(videoDir)));
+                String videoDir = "/api/album/" + albumId + "/vid/" + albumUrlList.size();
+                albumUrlList.add(new MediaUrl(mediaType, videoDir));
                 continue;
             }
 
             Path cachePath = getFileUrlPath(key, acceptHeader, res, albumDir);
             albumUrlList.add(new MediaUrl(mediaType, cachePath.toString()));
         }
-        return new AlbumUrlInfo(albumUrlList, List.of(mediaDescription.getBucket()), res, pathList);
+        return new AlbumUrlInfo(albumUrlList, new ArrayList<>(List.of(mediaDescription.getBucket())), res, pathList);
     }
 
     private Path getFileUrlPath(String key, String acceptHeader, Resolution res, Path albumDir) {
@@ -129,7 +157,7 @@ public class AlbumService extends MediaService {
                     item.objectName(), 60 * 60);
             albumUrls.add(new MediaUrl(mediaType, originalVideoUrl));
         }
-        return new AlbumUrlInfo(albumUrls, List.of(mediaDescription.getBucket()), null, null);
+        return new AlbumUrlInfo(albumUrls, new ArrayList<>(List.of(mediaDescription.getBucket())), Resolution.original, null);
     }
 
     private AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList, Resolution resolution,
@@ -151,14 +179,14 @@ public class AlbumService extends MediaService {
 
     public void processResizedAlbumImages(long albumId, Resolution resolution, int offset, int batch) throws IOException, InterruptedException {
         String albumCreationId = getCacheMediaJobId(albumId, resolution);
-        AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumCreationId);
+        AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumId, albumCreationId);
 
         if (albumUrlInfo == null)
             throw new RuntimeException("No cache found with albumId " + albumCreationId);
         boolean processed = processResizedImagesInBatch(albumUrlInfo, offset, batch, true);
 
         if (processed)
-            addCacheAlbumCreationInfo(albumCreationId, albumUrlInfo);
+            addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo);
     }
 
     public boolean processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, int offset, int batch, boolean isAlbum) throws InterruptedException, IOException {
@@ -237,13 +265,17 @@ public class AlbumService extends MediaService {
         return true;
     }
 
+    public String getAlbumVidCacheJobIdString(long albumId, int vidNum, Resolution resolution) {
+        return albumId + ":" + vidNum + ":" + resolution;
+    }
+
     public String getAlbumPartialVideoUrl(long albumId, int vidNum, Resolution res) throws Exception {
-        final String albumCreationId = getCacheMediaJobId(albumId, res);
-        AlbumService.AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumCreationId);
+        final String albumCreationId = getCacheMediaJobId(albumId, Resolution.p1080);
+        AlbumService.AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumId, albumCreationId);
         if (albumUrlInfo == null)
             throw new RuntimeException("No cache found with albumId " + albumCreationId);
 
-        final String albumVidCacheJobId = albumId + ":" + vidNum + ":" + res;
+        final String albumVidCacheJobId = getAlbumVidCacheJobIdString(albumId, vidNum, res);
 
         String videoPath = albumUrlInfo.pathList.get(vidNum);
         if (MediaType.detectMediaType(videoPath) != MediaType.VIDEO)
@@ -338,8 +370,12 @@ public class AlbumService extends MediaService {
     }
 
     private String getFfmpegScaleString(Resolution resolution) {
+//        return String.format(
+//                "\"scale='if(gte(iw,ih),-2,min(iw,%1$d))':'if(gte(ih,iw),-2,min(ih,%1$d))'\"",
+//                resolution.getResolution()
+//        );
         return String.format(
-                "\"scale='if(gte(iw,ih),-2,min(iw,%1$d))':'if(gte(ih,iw),-2,min(ih,%1$d))'\"",
+                "scale='if(gte(iw,ih),-2,min(iw,%1$d))':'if(gte(ih,iw),-2,min(ih,%1$d))'",
                 resolution.getResolution()
         );
     }
