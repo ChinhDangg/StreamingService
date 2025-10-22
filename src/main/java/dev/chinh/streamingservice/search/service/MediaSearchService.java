@@ -29,6 +29,8 @@ public class MediaSearchService {
     private final ObjectMapper mapper;
     private final AlbumService albumService;
 
+    private final Resolution thumbnailResolution = Resolution.p480;
+
     private void cacheMediaSearchItem(MediaSearchItem item) {
         String id = "media::" + item.getId();
         redisTemplate.opsForValue().set(id, item, Duration.ofHours(1));
@@ -115,7 +117,7 @@ public class MediaSearchService {
         if (newThumbnails.isEmpty())
             return;
         new Thread(() -> {
-            var albumUrlInfo = albumService.getMixThumbnailImagesAsAlbumUrls(newThumbnails, Resolution.p480, null);
+            var albumUrlInfo = albumService.getMixThumbnailImagesAsAlbumUrls(newThumbnails, thumbnailResolution);
             try {
                 if (albumUrlInfo.mediaUrlList().isEmpty())
                     return;
@@ -144,7 +146,10 @@ public class MediaSearchService {
         List<MediaSearchItemResponse> itemResponses = new ArrayList<>();
         for (SearchHit hit : response.getHits()) {
             items.add(mapper.convertValue(hit.getSourceAsMap(), MediaSearchItem.class));
-            itemResponses.add(mapper.convertValue(hit.getSourceAsMap(), MediaSearchItemResponse.class));
+            MediaSearchItemResponse itemResponse = mapper.convertValue(hit.getSourceAsMap(), MediaSearchItemResponse.class);
+            itemResponse.setThumbnail(albumService.getThumbnailPath(
+                    itemResponse.getId(), thumbnailResolution, itemResponse.getThumbnail()));
+            itemResponses.add(itemResponse);
         }
 
         MediaSearchResult result = new MediaSearchResult(itemResponses);
