@@ -16,7 +16,7 @@ import java.time.LocalDate;
 public class MediaSearchItemResponse {
 
     @JsonProperty(ContentMetaData.ID)
-    private String id;
+    private long id;
     @JsonProperty(ContentMetaData.TITLE)
     private String title;
     @JsonProperty(ContentMetaData.THUMBNAIL)
