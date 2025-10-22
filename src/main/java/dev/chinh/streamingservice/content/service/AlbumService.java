@@ -10,6 +10,7 @@ import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.data.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.exception.ResourceNotFoundException;
+import dev.chinh.streamingservice.search.service.MediaSearchService;
 import io.minio.Result;
 import io.minio.messages.Item;
 import jakarta.servlet.http.HttpServletRequest;
@@ -173,8 +174,6 @@ public class AlbumService extends MediaService {
     }
 
     public AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList, Resolution resolution) {
-        Path albumDir = Paths.get("/thumbnail-cache/" + resolution.name());
-
         List<String> pathList = new ArrayList<>();
         List<MediaUrl> albumUrlList = new ArrayList<>();
         List<String> bucketList = new ArrayList<>();
@@ -186,16 +185,10 @@ public class AlbumService extends MediaService {
             pathList.add(mediaDescription.getThumbnail());
 
             albumUrlList.add(new MediaUrl(MediaType.IMAGE,
-                    getThumbnailPath(mediaDescription.getId(), resolution, mediaDescription.getThumbnail()))
+                    MediaSearchService.getThumbnailPath(mediaDescription.getId(), resolution, mediaDescription.getThumbnail()))
             );
         }
         return new AlbumUrlInfo(albumUrlList, bucketList, resolution, pathList);
-    }
-
-    public String getThumbnailPath(long albumId, Resolution resolution, String thumbnail) {
-        String originalExtension = thumbnail.contains(".") ? thumbnail.substring(thumbnail.lastIndexOf(".") + 1)
-                .toLowerCase() : "jpg";
-        return "/thumbnail-cache/" + resolution + "/" + albumId + "_" + resolution.name() + "." + originalExtension;
     }
 
     public void processResizedAlbumImages(long albumId, Resolution resolution, int offset, int batch,
