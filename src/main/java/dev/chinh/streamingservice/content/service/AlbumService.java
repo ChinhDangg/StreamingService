@@ -172,8 +172,7 @@ public class AlbumService extends MediaService {
         return new AlbumUrlInfo(albumUrls, new ArrayList<>(List.of(mediaDescription.getBucket())), Resolution.original, null);
     }
 
-    public AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList, Resolution resolution,
-                                                          String acceptHeader) {
+    public AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList, Resolution resolution) {
         Path albumDir = Paths.get("/thumbnail-cache/" + resolution.name());
 
         List<String> pathList = new ArrayList<>();
@@ -186,10 +185,17 @@ public class AlbumService extends MediaService {
             bucketList.add(mediaDescription.getBucket());
             pathList.add(mediaDescription.getThumbnail());
 
-            Path cachePath = getFileUrlPath(String.valueOf(mediaDescription.getId()), acceptHeader, resolution, albumDir);
-            albumUrlList.add(new MediaUrl(MediaType.IMAGE, cachePath.toString()));
+            albumUrlList.add(new MediaUrl(MediaType.IMAGE,
+                    getThumbnailPath(mediaDescription.getId(), resolution, mediaDescription.getThumbnail()))
+            );
         }
         return new AlbumUrlInfo(albumUrlList, bucketList, resolution, pathList);
+    }
+
+    public String getThumbnailPath(long albumId, Resolution resolution, String thumbnail) {
+        String originalExtension = thumbnail.contains(".") ? thumbnail.substring(thumbnail.lastIndexOf(".") + 1)
+                .toLowerCase() : "jpg";
+        return "/thumbnail-cache/" + resolution + "/" + albumId + "_" + resolution.name() + "." + originalExtension;
     }
 
     public void processResizedAlbumImages(long albumId, Resolution resolution, int offset, int batch,
