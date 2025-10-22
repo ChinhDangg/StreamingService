@@ -49,6 +49,7 @@ public class AlbumService extends MediaService {
     public List<MediaUrl> getAllMediaInAnAlbum(Long albumId, Resolution resolution, HttpServletRequest request) throws Exception {
         String albumCreationId = getCacheMediaJobId(albumId, resolution);
         var cacheUrls = getCacheAlbumCreationInfo(albumId, albumCreationId);
+        cacheLastAccessForAlbum(albumCreationId, albumId);
         if (cacheUrls != null) {
             return cacheUrls.mediaUrlList;
         }
@@ -59,10 +60,15 @@ public class AlbumService extends MediaService {
                 getAlbumOriginalUrls(mediaDescription, results) :
                 getAlbumResizedUrls(mediaDescription, albumId, resolution, results, request);
 
-        addCacheLastAccess(albumCreationId, System.currentTimeMillis() + 60 * 60 * 1000);
         addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo, true);
         processResizedAlbumImages(albumId, resolution, 0, 5);
         return albumUrlInfo.mediaUrlList;
+    }
+
+    public void cacheLastAccessForAlbum(String albumCreationId, long albumId) {
+        long now = System.currentTimeMillis() + 60 * 60 * 1000;
+        addCacheLastAccess(albumCreationId, now);
+        addCacheLastAccess(getAlbumCacheHashId(albumId), now);
     }
 
     private String getAlbumCacheHashId(long albumId) {
@@ -114,7 +120,7 @@ public class AlbumService extends MediaService {
      */
     private AlbumUrlInfo getAlbumResizedUrls(MediaDescription mediaDescription, long albumId, Resolution res,
                                              Iterable<Result<Item>> results, HttpServletRequest request) throws Exception {
-        Path albumDir = Paths.get("/" + albumId + "/" + res.name());
+        Path albumDir = Paths.get("/stream/" + albumId + "/" + res.name());
         String acceptHeader = request.getHeader("Accept");
 
         List<String> pathList = new ArrayList<>(); // to get actual minio path for later resize
@@ -170,6 +176,9 @@ public class AlbumService extends MediaService {
         List<MediaUrl> albumUrlList = new ArrayList<>();
         List<String> bucketList = new ArrayList<>();
         for (MediaDescription mediaDescription : mediaDescriptionList) {
+            if (mediaDescription.getThumbnail() == null)
+                continue;
+
             bucketList.add(mediaDescription.getBucket());
             pathList.add(mediaDescription.getThumbnail());
 
@@ -186,6 +195,7 @@ public class AlbumService extends MediaService {
         if (albumUrlInfo == null)
             throw new RuntimeException("No cache found with albumId " + albumCreationId);
         boolean processed = processResizedImagesInBatch(albumUrlInfo, offset, batch, true);
+        cacheLastAccessForAlbum(albumCreationId, albumId);
 
         if (processed)
             addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo, false);
@@ -196,7 +206,7 @@ public class AlbumService extends MediaService {
      */
     public boolean processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, int offset, int batch, boolean isAlbum) throws InterruptedException, IOException {
         int size = albumUrlInfo.mediaUrlList.size();
-        if (offset > size)
+        if (offset >= size)
             return false;
 
         int stop = Math.min(size, offset + batch);
@@ -288,7 +298,7 @@ public class AlbumService extends MediaService {
 
         long now = System.currentTimeMillis();
         addCacheLastAccess(albumVidCacheJobId, now);
-        addCacheLastAccess(albumCreationId, now);
+        cacheLastAccessForAlbum(albumCreationId, albumId);
 
         final String videoDir = albumVidCacheJobId.replace(":", "/");
 

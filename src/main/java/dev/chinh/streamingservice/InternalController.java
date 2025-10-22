@@ -22,5 +22,6 @@ public class InternalController {
     public void cacheMediaLastAccess(@PathVariable long albumId, @PathVariable int vidNum,
                                      @PathVariable Resolution resolution) {
         albumService.addCacheLastAccess(albumService.getAlbumVidCacheJobIdString(albumId, vidNum, resolution), null);
+        albumService.cacheLastAccessForAlbum(albumService.getCacheMediaJobId(albumId, resolution), albumId);
     }
 }
