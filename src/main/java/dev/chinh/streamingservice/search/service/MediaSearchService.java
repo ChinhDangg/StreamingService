@@ -13,10 +13,12 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.sort.SortOrder;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
 
@@ -29,7 +31,7 @@ public class MediaSearchService {
     private final ObjectMapper mapper;
     private final AlbumService albumService;
 
-    private final Resolution thumbnailResolution = Resolution.p480;
+    public static final Resolution thumbnailResolution = Resolution.p480;
 
     private void cacheMediaSearchItem(MediaSearchItem item) {
         String id = "media::" + item.getId();
@@ -109,7 +111,8 @@ public class MediaSearchService {
         long now = System.currentTimeMillis() + 60 * 60 * 1000;
         List<MediaDescription> newThumbnails = new ArrayList<>();
         for (MediaDescription item : items) {
-            Boolean addedCache = addCacheThumbnails(item.getId(), now);
+            Boolean addedCache = addCacheThumbnails(
+                    Paths.get(getThumbnailPath(item.getId(), thumbnailResolution, item.getThumbnail())).getFileName().toString(), now);
             if (addedCache) { // if new thumbnail (not in cache)
                 newThumbnails.add(item);
             }
@@ -128,12 +131,27 @@ public class MediaSearchService {
         }).start();
     }
 
-    private Boolean addCacheThumbnails(long itemId, long expiry) {
-        return redisTemplate.opsForZSet().add("thumbnail-cache", itemId, expiry);
+    private Boolean addCacheThumbnails(String thumbnailFileName, long expiry) {
+        return redisTemplate.opsForZSet().add("thumbnail-cache", thumbnailFileName, expiry);
     }
 
-    public Double getCacheThumbnailsScore(long mediaId) {
-        return redisTemplate.opsForZSet().score("thumbnail-cache", mediaId);
+    public Set<ZSetOperations.TypedTuple<Object>> getAllThumbnailCacheLastAccess(long max) {
+        return redisTemplate.opsForZSet()
+                .rangeByScoreWithScores("thumbnail-cache", 0, max, 0, 50);
+    }
+
+    public void removeThumbnailLastAccess(String thumbnailFileName) {
+        redisTemplate.opsForZSet().remove("thumbnail-cache", thumbnailFileName);
+    }
+
+    public static String getThumbnailPath(long albumId, Resolution resolution, String thumbnail) {
+        String originalExtension = thumbnail.contains(".") ? thumbnail.substring(thumbnail.lastIndexOf(".") + 1)
+                .toLowerCase() : "jpg";
+        return getThumbnailParentPath() + "/" + albumId + "_" + resolution + "." + originalExtension;
+    }
+
+    public static String getThumbnailParentPath() {
+        return "/thumbnail-cache/" + thumbnailResolution;
     }
 
     public record MapSearchResult(
@@ -147,7 +165,7 @@ public class MediaSearchService {
         for (SearchHit hit : response.getHits()) {
             items.add(mapper.convertValue(hit.getSourceAsMap(), MediaSearchItem.class));
             MediaSearchItemResponse itemResponse = mapper.convertValue(hit.getSourceAsMap(), MediaSearchItemResponse.class);
-            itemResponse.setThumbnail(albumService.getThumbnailPath(
+            itemResponse.setThumbnail(getThumbnailPath(
                     itemResponse.getId(), thumbnailResolution, itemResponse.getThumbnail()));
             itemResponses.add(itemResponse);
         }
