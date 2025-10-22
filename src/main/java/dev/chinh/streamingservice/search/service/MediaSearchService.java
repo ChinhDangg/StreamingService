@@ -1,6 +1,9 @@
 package dev.chinh.streamingservice.search.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.chinh.streamingservice.content.constant.Resolution;
+import dev.chinh.streamingservice.content.service.AlbumService;
+import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import dev.chinh.streamingservice.search.data.MediaSearchItemResponse;
 import dev.chinh.streamingservice.search.data.MediaSearchRequest;
@@ -24,6 +27,7 @@ public class MediaSearchService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final OpenSearchService openSearchService;
     private final ObjectMapper mapper;
+    private final AlbumService albumService;
 
     private void cacheMediaSearchItem(MediaSearchItem item) {
         String id = "media::" + item.getId();
@@ -58,6 +62,7 @@ public class MediaSearchService {
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 openSearchService.advanceSearch(fieldValues, page, size, sortByYear, sortOrder), page, size);
 
+        processThumbnails(mapSearchResult.searchItems);
         cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
@@ -71,6 +76,7 @@ public class MediaSearchService {
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 openSearchService.search(searchString, page, size, sortByYear, sortOrder), page, size);
 
+        processThumbnails(mapSearchResult.searchItems);
         cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
@@ -78,19 +84,54 @@ public class MediaSearchService {
     public MediaSearchResult searchByKeywords(String field, Collection<Object> keywords, int page, int size, boolean sortByYear,
                                     SortOrder sortOrder) throws IOException {
         MediaSearchRequest.validateFieldName(field);
-        MapSearchResult mapResult = mapResponseToMediaSearchResult(
+        MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 openSearchService.searchTermByOneField(field, keywords, page, size, sortByYear, sortOrder), page, size);
-        cacheMediaSearchItems(mapResult.searchItems);
-        return mapResult.searchResult;
+
+        processThumbnails(mapSearchResult.searchItems);
+        cacheMediaSearchItems(mapSearchResult.searchItems);
+        return mapSearchResult.searchResult;
     }
 
     public MediaSearchResult searchMatch(String field, Collection<Object> searchStrings, int page, int size, boolean sortByYear,
                                          SortOrder sortOrder) throws IOException {
         MediaSearchRequest.validateFieldName(field);
-        MapSearchResult mapResult = mapResponseToMediaSearchResult(
+        MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 openSearchService.searchMatchByOneField(field, searchStrings, page, size, sortByYear, sortOrder), page, size);
-        cacheMediaSearchItems(mapResult.searchItems);
-        return mapResult.searchResult;
+
+        processThumbnails(mapSearchResult.searchItems);
+        cacheMediaSearchItems(mapSearchResult.searchItems);
+        return mapSearchResult.searchResult;
+    }
+
+    private void processThumbnails(Collection<MediaSearchItem> items) {
+        long now = System.currentTimeMillis() + 60 * 60 * 1000;
+        List<MediaDescription> newThumbnails = new ArrayList<>();
+        for (MediaDescription item : items) {
+            Boolean addedCache = addCacheThumbnails(item.getId(), now);
+            if (addedCache) { // if new thumbnail (not in cache)
+                newThumbnails.add(item);
+            }
+        }
+        if (newThumbnails.isEmpty())
+            return;
+        new Thread(() -> {
+            var albumUrlInfo = albumService.getMixThumbnailImagesAsAlbumUrls(newThumbnails, Resolution.p480, null);
+            try {
+                if (albumUrlInfo.mediaUrlList().isEmpty())
+                    return;
+                albumService.processResizedImagesInBatch(albumUrlInfo, 0, newThumbnails.size(), false);
+            } catch (InterruptedException | IOException e) {
+                throw new RuntimeException(e);
+            }
+        }).start();
+    }
+
+    private Boolean addCacheThumbnails(long itemId, long expiry) {
+        return redisTemplate.opsForZSet().add("thumbnail-cache", itemId, expiry);
+    }
+
+    public Double getCacheThumbnailsScore(long mediaId) {
+        return redisTemplate.opsForZSet().score("thumbnail-cache", mediaId);
     }
 
     public record MapSearchResult(
