@@ -124,7 +124,7 @@ public class AlbumService extends MediaService {
      */
     private AlbumUrlInfo getAlbumResizedUrls(MediaDescription mediaDescription, long albumId, Resolution res,
                                              Iterable<Result<Item>> results, HttpServletRequest request) throws Exception {
-        Path albumDir = Paths.get("/stream/" + albumId + "/" + res.name());
+        Path albumDir = Paths.get("/" + albumId + "/" + res.name());
         String acceptHeader = request.getHeader("Accept");
 
         List<String> pathList = new ArrayList<>(); // to get actual minio path for later resize
