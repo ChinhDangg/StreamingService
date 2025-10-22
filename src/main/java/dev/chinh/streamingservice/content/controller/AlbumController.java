@@ -24,16 +24,18 @@ public class AlbumController {
     @PostMapping("/{id}/{resolution}/{offset}/check-resized")
     public ResponseEntity<Void> checkResizedImage(@PathVariable Long id,
                                                   @PathVariable Resolution resolution,
-                                                  @PathVariable Integer offset) throws Exception {
-        albumService.processResizedAlbumImages(id, resolution, offset, 5);
+                                                  @PathVariable Integer offset,
+                                                  HttpServletRequest request) throws Exception {
+        albumService.processResizedAlbumImages(id, resolution, offset, 5, request);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{albumId}/vid/{vidNum}/{resolution}")
     public ResponseEntity<String> getAlbumVideoUrl(@PathVariable long albumId,
                                                    @PathVariable int vidNum,
-                                                   @PathVariable Resolution resolution) throws Exception {
-        return ResponseEntity.ok().body(albumService.getAlbumPartialVideoUrl(albumId, vidNum, resolution));
+                                                   @PathVariable Resolution resolution,
+                                                   HttpServletRequest request) throws Exception {
+        return ResponseEntity.ok().body(albumService.getAlbumPartialVideoUrl(albumId, vidNum, resolution, request));
     }
 
     @GetMapping("/original/{id}")

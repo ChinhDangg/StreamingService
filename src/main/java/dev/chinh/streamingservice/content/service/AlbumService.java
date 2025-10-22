@@ -54,15 +54,19 @@ public class AlbumService extends MediaService {
             return cacheUrls.mediaUrlList;
         }
 
+        AlbumUrlInfo albumUrlInfo = getAlbumUrlInfo(albumId, resolution, request);
+        addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo, true);
+
+        processResizedAlbumImages(albumId, resolution, 0, 5, request);
+        return albumUrlInfo.mediaUrlList;
+    }
+
+    private AlbumUrlInfo getAlbumUrlInfo(long albumId, Resolution resolution, HttpServletRequest request) throws Exception {
         MediaDescription mediaDescription = getMediaDescription(albumId);
         Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaDescription.getBucket(), mediaDescription.getPath());
-        AlbumUrlInfo albumUrlInfo = (resolution == Resolution.original) ?
+        return (resolution == Resolution.original) ?
                 getAlbumOriginalUrls(mediaDescription, results) :
                 getAlbumResizedUrls(mediaDescription, albumId, resolution, results, request);
-
-        addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo, true);
-        processResizedAlbumImages(albumId, resolution, 0, 5);
-        return albumUrlInfo.mediaUrlList;
     }
 
     public void cacheLastAccessForAlbum(String albumCreationId, long albumId) {
@@ -188,12 +192,15 @@ public class AlbumService extends MediaService {
         return new AlbumUrlInfo(albumUrlList, bucketList, resolution, pathList);
     }
 
-    public void processResizedAlbumImages(long albumId, Resolution resolution, int offset, int batch) throws IOException, InterruptedException {
+    public void processResizedAlbumImages(long albumId, Resolution resolution, int offset, int batch,
+                                          HttpServletRequest request) throws Exception {
         String albumCreationId = getCacheMediaJobId(albumId, resolution);
         AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumId, albumCreationId);
+        if (albumUrlInfo == null) {
+            System.out.println(("No cache found with albumId " + albumCreationId));
+            albumUrlInfo = getAlbumUrlInfo(albumId, resolution, request);
+        }
 
-        if (albumUrlInfo == null)
-            throw new RuntimeException("No cache found with albumId " + albumCreationId);
         boolean processed = processResizedImagesInBatch(albumUrlInfo, offset, batch, true);
         cacheLastAccessForAlbum(albumCreationId, albumId);
 
@@ -284,11 +291,14 @@ public class AlbumService extends MediaService {
         return albumId + ":" + vidNum + ":" + resolution;
     }
 
-    public String getAlbumPartialVideoUrl(long albumId, int vidNum, Resolution res) throws Exception {
+    public String getAlbumPartialVideoUrl(long albumId, int vidNum, Resolution res,
+                                          HttpServletRequest request) throws Exception {
         final String albumCreationId = getCacheMediaJobId(albumId, Resolution.p1080);
-        AlbumService.AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumId, albumCreationId);
-        if (albumUrlInfo == null)
-            throw new RuntimeException("No cache found with albumId " + albumCreationId);
+        AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumId, albumCreationId);
+        if (albumUrlInfo == null) {
+            System.out.println(("No cache found with albumId " + albumCreationId));
+            albumUrlInfo = getAlbumUrlInfo(albumId, Resolution.p1080, request);
+        }
 
         final String albumVidCacheJobId = getAlbumVidCacheJobIdString(albumId, vidNum, res);
 
