@@ -114,7 +114,7 @@ public class AlbumService extends MediaService {
      */
     private AlbumUrlInfo getAlbumResizedUrls(MediaDescription mediaDescription, long albumId, Resolution res,
                                              Iterable<Result<Item>> results, HttpServletRequest request) throws Exception {
-        Path albumDir = Paths.get("/album-cache" + "/" + albumId + "/" + res.name());
+        Path albumDir = Paths.get("/" + albumId + "/" + res.name());
         String acceptHeader = request.getHeader("Accept");
 
         List<String> pathList = new ArrayList<>(); // to get actual minio path for later resize
@@ -162,7 +162,7 @@ public class AlbumService extends MediaService {
         return new AlbumUrlInfo(albumUrls, new ArrayList<>(List.of(mediaDescription.getBucket())), Resolution.original, null);
     }
 
-    private AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList, Resolution resolution,
+    public AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList, Resolution resolution,
                                                           String acceptHeader) {
         Path albumDir = Paths.get("/thumbnail-cache/" + resolution.name());
 
@@ -231,15 +231,15 @@ public class AlbumService extends MediaService {
             }
 
             String scale = getFfmpegScaleString(albumUrlInfo.resolution, true);
-            //int stop = Math.min(size, offset + batch);
             for (int i = offset; i < stop; i++) {
-                String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(i);
-                String input = minIOService.getSignedUrlForContainerNginx(bucket, albumUrlInfo.pathList.get(i),
-                        60 * 60);
                 String output = notResized.get(i);
                 if (output == null) {
                     continue;
                 }
+
+                String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(i);
+                String input = minIOService.getSignedUrlForContainerNginx(bucket, albumUrlInfo.pathList.get(i),
+                        60 * 60);
 
                 String ffmpegCmd = String.format(
                         "ffmpeg -n -hide_banner -loglevel info " +
@@ -290,7 +290,7 @@ public class AlbumService extends MediaService {
         addCacheLastAccess(albumVidCacheJobId, now);
         addCacheLastAccess(albumCreationId, now);
 
-        final String videoDir = "album-cache/" + albumVidCacheJobId.replace(":", "/");
+        final String videoDir = albumVidCacheJobId.replace(":", "/");
 
         MediaJobStatus mediaJobStatus = getJobStatus(albumVidCacheJobId);
         boolean prevJobStopped = false;
@@ -311,7 +311,7 @@ public class AlbumService extends MediaService {
         String containerDir = "/chunks/" + videoDir;
         String outPath = containerDir + masterFileName;
 
-        String scale = getFfmpegScaleString(res, true);
+        String scale = getFfmpegScaleString(res, false);
         String partialVideoJobId = videoService.createPartialVideo(input, scale, videoDir, outPath, prevJobStopped, albumVidCacheJobId);
 
         long objectSize = minIOService.getObjectSize(bucket, videoPath);
@@ -320,7 +320,7 @@ public class AlbumService extends MediaService {
 
         videoService.checkPlaylistCreated(videoDir + masterFileName);
 
-        return getNginxVideoStreamUrl(videoDir);
+        return getNginxVideoStreamUrl("album-vid/" + videoDir);
     }
 
     public ResponseEntity<Void> processResizedImageURLAsRedirectResponse(Long albumId, String key, Resolution res,
@@ -340,9 +340,8 @@ public class AlbumService extends MediaService {
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(
                 mediaDescription.getBucket(), mediaPath.toString(), 30 * 60);
 
-        // 2. Build cache path {temp dir}/album-cache/{res}/{key}_{res}.{format}
-        Path cacheRoot = Paths.get("/album-cache");
-        Path albumIdDir = cacheRoot.resolve(String.valueOf(albumId));
+        // 2. Build cache path {temp dir}/{albumId}/{res}/{key}_{res}.{format}
+        Path albumIdDir = Paths.get(String.valueOf(albumId));
         Path albumDir = albumIdDir.resolve(res.name());
 
         // Append resolution + format to the file name
@@ -350,7 +349,7 @@ public class AlbumService extends MediaService {
         String cacheFileName = baseName + "_" + res.getResolution() + "." + format;
         Path cachePath = albumDir.resolve(cacheFileName);
 
-        String scale = getFfmpegScaleString(res, false);
+        String scale = getFfmpegScaleString(res, true);
         if (!OSUtil.checkTempFileExists(cachePath.toString())) {
             // make sure parent dir exist
             if (!OSUtil.createTempDir(cachePath.getParent().toString())) {
