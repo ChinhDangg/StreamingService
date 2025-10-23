@@ -34,8 +34,6 @@ public class OSUtil {
         if (!OSUtil.createRamDisk()) {
             throw new Exception("Fail to create RAM DISK");
         }
-        MEMORY_TOTAL = getMemoryTotalSpace();
-        MEMORY_USABLE = new AtomicLong(getActualMemoryUsableSpace());
     }
 
     public static OS detectOS() {
@@ -49,6 +47,11 @@ public class OSUtil {
         } else {
             return OS.OTHER;
         }
+    }
+
+    public static void initializeRAMInfo() throws IOException, InterruptedException {
+        MEMORY_TOTAL = getMemoryTotalSpace();
+        MEMORY_USABLE = new AtomicLong(getActualMemoryUsableSpace());
     }
 
     private String getRAMDISKName() {
@@ -191,7 +194,6 @@ public class OSUtil {
 
         // Filesystem   1B-blocks      Used Available Use% Mounted on
         String[] lines = output.split("\n");
-        System.out.println(Arrays.toString(lines));
         if (lines.length >= 2) {
             String[] parts = lines[1].trim().split("\\s+");
             return Long.parseLong(parts[3]);
@@ -271,10 +273,10 @@ public class OSUtil {
         process.waitFor();
 
         String[] lines = output.split("\n");
-        System.out.println(Arrays.toString(lines));
+        // [Filesystem      1B-blocks  Used  Available Use% Mounted on, tmpfs          1073741824     0 1073741824   0% /chunks]
         if (lines.length >= 2) {
             String[] parts = lines[1].trim().split("\\s+");
-            return Long.parseLong(parts[0]);
+            return Long.parseLong(parts[1]);
         }
         throw new RuntimeException("Unable to get RAM total from container");
     }
