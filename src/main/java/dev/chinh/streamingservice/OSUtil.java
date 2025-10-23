@@ -373,7 +373,7 @@ public class OSUtil {
                 "Created directory in container: " + dirPath);
     }
 
-    private static String normalizePath(String baseDir, String relativePath) {
+    public static String normalizePath(String baseDir, String relativePath) {
         if (relativePath.startsWith("/")) {
             return baseDir + relativePath; // e.g. "/dir1" → "/chunks/dir1"
         }
