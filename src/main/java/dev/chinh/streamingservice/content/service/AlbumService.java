@@ -125,7 +125,7 @@ public class AlbumService extends MediaService {
      */
     private AlbumUrlInfo getAlbumResizedUrls(MediaDescription mediaDescription, long albumId, Resolution res,
                                              Iterable<Result<Item>> results, HttpServletRequest request) throws Exception {
-        Path albumDir = Paths.get("/" + albumId + "/" + res.name());
+        String albumDir = "/" + albumId + "/" + res.name();
         String acceptHeader = request.getHeader("Accept");
 
         List<String> pathList = new ArrayList<>(); // to get actual minio path for later resize
@@ -144,20 +144,20 @@ public class AlbumService extends MediaService {
                 continue;
             }
 
-            Path cachePath = getFileUrlPath(key, acceptHeader, res, albumDir);
-            albumUrlList.add(new MediaUrl(mediaType, cachePath.toString()));
+            String cachePath = getFileUrlPath(key, acceptHeader, res, albumDir);
+            albumUrlList.add(new MediaUrl(mediaType, cachePath));
         }
         return new AlbumUrlInfo(albumUrlList, new ArrayList<>(List.of(mediaDescription.getBucket())), res, pathList);
     }
 
-    private Path getFileUrlPath(String key, String acceptHeader, Resolution res, Path albumDir) {
+    private String getFileUrlPath(String key, String acceptHeader, Resolution res, String albumDir) {
         // Append resolution + format to the file name
         String originalExtension = key.contains(".") ? key.substring(key.lastIndexOf(".") + 1)
                 .toLowerCase() : "jpg";
         String baseName = key.replaceAll("\\.[^.]+$", ""); // strip extension if present
         String format = (acceptHeader != null && acceptHeader.contains("image/webp")) ? "webp" : originalExtension;
         String cacheFileName = baseName + "_" + res.getResolution() + "." + format;
-        return albumDir.resolve(cacheFileName);
+        return OSUtil.normalizePath(albumDir, cacheFileName);
     }
 
     private AlbumUrlInfo getAlbumOriginalUrls(MediaDescription mediaDescription, Iterable<Result<Item>> results) throws Exception {
@@ -350,28 +350,27 @@ public class AlbumService extends MediaService {
         String acceptHeader = request.getHeader("Accept");
         String format = (acceptHeader != null && acceptHeader.contains("image/webp")) ? "webp" : originalExtension;
 
-        Path mediaPath = Paths.get(mediaDescription.getPath(), key);
-        if (!minIOService.objectExists(mediaDescription.getBucket(), mediaPath.toString())) {
+        String mediaPath = OSUtil.normalizePath(mediaDescription.getPath(), key);
+        if (!minIOService.objectExists(mediaDescription.getBucket(), mediaPath)) {
             throw new ResourceNotFoundException("Object not found: " + key);
         }
 
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(
-                mediaDescription.getBucket(), mediaPath.toString(), 30 * 60);
+                mediaDescription.getBucket(), mediaPath, 30 * 60);
 
         // 2. Build cache path {temp dir}/{albumId}/{res}/{key}_{res}.{format}
-        Path albumIdDir = Paths.get(String.valueOf(albumId));
-        Path albumDir = albumIdDir.resolve(res.name());
+        String albumDir = OSUtil.normalizePath(String.valueOf(albumId), res.name());
 
         // Append resolution + format to the file name
         String baseName = key.replaceAll("\\.[^.]+$", ""); // strip extension if present
         String cacheFileName = baseName + "_" + res.getResolution() + "." + format;
-        Path cachePath = albumDir.resolve(cacheFileName);
+        String cachePath = OSUtil.normalizePath(albumDir, cacheFileName);
 
         String scale = getFfmpegScaleString(res, true);
-        if (!OSUtil.checkTempFileExists(cachePath.toString())) {
+        if (!OSUtil.checkTempFileExists(cachePath)) {
             // make sure parent dir exist
-            if (!OSUtil.createTempDir(cachePath.getParent().toString())) {
-                throw new IOException("Failed to create temporary directory: " + cachePath.getParent());
+            if (!OSUtil.createTempDir(albumDir)) {
+                throw new IOException("Failed to create temporary directory: " + albumDir);
             }
 
             String outputPath = "/chunks" + cachePath;
@@ -387,8 +386,7 @@ public class AlbumService extends MediaService {
             runAndLog(dockerCmd, null);
         }
 
-        String cachedImageUrl = String.valueOf(cachePath);
-        return getUrlAsRedirectResponse(cachedImageUrl, true);
+        return getUrlAsRedirectResponse(cachePath, true);
     }
 
     private String getFfmpegScaleString(Resolution resolution, boolean wrapInDoubleQuotes) {
@@ -414,7 +412,7 @@ public class AlbumService extends MediaService {
     public ResponseEntity<Void> getOriginalImageURLAsRedirectResponse(Long albumId, String key, int expiry) throws Exception {
         MediaDescription mediaDescription = getMediaDescription(albumId);
         String signedUrl = minIOService.getSignedUrlForHostNginx(mediaDescription.getBucket(),
-                Paths.get(mediaDescription.getPath(), key).toString(), expiry);
+                OSUtil.normalizePath(mediaDescription.getPath(), key), expiry);
         return getUrlAsRedirectResponse(signedUrl, false);
     }
 
