@@ -35,7 +35,7 @@ services:
     entrypoint: [ "/bin/sh", "-c" ]   # replace ffmpeg with a shell
     command: [ "tail -f /dev/null" ]  # keep alive
     volumes:
-      - /Volumes/RAMDISK:/chunks      # 👈 mount same RAM disk
+      - /Volumes/RAMDISK:/chunks      # mount same RAM disk
 
   opensearch:
     image: opensearchproject/opensearch:2.15.0

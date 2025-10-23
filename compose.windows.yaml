@@ -12,6 +12,21 @@ services:
       - ./minio-data:/data
     command: server /data --console-address ":9001"
 
+  nginx:
+    build: ./nginx
+    container_name: nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - minio
+      - ffmpeg
+    volumes:
+      - ./nginx/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - chunks:/chunks
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # docker exec -it nginx nginx -V #check for config being applied or not - --config-path=
+
   ffmpeg:
     image: linuxserver/ffmpeg:latest
     container_name: ffmpeg
@@ -21,19 +36,6 @@ services:
     command: [ "tail -f /dev/null" ]  # keep alive
     volumes:
       - chunks:/chunks   # use shared tmpfs volume
-
-  nginx:
-    image: openresty/openresty:latest
-    container_name: nginx
-    ports:
-      - "80:80"
-    depends_on:
-      - minio
-      - ffmpeg
-    volumes:
-      - ./nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
-      - chunks:/chunks
-    # docker exec -it nginx nginx -V #check for config being applied or not - --config-path=
 
   opensearch:
     image: opensearchproject/opensearch:2.15.0
@@ -58,16 +60,6 @@ services:
     ports:
       - "6379:6379"
     command: [ "redis-server", "--save", "", "--appendonly", "no" ]
-
-
-#  opensearch-dashboards:
-#    image: opensearchproject/opensearch-dashboards:2.15.0
-#    ports:
-#      - "5601:5601"
-#    environment:
-#      - OPENSEARCH_HOSTS=http://opensearch:9200
-#    depends_on:
-#      - opensearch
 
 volumes:
   chunks:
