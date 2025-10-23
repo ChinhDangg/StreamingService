@@ -7,7 +7,7 @@ import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.MediaJobStatus;
 import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.content.constant.Resolution;
-import dev.chinh.streamingservice.data.MediaMetaDataRepository;
+import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.search.service.MediaSearchService;
@@ -178,7 +178,7 @@ public class AlbumService extends MediaService {
         List<MediaUrl> albumUrlList = new ArrayList<>();
         List<String> bucketList = new ArrayList<>();
         for (MediaDescription mediaDescription : mediaDescriptionList) {
-            if (mediaDescription.getThumbnail() == null)
+            if (!mediaDescription.hasThumbnail())
                 continue;
 
             bucketList.add(mediaDescription.getBucket());
@@ -407,6 +407,10 @@ public class AlbumService extends MediaService {
         if (mediaDescription.hasKey())
             throw new IllegalStateException("Not an album, individual media found: " + albumId);
         return mediaDescription;
+    }
+
+    public MediaDescription getMediaDescriptionGeneral(long mediaId) {
+        return super.getMediaDescription(mediaId);
     }
 
     public ResponseEntity<Void> getOriginalImageURLAsRedirectResponse(Long albumId, String key, int expiry) throws Exception {
