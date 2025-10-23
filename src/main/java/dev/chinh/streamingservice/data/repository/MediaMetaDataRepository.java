@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.data;
+package dev.chinh.streamingservice.data.repository;
 
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
 import org.springframework.data.jpa.repository.JpaRepository;
