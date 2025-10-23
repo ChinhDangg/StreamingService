@@ -1,7 +1,7 @@
 package dev.chinh.streamingservice.search.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.chinh.streamingservice.data.MediaMetaDataRepository;
+import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;

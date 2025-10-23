@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.MediaJobStatus;
 import dev.chinh.streamingservice.content.constant.Resolution;
-import dev.chinh.streamingservice.data.MediaMetaDataRepository;
+import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;

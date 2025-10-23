@@ -111,6 +111,8 @@ public class MediaSearchService {
         long now = System.currentTimeMillis() + 60 * 60 * 1000;
         List<MediaDescription> newThumbnails = new ArrayList<>();
         for (MediaDescription item : items) {
+            if (!item.hasThumbnail())
+                continue;
             Boolean addedCache = addCacheThumbnails(
                     Paths.get(getThumbnailPath(item.getId(), thumbnailResolution, item.getThumbnail())).getFileName().toString(), now);
             if (addedCache) { // if new thumbnail (not in cache)
@@ -165,7 +167,7 @@ public class MediaSearchService {
         for (SearchHit hit : response.getHits()) {
             items.add(mapper.convertValue(hit.getSourceAsMap(), MediaSearchItem.class));
             MediaSearchItemResponse itemResponse = mapper.convertValue(hit.getSourceAsMap(), MediaSearchItemResponse.class);
-            itemResponse.setThumbnail(getThumbnailPath(
+            itemResponse.setThumbnail(itemResponse.getThumbnail() == null ? null : getThumbnailPath(
                     itemResponse.getId(), thumbnailResolution, itemResponse.getThumbnail()));
             itemResponses.add(itemResponse);
         }
