@@ -15,11 +15,8 @@ public class MediaGroupMetaData {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String groupTitle;      // e.g.: the walking dead
+    // is group means not an individual item, that holds shared info and group other Media MetaData
+    private boolean isGroup;
 
-    private Integer groupOrder;     // 1 (season 1)
-
-    private String seriesTitle;     // the walking dead season 1
-
-    private Integer chapter;        // 1 (episode 1)
+    private Integer numInfo;    // episode/chapter for single media item or total episode/chapter for is group media
 }

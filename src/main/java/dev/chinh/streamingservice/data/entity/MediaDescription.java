@@ -62,8 +62,18 @@ public abstract class MediaDescription {
     @Column(nullable = false)
     private Integer year;
 
+    // Grouping (optional)
+    @JsonProperty(ContentMetaData.GROUP_INFO)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_id")
+    private MediaGroupMetaData groupInfo;
+
+    public boolean isGroup() {
+        return groupInfo != null && groupInfo.isGroup();
+    }
+
     public String getPath() {
-        if (parentPath != null && !parentPath.isBlank() && key != null && !key.isBlank())
+        if (parentPath != null && !parentPath.isBlank() && hasKey())
             return parentPath + "/" + key;
         else if (parentPath != null && !parentPath.isBlank())
             return parentPath;

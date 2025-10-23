@@ -63,8 +63,4 @@ public class MediaMetaData extends MediaDescription {
 
     @Column(nullable = false)
     private String absoluteFilePath;
-
-    // Grouping (optional)
-    @OneToOne(fetch = FetchType.LAZY)
-    private MediaGroupMetaData groupMetaData;
 }
