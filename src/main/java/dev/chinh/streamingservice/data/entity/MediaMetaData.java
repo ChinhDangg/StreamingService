@@ -63,4 +63,24 @@ public class MediaMetaData extends MediaDescription {
 
     @Column(nullable = false)
     private String absoluteFilePath;
+
+    @Override
+    public List<String> getTags() {
+        return tags.stream().map(MediaTag::getName).toList();
+    }
+
+    @Override
+    public List<String> getCharacters() {
+        return characters.stream().map(MediaCharacter::getName).toList();
+    }
+
+    @Override
+    public List<String> getUniverses() {
+        return universes.stream().map(MediaUniverse::getName).toList();
+    }
+
+    @Override
+    public List<String> getAuthors() {
+        return authors.stream().map(MediaAuthor::getName).toList();
+    }
 }
