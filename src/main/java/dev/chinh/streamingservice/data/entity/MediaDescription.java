@@ -13,7 +13,7 @@ import java.time.LocalDate;
 @Setter
 @ToString
 @MappedSuperclass
-public abstract class MediaDescription {
+public abstract class MediaDescription implements MetaDataProvider {
 
     @JsonProperty(ContentMetaData.ID)
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -65,11 +65,10 @@ public abstract class MediaDescription {
     // Grouping (optional)
     @JsonProperty(ContentMetaData.GROUP_INFO)
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_id")
     private MediaGroupMetaData groupInfo;
 
-    public boolean isGroup() {
-        return groupInfo != null && groupInfo.isGroup();
+    public boolean isGrouper() {
+        return groupInfo != null && groupInfo.getGrouperMetaDataId() == null;
     }
 
     public String getPath() {
@@ -91,6 +90,6 @@ public abstract class MediaDescription {
     }
 
     public boolean hasThumbnail() {
-        return false;
+        return thumbnail != null && !thumbnail.isEmpty();
     }
 }
