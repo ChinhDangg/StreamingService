@@ -184,9 +184,8 @@ public class AlbumService extends MediaService {
             bucketList.add(mediaDescription.getBucket());
             pathList.add(mediaDescription.getThumbnail());
 
-            albumUrlList.add(new MediaUrl(MediaType.IMAGE,
-                    MediaSearchService.getThumbnailPath(mediaDescription.getId(), resolution, mediaDescription.getThumbnail()))
-            );
+            String pathString = MediaSearchService.getThumbnailPath(mediaDescription.getId(), resolution, mediaDescription.getThumbnail());
+            albumUrlList.add(new MediaUrl(MediaType.IMAGE, pathString));
         }
         return new AlbumUrlInfo(albumUrlList, bucketList, resolution, pathList);
     }
@@ -242,7 +241,7 @@ public class AlbumService extends MediaService {
                 new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8))) {
 
             Path path = Paths.get(albumUrlInfo.mediaUrlList.getFirst().url.replaceFirst("/chunks", ""));
-            if (!OSUtil.createTempDir(path.getParent().toString())) {
+            if (!OSUtil.createTempDir(path.getParent().toString().replace("\\", "/"))) {
                 throw new IOException("Failed to create temporary directory: " + path.getParent());
             }
 
