@@ -53,7 +53,6 @@ public class ScheduleService {
     }
 
     private void cleanThumbnails() throws IOException, InterruptedException {
-        System.out.println("cleaning thumbnails");
         long now = System.currentTimeMillis();
         Set<ZSetOperations.TypedTuple<Object>> lastAccessThumbnails = mediaSearchService.getAllThumbnailCacheLastAccess(now);
         for (ZSetOperations.TypedTuple<Object> thumbnail : lastAccessThumbnails) {
