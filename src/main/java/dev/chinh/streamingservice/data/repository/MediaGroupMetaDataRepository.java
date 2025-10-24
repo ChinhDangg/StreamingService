@@ -1,9 +1,20 @@
 package dev.chinh.streamingservice.data.repository;
 
 import dev.chinh.streamingservice.data.entity.MediaGroupMetaData;
+import io.lettuce.core.dynamic.annotation.Param;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 public interface MediaGroupMetaDataRepository extends JpaRepository<MediaGroupMetaData, Long> {
 
-    long countByGrouperMetaDataId(long grouperMetaDataId);
+    @Query("""
+        SELECT m.mediaMetaDataId
+        FROM MediaGroupMetaData m
+        WHERE m.grouperMetaDataId = :grouperId
+        ORDER BY m.numInfo
+    """)
+    Slice<Long> findMediaMetadataIdsByGrouperMetaDataId(@Param("grouperId") Long grouperId, Pageable pageable);
 }

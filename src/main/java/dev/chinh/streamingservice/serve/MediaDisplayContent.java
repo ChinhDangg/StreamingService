@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -54,4 +56,7 @@ public class MediaDisplayContent {
 
     @JsonProperty(ContentMetaData.YEAR)
     private Integer year;
+
+    // optional inner child media ids if the current media is just a grouper (not individual content itself)
+    Slice<Long> childMediaIds;
 }
