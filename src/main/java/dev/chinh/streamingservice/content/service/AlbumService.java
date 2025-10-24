@@ -144,20 +144,14 @@ public class AlbumService extends MediaService {
                 continue;
             }
 
-            String cachePath = getFileUrlPath(key, acceptHeader, res, albumDir);
+            String originalExtension = key.contains(".") ? key.substring(key.lastIndexOf(".") + 1)
+                    .toLowerCase() : "jpg";
+            String format = (acceptHeader != null && acceptHeader.contains("image/webp")) ? "webp" : originalExtension;
+            String cacheFileName = albumUrlList.size() + "_" + res.getResolution() + "." + format;
+            String cachePath = OSUtil.normalizePath(albumDir, cacheFileName);
             albumUrlList.add(new MediaUrl(mediaType, cachePath));
         }
         return new AlbumUrlInfo(albumUrlList, new ArrayList<>(List.of(mediaDescription.getBucket())), res, pathList);
-    }
-
-    private String getFileUrlPath(String key, String acceptHeader, Resolution res, String albumDir) {
-        // Append resolution + format to the file name
-        String originalExtension = key.contains(".") ? key.substring(key.lastIndexOf(".") + 1)
-                .toLowerCase() : "jpg";
-        String baseName = key.replaceAll("\\.[^.]+$", ""); // strip extension if present
-        String format = (acceptHeader != null && acceptHeader.contains("image/webp")) ? "webp" : originalExtension;
-        String cacheFileName = baseName + "_" + res.getResolution() + "." + format;
-        return OSUtil.normalizePath(albumDir, cacheFileName);
     }
 
     private AlbumUrlInfo getAlbumOriginalUrls(MediaDescription mediaDescription, Iterable<Result<Item>> results) throws Exception {
