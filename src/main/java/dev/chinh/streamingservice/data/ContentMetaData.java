@@ -4,6 +4,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Arrays;
@@ -31,34 +32,27 @@ public class ContentMetaData {
     public static final String SIZE = "size";
     public static final String GROUP_INFO = "groupInfo";
 
-    // Technical
-    private short frameRate;
-    private String format;
-    private String absoluteFilePath;
+    public static void validateFieldName(String fieldNameCheck) throws IllegalAccessException {
+        ContentMetaData contentMetaData = new ContentMetaData();
 
-    // Grouping (optional so maybe another table)
-    private String groupTitle;      // e.g.: the walking dead
-    private int groupId;
-    private int groupOrder;         // 1 (season 1)
-    private String seriesTitle;     // the walking dead season 1
-    private int chapter;            // 1 (episode 1)
-
-    public boolean hasGroup() {
-        return groupTitle != null;
+        boolean found = false;
+        Field[] fields = ContentMetaData.class.getDeclaredFields();
+        for (Field field : fields) {
+            field.setAccessible(true);
+            String fieldValue = field.get(contentMetaData).toString();
+            if (fieldNameCheck.equals(fieldValue)) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            throw new IllegalArgumentException("Unknown field name: " + fieldNameCheck);
+        }
     }
 
-    public boolean hasSeries() {
-        return seriesTitle != null;
-    }
 
-
-    public static void main(String[] args) throws IOException {
-//        File[] mainFolders = getMainFolders("E:\\Readonly");
-//        for (File folder : mainFolders) {
-//            System.out.println(folder.getName());
-//        }
-
-        //walkAndGetDirThatContainsFile(new File("E:\\Temp"));
+    public static void main(String[] args) throws IOException, IllegalAccessException {
+        validateFieldName("something");
         walkAndStopIfHasFile(new File("E:\\Readonly\\3D"));
     }
 
