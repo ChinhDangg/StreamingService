@@ -5,6 +5,7 @@ import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.content.service.AlbumService;
 import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
+import dev.chinh.streamingservice.search.constant.SortBy;
 import dev.chinh.streamingservice.search.data.*;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.action.search.SearchResponse;
@@ -42,7 +43,7 @@ public class MediaSearchService {
     }
 
     public MediaSearchResult advanceSearch(MediaSearchRequest request, int page, int size,
-                                           boolean sortByYear, SortOrder sortOrder) throws IOException, IllegalAccessException {
+                                           SortBy sortBy, SortOrder sortOrder) throws IOException, IllegalAccessException {
 
         List<SearchFieldGroup> includes = request.getIncludeFields() == null ? null :
                 mapMediaSearchFieldsToSearchFieldGroups(request.getIncludeFields());
@@ -57,7 +58,7 @@ public class MediaSearchService {
         }
 
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.advanceSearch(includes, excludes, ranges, page, size, sortByYear, sortOrder), page, size);
+                openSearchService.advanceSearch(includes, excludes, ranges, page, size, sortBy, sortOrder), page, size);
 
         processThumbnails(mapSearchResult.searchItems);
         cacheMediaSearchItems(mapSearchResult.searchItems);
@@ -81,36 +82,36 @@ public class MediaSearchService {
         return searchFieldGroups;
     }
 
-    public MediaSearchResult search(String searchString, int page, int size, boolean sortByYear,
+    public MediaSearchResult search(String searchString, int page, int size, SortBy sortBy,
                                     SortOrder sortOrder) throws IOException {
 
         if (!MediaSearchField.validateSearchString(searchString)) {
             throw new IllegalArgumentException("Invalid search string");
         }
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.search(searchString, page, size, sortByYear, sortOrder), page, size);
+                openSearchService.search(searchString, page, size, sortBy, sortOrder), page, size);
 
         processThumbnails(mapSearchResult.searchItems);
         cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 
-    public MediaSearchResult searchByKeywords(String field, Collection<Object> keywords, int page, int size, boolean sortByYear,
-                                    SortOrder sortOrder) throws IOException, IllegalAccessException {
+    public MediaSearchResult searchByKeywords(String field, Collection<Object> keywords, int page, int size,
+                                              SortBy sortBy, SortOrder sortOrder) throws IOException, IllegalAccessException {
         ContentMetaData.validateFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.searchTermByOneField(field, keywords, page, size, sortByYear, sortOrder), page, size);
+                openSearchService.searchTermByOneField(field, keywords, page, size, sortBy, sortOrder), page, size);
 
         processThumbnails(mapSearchResult.searchItems);
         cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 
-    public MediaSearchResult searchMatch(String field, Object searchStrings, int page, int size, boolean sortByYear,
-                                         SortOrder sortOrder) throws IOException, IllegalAccessException {
+    public MediaSearchResult searchMatch(String field, Object searchStrings, int page, int size,
+                                         SortBy sortBy, SortOrder sortOrder) throws IOException, IllegalAccessException {
         ContentMetaData.validateFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.searchMatchByOneField(field, searchStrings, page, size, sortByYear, sortOrder), page, size);
+                openSearchService.searchMatchByOneField(field, searchStrings, page, size, sortBy, sortOrder), page, size);
 
         processThumbnails(mapSearchResult.searchItems);
         cacheMediaSearchItems(mapSearchResult.searchItems);

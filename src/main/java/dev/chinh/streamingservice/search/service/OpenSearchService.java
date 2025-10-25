@@ -1,5 +1,7 @@
 package dev.chinh.streamingservice.search.service;
 
+import dev.chinh.streamingservice.data.ContentMetaData;
+import dev.chinh.streamingservice.search.constant.SortBy;
 import dev.chinh.streamingservice.search.data.MediaSearchRangeField;
 import dev.chinh.streamingservice.search.data.SearchFieldGroup;
 import lombok.RequiredArgsConstructor;
@@ -140,7 +142,7 @@ public class OpenSearchService {
 
     public SearchResponse advanceSearch(List<SearchFieldGroup> includeGroups, List<SearchFieldGroup> excludeGroups,
                                         List<MediaSearchRangeField> mediaSearchRanges,
-                                        int page, int size, boolean sortByYear, SortOrder sortOrder) throws IOException {
+                                        int page, int size, SortBy sortBy, SortOrder sortOrder) throws IOException {
         BoolQueryBuilder rootQuery = QueryBuilders.boolQuery();
 
         // Handle range requests
@@ -190,7 +192,7 @@ public class OpenSearchService {
             }
         }
 
-        return searchWithQueryBuilder(rootQuery, page, size, sortByYear, sortOrder);
+        return searchWithQueryBuilder(rootQuery, page, size, sortBy, sortOrder);
     }
 
     private QueryBuilder buildTermOrMatch(String field, Object value, boolean searchTerm) {
@@ -201,7 +203,7 @@ public class OpenSearchService {
         }
     }
 
-    public SearchResponse search(Object text, int page, int size, boolean sortByYear,
+    public SearchResponse search(Object text, int page, int size, SortBy sortBy,
                                     SortOrder sortOrder) throws IOException {
         QueryBuilder q = QueryBuilders
                 .multiMatchQuery(text)
@@ -214,13 +216,13 @@ public class OpenSearchService {
                 .fuzziness(Fuzziness.AUTO)
                 .type(MultiMatchQueryBuilder.Type.BEST_FIELDS);
 
-        return searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
+        return searchWithQueryBuilder(q, page, size, sortBy, sortOrder);
     }
 
     public SearchResponse searchMatchByOneField(String field, Object text, int page, int size,
-                                                   boolean sortByYear, SortOrder sortOrder) throws IOException {
+                                                SortBy sortBy, SortOrder sortOrder) throws IOException {
         QueryBuilder q = QueryBuilders.matchQuery(field, text);
-        return searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
+        return searchWithQueryBuilder(q, page, size, sortBy, sortOrder);
     }
 
     /**
@@ -228,12 +230,12 @@ public class OpenSearchService {
      * Does not work with fields that have text type. Use search match for that.
      */
     public SearchResponse searchTermByOneField(String field, Collection<Object> text, int page, int size,
-                                            boolean sortByYear, SortOrder sortOrder) throws IOException {
+                                               SortBy sortBy, SortOrder sortOrder) throws IOException {
         QueryBuilder q = QueryBuilders.termsQuery(field, text);
-        return searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
+        return searchWithQueryBuilder(q, page, size, sortBy, sortOrder);
     }
 
-    private SearchResponse searchWithQueryBuilder(QueryBuilder queryBuilder, int page, int size, boolean sortByYear,
+    private SearchResponse searchWithQueryBuilder(QueryBuilder queryBuilder, int page, int size, SortBy sortBy,
                                                SortOrder sortOrder) throws IOException {
 
         SearchRequest searchRequest = new SearchRequest("media");
@@ -243,14 +245,14 @@ public class OpenSearchService {
                 .size(size);
 
         // Sorting
-        if (sortByYear) {
-            // Sort by year desc, then relevance as tie-breaker
-            sourceBuilder.sort(new FieldSortBuilder("uploadDate").order(sortOrder));
-            sourceBuilder.sort(SortBuilders.scoreSort().order(sortOrder));
-        } else {
-            // Default: sort by relevance
-            sourceBuilder.sort(SortBuilders.scoreSort().order(sortOrder));
+        switch (sortBy) {
+            case UPLOAD_DATE -> sourceBuilder.sort(new FieldSortBuilder(ContentMetaData.UPLOAD_DATE).order(sortOrder));
+            case LENGTH -> sourceBuilder.sort(new FieldSortBuilder(ContentMetaData.LENGTH).order(sortOrder));
+            case SIZE -> sourceBuilder.sort(SortBuilders.fieldSort(ContentMetaData.SIZE).order(sortOrder));
+            case YEAR -> sourceBuilder.sort(SortBuilders.fieldSort(ContentMetaData.YEAR).order(sortOrder));
         }
+        // tie-breaker then sort with score
+        sourceBuilder.sort(SortBuilders.scoreSort().order(sortOrder));
 
         searchRequest.source(sourceBuilder);
         SearchResponse response = client.search(searchRequest, RequestOptions.DEFAULT);

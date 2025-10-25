@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.search.controller;
 
+import dev.chinh.streamingservice.search.constant.SortBy;
 import dev.chinh.streamingservice.search.data.MediaSearchRequest;
 import dev.chinh.streamingservice.search.data.MediaSearchResult;
 import dev.chinh.streamingservice.search.service.MediaSearchService;
@@ -39,34 +40,34 @@ public class SearchController {
     @PostMapping
     public ResponseEntity<MediaSearchResult> search(@RequestParam String searchString,
                                                     @RequestParam(required = false) int page,
-                                                    @RequestParam(required = false) boolean sortByYear,
+                                                    @RequestParam(required = false) SortBy sortBy,
                                                     @RequestParam(required = false) SortOrder sortOrder) throws IOException {
-        return ResponseEntity.ok().body(mediaSearchService.search(searchString, page, pageSize, sortByYear, sortOrder));
+        return ResponseEntity.ok().body(mediaSearchService.search(searchString, page, pageSize, sortBy, sortOrder));
     }
 
     @PostMapping("/advance")
     public ResponseEntity<MediaSearchResult> advanceSearch(@RequestBody MediaSearchRequest mediaSearchRequest,
                                                            @RequestParam(required = false) int page,
-                                                           @RequestParam(required = false) boolean sortByYear,
+                                                           @RequestParam(required = false) SortBy sortBy,
                                                            @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
-        return ResponseEntity.ok().body(mediaSearchService.advanceSearch(mediaSearchRequest, page, pageSize, sortByYear, sortOrder));
+        return ResponseEntity.ok().body(mediaSearchService.advanceSearch(mediaSearchRequest, page, pageSize, sortBy, sortOrder));
     }
 
     @PostMapping("/keyword")
     public ResponseEntity<MediaSearchResult> keywordSearch(@Valid @RequestBody MediaKeyWordSearchRequest searchRequest,
                                                            @RequestParam(required = false) int page,
-                                                           @RequestParam(required = false) boolean sortByYear,
+                                                           @RequestParam(required = false) SortBy sortBy,
                                                            @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
         return ResponseEntity.ok().body(
-                mediaSearchService.searchByKeywords(searchRequest.field,  searchRequest.text, page, pageSize, sortByYear, sortOrder));
+                mediaSearchService.searchByKeywords(searchRequest.field,  searchRequest.text, page, pageSize, sortBy, sortOrder));
     }
 
     @PostMapping("/match")
     public ResponseEntity<MediaSearchResult> matchSearch(@Valid @RequestBody MediaMatchSearchRequest searchRequest,
                                                          @RequestParam(required = false) int page,
-                                                         @RequestParam(required = false) boolean sortByYear,
+                                                         @RequestParam(required = false) SortBy sortBy,
                                                          @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
         return ResponseEntity.ok().body(
-                mediaSearchService.searchMatch(searchRequest.field, searchRequest.text, page, pageSize, sortByYear, sortOrder));
+                mediaSearchService.searchMatch(searchRequest.field, searchRequest.text, page, pageSize, sortBy, sortOrder));
     }
 }
