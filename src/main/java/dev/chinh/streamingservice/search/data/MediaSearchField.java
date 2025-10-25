@@ -1,0 +1,20 @@
+package dev.chinh.streamingservice.search.data;
+
+import lombok.*;
+import java.util.Set;
+
+@Getter
+@Setter
+@ToString
+@NoArgsConstructor
+@AllArgsConstructor
+public class MediaSearchField {
+
+    private String field;
+    private Set<Object> values;
+    private boolean mustAll;
+
+    public static boolean validateSearchString(String string) {
+        return string != null && !string.isBlank() && string.length() >= 2 && string.length() <= 100;
+    }
+}
