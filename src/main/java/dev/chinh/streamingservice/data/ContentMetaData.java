@@ -50,7 +50,6 @@ public class ContentMetaData {
         }
     }
 
-
     public static void main(String[] args) throws IOException, IllegalAccessException {
         validateFieldName("something");
         walkAndStopIfHasFile(new File("E:\\Readonly\\3D"));
