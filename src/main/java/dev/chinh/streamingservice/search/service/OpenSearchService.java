@@ -1,5 +1,7 @@
 package dev.chinh.streamingservice.search.service;
 
+import dev.chinh.streamingservice.search.data.MediaSearchRangeField;
+import dev.chinh.streamingservice.search.data.SearchFieldGroup;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.action.DocWriteRequest;
 import org.opensearch.action.delete.DeleteRequest;
@@ -20,10 +22,7 @@ import org.opensearch.common.unit.Fuzziness;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.xcontent.XContentBuilder;
-import org.opensearch.index.query.BoolQueryBuilder;
-import org.opensearch.index.query.MultiMatchQueryBuilder;
-import org.opensearch.index.query.QueryBuilder;
-import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.index.query.*;
 import org.opensearch.script.Script;
 import org.opensearch.script.ScriptType;
 import org.opensearch.search.builder.SearchSourceBuilder;
@@ -35,7 +34,6 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -140,40 +138,67 @@ public class OpenSearchService {
         System.out.println("Scripted update done, result: " + response.getResult());
     }
 
-    public SearchResponse advanceSearch(Map<String, Collection<Object>> fieldValues, int page, int size,
-                              boolean sortByYear, SortOrder sortOrder) throws IOException {
-        BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
+    public SearchResponse advanceSearch(List<SearchFieldGroup> includeGroups, List<SearchFieldGroup> excludeGroups,
+                                        List<MediaSearchRangeField> mediaSearchRanges,
+                                        int page, int size, boolean sortByYear, SortOrder sortOrder) throws IOException {
+        BoolQueryBuilder rootQuery = QueryBuilders.boolQuery();
 
-        for (Map.Entry<String, Collection<Object>> entry : fieldValues.entrySet()) {
-            String field = entry.getKey();
-            Collection<Object> values = entry.getValue();
-
-            if (values == null || values.isEmpty()) {
-                continue;
-            }
-
-            if (values.size() == 1) {
-                Object value = values.iterator().next();
-                if (value instanceof String) {
-                    // text type with keyword type can't use termQuery
-                    boolQuery.must(QueryBuilders.matchQuery(field, value));
-                } else {
-                    boolQuery.must(QueryBuilders.termQuery(field, value));
-                }
-            } else { // Group multiple values for the same field with OR
-                BoolQueryBuilder innerOr = QueryBuilders.boolQuery();
-                for (Object value : values) {
-                    if (value instanceof String) {
-                        innerOr.should(QueryBuilders.matchQuery(field, value));
-                    } else {
-                        innerOr.should(QueryBuilders.termQuery(field, value));
-                    }
-                }
-                boolQuery.must(innerOr); // must match one of the values for this field
+        // Handle range requests
+        if (mediaSearchRanges != null) {
+            for (MediaSearchRangeField mediaSearchRange : mediaSearchRanges) {
+                RangeQueryBuilder rangeQuery = QueryBuilders.rangeQuery(mediaSearchRange.getField());
+                if (mediaSearchRange.getFromValue() != null) rangeQuery.gte(mediaSearchRange.getFromValue());
+                if (mediaSearchRange.getToValue() != null) rangeQuery.lte(mediaSearchRange.getToValue());
+                rootQuery.must(rangeQuery);
             }
         }
 
-        return searchWithQueryBuilder(boolQuery, page, size, sortByYear, sortOrder);
+        // Handle include groups
+        if (includeGroups != null) {
+            for (SearchFieldGroup group : includeGroups) {
+                String field = group.getField();
+                Set<Object> values = group.getValues();
+                if (values == null || values.isEmpty()) continue;
+
+                BoolQueryBuilder groupQuery = QueryBuilders.boolQuery();
+
+                if (group.isMustAll()) { // AND logic: must include all values
+                    for (Object value : values) {
+                        groupQuery.must(buildTermOrMatch(field, value, group.isSearchTerm()));
+                    }
+                } else { // OR logic: match any
+                    for (Object value : values) {
+                        groupQuery.should(buildTermOrMatch(field, value, group.isSearchTerm()));
+                    }
+                    groupQuery.minimumShouldMatch(1);
+                }
+
+                rootQuery.must(groupQuery); // each group combined with AND at root level
+            }
+        }
+
+        // Handle exclude groups (no range)
+        if (excludeGroups != null) {
+            for (SearchFieldGroup group : excludeGroups) {
+                String field = group.getField();
+                Set<Object> values = group.getValues();
+                if (values == null || values.isEmpty()) continue;
+
+                for (Object value : values) {
+                    rootQuery.mustNot(buildTermOrMatch(field, value, group.isSearchTerm()));
+                }
+            }
+        }
+
+        return searchWithQueryBuilder(rootQuery, page, size, sortByYear, sortOrder);
+    }
+
+    private QueryBuilder buildTermOrMatch(String field, Object value, boolean searchTerm) {
+        if (searchTerm) {
+            return QueryBuilders.termQuery(field, value);
+        } else {
+            return QueryBuilders.matchQuery(field, value);
+        }
     }
 
     public SearchResponse search(Object text, int page, int size, boolean sortByYear,
@@ -192,7 +217,7 @@ public class OpenSearchService {
         return searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
     }
 
-    public SearchResponse searchMatchByOneField(String field, Collection<Object> text, int page, int size,
+    public SearchResponse searchMatchByOneField(String field, Object text, int page, int size,
                                                    boolean sortByYear, SortOrder sortOrder) throws IOException {
         QueryBuilder q = QueryBuilders.matchQuery(field, text);
         return searchWithQueryBuilder(q, page, size, sortByYear, sortOrder);
@@ -212,12 +237,10 @@ public class OpenSearchService {
                                                SortOrder sortOrder) throws IOException {
 
         SearchRequest searchRequest = new SearchRequest("media");
-        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
-        sourceBuilder.query(queryBuilder);
-
-        // Pagination
-        sourceBuilder.from(page * size);   // e.g., page 2 → offset 20 if size=10
-        sourceBuilder.size(size);
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder()
+                .query(queryBuilder)
+                .from(page * size)   // e.g., page 2 → offset 20 if size=10
+                .size(size);
 
         // Sorting
         if (sortByYear) {
