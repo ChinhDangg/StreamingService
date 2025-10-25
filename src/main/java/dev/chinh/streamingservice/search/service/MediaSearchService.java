@@ -3,11 +3,9 @@ package dev.chinh.streamingservice.search.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.content.service.AlbumService;
+import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
-import dev.chinh.streamingservice.search.data.MediaSearchItem;
-import dev.chinh.streamingservice.search.data.MediaSearchItemResponse;
-import dev.chinh.streamingservice.search.data.MediaSearchRequest;
-import dev.chinh.streamingservice.search.data.MediaSearchResult;
+import dev.chinh.streamingservice.search.data.*;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.search.SearchHit;
@@ -17,7 +15,6 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
@@ -45,36 +42,49 @@ public class MediaSearchService {
     }
 
     public MediaSearchResult advanceSearch(MediaSearchRequest request, int page, int size,
-                                           boolean sortByYear, SortOrder sortOrder) throws IllegalAccessException, IOException {
-        request.validate();
+                                           boolean sortByYear, SortOrder sortOrder) throws IOException, IllegalAccessException {
 
-        Map<String, Collection<Object>> fieldValues = new HashMap<>();
-        Field[] fields = MediaSearchRequest.class.getDeclaredFields();
-        for (Field field : fields) {
-            field.setAccessible(true);
-            String fieldName = field.getName();
-            Object value = field.get(request);
+        List<SearchFieldGroup> includes = request.getIncludeFields() == null ? null :
+                mapMediaSearchFieldsToSearchFieldGroups(request.getIncludeFields());
+        List<SearchFieldGroup> excludes = request.getExcludeFields() == null ? null :
+                mapMediaSearchFieldsToSearchFieldGroups(request.getExcludeFields());
+        List<MediaSearchRangeField> ranges = new ArrayList<>();
 
-            if (value == null) continue;
-
-            if (value instanceof Collection<?>) {
-                fieldValues.put(fieldName, new ArrayList<>((Collection<?>) value));
-            } else {
-                fieldValues.put(fieldName, Collections.singletonList(value));
-            }
+        for (MediaSearchRangeField rangeField : request.getRangeFields()) {
+            if (!rangeField.getField().equals(ContentMetaData.UPLOAD_DATE) &&
+                    !rangeField.getField().equals(ContentMetaData.YEAR))
+                throw new IllegalArgumentException("Range query not support for field: " + rangeField.getField());
         }
+
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.advanceSearch(fieldValues, page, size, sortByYear, sortOrder), page, size);
+                openSearchService.advanceSearch(includes, excludes, ranges, page, size, sortByYear, sortOrder), page, size);
 
         processThumbnails(mapSearchResult.searchItems);
         cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 
+    private List<SearchFieldGroup> mapMediaSearchFieldsToSearchFieldGroups(List<MediaSearchField> searchFields) throws IllegalAccessException {
+        List<SearchFieldGroup> searchFieldGroups = new ArrayList<>();
+        for (MediaSearchField includeField : searchFields) {
+            ContentMetaData.validateFieldName(includeField.getField());
+            if (includeField.getField().equals(ContentMetaData.TITLE)) {
+                searchFieldGroups.add(new SearchFieldGroup(
+                        includeField.getField(), includeField.getValues(), includeField.isMustAll(), false
+                ));
+            } else {
+                searchFieldGroups.add(new SearchFieldGroup(
+                        includeField.getField(), includeField.getValues(), includeField.isMustAll(), true
+                ));
+            }
+        }
+        return searchFieldGroups;
+    }
+
     public MediaSearchResult search(String searchString, int page, int size, boolean sortByYear,
                                     SortOrder sortOrder) throws IOException {
 
-        if (!MediaSearchRequest.validateSearchString(searchString)) {
+        if (!MediaSearchField.validateSearchString(searchString)) {
             throw new IllegalArgumentException("Invalid search string");
         }
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
@@ -86,8 +96,8 @@ public class MediaSearchService {
     }
 
     public MediaSearchResult searchByKeywords(String field, Collection<Object> keywords, int page, int size, boolean sortByYear,
-                                    SortOrder sortOrder) throws IOException {
-        MediaSearchRequest.validateFieldName(field);
+                                    SortOrder sortOrder) throws IOException, IllegalAccessException {
+        ContentMetaData.validateFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 openSearchService.searchTermByOneField(field, keywords, page, size, sortByYear, sortOrder), page, size);
 
@@ -96,9 +106,9 @@ public class MediaSearchService {
         return mapSearchResult.searchResult;
     }
 
-    public MediaSearchResult searchMatch(String field, Collection<Object> searchStrings, int page, int size, boolean sortByYear,
-                                         SortOrder sortOrder) throws IOException {
-        MediaSearchRequest.validateFieldName(field);
+    public MediaSearchResult searchMatch(String field, Object searchStrings, int page, int size, boolean sortByYear,
+                                         SortOrder sortOrder) throws IOException, IllegalAccessException {
+        ContentMetaData.validateFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 openSearchService.searchMatchByOneField(field, searchStrings, page, size, sortByYear, sortOrder), page, size);
 
