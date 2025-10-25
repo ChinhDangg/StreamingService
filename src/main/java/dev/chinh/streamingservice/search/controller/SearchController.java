@@ -12,7 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.util.Collection;
+import java.util.List;
 
 @RequiredArgsConstructor
 @RestController
@@ -22,11 +22,18 @@ public class SearchController {
     private final MediaSearchService mediaSearchService;
     private final int pageSize = 20;
 
-    public record MediaFieldSearchRequest(
+    public record MediaKeyWordSearchRequest(
             @NotNull @NotBlank
             String field,
             @NotNull
-            Collection<Object> text
+            List<Object> text
+    ) {}
+
+    public record MediaMatchSearchRequest(
+            @NotNull @NotBlank
+            String field,
+            @NotNull
+            String text
     ) {}
 
     @PostMapping
@@ -46,19 +53,19 @@ public class SearchController {
     }
 
     @PostMapping("/keyword")
-    public ResponseEntity<MediaSearchResult> keywordSearch(@Valid @RequestBody MediaFieldSearchRequest searchRequest,
+    public ResponseEntity<MediaSearchResult> keywordSearch(@Valid @RequestBody MediaKeyWordSearchRequest searchRequest,
                                                            @RequestParam(required = false) int page,
                                                            @RequestParam(required = false) boolean sortByYear,
-                                                           @RequestParam(required = false) SortOrder sortOrder) throws IOException {
+                                                           @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
         return ResponseEntity.ok().body(
                 mediaSearchService.searchByKeywords(searchRequest.field,  searchRequest.text, page, pageSize, sortByYear, sortOrder));
     }
 
     @PostMapping("/match")
-    public ResponseEntity<MediaSearchResult> matchSearch(@Valid @RequestBody MediaFieldSearchRequest searchRequest,
+    public ResponseEntity<MediaSearchResult> matchSearch(@Valid @RequestBody MediaMatchSearchRequest searchRequest,
                                                          @RequestParam(required = false) int page,
                                                          @RequestParam(required = false) boolean sortByYear,
-                                                         @RequestParam(required = false) SortOrder sortOrder) throws IOException {
+                                                         @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
         return ResponseEntity.ok().body(
                 mediaSearchService.searchMatch(searchRequest.field, searchRequest.text, page, pageSize, sortByYear, sortOrder));
     }
