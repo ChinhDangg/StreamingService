@@ -295,7 +295,7 @@ public class AlbumService extends MediaService {
         final String albumVidCacheJobId = getAlbumVidCacheJobIdString(albumId, vidNum, res);
 
         String videoPath = albumUrlInfo.pathList.get(vidNum);
-        if (MediaType.detectMediaType(videoPath) != MediaType.VIDEO)
+        if (albumUrlInfo.mediaUrlList.get(vidNum).type != MediaType.VIDEO)
             throw new BadRequestException("Invalid video path: " + albumVidCacheJobId);
 
         long now = System.currentTimeMillis();
