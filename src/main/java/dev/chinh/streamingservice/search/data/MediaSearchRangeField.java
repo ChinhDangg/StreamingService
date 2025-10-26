@@ -8,6 +8,6 @@ import lombok.Setter;
 public class MediaSearchRangeField {
 
     private String field;
-    private Integer fromValue;
-    private Integer toValue;
+    private Object fromValue;
+    private Object toValue;
 }
