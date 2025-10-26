@@ -8,6 +8,7 @@ import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.search.constant.SortBy;
 import dev.chinh.streamingservice.search.data.*;
 import lombok.RequiredArgsConstructor;
+import org.apache.coyote.BadRequestException;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.sort.SortOrder;
@@ -44,6 +45,11 @@ public class MediaSearchService {
 
     public MediaSearchResult advanceSearch(MediaSearchRequest request, int page, int size,
                                            SortBy sortBy, SortOrder sortOrder) throws IOException, IllegalAccessException {
+
+        boolean hasAnyField = request.hasAny();
+        if (!hasAnyField) {
+            throw new BadRequestException("Empty advanced search request");
+        }
 
         List<SearchFieldGroup> includes = request.getIncludeFields() == null ? null :
                 mapMediaSearchFieldsToSearchFieldGroups(request.getIncludeFields());

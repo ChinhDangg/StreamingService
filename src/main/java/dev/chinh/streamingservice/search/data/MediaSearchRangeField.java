@@ -10,4 +10,8 @@ public class MediaSearchRangeField {
     private String field;
     private Object fromValue;
     private Object toValue;
+
+    public boolean hasAny() {
+        return field != null && !field.isBlank() && (fromValue != null || toValue != null);
+    }
 }

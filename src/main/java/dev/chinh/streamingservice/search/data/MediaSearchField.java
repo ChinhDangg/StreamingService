@@ -17,4 +17,8 @@ public class MediaSearchField {
     public static boolean validateSearchString(String string) {
         return string != null && !string.isBlank() && string.length() >= 2 && string.length() <= 100;
     }
+
+    public boolean hasAny() {
+        return field != null && !field.isBlank() && values != null && !values.isEmpty();
+    }
 }
