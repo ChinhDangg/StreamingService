@@ -50,6 +50,13 @@ public class ContentMetaData {
         }
     }
 
+    public static void validateSearchFieldName(String fieldNameCheck) {
+        if (!(fieldNameCheck.equals(TITLE) || fieldNameCheck.equals(UNIVERSES) || fieldNameCheck.equals(CHARACTERS) ||
+        fieldNameCheck.equals(TAGS) || fieldNameCheck.equals(AUTHORS))) {
+            throw new IllegalArgumentException("Invalid search field name: " + fieldNameCheck);
+        }
+    }
+
     public static void main(String[] args) throws IOException {
         walkAndStopIfHasFile(new File("E:\\Readonly\\3D"));
     }

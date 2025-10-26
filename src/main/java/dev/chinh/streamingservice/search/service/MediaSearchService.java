@@ -75,7 +75,7 @@ public class MediaSearchService {
     private List<SearchFieldGroup> mapMediaSearchFieldsToSearchFieldGroups(List<MediaSearchField> searchFields) throws IllegalAccessException {
         List<SearchFieldGroup> searchFieldGroups = new ArrayList<>();
         for (MediaSearchField includeField : searchFields) {
-            ContentMetaData.validateFieldName(includeField.getField());
+            ContentMetaData.validateSearchFieldName(includeField.getField());
             if (includeField.getField().equals(ContentMetaData.TITLE)) {
                 searchFieldGroups.add(new SearchFieldGroup(
                         includeField.getField(), includeField.getValues(), includeField.isMustAll(), false
@@ -105,7 +105,7 @@ public class MediaSearchService {
 
     public MediaSearchResult searchByKeywords(String field, Collection<Object> keywords, int page, int size,
                                               SortBy sortBy, SortOrder sortOrder) throws IOException, IllegalAccessException {
-        ContentMetaData.validateFieldName(field);
+        ContentMetaData.validateSearchFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 openSearchService.searchTermByOneField(field, keywords, page, size, sortBy, sortOrder), page, size);
 
@@ -116,7 +116,7 @@ public class MediaSearchService {
 
     public MediaSearchResult searchMatch(String field, Object searchStrings, int page, int size,
                                          SortBy sortBy, SortOrder sortOrder) throws IOException, IllegalAccessException {
-        ContentMetaData.validateFieldName(field);
+        ContentMetaData.validateSearchFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 openSearchService.searchMatchByOneField(field, searchStrings, page, size, sortBy, sortOrder), page, size);
 
