@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.redis.core.RedisTemplate;
 
+import java.time.LocalDate;
 import java.util.Map;
 
 @SpringBootApplication
@@ -24,7 +25,7 @@ public class StreamingServiceApplication {
         return args -> {
 //            Map<String, Object> document = new HashMap<>();
 //            document.put("title", "Test Video Sample 1");
-//            document.put("universes", List.of(""));
+//            document.put("universes", List.of("Nier Automata"));
 //            document.put("bucket", "3dvid");
 //            document.put("parentPath", "");
 //            document.put("key", "2b.mp4");
@@ -38,16 +39,16 @@ public class StreamingServiceApplication {
 
 //            Map<String, Object> document = new HashMap<>();
 //            document.put("title", "Test Album");
-//            document.put("universes", List.of(""));
-//            document.put("bucket", "");
-//            document.put("parentPath", "");
+//            document.put("universes", List.of("Genshin Impact"));
+//            document.put("bucket", "cos");
+//            document.put("parentPath", "aqua/Legion/Aqua水淼Clorinde");
 //            document.put("length", 92);
 //            document.put("size", 180111222);
 //            document.put("id", 2);
 //            openSearchService.indexDocument(2, document);
 
             //openSearchService.partialUpdateDocument(1, Map.of("width", 3840, "height", 2160));
-            //openSearchService.partialUpdateDocument(2, Map.of("thumbnail", ""));
+            //openSearchService.partialUpdateDocument(2, Map.of("uploadDate", LocalDate.now()));
             //openSearchService.createIndexWithMapping();
         };
     }

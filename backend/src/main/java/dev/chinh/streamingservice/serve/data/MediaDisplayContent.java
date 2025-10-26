@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.serve;
+package dev.chinh.streamingservice.serve.data;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.data.ContentMetaData;
@@ -6,7 +6,6 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Slice;
 
 import java.time.LocalDate;

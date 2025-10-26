@@ -13,7 +13,7 @@ import java.io.IOException;
 import java.util.Set;
 
 @Service
-@EnableScheduling
+//@EnableScheduling
 @RequiredArgsConstructor
 public class ScheduleService {
 
