@@ -49,16 +49,17 @@ public class MediaSearchService {
                 mapMediaSearchFieldsToSearchFieldGroups(request.getIncludeFields());
         List<SearchFieldGroup> excludes = request.getExcludeFields() == null ? null :
                 mapMediaSearchFieldsToSearchFieldGroups(request.getExcludeFields());
-        List<MediaSearchRangeField> ranges = new ArrayList<>();
 
-        for (MediaSearchRangeField rangeField : request.getRangeFields()) {
-            if (!rangeField.getField().equals(ContentMetaData.UPLOAD_DATE) &&
-                    !rangeField.getField().equals(ContentMetaData.YEAR))
-                throw new IllegalArgumentException("Range query not support for field: " + rangeField.getField());
+        if (request.getRangeFields() != null) {
+            for (MediaSearchRangeField rangeField : request.getRangeFields()) {
+                if (!rangeField.getField().equals(ContentMetaData.UPLOAD_DATE) &&
+                        !rangeField.getField().equals(ContentMetaData.YEAR))
+                    throw new IllegalArgumentException("Range query not support for field: " + rangeField.getField());
+            }
         }
 
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.advanceSearch(includes, excludes, ranges, page, size, sortBy, sortOrder), page, size);
+                openSearchService.advanceSearch(includes, excludes, request.getRangeFields(), page, size, sortBy, sortOrder), page, size);
 
         processThumbnails(mapSearchResult.searchItems);
         cacheMediaSearchItems(mapSearchResult.searchItems);

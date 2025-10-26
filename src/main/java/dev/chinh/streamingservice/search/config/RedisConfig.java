@@ -1,15 +1,14 @@
 package dev.chinh.streamingservice.search.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.chinh.streamingservice.data.entity.MediaGroupMetaData;
+import dev.chinh.streamingservice.data.repository.MediaGroupMetaDataRepository;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.domain.Example;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
@@ -196,6 +195,169 @@ public class RedisConfig {
                 return Optional.empty();
             }
             // no-op stub methods; all can return null or empty
+        };
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(MediaGroupMetaDataRepository.class)
+    public MediaGroupMetaDataRepository mediaGroupMetaDataRepository() {
+        // Return a dummy instance (can be a mock or no-op)
+        return new MediaGroupMetaDataRepository() {
+
+            @Override
+            public List<MediaGroupMetaData> findAll(Sort sort) {
+                return List.of();
+            }
+
+            @Override
+            public Page<MediaGroupMetaData> findAll(Pageable pageable) {
+                return null;
+            }
+
+            @Override
+            public <S extends MediaGroupMetaData> S save(S entity) {
+                return null;
+            }
+
+            @Override
+            public <S extends MediaGroupMetaData> List<S> saveAll(Iterable<S> entities) {
+                return List.of();
+            }
+
+            @Override
+            public Optional<MediaGroupMetaData> findById(Long aLong) {
+                return Optional.empty();
+            }
+
+            @Override
+            public boolean existsById(Long aLong) {
+                return false;
+            }
+
+            @Override
+            public List<MediaGroupMetaData> findAll() {
+                return List.of();
+            }
+
+            @Override
+            public List<MediaGroupMetaData> findAllById(Iterable<Long> longs) {
+                return List.of();
+            }
+
+            @Override
+            public long count() {
+                return 0;
+            }
+
+            @Override
+            public void deleteById(Long aLong) {
+
+            }
+
+            @Override
+            public void delete(MediaGroupMetaData entity) {
+
+            }
+
+            @Override
+            public void deleteAllById(Iterable<? extends Long> longs) {
+
+            }
+
+            @Override
+            public void deleteAll(Iterable<? extends MediaGroupMetaData> entities) {
+
+            }
+
+            @Override
+            public void deleteAll() {
+
+            }
+
+            @Override
+            public void flush() {
+
+            }
+
+            @Override
+            public <S extends MediaGroupMetaData> S saveAndFlush(S entity) {
+                return null;
+            }
+
+            @Override
+            public <S extends MediaGroupMetaData> List<S> saveAllAndFlush(Iterable<S> entities) {
+                return List.of();
+            }
+
+            @Override
+            public void deleteAllInBatch(Iterable<MediaGroupMetaData> entities) {
+
+            }
+
+            @Override
+            public void deleteAllByIdInBatch(Iterable<Long> longs) {
+
+            }
+
+            @Override
+            public void deleteAllInBatch() {
+
+            }
+
+            @Override
+            public MediaGroupMetaData getOne(Long aLong) {
+                return null;
+            }
+
+            @Override
+            public MediaGroupMetaData getById(Long aLong) {
+                return null;
+            }
+
+            @Override
+            public MediaGroupMetaData getReferenceById(Long aLong) {
+                return null;
+            }
+
+            @Override
+            public <S extends MediaGroupMetaData> Optional<S> findOne(Example<S> example) {
+                return Optional.empty();
+            }
+
+            @Override
+            public <S extends MediaGroupMetaData> List<S> findAll(Example<S> example) {
+                return List.of();
+            }
+
+            @Override
+            public <S extends MediaGroupMetaData> List<S> findAll(Example<S> example, Sort sort) {
+                return List.of();
+            }
+
+            @Override
+            public <S extends MediaGroupMetaData> Page<S> findAll(Example<S> example, Pageable pageable) {
+                return null;
+            }
+
+            @Override
+            public <S extends MediaGroupMetaData> long count(Example<S> example) {
+                return 0;
+            }
+
+            @Override
+            public <S extends MediaGroupMetaData> boolean exists(Example<S> example) {
+                return false;
+            }
+
+            @Override
+            public <S extends MediaGroupMetaData, R> R findBy(Example<S> example, Function<FluentQuery.FetchableFluentQuery<S>, R> queryFunction) {
+                return null;
+            }
+
+            @Override
+            public Slice<Long> findMediaMetadataIdsByGrouperMetaDataId(Long grouperId, Pageable pageable) {
+                return null;
+            }
         };
     }
 }

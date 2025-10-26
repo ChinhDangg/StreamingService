@@ -17,11 +17,11 @@ public abstract class MediaDescription implements MetaDataProvider {
 
     @JsonProperty(ContentMetaData.ID)
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    protected Long id;
 
     @JsonProperty(ContentMetaData.TITLE)
     @Column(nullable = false)
-    private String title;
+    protected String title;
 
     @JsonProperty(ContentMetaData.BUCKET)
     @Column(nullable = false)
@@ -56,16 +56,16 @@ public abstract class MediaDescription implements MetaDataProvider {
 
     @JsonProperty(ContentMetaData.UPLOAD_DATE)
     @Column(nullable = false)
-    private LocalDate uploadDate;
+    protected LocalDate uploadDate;
 
     @JsonProperty(ContentMetaData.YEAR)
     @Column(nullable = false)
-    private Integer year;
+    protected Integer year;
 
     // Grouping (optional)
     @JsonProperty(ContentMetaData.GROUP_INFO)
     @OneToOne(fetch = FetchType.LAZY)
-    private MediaGroupMetaData groupInfo;
+    protected MediaGroupMetaData groupInfo;
 
     public boolean isGrouper() {
         return groupInfo != null && groupInfo.getGrouperMetaDataId() == null;
