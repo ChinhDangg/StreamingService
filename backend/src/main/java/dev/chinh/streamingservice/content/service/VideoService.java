@@ -117,7 +117,7 @@ public class VideoService extends MediaService {
                 "-filter_complex", filterComplex,
                 "-map", "[v]", "-map", "[acat]",
                 "-c:v", "h264", "-preset", "veryfast",
-                "-c:a", "aac",
+//                "-c:a", "aac",
                 "-metadata", "job_id=" + partialVideoJobId,
                 // Optional: improve HLS segmenting/keyframes consistency
                 "-g", "48", "-keyint_min", "48", "-sc_threshold", "0",
@@ -127,7 +127,7 @@ public class VideoService extends MediaService {
                 "-hls_flags", "append_list+omit_endlist",
                 outPath
         ));
-        runAndLogAsync(command.toArray(new String[0]), cacheJobId);
+        runAndLogAsync(command.toArray(new String[0]), cacheJobId, outPath);
 
         addCacheTempVideoJobStatus(cacheJobId, null, estimatedSize, MediaJobStatus.RUNNING);
         addCacheRunningJob(cacheJobId);
@@ -223,7 +223,7 @@ public class VideoService extends MediaService {
                 outPath                       // output playlist path: /chunks/<videoId>/<resolution>/partial/master.m3u8)
         ));
 
-        runAndLogAsync(command.toArray(new String[0]), cacheJobId);
+        runAndLogAsync(command.toArray(new String[0]), cacheJobId, outPath);
         return partialVideoJobId;
     }
 
@@ -291,7 +291,7 @@ public class VideoService extends MediaService {
         }
     }
 
-    private void runAndLogAsync(String[] cmd, String videoId) throws Exception {
+    private void runAndLogAsync(String[] cmd, String videoId, String videoMasterFilePath) throws Exception {
         Process process = new ProcessBuilder(cmd)
                 .redirectErrorStream(true)
                 .start();
@@ -312,8 +312,12 @@ public class VideoService extends MediaService {
                 // mark as completed
                 if (videoId != null && exit == 0)
                     addCacheTempVideoJobStatus(videoId, null, null, MediaJobStatus.COMPLETED);
+                if (exit == 0)
+                    OSUtil.writeTextToTempFile(videoMasterFilePath.replaceFirst("/chunks/", ""), List.of("#EXT-X-ENDLIST"), false);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
         }).start();
     }

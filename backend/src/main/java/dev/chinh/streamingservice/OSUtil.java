@@ -135,7 +135,7 @@ public class OSUtil {
         return containerFileExists(fileName);
     }
 
-    public static boolean createTempTextFile(String relativePath, List<String> lines, boolean createDir) throws Exception {
+    public static boolean writeTextToTempFile(String relativePath, List<String> lines, boolean createDir) throws Exception {
         int dot = relativePath.lastIndexOf('.');
         if (dot == -1 || dot == 0 || dot == relativePath.length() - 1) {
             System.out.println(("Invalid relative file path: " + relativePath));
@@ -169,6 +169,47 @@ public class OSUtil {
                 Files.writeString(path, part + "\n", StandardOpenOption.APPEND);
             }
         }
+        return true;
+    }
+
+    /**
+     * Writes lines directly into a file inside the container's /chunks dir.
+     * No host file is created (pure RAM inside container).
+     * RelativePath must be file path and not a directory.
+     */
+    private static boolean writeTextToContainer(String relativePath, List<String> lines, boolean createDir) throws Exception {
+
+        if (createDir) {
+            String parentDir = relativePath.substring(0, relativePath.lastIndexOf('/'));
+            createDirectoryInContainer(parentDir);
+        }
+
+        // Normalize target path inside /chunks
+        String targetPath = normalizePath(BASE_DIR, relativePath);
+
+        // Build docker exec command
+        ProcessBuilder pb = new ProcessBuilder(
+                "docker", "exec", "-i", CONTAINER,
+                "sh", "-c", "cat >> " + targetPath
+        );
+
+        Process process = pb.start();
+
+        // Stream the content into container's stdin
+        try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream())) {
+            for (String line : lines) {
+                writer.write(line);
+                writer.write("\n"); // System.lineSeparator()
+            }
+        }
+
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            System.out.println(exitCode);
+            throw new IOException("Failed to write to container file: " + targetPath);
+        }
+
+        System.out.println("✅ Wrote text directly to " + targetPath + " in " + CONTAINER);
         return true;
     }
 
@@ -213,7 +254,7 @@ public class OSUtil {
         throw new RuntimeException("Unable to get RAM usable space from container");
     }
 
-    public static void deleteForceMemoryDirectory(String dir) throws IOException, InterruptedException {
+    public static void deleteForceMemoryDirectory(String dir) {
         if (currentOS == OS.WINDOWS) {
             deleteForceDirectoryInContainer(dir);
             return;
@@ -242,7 +283,7 @@ public class OSUtil {
         System.out.println("RAM disk successfully deleted: " + dir);
     }
 
-    private static void deleteForceDirectoryInContainer(String path) throws IOException, InterruptedException {
+    private static void deleteForceDirectoryInContainer(String path) {
         path = normalizePath(BASE_DIR, path);
         String[] cmd = {"docker", "exec", CONTAINER, "rm", "-rf", path};
 
@@ -384,47 +425,6 @@ public class OSUtil {
             return baseDir + relativePath; // e.g. "/dir1" → "/chunks/dir1"
         }
         return baseDir + "/" + relativePath; // e.g. "dir1" → "/chunks/dir1"
-    }
-
-    /**
-     * Writes lines directly into a file inside the container's /chunks dir.
-     * No host file is created (pure RAM inside container).
-     * RelativePath must be file path and not a directory.
-     */
-    private static boolean writeTextToContainer(String relativePath, List<String> lines, boolean createDir) throws Exception {
-
-        if (createDir) {
-            String parentDir = relativePath.substring(0, relativePath.lastIndexOf('/'));
-            createDirectoryInContainer(parentDir);
-        }
-
-        // Normalize target path inside /chunks
-        String targetPath = normalizePath(BASE_DIR, relativePath);
-
-        // Build docker exec command
-        ProcessBuilder pb = new ProcessBuilder(
-                "docker", "exec", "-i", CONTAINER,
-                "sh", "-c", "cat >> " + targetPath
-        );
-
-        Process process = pb.start();
-
-        // Stream the content into container's stdin
-        try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream())) {
-            for (String line : lines) {
-                writer.write(line);
-                writer.write("\n"); // System.lineSeparator()
-            }
-        }
-
-        int exitCode = process.waitFor();
-        if (exitCode != 0) {
-            System.out.println(exitCode);
-            throw new IOException("Failed to write to container file: " + targetPath);
-        }
-
-        System.out.println("✅ Wrote text directly to " + targetPath + " in " + CONTAINER);
-        return true;
     }
 
     public static void runCommandAndLog(String[] cmd, List<Integer> acceptableCode) throws Exception {
