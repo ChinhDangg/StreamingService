@@ -3,12 +3,8 @@ package dev.chinh.streamingservice;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
-import java.nio.file.FileStore;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
 import java.util.ArrayDeque;
-import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
@@ -123,14 +119,12 @@ public class OSUtil {
         System.out.println("docker compose finished with exit code: " + exit);
     }
 
-    public static void main(String[] args) throws IOException, InterruptedException {
-    }
-
-    public static boolean createTempDir(String dir) throws IOException, InterruptedException {
-        if (currentOS == OS.MAC) {
-            return createPathInRAMDisk(dir);
+    public static void createTempDir(String dir) throws Exception {
+        if (currentOS == OS.MAC ||  currentOS == OS.LINUX) {
+            createPathInRAMDisk(dir);
+        } else {
+            createDirectoryInContainer(dir);
         }
-        return createDirectoryInContainer(dir);
     }
 
     public static boolean checkTempFileExists(String fileName) throws IOException, InterruptedException {
@@ -141,23 +135,41 @@ public class OSUtil {
         return containerFileExists(fileName);
     }
 
-    public static boolean createTempTextFile(String relativePath, List<String> lines) throws IOException, InterruptedException {
-        if (!relativePath.substring(relativePath.lastIndexOf(".")).equalsIgnoreCase(".txt")) {
+    public static boolean createTempTextFile(String relativePath, List<String> lines, boolean createDir) throws Exception {
+        int dot = relativePath.lastIndexOf('.');
+        if (dot == -1 || dot == 0 || dot == relativePath.length() - 1) {
+            System.out.println(("Invalid relative file path: " + relativePath));
             return false;
         }
+
         if (currentOS == OS.WINDOWS) {
-            return writeTextToContainer(relativePath, lines);
-        } else if (currentOS == OS.MAC) {
-            String targetPath = normalizePath(RAMDISK, relativePath);
+            return writeTextToContainer(relativePath, lines, createDir);
+        } else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
+            return writeTextToRAMDISK(relativePath, lines, createDir);
+        }
+        return false;
+    }
+
+    private static boolean writeTextToRAMDISK(String relativePath, List<String> lines, boolean createDir) throws Exception {
+        String targetPath = normalizePath(RAMDISK, relativePath);
+        if (createDir) {
+            createTempDir(relativePath.substring(0, relativePath.lastIndexOf('/')));
             File concatList = new File(targetPath);
             try (PrintWriter pw = new PrintWriter(concatList)) {
                 for (String part : lines) {
                     pw.println(part);
                 }
             }
-            return true;
+        } else {
+            Path path = Paths.get(targetPath);
+            if (!Files.exists(path)) {
+                return false;
+            }
+            for (String part : lines) {
+                Files.writeString(path, part + "\n", StandardOpenOption.APPEND);
+            }
         }
-        return false;
+        return true;
     }
 
     public static long getUsableMemory() {
@@ -213,43 +225,33 @@ public class OSUtil {
     }
 
     private static void deleteForceDirectoryForRAMDisk(String dir) {
-        try {
-            dir = normalizePath(RAMDISK, dir);
-            if (!Files.exists(Paths.get(dir))) {
-                System.out.println("RAM disk does not exist to delete: " + dir);
-                return;
-            }
-
-            String[] cmd = new String[]{"rm", "-rf", dir};
-            Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
-            int code = process.waitFor();
-
-            if (code != 0) {
-                String out = new String(process.getInputStream().readAllBytes());
-                System.err.println("Deletion failed for " + dir + ": " + out);
-            } else {
-                System.out.println("RAM disk successfully deleted: " + dir);
-            }
-        } catch (Exception e) {
-            System.err.println("Error deleting " + dir + ": " + e.getMessage());
+        dir = normalizePath(RAMDISK, dir);
+        if (!Files.exists(Paths.get(dir))) {
+            System.out.println("RAM disk does not exist to delete: " + dir);
+            return;
         }
+
+        String[] cmd = new String[]{"rm", "-rf", dir};
+
+        try {
+            runCommandAndLog(cmd, null);
+        } catch (Exception e) {
+            System.err.println("Deletion failed for " + dir);
+        }
+
+        System.out.println("RAM disk successfully deleted: " + dir);
     }
 
     private static void deleteForceDirectoryInContainer(String path) throws IOException, InterruptedException {
         path = normalizePath(BASE_DIR, path);
         String[] cmd = {"docker", "exec", CONTAINER, "rm", "-rf", path};
-        ProcessBuilder pb = new ProcessBuilder(cmd);
-        pb.redirectErrorStream(true);
-        Process p = pb.start();
 
-        String output = new String(p.getInputStream().readAllBytes());
-        int code = p.waitFor();
-
-        if (code != 0) {
-            System.err.println("Failed to delete in container: " + output);
-        } else {
-            System.out.println("Deleted " + path + " in container");
+        try {
+            runCommandAndLog(cmd, null);
+        } catch (Exception e) {
+            System.err.println("Failed to delete in container: ");
         }
+        System.out.println("Deleted " + path + " in container");
     }
 
     private static long getMemoryTotalSpace() throws IOException, InterruptedException {
@@ -287,16 +289,15 @@ public class OSUtil {
      * Does not copy the content of the file. Only create the path if it doesn't exist.
      *
      * @param path The path that to write to RAMDISK
-     * @return true, if the path is written, otherwise throw IOException
+     * if the path is written, otherwise throw IOException
      */
-    private static boolean createPathInRAMDisk(String path) throws IOException {
+    private static void createPathInRAMDisk(String path) throws IOException {
         File dir = new File(normalizePath(RAMDISK, path));
         if (!dir.exists()) {
             if (!dir.mkdirs()) {
                 throw new IOException("Failed to create path: " + path);
             }
         }
-        return true;
     }
 
     public static String readPlayListFromTempDir(String videoDir) throws IOException, InterruptedException {
@@ -349,28 +350,33 @@ public class OSUtil {
         return String.join("\n", lastLines);
     }
 
-    private static boolean containerFileExists(String relativePath) throws IOException, InterruptedException {
+    private static boolean containerFileExists(String relativePath) {
         String targetPath = normalizePath(BASE_DIR, relativePath);
 
-        ProcessBuilder pb = new ProcessBuilder(
+        String[] commands = {
                 "docker", "exec", CONTAINER,
                 "test", "-f", targetPath
-        );
+        };
 
-        Process process = pb.start();
-        int exitCode = process.waitFor();
-
-        return exitCode == 0; // 0 = exists, else doesn't
+        try {
+            runCommandAndLog(commands, null);
+        } catch (Exception e) {
+            return false;
+        }
+        return true; // 0 = exists, else doesn't
     }
 
     /**
      * Create a directory directly inside the container under /chunks.
      */
-    private static boolean createDirectoryInContainer(String relativeDir) throws IOException, InterruptedException {
+    private static void createDirectoryInContainer(String relativeDir) throws Exception {
         String dirPath = normalizePath(BASE_DIR, relativeDir);
 
-        return runCommand(List.of("docker", "exec", CONTAINER, "mkdir", "-p", dirPath),
-                "Created directory in container: " + dirPath);
+        try {
+            runCommandAndLog(new String[]{"docker", "exec", CONTAINER, "mkdir", "-p", dirPath}, null);
+        } catch (Exception e) {
+            throw new IOException("Failed to create directory: " + dirPath, e);
+        }
     }
 
     public static String normalizePath(String baseDir, String relativePath) {
@@ -380,42 +386,25 @@ public class OSUtil {
         return baseDir + "/" + relativePath; // e.g. "dir1" → "/chunks/dir1"
     }
 
-    private static boolean runCommand(List<String> command, String successMsg)
-            throws IOException, InterruptedException {
-        ProcessBuilder pb = new ProcessBuilder(command);
-        pb.inheritIO(); // print stdout/stderr to console
-        Process process = pb.start();
-        int exitCode = process.waitFor();
-
-        if (exitCode != 0) {
-            throw new IOException("Command failed: " + String.join(" ", command));
-        }
-
-        System.out.println("✅ " + successMsg);
-        return true;
-    }
-
     /**
      * Writes lines directly into a file inside the container's /chunks dir.
      * No host file is created (pure RAM inside container).
+     * RelativePath must be file path and not a directory.
      */
-    private static boolean writeTextToContainer(String relativePath, List<String> lines)
-            throws IOException, InterruptedException {
+    private static boolean writeTextToContainer(String relativePath, List<String> lines, boolean createDir) throws Exception {
+
+        if (createDir) {
+            String parentDir = relativePath.substring(0, relativePath.lastIndexOf('/'));
+            createDirectoryInContainer(parentDir);
+        }
 
         // Normalize target path inside /chunks
         String targetPath = normalizePath(BASE_DIR, relativePath);
 
-        String parentDir = targetPath.substring(0, targetPath.lastIndexOf('/'));
-        if (!parentDir.equals(BASE_DIR)) {
-            // Strip the /chunks/ prefix to pass a relative path to createDirectoryInContainer
-            String relativeParent = parentDir.substring(BASE_DIR.length() + 1);
-            createDirectoryInContainer(relativeParent);
-        }
-
         // Build docker exec command
         ProcessBuilder pb = new ProcessBuilder(
                 "docker", "exec", "-i", CONTAINER,
-                "sh", "-c", "cat > " + targetPath
+                "sh", "-c", "cat >> " + targetPath
         );
 
         Process process = pb.start();
@@ -424,7 +413,7 @@ public class OSUtil {
         try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream())) {
             for (String line : lines) {
                 writer.write(line);
-                writer.write(System.lineSeparator());
+                writer.write("\n"); // System.lineSeparator()
             }
         }
 
@@ -436,5 +425,23 @@ public class OSUtil {
 
         System.out.println("✅ Wrote text directly to " + targetPath + " in " + CONTAINER);
         return true;
+    }
+
+    public static void runCommandAndLog(String[] cmd, List<Integer> acceptableCode) throws Exception {
+        Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
+//        String line;
+//        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+//            while ((line = br.readLine()) != null) {
+//                //System.out.println("[ffmpeg] " + line);
+//            }
+//        }
+        int exit = process.waitFor();
+        System.out.println("Command exited with code " + exit);
+        if (exit != 0) {
+            if (acceptableCode != null && acceptableCode.contains(exit))
+                return;
+            String out = new String(process.getInputStream().readAllBytes());
+            throw new RuntimeException("Command failed with code " + exit + ": " + out);
+        }
     }
 }
