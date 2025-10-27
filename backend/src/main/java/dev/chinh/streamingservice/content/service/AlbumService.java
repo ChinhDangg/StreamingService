@@ -235,9 +235,7 @@ public class AlbumService extends MediaService {
                 new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8))) {
 
             Path path = Paths.get(albumUrlInfo.mediaUrlList.getFirst().url.replaceFirst("/chunks", ""));
-            if (!OSUtil.createTempDir(path.getParent().toString().replace("\\", "/"))) {
-                throw new IOException("Failed to create temporary directory: " + path.getParent());
-            }
+            OSUtil.createTempDir(path.getParent().toString().replace("\\", "/"));
 
             String scale = getFfmpegScaleString(albumUrlInfo.resolution, true);
             for (int i = offset; i < stop; i++) {
@@ -316,9 +314,7 @@ public class AlbumService extends MediaService {
         String bucket = albumUrlInfo.buckets.getFirst();
         String input = minIOService.getSignedUrlForContainerNginx(bucket, videoPath, 60 * 60);
 
-        if (!OSUtil.createTempDir(videoDir)) {
-            throw new IOException("Failed to create temporary directory: " + videoDir);
-        }
+        OSUtil.createTempDir(videoDir);
 
         String containerDir = "/chunks/" + videoDir;
         String outPath = containerDir + masterFileName;
@@ -363,9 +359,7 @@ public class AlbumService extends MediaService {
         String scale = getFfmpegScaleString(res, true);
         if (!OSUtil.checkTempFileExists(cachePath)) {
             // make sure parent dir exist
-            if (!OSUtil.createTempDir(albumDir)) {
-                throw new IOException("Failed to create temporary directory: " + albumDir);
-            }
+            OSUtil.createTempDir(albumDir);
 
             String outputPath = "/chunks" + cachePath;
             String ffmpegCmd = String.format(
@@ -377,7 +371,7 @@ public class AlbumService extends MediaService {
                     "docker", "exec", "ffmpeg",
                     "bash", "-c", ffmpegCmd
             };
-            runAndLog(dockerCmd, null);
+            OSUtil.runCommandAndLog(dockerCmd, null);
         }
 
         return getUrlAsRedirectResponse(cachePath, true);

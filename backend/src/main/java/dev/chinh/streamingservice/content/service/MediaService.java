@@ -15,7 +15,6 @@ import org.springframework.data.redis.core.ZSetOperations;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -149,21 +148,6 @@ public abstract class MediaService {
             return height <= target;
         } else { // Portrait
             return width <= target;
-        }
-    }
-
-    protected void runAndLog(String[] cmd, List<Integer> acceptableCode) throws Exception {
-        Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
-//        String line;
-//        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-//            while ((line = br.readLine()) != null) {
-//                //System.out.println("[ffmpeg] " + line);
-//            }
-//        }
-        int exit = process.waitFor();
-        System.out.println("ffmpeg exited with code " + exit);
-        if (exit != 0 && (acceptableCode != null && !acceptableCode.contains(exit))) {
-            throw new RuntimeException("Command failed with code " + exit);
         }
     }
 }

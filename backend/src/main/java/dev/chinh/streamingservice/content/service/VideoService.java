@@ -48,9 +48,7 @@ public class VideoService extends MediaService {
                 prevJobStopped = true;
         }
 
-        if (!OSUtil.createTempDir(videoDir)) {
-            throw new IOException("Failed to create temporary directory: " + videoDir);
-        }
+        OSUtil.createTempDir(videoDir);
 
         // === resolution control ===
         final Resolution resolution = Resolution.p360;
@@ -166,9 +164,7 @@ public class VideoService extends MediaService {
         if (!enoughSpace)
             return getOriginalVideoUrl(videoId);
 
-        if (!OSUtil.createTempDir(videoDir)) {
-            throw new IOException("Failed to create temporary directory: " + videoDir);
-        }
+        OSUtil.createTempDir(videoDir);
 
         // 2. Get a presigned URL with container Nginx so ffmpeg can access in container
         // 3. Rewrite URL to go through Nginx proxy instead of direct MinIO
@@ -258,10 +254,10 @@ public class VideoService extends MediaService {
     }
 
     public void stopFfmpegJob(String jobId) throws Exception {
-        runAndLog(new String[]{
+        OSUtil.runCommandAndLog(new String[]{
                 "docker", "exec", "ffmpeg",
                 "pkill", "-INT", "-f", "job_id=" + jobId
-        }, List.of(0));
+        }, List.of(255));
     }
 
     private int findLastSegmentFromPlayList(String lines) {
