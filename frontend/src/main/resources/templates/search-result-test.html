@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Search Page</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-6">
+
+<!-- Header -->
+<header class="max-w-7xl mx-auto mb-6">
+    <h1 class="text-2xl font-semibold mb-4">Search Page</h1>
+    <div class="flex gap-3">
+        <input type="text" placeholder="Search..."
+               class="flex-1 px-4 py-2 rounded-lg bg-gray-800 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+        <button class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium">Search</button>
+    </div>
+</header>
+
+<!-- Grid -->
+<main class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0">
+
+    <!-- Horizontal (16:9) -->
+    <article class="bg-gray-800 flex flex-col border border-gray-900">
+        <div class="relative w-full aspect-[16/9] bg-gray-700 overflow-hidden">
+            <div>
+                <img src="https://placehold.co/1280x720" alt="Horizontal"
+                     class="w-full h-full object-contain" />
+                <span class="absolute bottom-1 left-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+                1:54
+            </span>
+                <span class="absolute bottom-1 right-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+                1920×1080
+            </span>
+            </div>
+        </div>
+        <div class="p-3">
+            <h2 class="text-sm font-medium truncate">First Horizontal Node Title Example</h2>
+            <div class="flex justify-between text-xs text-gray-400">
+                <span class="truncate">Oct 26, 2025</span>
+                <span class="truncate">John Doe</span>
+            </div>
+        </div>
+    </article>
+
+    <!-- Horizontal -->
+    <article class="bg-gray-800 flex flex-col border border-gray-900">
+        <div class="relative w-full aspect-[16/9] bg-gray-700 overflow-hidden">
+            <img src="https://placehold.co/1280x720" alt="Horizontal"
+                 class="w-full h-full object-contain" />
+            <span class="absolute bottom-1 left-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+          2:37
+        </span>
+            <span class="absolute bottom-1 right-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+          3840×2160
+        </span>
+        </div>
+        <div class="p-3">
+            <h2 class="text-sm font-medium truncate">Second Horizontal Node Title</h2>
+            <div class="flex justify-between text-xs text-gray-400">
+                <span class="truncate">Oct 26, 2025</span>
+                <span class="truncate">John Doe</span>
+            </div>
+        </div>
+    </article>
+
+    <!-- Vertical (9:16) -->
+    <article class="bg-gray-800 flex flex-col border border-gray-900 row-span-2">
+        <div class="relative w-full aspect-[2/3] bg-gray-700 overflow-hidden flex justify-center items-center">
+            <img src="https://placehold.co/200x300" alt="Vertical"
+                 class="w-full h-full object-contain" />
+            <span class="absolute bottom-1 left-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+          3:45
+        </span>
+            <span class="absolute bottom-1 right-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+          1080×1920
+        </span>
+        </div>
+        <div class="p-3">
+            <h2 class="text-sm font-medium truncate">Vertical Node Title Example</h2>
+            <div class="flex justify-between text-xs text-gray-400">
+                <span class="truncate">Oct 26, 2025</span>
+                <span class="truncate">John Doe</span>
+            </div>
+        </div>
+    </article>
+
+    <!-- Horizontal -->
+    <article class="bg-gray-800 flex flex-col border border-gray-900">
+        <div class="relative w-full aspect-[16/9] bg-gray-700 overflow-hidden">
+            <img src="https://placehold.co/1600x900" alt="Horizontal"
+                 class="w-full h-full object-contain" />
+            <span class="absolute bottom-1 left-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+          0:58
+        </span>
+            <span class="absolute bottom-1 right-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+          1280×720
+        </span>
+        </div>
+        <div class="p-3">
+            <h2 class="text-sm font-medium truncate">Another Horizontal Example</h2>
+            <div class="flex justify-between text-xs text-gray-400">
+                <span class="truncate">Oct 26, 2025</span>
+                <span class="truncate">John Doe</span>
+            </div>
+        </div>
+    </article>
+
+    <!-- Horizontal -->
+    <article class="bg-gray-800 flex flex-col border border-gray-900">
+        <div class="relative w-full aspect-[16/9] bg-gray-700 overflow-hidden">
+            <img src="https://placehold.co/1280x720" alt="Horizontal"
+                 class="w-full h-full object-contain" />
+            <span class="absolute bottom-1 left-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+          3:21
+        </span>
+            <span class="absolute bottom-1 right-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+          1920×1080
+        </span>
+        </div>
+        <div class="p-3">
+            <h2 class="text-sm font-medium truncate">Fourth Horizontal Card</h2>
+            <div class="flex justify-between text-xs text-gray-400">
+                <span class="truncate">Oct 26, 2025</span>
+                <span class="truncate">John Doe</span>
+            </div>
+        </div>
+    </article>
+
+    <!-- Vertical -->
+    <article class="bg-gray-800 flex flex-col border border-gray-900 row-span-2">
+        <div class="relative w-full aspect-[2/3] bg-gray-700 overflow-hidden flex justify-center items-center">
+            <img src="https://placehold.co/200x300" alt="Vertical"
+                 class="w-full h-full object-contain" />
+            <span class="absolute bottom-1 left-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+          5:07
+        </span>
+            <span class="absolute bottom-1 right-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+          1440×2560
+        </span>
+        </div>
+        <div class="p-3">
+            <h2 class="text-sm font-medium truncate">Another Vertical Example</h2>
+            <div class="flex justify-between text-xs text-gray-400">
+                <span class="truncate">Oct 26, 2025</span>
+                <span class="truncate">John Doe</span>
+            </div>
+        </div>
+    </article>
+
+    <!-- Horizontal -->
+    <article class="bg-gray-800 flex flex-col border border-gray-900">
+        <div class="relative w-full aspect-[16/9] bg-gray-700 overflow-hidden">
+            <img src="https://placehold.co/1280x720" alt="Horizontal"
+                 class="w-full h-full object-contain" />
+            <span class="absolute bottom-1 left-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+          3:21
+        </span>
+            <span class="absolute bottom-1 right-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+          1920×1080
+        </span>
+        </div>
+        <div class="p-3">
+            <h2 class="text-sm font-medium truncate">Fourth Horizontal Card</h2>
+            <div class="flex justify-between text-xs text-gray-400">
+                <span class="truncate">Oct 26, 2025</span>
+                <span class="truncate">John Doe</span>
+            </div>
+        </div>
+    </article>
+
+
+    <!-- Horizontal -->
+    <article class="bg-gray-800 flex flex-col border border-gray-900">
+        <div class="relative w-full aspect-[16/9] bg-gray-700 overflow-hidden">
+            <img src="https://placehold.co/1280x720" alt="Horizontal"
+                 class="w-full h-full object-contain" />
+            <span class="absolute bottom-1 left-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+          3:21
+        </span>
+            <span class="absolute bottom-1 right-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+          1920×1080
+        </span>
+        </div>
+        <div class="p-3">
+            <h2 class="text-sm font-medium truncate">Fourth Horizontal Card</h2>
+            <div class="flex justify-between text-xs text-gray-400">
+                <span class="truncate">Oct 26, 2025</span>
+                <span class="truncate">John Doe</span>
+            </div>
+        </div>
+    </article>
+
+</main>
+
+
+<!-- Pagination Node -->
+<div class="flex flex-col items-center justify-center mt-8 select-none text-gray-300 space-y-3">
+
+    <!-- Control Buttons (Top Row) -->
+    <div class="flex items-center justify-between w-full max-w-xs mx-auto gap-4">
+
+        <!-- Left Controls -->
+        <div class="flex items-center gap-2">
+            <!-- Previous -->
+            <a href="#prev" class="p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Previous Page">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                     stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+            </a>
+
+            <!-- Next -->
+            <a href="#next" class="p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Next Page">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                     stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+            </a>
+
+            <!-- Go to First -->
+            <a href="#first" class="p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="First Page">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                     stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+                </svg>
+            </a>
+        </div>
+
+        <!-- Right Controls -->
+        <div class="flex items-center gap-2">
+            <!-- Go to Last -->
+            <a href="#last" class="p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Last Page">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                     stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 19l7-7-7-7M13 19l7-7-7-7" />
+                </svg>
+            </a>
+
+            <!-- Previous -->
+            <a href="#prev" class="p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Previous Page">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                     stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+            </a>
+
+            <!-- Next -->
+            <a href="#next" class="p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Next Page">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                     stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+            </a>
+        </div>
+    </div>
+
+    <!-- Page Numbers (Bottom Row) -->
+    <div class="flex items-center gap-1">
+        <a href="#1" class="px-3 py-1 rounded-md bg-gray-800 hover:bg-gray-700 text-sm font-medium">1</a>
+        <a href="#2" class="px-3 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-sm font-medium text-white ring-1 ring-indigo-500">
+            2
+        </a>
+        <a href="#3" class="px-3 py-1 rounded-md bg-gray-800 hover:bg-gray-700 text-sm font-medium">3</a>
+        <span class="px-2 text-gray-500">...</span>
+        <a href="#10" class="px-3 py-1 rounded-md bg-gray-800 hover:bg-gray-700 text-sm font-medium">10</a>
+    </div>
+
+</div>
+
+
+
+
+
+<!-- Full Page Overlay -->
+<div id="previewOverlay"
+     class="fixed inset-0 z-50 bg-gray-950/50 text-gray-100 border border-gray-800/50 hidden flex flex-col transition-all duration-300">
+
+    <!-- Fixed Top Bar -->
+    <div class="fixed top-0 left-0 w-full z-20 bg-gray-900/90 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-6 py-4">
+        <h2 class="text-lg font-semibold tracking-wide">Preview: Media Title</h2>
+        <button id="closeOverlayBtn"
+                class="text-gray-400 hover:text-gray-200 transition">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                 stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+    </div>
+
+    <!-- Scrollable Content Area -->
+    <div id="overlayContent"
+         class="flex-1 overflow-y-auto pt-[72px] pb-10 flex justify-center"
+         onclick="closeOverlay(event)">
+        <div class="relative bg-gray-900/90 rounded-lg shadow-xl w-[90%] max-w-5xl mt-6 mb-16 p-8 animate-slideIn"
+             onclick="event.stopPropagation();">
+
+            <!-- Media Preview -->
+            <div class="w-full rounded-lg overflow-hidden shadow-lg bg-gray-800 aspect-video flex items-center justify-center">
+                <p class="text-gray-400 text-sm">Your media preview goes here (video, image, etc.)</p>
+            </div>
+
+            <!-- Description -->
+            <div class="mt-8 space-y-4">
+                <h3 class="text-xl font-semibold border-b border-gray-700 pb-2">Description</h3>
+                <p class="text-gray-300 leading-relaxed text-sm">
+                    This overlay behaves like a full page — scrollable with a fixed header on top.
+                    The dark glassy background still shows a bit of the page behind it.
+                    Clicking outside this content area will close the overlay.
+                </p>
+            </div>
+
+            <!-- Example extra content to test scrolling -->
+            <div class="mt-8 space-y-2">
+                <h3 class="text-lg font-semibold border-b border-gray-700 pb-1">More Details</h3>
+                <p class="text-sm text-gray-400">
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed in tempor mi, in pulvinar justo.
+                    Phasellus tincidunt, lectus nec porta viverra, libero nulla sollicitudin enim, ut finibus enim justo vitae sapien.
+                    Cras id augue ut massa placerat efficitur sed nec sapien. Integer pulvinar erat non mi vulputate, ut eleifend orci
+                    volutpat. Nunc efficitur justo quis nunc facilisis, a aliquam massa feugiat. Donec laoreet tellus vitae nunc ornare,
+                    at elementum lectus gravida.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Example Trigger -->
+<button onclick="openOverlay()"
+        class="mt-10 mx-auto block px-5 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-md text-white font-medium">
+    Open Preview
+</button>
+
+<script>
+    const overlay = document.getElementById('previewOverlay');
+    const closeBtn = document.getElementById('closeOverlayBtn');
+    const body = document.body;
+
+    function openOverlay() {
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+        body.style.overflow = 'hidden'; // disable background scroll
+    }
+
+    function closeOverlay(e) {
+        // close only if clicked outside main content
+        if (e.target === e.currentTarget || e.target === overlay) {
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+            body.style.overflow = ''; // re-enable background scroll
+        }
+    }
+
+    closeBtn.addEventListener('click', () => {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+        body.style.overflow = '';
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !overlay.classList.contains('hidden')) {
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+            body.style.overflow = '';
+        }
+    });
+</script>
+
+<style>
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateY(1rem); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-slideIn {
+        animation: slideIn 0.35s ease-out;
+    }
+</style>
+
+
+
+
+
+
+
+
+</body>
+</html>
