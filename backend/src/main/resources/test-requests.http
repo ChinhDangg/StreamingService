@@ -10,7 +10,7 @@ Content-Type: application/json
   "includeFields": [
     {
       "field": "universes",
-      "values": ["Genshin Impact"],
+      "values": [""],
       "mustAll": false
     }
   ],
@@ -32,7 +32,7 @@ Content-Type: application/json
 ###
 # @no-log
 POST http://localhost/api/search?
-    searchString=Nier Automata&
+    searchString=&
     page=0&
     sortBy=YEAR&
     sortOrder=DESC
@@ -47,7 +47,7 @@ Content-Type: application/json
 
 {
   "field": "universes",
-  "text": ["Genshin Impact"]
+  "text": [""]
 }
 
 ###
@@ -60,7 +60,7 @@ Content-Type: application/json
 
 {
   "field": "universes",
-  "text": "Genshin Impact"
+  "text": ""
 }
 
 ###
@@ -73,7 +73,7 @@ GET http://localhost/api/videos/preview/1
 
 ###
 # @no-log
-GET http://localhost/api/videos/partial/1/p360
+GET http://localhost/api/videos/partial/1/p720
 
 ###
 # @no-log
@@ -98,7 +98,3 @@ GET http://localhost/api/album/resize/2?res=p1080&key=0_1080.jpg
 ###
 # @no-log
 GET http://localhost/api/album/original/2?res=p1080&key=0_1080.jpg
-
-###
-# @no-log
-GET http://localhost/internal/watchers
