@@ -1,11 +1,13 @@
 package dev.chinh.streamingservice.search.controller;
 
+import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.search.constant.SortBy;
 import dev.chinh.streamingservice.search.data.MediaSearchRequest;
 import dev.chinh.streamingservice.search.data.MediaSearchResult;
 import dev.chinh.streamingservice.search.service.MediaSearchService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.search.sort.SortOrder;
@@ -13,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -60,6 +63,33 @@ public class SearchController {
                                                            @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
         return ResponseEntity.ok().body(
                 mediaSearchService.searchByKeywords(searchRequest.field,  searchRequest.text, page, pageSize, sortBy, sortOrder));
+    }
+
+    @PostMapping("/universes")
+    public ResponseEntity<MediaSearchResult> universesSearch(@Valid @NotEmpty List<String> universes,
+                                                           @RequestParam(required = false) int page,
+                                                           @RequestParam(required = false) SortBy sortBy,
+                                                           @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
+        return ResponseEntity.ok().body(
+                mediaSearchService.searchByKeywords(ContentMetaData.UNIVERSES, Collections.singleton(universes), page, pageSize, sortBy, sortOrder));
+    }
+
+    @PostMapping("/characters")
+    public ResponseEntity<MediaSearchResult> charactersSearch(@Valid @NotEmpty List<String> characters,
+                                                             @RequestParam(required = false) int page,
+                                                             @RequestParam(required = false) SortBy sortBy,
+                                                             @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
+        return ResponseEntity.ok().body(
+                mediaSearchService.searchByKeywords(ContentMetaData.CHARACTERS, Collections.singleton(characters), page, pageSize, sortBy, sortOrder));
+    }
+
+    @PostMapping("/tags")
+    public ResponseEntity<MediaSearchResult> tagsSearch(@Valid @NotEmpty List<String> tags,
+                                                              @RequestParam(required = false) int page,
+                                                              @RequestParam(required = false) SortBy sortBy,
+                                                              @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
+        return ResponseEntity.ok().body(
+                mediaSearchService.searchByKeywords(ContentMetaData.TAGS, Collections.singleton(tags), page, pageSize, sortBy, sortOrder));
     }
 
     @PostMapping("/match")
