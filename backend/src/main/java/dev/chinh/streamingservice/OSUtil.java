@@ -27,9 +27,7 @@ public class OSUtil {
     public OSUtil() throws Exception {
         currentOS = detectOS();
         RAMDISK = getRAMDISKName();
-        if (!OSUtil.createRamDisk()) {
-            throw new Exception("Fail to create RAM DISK");
-        }
+        OSUtil.createRamDisk();
     }
 
     public static OS detectOS() {
@@ -61,10 +59,15 @@ public class OSUtil {
         throw new RuntimeException("Unsupported OS: " + currentOS);
     }
 
-    public static boolean createRamDisk() throws Exception {
+    public static void createRamDisk() throws Exception {
         if (Files.exists(Paths.get(RAMDISK))) {
             System.out.println("Ramdisk already exists");
-            return true;
+            return;
+        }
+
+        if (currentOS == OS.WINDOWS) {
+            // skipping windows ramdisk as can't be mounted as volume
+            return;
         }
 
         String[] command = switch (currentOS) {
@@ -83,20 +86,13 @@ public class OSUtil {
             default -> throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
         };
 
-        ProcessBuilder pb = new ProcessBuilder(command);
-        pb.redirectErrorStream(true);
-        Process process = pb.start();
-
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                System.out.println("[ramdisk] " + line);
-            }
+        try {
+            runCommandAndLog(command, null);
+        } catch (Exception e) {
+            throw new Exception("Fail to create RAM DISK");
         }
 
-        int exitCode = process.waitFor();
-        System.out.println("RAMDisk creation finished with exit code: " + exitCode);
-        return exitCode == 0;
+        System.out.println("RAMDisk creation finished");
     }
 
     public static void startDockerCompose() throws IOException, InterruptedException {
