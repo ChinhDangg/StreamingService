@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.content.controller;
+package dev.chinh.streamingservice;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
