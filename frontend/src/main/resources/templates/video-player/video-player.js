@@ -1,0 +1,281 @@
+lucide.createIcons();
+
+const video = document.getElementById('video');
+const container = document.getElementById('videoContainer');
+const controls = document.getElementById('controls');
+const playPauseBtn = document.getElementById('playPause');
+const seekSlider = document.getElementById('seekSlider');
+const currentTimeEl = document.getElementById('currentTime');
+const totalTimeEl = document.getElementById('totalTime');
+const muteBtn = document.getElementById('muteBtn');
+const volumeSlider = document.getElementById('volumeSlider');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const speedButton = document.getElementById('speedButton');
+const speedMenu = document.getElementById('speedMenu');
+const resButton = document.getElementById('resButton');
+const resMenu = document.getElementById('resMenu');
+
+const playlistUrl = "p720/master.m3u8";
+
+video.pause();
+video.removeAttribute('src');
+video.load(); // force media element reset
+
+if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = playlistUrl + '?_=' + Date.now(); // cache-buster
+} else if (Hls.isSupported()) {
+    const hls = new Hls({ startPosition: 0 });
+    hls.loadSource(playlistUrl + '?_=' + Date.now());
+    hls.attachMedia(video);
+}
+
+const formatTime = s => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
+
+// --- Play / Pause ---
+const togglePlay = () => video.paused ? video.play() : video.pause();
+playPauseBtn.addEventListener('click', togglePlay);
+
+video.addEventListener('play', () => {
+    playPauseBtn.innerHTML = '<i data-lucide="pause" class="w-5 h-5"></i>';
+    lucide.createIcons();
+});
+video.addEventListener('pause', () => {
+    playPauseBtn.innerHTML = '<i data-lucide="play" class="w-5 h-5"></i>';
+    lucide.createIcons();
+});
+
+// --- Time + Slider ---
+let isSeeking = false;
+const updateSliderColor = val => {
+    seekSlider.style.background = `linear-gradient(to right, #a855f7 0%, #a855f7 ${val}%, rgba(255,255,255,0.25) ${val}%, rgba(255,255,255,0.25) 100%)`;
+};
+
+video.addEventListener('timeupdate', () => {
+    if (!isSeeking && video.duration) {
+        const val = (video.currentTime / video.duration) * 100;
+        seekSlider.value = val;
+        updateSliderColor(val);
+    }
+    currentTimeEl.textContent = formatTime(video.currentTime);
+});
+video.addEventListener('loadedmetadata', () => {
+    totalTimeEl.textContent = formatTime(video.duration);
+}, { once: true });
+
+seekSlider.addEventListener('input', e => {
+    isSeeking = true;
+    const val = e.target.value;
+    updateSliderColor(val);
+    video.currentTime = (val / 100) * video.duration;
+});
+seekSlider.addEventListener('change', () => isSeeking = false);
+
+// --- Volume ---
+volumeSlider.addEventListener('input', () => {
+    video.volume = volumeSlider.value;
+    video.muted = video.volume === 0;
+    updateVolumeIcon();
+});
+muteBtn.addEventListener('click', () => {
+    video.muted = !video.muted;
+    if (!video.muted && video.volume === 0) video.volume = 0.5;
+    volumeSlider.value = video.muted ? 0 : video.volume;
+    updateVolumeIcon();
+});
+function updateVolumeIcon() {
+    let icon = 'volume-2';
+    if (video.muted || video.volume === 0) icon = 'volume-x';
+    else if (video.volume < 0.5) icon = 'volume-1';
+    muteBtn.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5"></i>`;
+    lucide.createIcons();
+}
+
+// --- Speed Menu ---
+speedButton.addEventListener('click', () => {
+    speedMenu.classList.toggle('hidden');
+    resMenu.classList.add('hidden');
+});
+speedMenu.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const rate = parseFloat(btn.dataset.speed);
+        video.playbackRate = rate;
+        speedButton.textContent = `${rate}x`;
+        speedMenu.classList.add('hidden');
+    });
+});
+
+// --- Resolution Menu (UI only) ---
+resButton.addEventListener('click', () => {
+    resMenu.classList.toggle('hidden');
+    speedMenu.classList.add('hidden');
+});
+resMenu.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const res = btn.dataset.res;
+        resButton.textContent = res;
+        resMenu.classList.add('hidden');
+        console.log('Change resolution to', res);
+    });
+});
+
+// --- Fullscreen ---
+fullscreenBtn.addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+        container.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
+});
+document.addEventListener('fullscreenchange', () => {
+    const icon = document.fullscreenElement ? 'minimize' : 'maximize';
+    fullscreenBtn.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5"></i>`;
+    lucide.createIcons();
+
+    // Reset visibility when leaving fullscreen
+    if (!document.fullscreenElement) showControls();
+});
+
+// --- Auto-hide Controls (all screen sizes) ---
+let hideTimer;
+const showControls = () => {
+    controls.style.opacity = '1';
+    controls.style.pointerEvents = 'auto';
+};
+const hideControls = () => {
+    controls.style.opacity = '0';
+    controls.style.pointerEvents = 'none';
+
+    resMenu.classList.add('hidden');
+    speedMenu.classList.add('hidden');
+};
+const resetHideTimer = () => {
+    showControls();
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(hideControls, 3000);
+};
+
+// desktop
+container.addEventListener('mousemove', resetHideTimer);
+container.addEventListener('mouseleave', hideControls);
+container.addEventListener('mouseenter', showControls);
+
+// --- Unified Skip Controls ---
+const SKIP_SECONDS = 5;
+function replay() {
+    video.currentTime = Math.max(video.currentTime - SKIP_SECONDS, 0);
+}
+function skip() {
+    video.currentTime = Math.min(video.currentTime + SKIP_SECONDS, video.duration);
+}
+
+let lastClickTime = 0;
+let lastTouchTime = 0;
+const DOUBLE_TAP_THRESHOLD = 250; // ms
+let singleTapTimer = null;
+let skipTimeTotalTimer = null;
+let skipTimeTotal = 0;
+let replayTimeTotalTimer = null;
+let replayTimeTotal = 0;
+
+function handleClickOrTap(clientX, time, isTouch) {
+    const now = time;
+    const lastTime = isTouch ? lastTouchTime : lastClickTime;
+    const isDouble = now - lastTime < DOUBLE_TAP_THRESHOLD;
+
+    if (isTouch) lastTouchTime = now;
+    else lastClickTime = now;
+
+    if (isDouble) {
+        clearTimeout(singleTapTimer);
+        handleDouble(clientX);
+    } else {
+        // Delay single tap a bit to check if second comes
+        singleTapTimer = setTimeout(() => {
+            togglePlay();
+        }, DOUBLE_TAP_THRESHOLD + 30);
+    }
+}
+
+function handleDouble(clientX) {
+    const rect = container.getBoundingClientRect();
+    const relativeX = clientX - rect.left;
+
+
+    if (relativeX < rect.width / 2) {
+        clearInterval(replayTimeTotalTimer);
+        replay();
+        replayTimeTotal -= SKIP_SECONDS;
+        showFeedback("⏪ " + replayTimeTotal + "s");
+        replayTimeTotalTimer = setTimeout(() => {
+            replayTimeTotal = 0;
+        }, 500);
+    } else {
+        clearInterval(skipTimeTotalTimer);
+        skip();
+        skipTimeTotal += SKIP_SECONDS;
+        showFeedback("⏩ " + skipTimeTotal + "s");
+        skipTimeTotalTimer = setTimeout(() => {
+            skipTimeTotal = 0;
+        }, 500);
+    }
+}
+
+video.addEventListener('click', e => {
+    handleClickOrTap(e.clientX, e.timeStamp, false);
+});
+
+// Mobile touch support
+video.addEventListener('touchstart', (e) => {
+    showControls();
+    resetHideTimer();
+});
+video.addEventListener('touchend', () => {
+    resetHideTimer();
+    const touch = e.changedTouches[0];
+    handleClickOrTap(touch.clientX, e.timeStamp, true);
+});
+
+container.addEventListener('keydown', e => {
+    // Avoid interfering with form inputs or system shortcuts
+    if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+
+    switch (e.key.toLowerCase()) {
+        case 'arrowleft':
+            e.preventDefault();
+            replay(); // reuse unified function
+            showFeedback("⏪ 5s");
+            break;
+
+        case 'arrowright':
+            e.preventDefault();
+            skip(); // reuse unified function
+            showFeedback("⏩ 5s");
+            break;
+
+        case ' ': // Space
+        case 'k':
+            e.preventDefault();
+            togglePlay(); // same play/pause toggle
+            break;
+
+        default:
+            break;
+    }
+});
+
+// --- visual feedback overlay (like YouTube pulse) ---
+const feedbackEl = document.createElement("div");
+feedbackEl.className = "absolute inset-0 flex items-center justify-center text-white text-3xl font-semibold opacity-0 select-none pointer-events-none transition-opacity duration-300";
+container.appendChild(feedbackEl);
+
+function showFeedback(text) {
+    feedbackEl.textContent = text;
+    feedbackEl.style.opacity = "1";
+    clearTimeout(feedbackEl._timer);
+    feedbackEl._timer = setTimeout(() => {
+        feedbackEl.style.opacity = "0";
+    }, 400);
+}
+
+// Start timer immediately
+resetHideTimer();
