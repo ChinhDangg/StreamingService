@@ -8,8 +8,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @RequestMapping("/page")
 public class FrontEndController {
 
-    @GetMapping("/test")
-    public String index(){
-        return "test";
+    @GetMapping("/search")
+    public String searchPage(){
+        return "video-player/search-result-test2";
     }
 }
