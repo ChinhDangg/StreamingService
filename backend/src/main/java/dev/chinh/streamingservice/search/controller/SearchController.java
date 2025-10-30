@@ -66,7 +66,7 @@ public class SearchController {
     }
 
     @PostMapping("/universes")
-    public ResponseEntity<MediaSearchResult> universesSearch(@Valid @NotEmpty List<String> universes,
+    public ResponseEntity<MediaSearchResult> universesSearch(@RequestParam List<String> universes,
                                                            @RequestParam(required = false) int page,
                                                            @RequestParam(required = false) SortBy sortBy,
                                                            @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
@@ -75,7 +75,7 @@ public class SearchController {
     }
 
     @PostMapping("/characters")
-    public ResponseEntity<MediaSearchResult> charactersSearch(@Valid @NotEmpty List<String> characters,
+    public ResponseEntity<MediaSearchResult> charactersSearch(@RequestParam List<String> characters,
                                                              @RequestParam(required = false) int page,
                                                              @RequestParam(required = false) SortBy sortBy,
                                                              @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
@@ -84,7 +84,7 @@ public class SearchController {
     }
 
     @PostMapping("/tags")
-    public ResponseEntity<MediaSearchResult> tagsSearch(@Valid @NotEmpty List<String> tags,
+    public ResponseEntity<MediaSearchResult> tagsSearch(@RequestParam List<String> tags,
                                                               @RequestParam(required = false) int page,
                                                               @RequestParam(required = false) SortBy sortBy,
                                                               @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
