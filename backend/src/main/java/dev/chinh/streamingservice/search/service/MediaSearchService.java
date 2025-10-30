@@ -1,6 +1,8 @@
 package dev.chinh.streamingservice.search.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.chinh.streamingservice.MediaMapper;
+import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.content.service.AlbumService;
 import dev.chinh.streamingservice.data.ContentMetaData;
@@ -29,6 +31,7 @@ public class MediaSearchService {
     private final OpenSearchService openSearchService;
     private final ObjectMapper mapper;
     private final AlbumService albumService;
+    private final MediaMapper mediaMapper;
 
     public static final Resolution thumbnailResolution = Resolution.p480;
 
@@ -183,10 +186,12 @@ public class MediaSearchService {
         List<MediaSearchItem> items = new ArrayList<>();
         List<MediaSearchItemResponse> itemResponses = new ArrayList<>();
         for (SearchHit hit : response.getHits()) {
-            items.add(mapper.convertValue(hit.getSourceAsMap(), MediaSearchItem.class));
-            MediaSearchItemResponse itemResponse = mapper.convertValue(hit.getSourceAsMap(), MediaSearchItemResponse.class);
-            itemResponse.setThumbnail(itemResponse.getThumbnail() == null ? null : getThumbnailPath(
-                    itemResponse.getId(), thumbnailResolution, itemResponse.getThumbnail()));
+            MediaSearchItem searchItem = mediaMapper.map(hit.getSourceAsMap());
+            items.add(searchItem);
+            MediaSearchItemResponse itemResponse = mediaMapper.map(searchItem);
+            itemResponse.setThumbnail(searchItem.hasThumbnail() ? getThumbnailPath(
+                    itemResponse.getId(), thumbnailResolution, itemResponse.getThumbnail()) : null);
+            itemResponse.setMediaType(searchItem.hasKey() ? MediaType.VIDEO : MediaType.IMAGE);
             itemResponses.add(itemResponse);
         }
 
