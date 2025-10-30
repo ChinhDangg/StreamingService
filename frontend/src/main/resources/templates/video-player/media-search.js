@@ -150,7 +150,7 @@ function displaySearchResults(results, searchType, sortBy, sortOrder,
         searchString, keywordField, keywordValueList, advanceRequestBody);
 }
 
-function displaySearchItems() {
+function displaySearchItems(searchItems) {
 
 }
 
@@ -158,12 +158,14 @@ function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
                            searchString = null,
                            keywordField = null, keywordValueList = null,
                            advanceRequestBody = null) {
+    const paginationTop = document.getElementById('pagination-node-top');
+    const pageNodeBottom = document.getElementById('pagination-node-bottom');
+
     if (page === 0 && page === totalPages) {
-        document.getElementById('pagination-node').classList.add('hidden');
+        paginationTop.classList.add('hidden');
+        paginationTop.classList.add('hidden');
         return;
     }
-
-    const pageNodeBottom = document.getElementById('pagination-node-bottom');
 
     const pageContainer = pageNodeBottom.querySelector('.page-container');
     const pageLinkNodeTem = pageContainer.querySelector('.page-link-node');
@@ -256,8 +258,9 @@ function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
             break;
     }
 
+    paginationTop.innerHTML = '';
     const paginationNodeDup = helperCloneAndUnHideNode(pageNodeBottom.firstElementChild);
-    document.getElementById('pagination-node-top').appendChild(paginationNodeDup);
+    paginationTop.appendChild(paginationNodeDup);
 }
 
 async function pageClickHandler(e, page,
