@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Search Page</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen p-6">
 
@@ -25,7 +27,7 @@
 </div>
 
 <!-- Grid -->
-<main class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0">
+<main id="main-item-container" class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0">
 
     <!-- Horizontal (16:9) -->
     <article class="bg-gray-800 flex flex-col border border-gray-900">
@@ -41,8 +43,6 @@
 <!--                </span>-->
 <!--            </div>-->
 
-            <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-            <script src="https://unpkg.com/lucide@latest"></script>
             <div id="videoContainer" tabindex="0" class="relative aspect-video bg-black flex items-center justify-center overflow-hidden select-none">
                 <video id="video" class="w-full h-full bg-black cursor-pointer" disablePictureInPicture controlsList="nodownload nofullscreen noremoteplayback"></video>
             </div>
@@ -58,54 +58,55 @@
         </div>
     </article>
 
+</main>
+
+<div id="search-item-container">
     <!-- Horizontal -->
-    <article class="bg-gray-800 flex flex-col border border-gray-900">
+    <article class="horizontal-item hidden bg-gray-800 flex flex-col border border-gray-900">
         <div class="relative w-full aspect-[16/9] bg-gray-700 overflow-hidden">
-            <div>
+            <div class="image-container">
                 <img src="https://placehold.co/1600x900" alt="Horizontal"
-                     class="w-full h-full object-contain" />
-                <span class="absolute bottom-1 left-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
-                0:58
-            </span>
-                <span class="absolute bottom-1 right-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
-                1280×720
-            </span>
+                     class="thumbnail-image w-full h-full object-contain" />
+                <span class="time-note absolute bottom-1 left-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+                    0:58
+                </span>
+                <span class="resolution-note absolute bottom-1 right-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+                    1280×720
+                </span>
             </div>
         </div>
         <div class="p-3">
-            <h2 class="text-sm font-medium truncate">Another Horizontal Example</h2>
+            <h2 class="media-title text-sm font-medium truncate">Another Horizontal Example</h2>
             <div class="flex justify-between text-xs text-gray-400">
-                <span class="truncate">Oct 26, 2025</span>
-                <span class="truncate">John Doe</span>
+                <span class="date-note truncate">Oct 26, 2025</span>
+                <span class="name-note truncate">John Doe</span>
             </div>
         </div>
     </article>
 
     <!-- Vertical -->
-    <article class="bg-gray-800 flex flex-col border border-gray-900 row-span-2">
+    <article class="vertical-item hidden bg-gray-800 flex flex-col border border-gray-900 row-span-2">
         <div class="relative w-full aspect-[2/3] bg-gray-700 overflow-hidden flex justify-center items-center">
-            <div>
+            <div class="image-container">
                 <img src="https://placehold.co/600x900" alt="Vertical"
-                     class="w-full h-full object-contain" />
-                <span class="absolute bottom-1 left-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
-                5:07
-            </span>
-                <span class="absolute bottom-1 right-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
-                1440×2560
-            </span>
+                     class="thumbnail-image w-full h-full object-contain" />
+                <span class="time-note absolute bottom-1 left-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+                    5:07
+                </span>
+                <span class="resolution-note absolute bottom-1 right-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">
+                    1440×2560
+                </span>
             </div>
         </div>
         <div class="p-3">
-            <h2 class="text-sm font-medium truncate">Another Vertical Example</h2>
+            <h2 class="media-title text-sm font-medium truncate">Another Vertical Example</h2>
             <div class="flex justify-between text-xs text-gray-400">
-                <span class="truncate">Oct 26, 2025</span>
-                <span class="truncate">John Doe</span>
+                <span class="date-note truncate">Oct 26, 2025</span>
+                <span class="name-note truncate">John Doe</span>
             </div>
         </div>
     </article>
-
-
-</main>
+</div>
 
 
 <!-- Pagination Node -->

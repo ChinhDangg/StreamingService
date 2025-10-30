@@ -127,6 +127,11 @@ function displaySearchResults(results, searchType, sortBy, sortOrder,
                 "title": "Test Video Sample 1",
                 "thumbnail": "/thumbnail-cache/p480/2_p480.jpg",
                 "uploadDate": "2025-10-28",
+                "authors" : [
+                    "Jane Doe",
+                    "John Doe",
+                ],
+                "mediaType": "VIDEO",
                 "length": 657,
                 "width": 1920,
                 "height": 1080
@@ -136,6 +141,10 @@ function displaySearchResults(results, searchType, sortBy, sortOrder,
                 "title": "Test Album",
                 "thumbnail": "/thumbnail-cache/p480/2_p480.jpg",
                 "uploadDate": "2025-10-28",
+                "authors": [
+                    "Jane Doe"
+                ],
+                "mediaType": "IMAGE",
                 "length": 81,
                 "width": 1080,
                 "height": 1920
@@ -148,10 +157,39 @@ function displaySearchResults(results, searchType, sortBy, sortOrder,
     }
     displayPagination(results.page, results.totalPages, searchType, sortBy, sortOrder,
         searchString, keywordField, keywordValueList, advanceRequestBody);
+
+    displaySearchItems(results.searchItems);
+}
+
+function formatTime(s) {
+    return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 }
 
 function displaySearchItems(searchItems) {
+    const mainItemContainer = document.getElementById('main-item-container');
+    if (searchItems.length === 0) {
+        mainItemContainer.innerHTML = 'No results found.';
+        return;
+    }
+    const searchItemsContainer = document.getElementById('search-item-container');
+    const horizontalItemTem = searchItemsContainer.querySelector('.horizontal-item');
+    const verticalItemTem = searchItemsContainer.querySelector('.vertical-item');
 
+    searchItems.forEach(item => {
+        const itemContainer = (item.width >= item.height) ? helperCloneAndUnHideNode(horizontalItemTem)
+                                        : helperCloneAndUnHideNode(verticalItemTem);
+        itemContainer.querySelector('.thumbnail-image').src = item.thumbnail;
+        if (item.mediaType === 'VIDEO')
+            itemContainer.querySelector('.time-note').textContent = formatTime(item.length);
+        else
+            itemContainer.querySelector('.time-note').remove();
+        itemContainer.querySelector('.resolution-note').textContent = `${item.width}x${item.height}`;
+        itemContainer.querySelector('.media-title').textContent = item.title;
+        itemContainer.querySelector('.date-note').textContent = item.uploadDate;
+        itemContainer.querySelector('.name-note').textContent = item.authors.join(", ");
+
+        mainItemContainer.appendChild(itemContainer);
+    });
 }
 
 function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
@@ -163,7 +201,9 @@ function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
 
     if (page === 0 && page === totalPages) {
         paginationTop.classList.add('hidden');
-        paginationTop.classList.add('hidden');
+        paginationTop.innerHTML = '';
+        pageNodeBottom.classList.add('hidden');
+        pageNodeBottom.innerHTML = '';
         return;
     }
 
