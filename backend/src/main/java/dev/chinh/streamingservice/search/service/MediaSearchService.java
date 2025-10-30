@@ -186,11 +186,11 @@ public class MediaSearchService {
         List<MediaSearchItem> items = new ArrayList<>();
         List<MediaSearchItemResponse> itemResponses = new ArrayList<>();
         for (SearchHit hit : response.getHits()) {
-            MediaSearchItem searchItem = mediaMapper.map(hit.getSourceAsMap());
+            MediaSearchItem searchItem = mapper.convertValue(hit.getSourceAsMap(),  MediaSearchItem.class);
             items.add(searchItem);
             MediaSearchItemResponse itemResponse = mediaMapper.map(searchItem);
             itemResponse.setThumbnail(searchItem.hasThumbnail() ? getThumbnailPath(
-                    itemResponse.getId(), thumbnailResolution, itemResponse.getThumbnail()) : null);
+                    searchItem.getId(), thumbnailResolution, searchItem.getThumbnail()) : null);
             itemResponse.setMediaType(searchItem.hasKey() ? MediaType.VIDEO : MediaType.IMAGE);
             itemResponses.add(itemResponse);
         }
