@@ -2,10 +2,12 @@ package dev.chinh.streamingservice.search.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.data.ContentMetaData;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Setter
@@ -23,6 +25,9 @@ public class MediaSearchItemResponse {
     private String thumbnail;
     @JsonProperty(ContentMetaData.UPLOAD_DATE)
     private LocalDate uploadDate;
+    @JsonProperty(ContentMetaData.AUTHORS)
+    private List<String> authors;
+    private MediaType mediaType;
     @JsonProperty(ContentMetaData.LENGTH)
     private Integer length;
     @JsonProperty(ContentMetaData.WIDTH)
