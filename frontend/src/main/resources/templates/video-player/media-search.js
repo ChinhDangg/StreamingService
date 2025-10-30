@@ -158,17 +158,19 @@ function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
                            searchString = null,
                            keywordField = null, keywordValueList = null,
                            advanceRequestBody = null) {
-    const pageContainer = document.getElementById('page-container');
-    const pageLinkNodeTem = pageContainer.querySelector('.page-link-node');
-    const pageNumContainer = document.getElementById('page-num-container');
-
     if (page === 0 && page === totalPages) {
         document.getElementById('pagination-node').classList.add('hidden');
         return;
     }
 
-    const leftControl = document.getElementById('page-left-control');
-    const rightControl = document.getElementById('page-right-control');
+    const pageNodeBottom = document.getElementById('pagination-node-bottom');
+
+    const pageContainer = pageNodeBottom.querySelector('.page-container');
+    const pageLinkNodeTem = pageContainer.querySelector('.page-link-node');
+    const pageNumContainer = pageNodeBottom.querySelector('.page-num-container');
+
+    const leftControl = pageNodeBottom.querySelector('.page-left-control');
+    const rightControl = pageNodeBottom.querySelector('.page-right-control');
     const goFirstControl = leftControl.querySelector('.page-first-control');
     const goLastControl = rightControl.querySelector('.page-last-control');
 
@@ -253,6 +255,9 @@ function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
         if (reachedMax)
             break;
     }
+
+    const paginationNodeDup = helperCloneAndUnHideNode(pageNodeBottom.firstElementChild);
+    document.getElementById('pagination-node-top').appendChild(paginationNodeDup);
 }
 
 async function pageClickHandler(e, page,
