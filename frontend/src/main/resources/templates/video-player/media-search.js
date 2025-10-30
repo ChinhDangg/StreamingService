@@ -1,14 +1,14 @@
 let page = 0;
-const sortBys = [
-    'UPLOAD-DATE',
-    'YEAR',
-    'LENGTH',
-    'SIZE'
-];
-const sortOrders = [
-    'ASC',
-    'DESC',
-];
+const SORT_BY = Object.freeze({
+    UPLOAD_DATE: 'UPLOAD_DATE',
+    YEAR: 'YEAR',
+    LENGTH: 'LENGTH',
+    SIZE: 'SIZE'
+});
+const SORT_ORDERS = Object.freeze({
+   ASC: 'ASC',
+   DESC: 'DESC',
+});
 let currentSortBy = 0;
 let currentSortOrder = 0;
 
@@ -41,51 +41,60 @@ function setAlertStatus(boldStatus, normalText) {
     }, 10000);
 }
 
-const SEARCH_TYPES = Object.freeze({
-    BASIC: 'search',
-    KEYWORD: 'keyword',
-    ADVANCE: 'advance'
-});
-
-const searchHandlers = {
-    [SEARCH_TYPES.BASIC]: async ({ searchString, page, sortBy, sortOrder }) =>
-        requestSearch(searchString, page, sortBy, sortOrder),
-
-    [SEARCH_TYPES.KEYWORD]: async ({ keywordField, keywordValueList, page, sortBy, sortOrder }) =>
-        requestKeywordSearch(keywordField, keywordValueList, page, sortBy, sortOrder),
-
-    [SEARCH_TYPES.ADVANCE]: async ({ requestBody, page, sortBy, sortOrder }) =>
-        requestAdvanceSearch(requestBody, page, sortBy, sortOrder)
-};
-
-async function sendSearchRequest(options) {
-    const { type } = options;
-    const handler = searchHandlers[type];
-    if (!handler) {
-        throw new Error(`Unknown search type: ${type}`);
-    }
-    return handler(options);
-}
-
-async function requestSearch(searchString, page, sortBy, sortOrder) {
-
-}
-
 const KEYWORDS = Object.freeze({
     UNIVERSE: 'universes',
     CHARACTER: 'characters',
     TAG: 'tags'
 });
 
+const SEARCH_TYPES = Object.freeze({
+    BASIC: 'search',
+    KEYWORD: 'keyword',
+    ADVANCE: 'advance'
+});
+
+async function sendSearchRequest(searchType, page, sortBy, sortOrder,
+                                 searchString = null,
+                                 keywordField = null, keywordValueList = null,
+                                 advanceRequestBody = null) {
+    switch (searchType) {
+        case SEARCH_TYPES.BASIC:
+            return requestSearch(searchString, page, sortBy, sortOrder);
+        case SEARCH_TYPES.KEYWORD:
+            return requestKeywordSearch(keywordField, keywordValueList, page, sortBy, sortOrder);
+        case SEARCH_TYPES.ADVANCE:
+            return requestAdvanceSearch(advanceRequestBody, page, sortBy, sortOrder);
+        default:
+            throw new Error('Unknown searchType');
+    }
+}
+
+async function requestSearch(searchString, page, sortBy, sortOrder) {
+
+}
+
 async function requestKeywordSearch(field, valueList, page, sortBy, sortOrder) {
 
 }
 
-async function requestAdvanceSearch(searchRequestBody, page, sortBy, sortOrder) {
+async function requestAdvanceSearch(advanceRequestBody, page, sortBy, sortOrder) {
 
 }
 
-function getSearchUrl(searchString, page, sortBy, sortOrder) {
+function getSearchUrl(searchType, page, sortBy, sortOrder,
+                      searchString = null,
+                      keywordField = null, keywordValueList = null) {
+    switch (searchType) {
+        case SEARCH_TYPES.BASIC:
+            return getBasicSearchUrl(searchString, page, sortBy, sortOrder);
+        case SEARCH_TYPES.KEYWORD:
+            return getKeywordSearchUrl(keywordField, keywordValueList, page, sortBy, sortOrder);
+        default:
+            return '/';
+    }
+}
+
+function getBasicSearchUrl(searchString, page, sortBy, sortOrder) {
     const queryParams = new URLSearchParams({
         searchString: searchString,
         page: page,
@@ -95,13 +104,28 @@ function getSearchUrl(searchString, page, sortBy, sortOrder) {
     return `http://localhost/api/search?${queryParams}`
 }
 
-function displaySearchResults(results) {
+function getKeywordSearchUrl(keywordField, valueList, page, sortBy, sortOrder) {
+    const queryParams = new URLSearchParams({
+        [keywordField]: valueList.join(','),
+        page: page,
+        sortBy: sortBy,
+        sortOrder: sortOrder
+    });
+    return `http://localhost/api/${keywordField}?${queryParams}`
+}
+
+displaySearchResults(null, SEARCH_TYPES.BASIC, SORT_BY.YEAR, SORT_ORDERS.DESC, "Genshin Impact");
+
+function displaySearchResults(results, searchType, sortBy, sortOrder,
+                              searchString,
+                              keywordField, keywordValueList,
+                              advanceRequestBody) {
     results = {
         "searchItems": [
             {
                 "id": 1,
                 "title": "Test Video Sample 1",
-                "thumbnail": null,
+                "thumbnail": "/thumbnail-cache/p480/2_p480.jpg",
                 "uploadDate": "2025-10-28",
                 "length": 657,
                 "width": 1920,
@@ -113,22 +137,27 @@ function displaySearchResults(results) {
                 "thumbnail": "/thumbnail-cache/p480/2_p480.jpg",
                 "uploadDate": "2025-10-28",
                 "length": 81,
-                "width": null,
-                "height": null
+                "width": 1080,
+                "height": 1920
             }
         ],
-        "page": 0,
+        "page": 15,
         "pageSize": 20,
-        "totalPages": 1,
+        "totalPages": 20,
         "total": 2
     }
+    displayPagination(results.page, results.totalPages, searchType, sortBy, sortOrder,
+        searchString, keywordField, keywordValueList, advanceRequestBody);
 }
 
 function displaySearchItems() {
 
 }
 
-function displayPagination(page, totalPages, searchString, sortBy, sortOrder) {
+function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
+                           searchString = null,
+                           keywordField = null, keywordValueList = null,
+                           advanceRequestBody = null) {
     const pageContainer = document.getElementById('page-container');
     const pageLinkNodeTem = pageContainer.querySelector('.page-link-node');
     const pageNumContainer = document.getElementById('page-num-container');
@@ -138,18 +167,105 @@ function displayPagination(page, totalPages, searchString, sortBy, sortOrder) {
         return;
     }
 
-    pageNumContainer.innerHTML = '';
-    for (let i = 0; i < totalPages; i++) {
-        const pageLinkNode = helperCloneAndVisibleNode(pageLinkNodeTem);
-        const page = i + 1;
-        pageLinkNode.innerText = page;
-        pageLinkNode.href = getSearchUrl(searchString, page, sortBy, sortOrder);
+    const leftControl = document.getElementById('page-left-control');
+    const rightControl = document.getElementById('page-right-control');
+    const goFirstControl = leftControl.querySelector('.page-first-control');
+    const goLastControl = rightControl.querySelector('.page-last-control');
 
+    if (page > 0) {
+        const prevControl = leftControl.querySelector('.page-prev-control');
+        prevControl.classList.remove('hidden');
+        const prevIndex = page - 1;
+        prevControl.href = getSearchUrl(searchType, prevIndex, sortBy, sortOrder, searchString, keywordField, keywordValueList);
+        prevControl.addEventListener("click", async (e) => {
+            await pageClickHandler(e, prevIndex, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+        });
+        const prevControlDup = helperCloneAndUnHideNode(prevControl);
+        prevControlDup.addEventListener("click", async (e) => {
+            await pageClickHandler(e, prevIndex, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+        });
+        rightControl.appendChild(prevControlDup);
+
+        goFirstControl.href = getSearchUrl(searchType, 0, sortBy, sortOrder, searchString, keywordField, keywordValueList);
+        goFirstControl.addEventListener("click", async (e) => {
+            await pageClickHandler(e, 0, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+        });
+    } else {
+        leftControl.querySelector('.page-prev-control').classList.add('hidden');
+        goFirstControl.classList.add('hidden');
     }
 
+    if (page < totalPages - 1) {
+        const nextControl = leftControl.querySelector('.page-next-control');
+        nextControl.classList.remove('hidden');
+        const nextIndex = page + 1;
+        nextControl.href = getSearchUrl(searchType, nextIndex, sortBy, sortOrder, searchString, keywordField, keywordValueList);
+        nextControl.addEventListener("click", async (e) => {
+            await pageClickHandler(e, nextIndex, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+        });
+        const nextControlDup = helperCloneAndUnHideNode(nextControl);
+        nextControlDup.addEventListener("click", async (e) => {
+            await pageClickHandler(e, nextIndex, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+        });
+        rightControl.appendChild(nextControlDup);
+
+        goLastControl.href = getSearchUrl(searchType, totalPages-1, sortBy, sortOrder, searchString, keywordField, keywordValueList);
+        goLastControl.addEventListener("click", async (e) => {
+            await pageClickHandler(e, totalPages-1, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+        });
+    } else {
+        leftControl.querySelector('.page-next-control').classList.add('hidden');
+        goLastControl.classList.add('hidden');
+    }
+
+    const start = Math.max(page - 2, 0);
+    const maxPageShow = start + 5;
+
+    pageNumContainer.innerHTML = '';
+    for (let i = start; i < totalPages; i++) {
+        let currentPage = i;
+
+        let reachedMax = false;
+        if (currentPage === maxPageShow) {
+            if (maxPageShow < totalPages - 1) {
+                const threeDots = helperCloneAndUnHideNode(pageContainer.querySelector('.page-dots'));
+                pageNumContainer.appendChild(threeDots);
+                currentPage = totalPages - 1;
+            }
+            reachedMax = true;
+        }
+
+        const pageLinkNode = (currentPage !== page) ? helperCloneAndUnHideNode(pageLinkNodeTem)
+                            : helperCloneAndUnHideNode(pageContainer.querySelector('.page-selected-link-node'));
+        pageLinkNode.innerText = currentPage + 1;
+        pageLinkNode.href = getSearchUrl(searchType, currentPage, sortBy, sortOrder, searchString, keywordField, keywordValueList);
+        if (currentPage === page) {
+            pageLinkNode.addEventListener('click', (e) => {
+                e.preventDefault();
+            });
+        } else {
+            pageLinkNode.addEventListener('click', async (e) => {
+                await pageClickHandler(e, currentPage, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+            });
+        }
+        pageNumContainer.appendChild(pageLinkNode);
+
+        if (reachedMax)
+            break;
+    }
 }
 
-function helperCloneAndVisibleNode(node) {
+async function pageClickHandler(e, page,
+                                searchType, sortBy, sortOrder,
+                                searchString = null,
+                                keywordField = null, keywordValueList = null,
+                                advanceRequestBody = null) {
+    e.preventDefault();
+    const result = await sendSearchRequest(searchType, page, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+    displaySearchResults(result, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+}
+
+function helperCloneAndUnHideNode(node) {
     const clone = node.cloneNode(true);
     clone.classList.remove('hidden');
     return clone;
