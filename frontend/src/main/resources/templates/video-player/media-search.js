@@ -179,6 +179,53 @@ function formatTime(s) {
     return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 }
 
+const videoContainer = document.getElementById('videoContainer-preivew');
+
+function displaySearchItems(searchItems) {
+    const mainItemContainer = document.getElementById('main-item-container');
+    if (searchItems.length === 0) {
+        mainItemContainer.innerHTML = 'No results found.';
+        return;
+    }
+    const searchItemsContainer = document.getElementById('search-item-container');
+    const horizontalItemTem = searchItemsContainer.querySelector('.horizontal-item');
+    const verticalItemTem = searchItemsContainer.querySelector('.vertical-item');
+
+    searchItems.forEach(item => {
+        const itemContainer = (item.width >= item.height) ? helperCloneAndUnHideNode(horizontalItemTem)
+                                        : helperCloneAndUnHideNode(verticalItemTem);
+        itemContainer.querySelector('.item-link').href = `/api/media/content-page/${item.id}`;
+        itemContainer.querySelector('.thumbnail-image').src = item.thumbnail;
+        itemContainer.querySelector('.resolution-note').textContent = `${item.width}x${item.height}`;
+        itemContainer.querySelector('.media-title').textContent = item.title;
+        itemContainer.querySelector('.date-note').textContent = item.uploadDate;
+        itemContainer.querySelector('.name-note').textContent = item.authors.join(", ");
+        if (item.mediaType === 'VIDEO') {
+            itemContainer.querySelector('.time-note').textContent = formatTime(item.length);
+            const thumbnailContainer = itemContainer.querySelector('.thumbnail-container');
+            const imageContainer = thumbnailContainer.querySelector('.image-container');
+            thumbnailContainer.addEventListener('mouseenter', async () => {
+                await requestVideoPreview(item.id, itemContainer);
+            });
+            thumbnailContainer.addEventListener('touchstart', async () => {
+                await requestVideoPreview(item.id, itemContainer);
+            });
+            thumbnailContainer.addEventListener('mouseleave', async () => {
+                videoContainer.classList.add('hidden');
+                imageContainer.classList.remove('hidden');
+            });
+            thumbnailContainer.addEventListener('touchend', async () => {
+                videoContainer.classList.add('hidden');
+                imageContainer.classList.remove('hidden');
+            });
+        }
+        else
+            itemContainer.querySelector('.time-note').remove();
+
+        mainItemContainer.appendChild(itemContainer);
+    });
+}
+
 function createLoader(container) {
     // Create overlay wrapper
     const loader = document.createElement("div");
@@ -238,52 +285,6 @@ function createLoader(container) {
     return loader;
 }
 
-const videoContainer = document.getElementById('videoContainer');
-
-function displaySearchItems(searchItems) {
-    const mainItemContainer = document.getElementById('main-item-container');
-    if (searchItems.length === 0) {
-        mainItemContainer.innerHTML = 'No results found.';
-        return;
-    }
-    const searchItemsContainer = document.getElementById('search-item-container');
-    const horizontalItemTem = searchItemsContainer.querySelector('.horizontal-item');
-    const verticalItemTem = searchItemsContainer.querySelector('.vertical-item');
-
-    searchItems.forEach(item => {
-        const itemContainer = (item.width >= item.height) ? helperCloneAndUnHideNode(horizontalItemTem)
-                                        : helperCloneAndUnHideNode(verticalItemTem);
-        itemContainer.querySelector('.thumbnail-image').src = item.thumbnail;
-        if (item.mediaType === 'VIDEO') {
-            itemContainer.querySelector('.time-note').textContent = formatTime(item.length);
-            const thumbnailContainer = itemContainer.querySelector('.thumbnail-container');
-            const imageContainer = thumbnailContainer.querySelector('.image-container');
-            thumbnailContainer.addEventListener('mouseenter', async () => {
-                await requestVideoPreview(item.id, itemContainer);
-            });
-            thumbnailContainer.addEventListener('touchstart', async () => {
-                await requestVideoPreview(item.id, itemContainer);
-            });
-            thumbnailContainer.addEventListener('mouseleave', async () => {
-                videoContainer.classList.add('hidden');
-                imageContainer.classList.remove('hidden');
-            });
-            thumbnailContainer.addEventListener('touchend', async () => {
-                videoContainer.classList.add('hidden');
-                imageContainer.classList.remove('hidden');
-            });
-        }
-        else
-            itemContainer.querySelector('.time-note').remove();
-        itemContainer.querySelector('.resolution-note').textContent = `${item.width}x${item.height}`;
-        itemContainer.querySelector('.media-title').textContent = item.title;
-        itemContainer.querySelector('.date-note').textContent = item.uploadDate;
-        itemContainer.querySelector('.name-note').textContent = item.authors.join(", ");
-
-        mainItemContainer.appendChild(itemContainer);
-    });
-}
-
 let previousPreviewVideoId = null;
 
 async function requestVideoPreview(videoId, itemNode) {
@@ -320,7 +321,7 @@ async function requestVideoPreview(videoId, itemNode) {
 
     playlistUrl = "p720/master.m3u8";
 
-    const video = document.getElementById('video');
+    const video = document.getElementById('video-preview');
 
     video.pause();
     video.removeAttribute('src');
@@ -349,6 +350,38 @@ async function requestVideoPreview(videoId, itemNode) {
         video.pause();
         video.currentTime = 0;
     });
+}
+
+async function quickViewContentInOverlay(mediaId) {
+    // const infoResponse = await fetch(`/api/media/content/${mediaId}`);
+    // if (!infoResponse.ok) {
+    //     setAlertStatus("Quick view info failed: ", infoResponse.statusText);
+    //     return;
+    // }
+    //
+    // const info = await infoResponse.json();
+
+    const info = {
+        "childMediaIds": null,
+        "id": 1,
+        "title": "Test Video Sample 1",
+        "thumbnail": null,
+        "tags": null,
+        "characters": null,
+        "universes": [
+            "Nier Automata"
+        ],
+        "authors": null,
+        "length": 657,
+        "size": 400111222,
+        "width": 1920,
+        "height": 1080,
+        "uploadDate": "2025-10-30",
+        "year": null
+    };
+
+    const quickViewOverlay = document.getElementById('quickViewOverlay');
+    quickViewOverlay.querySelector('.quick-view-title').textContent = info.title;
 }
 
 function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
