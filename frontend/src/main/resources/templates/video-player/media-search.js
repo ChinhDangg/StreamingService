@@ -179,15 +179,17 @@ function formatTime(s) {
     return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 }
 
-function getLoading() {
+function createLoader(container) {
+    // Create overlay wrapper
     const loader = document.createElement("div");
-    loader.id = "loader";
+    loader.className = "custom-loader-overlay";
     loader.innerHTML = `
-    <div class="spinner"></div>
-    <p>Loading...</p>
+    <div class="custom-loader-spinner"></div>
   `;
+
+    // Style: covers container but not entire page
     Object.assign(loader.style, {
-        position: "fixed",
+        position: "absolute",
         top: 0,
         left: 0,
         width: "100%",
@@ -196,26 +198,44 @@ function getLoading() {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        color: "white",
-        zIndex: 9999,
-        flexDirection: "column"
+        zIndex: 999,
+        borderRadius: "inherit",
     });
 
-    const spinner = document.createElement("div");
+    // Ensure container can hold absolutely positioned children
+    const computed = window.getComputedStyle(container);
+    if (computed.position === "static") {
+        container.style.position = "relative";
+    }
+
+    // Add the loader inside container
+    container.appendChild(loader);
+
+    // Spinner style
+    const spinner = loader.querySelector(".custom-loader-spinner");
     Object.assign(spinner.style, {
-        width: "50px",
-        height: "50px",
+        width: "48px",
+        height: "48px",
         border: "6px solid #fff",
         borderTopColor: "transparent",
         borderRadius: "50%",
-        animation: "spin 1s linear infinite"
+        animation: "spin 1s linear infinite",
     });
-    loader.querySelector(".spinner")?.appendChild(spinner);
-    return loader;
-}
 
-function hideLoading() {
-    document.getElementById("loader")?.remove();
+    // Add keyframes (only once)
+    if (!document.getElementById("custom-loader-style")) {
+        const style = document.createElement("style");
+        style.id = "custom-loader-style";
+        style.textContent = `
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    `;
+        document.head.appendChild(style);
+    }
+
+    // Return the loader so caller can remove it later
+    return loader;
 }
 
 const videoContainer = document.getElementById('videoContainer');
@@ -280,10 +300,11 @@ async function requestVideoPreview(videoId, itemNode) {
     if (!thumbnailContainer.contains(videoContainer))
         thumbnailContainer.appendChild(videoContainer);
 
+    const loader = createLoader(thumbnailContainer);
     let playlistUrl;
     try {
         // simulate a slow async call
-        thumbnailContainer.appendChild(getLoading());
+        thumbnailContainer.appendChild(loader);
         // const response = await fetch(`/api/videos/preview/${videoId}`);
         // if (!response.ok) {
         //     setAlertStatus('Preview Failed', response.statusText);
@@ -294,7 +315,7 @@ async function requestVideoPreview(videoId, itemNode) {
         console.error("Error:", err);
     } finally {
         // remove loading indicator
-        hideLoading();
+        loader.remove();
     }
 
     playlistUrl = "p720/master.m3u8";
