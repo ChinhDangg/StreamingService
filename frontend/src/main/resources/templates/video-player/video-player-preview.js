@@ -1,5 +1,4 @@
 const video = document.getElementById('video');
-const container = document.getElementById('videoContainer');
 
 const playlistUrl = "p720/master.m3u8";
 

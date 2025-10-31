@@ -27,7 +27,7 @@ public class StreamingServiceApplication {
         return args -> {
 //            Map<String, Object> document = new HashMap<>();
 //            document.put("title", "Test Video Sample 1");
-//            document.put("universes", List.of(""));
+//            document.put("universes", List.of("Nier Automata"));
 //            document.put("bucket", "3dvid");
 //            document.put("parentPath", "");
 //            document.put("key", "2b.mp4");
@@ -42,10 +42,10 @@ public class StreamingServiceApplication {
 
 //            Map<String, Object> document = new HashMap<>();
 //            document.put("title", "Test Album");
-//            document.put("universes", List.of(""));
+//            document.put("universes", List.of("Genshin Impact"));
 //            document.put("bucket", "cos");
-//            document.put("parentPath", "");
-              // document.put("thumbnail", "");
+//            document.put("parentPath", "aqua/Legion/Aqua水淼Clorinde");
+              // document.put("thumbnail", "aqua/Legion/Aqua水淼Clorinde/Aqua水淼 - Clorinde (78).jpg");
 //            document.put("uploadDate", LocalDate.now());
 //            document.put("year", 2025);
 //            document.put("length", 92);
@@ -54,7 +54,7 @@ public class StreamingServiceApplication {
 //            openSearchService.indexDocument(2, document);
 
             //openSearchService.partialUpdateDocument(1, Map.of("width", 3840, "height", 2160));
-            //openSearchService.partialUpdateDocument(2, Map.of("thumbnail", ""));
+            //openSearchService.partialUpdateDocument(2, Map.of("thumbnail", "aqua/Legion/Aqua水淼Clorinde/Aqua水淼 - Clorinde (78).jpg"));
             //openSearchService.createIndexWithMapping();
         };
     }
