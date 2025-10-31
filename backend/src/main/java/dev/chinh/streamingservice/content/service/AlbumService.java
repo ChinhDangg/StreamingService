@@ -234,8 +234,13 @@ public class AlbumService extends MediaService {
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8))) {
 
-            Path path = Paths.get(albumUrlInfo.mediaUrlList.getFirst().url.replaceFirst("/chunks", ""));
-            OSUtil.createTempDir(path.getParent().toString().replace("\\", "/"));
+            String path = albumUrlInfo.mediaUrlList.stream()
+                    .filter(m -> m.type == MediaType.IMAGE)
+                    .findFirst()
+                    .orElse(albumUrlInfo.mediaUrlList.getFirst())
+                    .url
+                    .replaceFirst("/chunks", "");
+            OSUtil.createTempDir(path.substring(0, path.lastIndexOf("/")));
 
             String scale = getFfmpegScaleString(albumUrlInfo.resolution, true);
             for (int i = offset; i < stop; i++) {
