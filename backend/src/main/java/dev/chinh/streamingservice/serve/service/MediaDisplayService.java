@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.serve.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.chinh.streamingservice.MediaMapper;
 import dev.chinh.streamingservice.content.service.AlbumService;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.data.repository.MediaGroupMetaDataRepository;
@@ -18,7 +19,7 @@ import org.springframework.stereotype.Service;
 public class MediaDisplayService {
 
     private final AlbumService albumService;
-    private final ObjectMapper objectMapper;
+    private final MediaMapper mediaMapper;
     private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
 
     private final int maxBatchSize = 10;
@@ -26,7 +27,7 @@ public class MediaDisplayService {
     public MediaDisplayContent getMediaContentInfo(long mediaId) {
         MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(mediaId);
 
-        MediaDisplayContent mediaDisplayContent = objectMapper.convertValue(mediaItem, MediaDisplayContent.class);
+        MediaDisplayContent mediaDisplayContent = mediaMapper.map(mediaItem);
         if (mediaItem.hasThumbnail())
             mediaDisplayContent.setThumbnail(MediaSearchService.getThumbnailPath(mediaId, MediaSearchService.thumbnailResolution, mediaItem.getThumbnail()));
 

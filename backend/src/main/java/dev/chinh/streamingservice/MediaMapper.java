@@ -1,7 +1,9 @@
 package dev.chinh.streamingservice;
 
+import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import dev.chinh.streamingservice.search.data.MediaSearchItemResponse;
+import dev.chinh.streamingservice.serve.data.MediaDisplayContent;
 import org.mapstruct.Builder;
 import org.mapstruct.Mapper;
 
@@ -9,4 +11,6 @@ import org.mapstruct.Mapper;
 public interface MediaMapper {
 
     MediaSearchItemResponse map(MediaSearchItem source);
+
+    MediaDisplayContent map(MediaDescription source);
 }
