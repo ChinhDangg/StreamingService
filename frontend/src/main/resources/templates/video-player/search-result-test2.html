@@ -28,42 +28,16 @@
 
 <!-- Grid -->
 <main id="main-item-container" class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0">
-
-    <!-- Horizontal (16:9) -->
-    <article class="bg-gray-800 flex flex-col border border-gray-900">
-        <div class="relative w-full aspect-[16/9] bg-gray-700 overflow-hidden">
-<!--            <div>-->
-<!--                <img src="https://placehold.co/1280x720" alt="Horizontal"-->
-<!--                     class="w-full h-full object-contain" />-->
-<!--                <span class="absolute bottom-1 left-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">-->
-<!--                    1:54-->
-<!--                </span>-->
-<!--                    <span class="absolute bottom-1 right-1 bg-black/70 text-gray-200 text-[11px] px-1 py-[1px] rounded">-->
-<!--                    1920×1080-->
-<!--                </span>-->
-<!--            </div>-->
-
-            <div id="videoContainer" tabindex="0" class="relative aspect-video bg-black flex items-center justify-center overflow-hidden select-none">
-                <video id="video" class="w-full h-full bg-black cursor-pointer" disablePictureInPicture controlsList="nodownload nofullscreen noremoteplayback"></video>
-            </div>
-
-
-        </div>
-        <div class="p-3">
-            <h2 class="text-sm font-medium truncate">First Horizontal Node Title Example</h2>
-            <div class="flex justify-between text-xs text-gray-400">
-                <span class="truncate">Oct 26, 2025</span>
-                <span class="truncate">John Doe</span>
-            </div>
-        </div>
-    </article>
-
 </main>
+
+<div id="videoContainer" tabindex="0" class="hidden relative aspect-video bg-black flex items-center justify-center overflow-hidden select-none">
+    <video id="video" class="w-full h-full bg-black cursor-pointer" disablePictureInPicture controlsList="nodownload nofullscreen noremoteplayback"></video>
+</div>
 
 <div id="search-item-container">
     <!-- Horizontal -->
     <article class="horizontal-item hidden bg-gray-800 flex flex-col border border-gray-900">
-        <div class="relative w-full aspect-[16/9] bg-gray-700 overflow-hidden">
+        <div class="thumbnail-container relative w-full aspect-[16/9] bg-gray-700 overflow-hidden">
             <div class="image-container">
                 <img src="https://placehold.co/1600x900" alt="Horizontal"
                      class="thumbnail-image w-full h-full object-contain" />
@@ -279,9 +253,6 @@
 
 <script src="/js/search/media-search.js"></script>
 <script src="media-search.js"></script>
-
-<script src="/js/search/video-player-preview.js"></script>
-<script src="video-player-preview.js"></script>
 
 
 </body>
