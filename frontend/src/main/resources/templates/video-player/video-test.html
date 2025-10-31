@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <title>Ultimate Custom Video Player</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         /* ===== Custom Seek Slider ===== */
         input[type="range"].seek-slider {
@@ -40,8 +42,6 @@
 </head>
 <body class="bg-black flex flex-col items-center justify-center min-h-screen text-white">
 
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
     <div id="videoContainer" tabindex="0" class="relative w-4/5 max-w-3xl aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg select-none">
         <video id="video" class="w-full h-full bg-black cursor-pointer"></video>
 
@@ -121,7 +121,7 @@
         </div>
     </div>
 
-    <script src="../../static/video-player/js/video-player.js"></script>
+    <script src="video-player.js"></script>
 
 </body>
 </html>

@@ -7,6 +7,16 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(1rem); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slideIn {
+            animation: slideIn 0.35s ease-out;
+        }
+    </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen p-6">
 
@@ -30,8 +40,8 @@
 <main id="main-item-container" class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0">
 </main>
 
-<div id="videoContainer" tabindex="0" class="hidden relative aspect-video bg-black flex items-center justify-center overflow-hidden select-none">
-    <video id="video" class="w-full h-full bg-black cursor-pointer" disablePictureInPicture controlsList="nodownload nofullscreen noremoteplayback"></video>
+<div id="videoContainer-preview" tabindex="0" class="hidden relative aspect-video bg-black flex items-center justify-center overflow-hidden select-none">
+    <video id="video-preview" class="w-full h-full bg-black cursor-pointer" disablePictureInPicture controlsList="nodownload nofullscreen noremoteplayback"></video>
 </div>
 
 <div id="search-item-container">
@@ -96,7 +106,7 @@
             <!-- Left Controls -->
             <div class="page-left-control flex items-center gap-2">
                 <!-- Previous -->
-                <a href="#prev" class="page-prev-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Previous Page">
+                <a href="#" class="page-prev-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Previous Page">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                          stroke-width="2" stroke="currentColor" class="w-5 h-5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
@@ -104,7 +114,7 @@
                 </a>
 
                 <!-- Next -->
-                <a href="#next" class="page-next-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Next Page">
+                <a href="#" class="page-next-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Next Page">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                          stroke-width="2" stroke="currentColor" class="w-5 h-5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
@@ -112,7 +122,7 @@
                 </a>
 
                 <!-- Go to First -->
-                <a href="#first" class="page-first-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="First Page">
+                <a href="#" class="page-first-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="First Page">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                          stroke-width="2" stroke="currentColor" class="w-5 h-5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
@@ -123,7 +133,7 @@
             <!-- Right Controls -->
             <div class="page-right-control flex items-center gap-2">
                 <!-- Go to Last -->
-                <a href="#last" class="page-last-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Last Page">
+                <a href="#" class="page-last-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Last Page">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                          stroke-width="2" stroke="currentColor" class="w-5 h-5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 19l7-7-7-7M13 19l7-7-7-7" />
@@ -134,8 +144,8 @@
 
         <!-- Page Numbers (Bottom Row) -->
         <div class="page-container flex items-center gap-1">
-            <a href="#1" class="page-link-node hidden px-3 py-1 rounded-md bg-gray-800 hover:bg-gray-700 text-sm font-medium"></a>
-            <a href="#2" class="page-selected-link-node hidden px-3 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-sm font-medium text-white ring-1 ring-indigo-500">
+            <a href="#" class="page-link-node hidden px-3 py-1 rounded-md bg-gray-800 hover:bg-gray-700 text-sm font-medium"></a>
+            <a href="#" class="page-selected-link-node hidden px-3 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-sm font-medium text-white ring-1 ring-indigo-500">
             </a>
             <span class="page-dots hidden px-2 text-gray-500">...</span>
             <div class="page-num-container flex items-center gap-1">
@@ -150,12 +160,12 @@
 
 
 <!-- Full Page Overlay -->
-<div id="previewOverlay"
-     class="fixed inset-0 z-50 bg-gray-950/50 text-gray-100 border border-gray-800/50 hidden flex flex-col transition-all duration-300">
+<div id="quickViewOverlay"
+     class="fixed inset-0 z-50 bg-gray-950/50 text-gray-100 border border-gray-800/50 flex flex-col transition-all duration-300">
 
     <!-- Fixed Top Bar -->
     <div class="fixed top-0 left-0 w-full z-20 bg-gray-900/90 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-6 py-4">
-        <h2 class="text-lg font-semibold tracking-wide">Preview: Media Title</h2>
+        <h2 class="quick-view-title text-lg font-semibold tracking-wide">Preview: Media Title</h2>
         <button id="closeOverlayBtn"
                 class="text-gray-400 hover:text-gray-200 transition">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -174,30 +184,147 @@
 
             <!-- Media Preview -->
             <div class="w-full rounded-lg overflow-hidden shadow-lg bg-gray-800 aspect-video flex items-center justify-center">
-                <p class="text-gray-400 text-sm">Your media preview goes here (video, image, etc.)</p>
+
+                <style>
+                    /* ===== Custom Seek Slider ===== */
+                    input[type="range"].seek-slider {
+                        appearance: none;
+                        width: 100%;
+                        height: 5px;
+                        border-radius: 4px;
+                        background: linear-gradient(to right, #a855f7 0%, #a855f7 0%, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.25) 100%);
+                        outline: none;
+                        cursor: pointer;
+                        transition: background-size 0.1s linear;
+                    }
+                    input[type="range"].seek-slider::-webkit-slider-thumb {
+                        appearance: none;
+                        width: 12px;
+                        height: 12px;
+                        border-radius: 50%;
+                        background: #a855f7;
+                        cursor: pointer;
+                        transition: transform 0.1s;
+                    }
+                    input[type="range"].seek-slider::-webkit-slider-thumb:hover {
+                        transform: scale(1.2);
+                    }
+                    input[type="range"].seek-slider::-moz-range-thumb {
+                        width: 12px;
+                        height: 12px;
+                        border-radius: 50%;
+                        background: #a855f7;
+                        border: none;
+                        cursor: pointer;
+                    }
+                </style>
+
+                <div id="videoContainer" tabindex="0" class="relative w-full aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg select-none">
+                    <video id="video" class="w-full h-full bg-black cursor-pointer"></video>
+
+                    <!-- Controls -->
+                    <div id="controls"
+                         class="absolute bottom-0 left-0 right-0 flex flex-col bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4
+                opacity-0 transition-opacity duration-300 pointer-events-none">
+
+                        <!-- Seek Slider -->
+                        <div class="w-full mb-3">
+                            <input type="range" id="seekSlider" class="seek-slider" min="0" max="100" value="0" step="0.1">
+                        </div>
+
+                        <!-- Control Buttons -->
+                        <div class="flex items-center justify-between text-sm">
+                            <div class="flex items-center space-x-3">
+                                <button id="playPause" class="p-2 rounded-full bg-white/20 hover:bg-white/40 transition">
+                                    <i data-lucide="play" class="w-5 h-5"></i>
+                                </button>
+
+                                <button onclick="replay()" class="relative p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Replay 5s">
+                                    <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
+                                    <span class="absolute bottom-0 right-1 text-[10px] font-bold">5</span>
+                                </button>
+
+                                <button onclick="skip()" class="relative p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Forward 5s">
+                                    <i data-lucide="rotate-cw" class="w-5 h-5"></i>
+                                    <span class="absolute bottom-0 right-1 text-[10px] font-bold">5</span>
+                                </button>
+                            </div>
+
+                            <div class="flex items-center space-x-3">
+                                <span id="currentTime" class="text-gray-300">0:00</span>
+                                <span class="text-gray-400">/</span>
+                                <span id="totalTime" class="text-gray-300">0:00</span>
+
+                                <!-- Volume -->
+                                <div class="flex items-center space-x-2">
+                                    <button id="muteBtn" class="p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Mute/Unmute">
+                                        <i data-lucide="volume-2" class="w-5 h-5"></i>
+                                    </button>
+                                    <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="1"
+                                           class="w-24 h-[3px] accent-purple-500 cursor-pointer">
+                                </div>
+
+                                <!-- Compact Speed & Resolution -->
+                                <div class="flex items-center space-x-3 relative">
+                                    <div class="relative">
+                                        <button id="speedButton" class="text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1">1x</button>
+                                        <div id="speedMenu" class="absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs">
+                                            <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="0.5">0.5x</button>
+                                            <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="0.75">0.75x</button>
+                                            <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="1">1x</button>
+                                            <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="1.25">1.25x</button>
+                                            <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="1.5">1.5x</button>
+                                            <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="2">2x</button>
+                                        </div>
+                                    </div>
+
+                                    <div class="relative">
+                                        <button id="resButton" class="text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1">720p</button>
+                                        <div id="resMenu" class="absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs">
+                                            <button class="px-3 py-1 hover:bg-purple-600 w-full" data-res="1080p">1080p</button>
+                                            <button class="px-3 py-1 hover:bg-purple-600 w-full" data-res="720p">720p</button>
+                                            <button class="px-3 py-1 hover:bg-purple-600 w-full" data-res="480p">480p</button>
+                                            <button class="px-3 py-1 hover:bg-purple-600 w-full" data-res="360p">360p</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Fullscreen -->
+                                <button id="fullscreenBtn" class="p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Fullscreen">
+                                    <i data-lucide="maximize" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Description -->
             <div class="mt-8 space-y-4">
-                <h3 class="text-xl font-semibold border-b border-gray-700 pb-2">Description</h3>
+                <h3 class="text-xl font-semibold border-b border-gray-700 pb-1">Universes</h3>
                 <p class="text-gray-300 leading-relaxed text-sm">
-                    This overlay behaves like a full page — scrollable with a fixed header on top.
-                    The dark glassy background still shows a bit of the page behind it.
-                    Clicking outside this content area will close the overlay.
+                    Genshin Impact
                 </p>
             </div>
 
-            <!-- Example extra content to test scrolling -->
-            <div class="mt-8 space-y-2">
-                <h3 class="text-lg font-semibold border-b border-gray-700 pb-1">More Details</h3>
-                <p class="text-sm text-gray-400">
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed in tempor mi, in pulvinar justo.
-                    Phasellus tincidunt, lectus nec porta viverra, libero nulla sollicitudin enim, ut finibus enim justo vitae sapien.
-                    Cras id augue ut massa placerat efficitur sed nec sapien. Integer pulvinar erat non mi vulputate, ut eleifend orci
-                    volutpat. Nunc efficitur justo quis nunc facilisis, a aliquam massa feugiat. Donec laoreet tellus vitae nunc ornare,
-                    at elementum lectus gravida.
+            <div class="mt-8 space-y-4">
+                <h3 class="text-xl font-semibold border-b border-gray-700 pb-1">Author(s)</h3>
+                <p class="text-gray-300 leading-relaxed text-sm">
+                    Jahn Doe, Jane Doe
                 </p>
             </div>
+
+            <div class="mt-8 space-y-4">
+                <h3 class="text-xl font-semibold border-b border-gray-700 pb-1">Tags</h3>
+                <p class="text-gray-300 leading-relaxed text-sm">
+                    Jahn Doe, Jane Doe
+                </p>
+            </div>
+
+            <script type="module" src="video-player.js"></script>
+
+
+
         </div>
     </div>
 </div>
@@ -209,7 +336,7 @@
 </button>
 
 <script>
-    const overlay = document.getElementById('previewOverlay');
+    const overlay = document.getElementById('quickViewOverlay');
     const closeBtn = document.getElementById('closeOverlayBtn');
     const body = document.body;
 
@@ -242,16 +369,6 @@
         }
     });
 </script>
-
-<style>
-    @keyframes slideIn {
-        from { opacity: 0; transform: translateY(1rem); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    .animate-slideIn {
-        animation: slideIn 0.35s ease-out;
-    }
-</style>
 
 
 
