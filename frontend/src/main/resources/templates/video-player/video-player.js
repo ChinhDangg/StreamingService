@@ -235,7 +235,7 @@ video.addEventListener('touchend', () => {
     handleClickOrTap(touch.clientX, e.timeStamp, true);
 });
 
-container.addEventListener('keydown', e => {
+document.addEventListener('keydown', e => {
     // Avoid interfering with form inputs or system shortcuts
     if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
 
@@ -250,6 +250,18 @@ container.addEventListener('keydown', e => {
             e.preventDefault();
             skip(); // reuse unified function
             showFeedback("⏩ 5s");
+            break;
+
+        case 'f':
+            if (video.requestFullscreen) {
+                video.requestFullscreen();
+            } else if (video.webkitRequestFullscreen) { /* Safari */
+                video.webkitRequestFullscreen();
+            } else if (video.msRequestFullscreen) { /* IE11 */
+                video.msRequestFullscreen();
+            } else if (video.mozRequestFullScreen) { /* Firefox */
+                video.mozRequestFullScreen();
+            }
             break;
 
         case ' ': // Space
