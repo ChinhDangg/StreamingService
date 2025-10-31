@@ -24,4 +24,9 @@ public class MediaDisplayController {
                                                       @RequestParam int offset) {
         return ResponseEntity.ok().body(mediaDisplayService.getNextGroupOfMedia(id, offset));
     }
+
+    @GetMapping("/content-page/{id}")
+    public ResponseEntity<Void> getMediaPage(@PathVariable long id) {
+        return mediaDisplayService.getServePageTypeFromMedia(id);
+    }
 }

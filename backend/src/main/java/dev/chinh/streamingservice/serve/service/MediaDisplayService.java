@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -49,9 +50,10 @@ public class MediaDisplayService {
         return mediaGroupMetaDataRepository.findMediaMetadataIdsByGrouperMetaDataId(mediaId, pageable);
     }
 
-    public void getServePageTypeFromMedia(long mediaId) {
+    public ResponseEntity<Void> getServePageTypeFromMedia(long mediaId) {
         MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(mediaId);
 
+        System.out.println(mediaItem.toString());
         // get media display content to display extra info about album media
 
         if (mediaItem.isGrouper()) {
