@@ -234,11 +234,8 @@ public class AlbumService extends MediaService {
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8))) {
 
-            String path = albumUrlInfo.mediaUrlList.stream()
-                    .filter(m -> m.type == MediaType.IMAGE)
-                    .findFirst()
-                    .orElse(albumUrlInfo.mediaUrlList.getFirst())
-                    .url
+            String path = albumUrlInfo.mediaUrlList.getFirst().url
+                    .replaceFirst("/api/album", "")
                     .replaceFirst("/chunks", "");
             OSUtil.createTempDir(path.substring(0, path.lastIndexOf("/")));
 
