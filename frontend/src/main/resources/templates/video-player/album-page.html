@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Native Full-Screen Photo Album - Complete</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         /* 1. Base style for the image wrapper when it is in full screen */
         .image-container-wrapper:fullscreen {
@@ -37,35 +39,35 @@
 </head>
 <body class="bg-gray-900 min-h-screen">
 
-<main class="max-w-4xl mx-auto py-8">
+<main id="album-main-container" class="max-w-4xl mx-auto py-8">
 
     <div class="px-4 py-4 sm:px-0">
 
         <h1 class="album-title text-4xl font-extrabold tracking-tight text-white">
-            🌌 Night Shots Collection
+            Collection
         </h1>
 
         <div class="flex items-center space-x-4 mt-2 text-lg">
 
-            <p class="authors-info flex items-center">
-                <a href="#author-janedoe" class="text-gray-300 font-semibold hover:text-indigo-400 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 mr-2 text-indigo-400 inline-block align-text-bottom">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.58-7.499-1.632Z" />
-                    </svg>
+            <div class="authors-info-container flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 mr-2 text-indigo-400 inline-block align-text-bottom">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.58-7.499-1.632Z" />
+                </svg>
+                <a href="#" class="author-info hidden mr-3 text-gray-300 font-semibold hover:text-indigo-400 transition">
                     Jane Doe
                 </a>
-            </p>
+            </div>
 
             <span class="text-gray-600">|</span>
 
-            <p class="flex items-center">
-                <a href="#universe-celestial" class="text-gray-300 font-semibold hover:text-cyan-400 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 mr-2 text-cyan-400 inline-block align-text-bottom">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21v-4.5m0 0H3.328a9.004 9.004 0 0 1 7.85-4.887M12 16.5V9a2.25 2.25 0 0 0-2.25-2.25V4.5m2.25 12V19.5" />
-                    </svg>
+            <div class="universes-info-container flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 mr-2 text-cyan-400 inline-block align-text-bottom">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21v-4.5m0 0H3.328a9.004 9.004 0 0 1 7.85-4.887M12 16.5V9a2.25 2.25 0 0 0-2.25-2.25V4.5m2.25 12V19.5" />
+                </svg>
+                <a href="#" class="universe-info hidden text-gray-300 font-semibold hover:text-cyan-400 transition">
                     Celestial / Cityscape
                 </a>
-            </p>
+            </div>
 
         </div>
 
@@ -73,18 +75,10 @@
 
         <div class="mt-4">
             <span class="text-sm font-bold uppercase text-gray-500 mr-3">Tags:</span>
-            <div class="inline-flex flex-wrap gap-2">
+            <div class="tags-info-container inline-flex flex-wrap gap-2">
 
-                <a href="#tag-astrophotography" class="text-xs font-medium px-3 py-1 rounded-full bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white transition cursor-pointer">
+                <a href="#" class="tag-info hidden text-xs font-medium px-3 py-1 rounded-full bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white transition cursor-pointer">
                     #Astrophotography
-                </a>
-
-                <a href="#tag-longexposure" class="text-xs font-medium px-3 py-1 rounded-full bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white transition cursor-pointer">
-                    #LongExposure
-                </a>
-
-                <a href="#tag-urban" class="text-xs font-medium px-3 py-1 rounded-full bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white transition cursor-pointer">
-                    #Urban
                 </a>
 
             </div>
@@ -94,40 +88,30 @@
     <div class="border-t border-gray-700 mt-4"></div>
 
     <div class="px-4 py-8 sm:px-0">
-        <div class="grid grid-cols-1 gap-6">
+        <div id="album-video-container" class="grid grid-cols-1 gap-6 mb-5">
+            <div class="aspect-[16/9] w-2/3 mx-auto relative hidden video-container-wrapper">
+                <div class="temp-video-holder relative w-full h-full">
+                    <video class="w-full h-full bg-black cursor-pointer"></video>
+                    <div class="play-overlay absolute inset-0 flex items-center justify-center cursor-pointer">
+                        <svg class="play-icon w-20 h-20 text-white opacity-90 transition-opacity duration-300 hover:opacity-100" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 5v14l11-7z"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="video-holder"></div>
+            </div>
+        </div>
 
-            <div id="image-wrapper-1" class="image-container-wrapper group relative overflow-hidden rounded-xl shadow-lg bg-gray-800 hover:shadow-2xl transition-shadow duration-300">
-                <img
-                        class="image-to-fix object-cover w-full h-auto max-w-full transition-transform duration-500 group-hover:scale-105"
+        <div id="album-image-container" class="grid grid-cols-1 gap-6">
+
+            <div id="image-wrapper-1" class="image-container-wrapper hidden group relative overflow-hidden rounded-xl shadow-lg bg-gray-800 hover:shadow-2xl transition-shadow duration-300">
+                <img class="image-to-fix object-cover w-full h-auto max-w-full transition-transform duration-500 group-hover:scale-105"
                         src="https://placehold.co/1920x1080"
                         alt="A beautiful landscape view"
                 />
 
-                <button
-                        aria-label="View image in full screen"
+                <button aria-label="View image in full screen"
                         data-target-id="image-wrapper-1"
-                        class="fullscreen-trigger absolute top-4 right-4
-                              p-3 rounded-full bg-black/50 text-white
-                              opacity-0 group-hover:opacity-100
-                              transition-opacity duration-300
-                              hover:bg-black/70 hover:scale-110">
-
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-6 h-6 pointer-events-none">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 16.5h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                    </svg>
-                </button>
-            </div>
-
-            <div id="image-wrapper-2" class="image-container-wrapper group relative overflow-hidden rounded-xl shadow-lg bg-gray-800 hover:shadow-2xl transition-shadow duration-300">
-                <img
-                        class="image-to-fix object-cover w-full h-auto max-w-full transition-transform duration-500 group-hover:scale-105"
-                        src="https://placehold.co/1080x1920"
-                        alt="A beautiful portrait view"
-                />
-
-                <button
-                        aria-label="View image in full screen"
-                        data-target-id="image-wrapper-2"
                         class="fullscreen-trigger absolute top-4 right-4
                               p-3 rounded-full bg-black/50 text-white
                               opacity-0 group-hover:opacity-100
@@ -144,49 +128,7 @@
     </div>
 </main>
 
-<script>
-    function enterFullScreen(element) {
-        if (element.requestFullscreen) {
-            element.requestFullscreen();
-        } else if (element.webkitRequestFullscreen) {
-            element.webkitRequestFullscreen();
-        } else if (element.msRequestFullscreen) {
-            element.msRequestFullscreen();
-        }
-    }
-
-    document.querySelectorAll('.fullscreen-trigger').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-
-            const targetId = e.currentTarget.getAttribute('data-target-id');
-            const wrapperElement = document.getElementById(targetId);
-            const imageElement = wrapperElement ? wrapperElement.querySelector('img') : null;
-
-            if (wrapperElement && imageElement) {
-                const originalSrc = imageElement.src;
-
-                // 1. Swap image source
-
-                // 2. CRUCIAL FIX: Add the class to enforce aspect ratio CSS
-                imageElement.classList.add('is-fullscreen-target');
-
-                // 3. Request full screen on the WRAPPER element
-                enterFullScreen(wrapperElement);
-
-                // 4. Revert state when exiting full screen
-                document.addEventListener('fullscreenchange', function handler() {
-                    if (!document.fullscreenElement) {
-                        // Remove the temporary class
-                        imageElement.classList.remove('is-fullscreen-target');
-
-                        document.removeEventListener('fullscreenchange', handler);
-                    }
-                });
-            }
-        });
-    });
-</script>
+<script type="module" src="album-page.js"></script>
 
 </body>
 </html>
