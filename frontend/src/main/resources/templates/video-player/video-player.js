@@ -15,19 +15,21 @@ const speedMenu = document.getElementById('speedMenu');
 const resButton = document.getElementById('resButton');
 const resMenu = document.getElementById('resMenu');
 
-const playlistUrl = "p720/master.m3u8";
-
-video.pause();
-video.removeAttribute('src');
-video.load(); // force media element reset
-
-if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    video.src = playlistUrl + '?_=' + Date.now(); // cache-buster
-} else if (Hls.isSupported()) {
-    const hls = new Hls({ startPosition: 0 });
-    hls.loadSource(playlistUrl + '?_=' + Date.now());
-    hls.attachMedia(video);
+function setVideoUrl(playlistUrl = "p720/master.m3u8") {
+    if (playlistUrl.endsWith(".m3u8")) {
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = playlistUrl + '?_=' + Date.now(); // cache-buster
+        } else if (Hls.isSupported()) {
+            const hls = new Hls({ startPosition: 0 });
+            hls.loadSource(playlistUrl + '?_=' + Date.now());
+            hls.attachMedia(video);
+        }
+    } else {
+        video.src = playlistUrl;
+    }
 }
+
+//setVideoUrl();
 
 const formatTime = s => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 
