@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Native Full-Screen Photo Album - Complete</title>
+    <title>SS Album</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
+    <style th:fragment="album-style" th:remove="tag">
         /* 1. Base style for the image wrapper when it is in full screen */
         .image-container-wrapper:fullscreen {
             background-color: black;
@@ -39,11 +39,11 @@
 </head>
 <body class="bg-gray-900 min-h-screen">
 
-<main id="album-main-container" class="max-w-4xl mx-auto py-8">
+<main th:fragment="album-html" id="main-container" class="max-w-4xl mx-auto px-4 py-8">
 
     <div class="px-4 py-4 sm:px-0">
 
-        <h1 class="album-title text-4xl font-extrabold tracking-tight text-white">
+        <h1 class="main-title text-4xl font-extrabold tracking-tight text-white">
             Collection
         </h1>
 
@@ -127,6 +127,10 @@
         </div>
     </div>
 </main>
+
+<div th:fragment="album-script" th:remove="tag" class="hidden">
+    album-page.js
+</div>
 
 <script type="module" src="album-page.js"></script>
 
