@@ -41,7 +41,7 @@
 </head>
 <body class="bg-black flex flex-col items-center justify-center min-h-screen text-white">
 
-    <div th:fragment="video-player-html" th:remove="tag">
+    <main th:fragment="video-player-html" th:remove="tag">
         <div id="videoContainer" tabindex="0" class="relative aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg select-none">
             <video id="video" class="w-full h-full bg-black cursor-pointer"></video>
 
@@ -120,7 +120,7 @@
                 </div>
             </div>
         </div>
-    </div> <!-- End of video fragment -->
+    </main> <!-- End of video fragment -->
 
     <div th:fragment="video-player-script" th:remove="tag" class="hidden">
         video-player.js
