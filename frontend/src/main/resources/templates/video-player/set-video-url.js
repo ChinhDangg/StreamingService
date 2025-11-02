@@ -1,0 +1,14 @@
+export function setVideoUrl(playlistUrl = "p720/master.m3u8") {
+    const video = document.getElementById('video');
+    if (playlistUrl.endsWith(".m3u8")) {
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = playlistUrl + '?_=' + Date.now(); // cache-buster
+        } else if (Hls.isSupported()) {
+            const hls = new Hls({ startPosition: 0 });
+            hls.loadSource(playlistUrl + '?_=' + Date.now());
+            hls.attachMedia(video);
+        }
+    } else {
+        video.src = playlistUrl;
+    }
+}
