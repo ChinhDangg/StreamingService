@@ -1,9 +1,13 @@
+
 export function displayContentInfo(mediaInfo) {
     const mainContainer = document.getElementById('main-container');
     mainContainer.querySelector('.main-title').textContent = mediaInfo.title;
 
     if (mediaInfo.authors) {
         const authorContainer = mainContainer.querySelector('.authors-info-container');
+        const first = authorContainer.firstElementChild;
+        if (first) authorContainer.replaceChildren(first);
+
         const authorNodeTem = authorContainer.querySelector('.author-info');
         mediaInfo.authors.forEach(author => {
             const authorNode = helperCloneAndUnHideNode(authorNodeTem);
@@ -15,6 +19,9 @@ export function displayContentInfo(mediaInfo) {
 
     if (mediaInfo.universes) {
         const universeContainer = mainContainer.querySelector('.universes-info-container');
+        const first = universeContainer.firstElementChild;
+        if (first) universeContainer.replaceChildren(first);
+
         const universeNodeTem = universeContainer.querySelector('.universe-info');
         mediaInfo.universes.forEach(universe => {
             const universeNode = helperCloneAndUnHideNode(universeNodeTem);
@@ -26,6 +33,9 @@ export function displayContentInfo(mediaInfo) {
 
     if (mediaInfo.tags) {
         const tagContainer = mainContainer.querySelector('.tags-info-container');
+        const first = tagContainer.firstElementChild;
+        if (first) tagContainer.replaceChildren(first);
+
         const tagNodeTem = tagContainer.querySelector('.tag-info');
         mediaInfo.tags.forEach(tag => {
             const tagNode = helperCloneAndUnHideNode(tagNodeTem);

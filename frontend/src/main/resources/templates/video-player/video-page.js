@@ -1,7 +1,10 @@
 import { setVideoUrl} from "./set-video-url.js";
 import { displayContentInfo } from "./metadata-display.js";
 
-async function initialize() {
+const container = document.querySelector('[data-player="videoPlayerContainer"]');
+container.dataset.player = 'videoPagePlayerContainer';
+
+export async function initialize() {
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     const videoId = urlParams.get('mediaId');
@@ -63,7 +66,6 @@ async function getVideoUrl(videoId) {
     // }
     // const videoUrl = await response.text();
     // setVideoUrl(videoUrl);
-    const container = document.querySelector('[data-player="videoPlayerContainer"]');
-    container.dataset.player = 'videoPagePlayerContainer';
+    const container = document.querySelector('[data-player="videoPagePlayerContainer"]');
     setVideoUrl(container);
 }

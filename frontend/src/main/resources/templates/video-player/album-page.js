@@ -1,7 +1,7 @@
 import { setVideoUrl} from "./set-video-url.js";
 import { displayContentInfo, helperCloneAndUnHideNode} from "./metadata-display.js";
 
-async function initialize() {
+export async function initialize() {
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     const albumId = urlParams.get('mediaId');

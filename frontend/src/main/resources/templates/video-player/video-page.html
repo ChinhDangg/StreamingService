@@ -155,22 +155,26 @@
 
     </div> <!-- End of video player insert div -->
 
-    <div class="universes-info-container flex items-center mt-5 mb-5 pb-3 border-b border-gray-700">
+    <div class="flex items-center mt-5 mb-5 pb-3 border-b border-gray-700">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 mr-2 text-cyan-400 inline-block align-text-bottom">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21v-4.5m0 0H3.328a9.004 9.004 0 0 1 7.85-4.887M12 16.5V9a2.25 2.25 0 0 0-2.25-2.25V4.5m2.25 12V19.5" />
         </svg>
-        <a href="#" class="universe-info hidden text-gray-300 font-semibold hover:text-cyan-400 transition">
-            Celestial / Cityscape
-        </a>
+        <div class="universes-info-container">
+            <a href="#" class="universe-info hidden text-gray-300 font-semibold hover:text-cyan-400 transition">
+                Celestial / Cityscape
+            </a>
+        </div>
     </div>
 
-    <div class="authors-info-container flex items-center mt-5 mb-5 pb-3 border-b border-gray-700">
+    <div class="flex items-center mt-5 mb-5 pb-3 border-b border-gray-700">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 mr-2 text-indigo-400 inline-block align-text-bottom">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.58-7.499-1.632Z" />
         </svg>
-        <a href="#" class="author-info hidden mr-3 text-gray-300 font-semibold hover:text-indigo-400 transition">
-            Jane Doe
-        </a>
+        <div class="authors-info-container ">
+            <a href="#" class="author-info hidden mr-3 text-gray-300 font-semibold hover:text-indigo-400 transition">
+                Jane Doe
+            </a>
+        </div>
     </div>
 
     <div class="mt-4">
@@ -214,10 +218,8 @@
     video-page.js
 </div>
 
-<script type="module" src="video-player.js"></script>
-<script type="module" th:src="@{video-player.js}"></script>
-<script type="module" src="video-page.js"></script>
-<script type="module" th:src="@{video-page.js}"></script>
+<script type="module" th:src="@{video-player.js}" src="video-player.js"></script>
+<script type="module" th:src="@{video-page.js}" src="video-page.js"></script>
 
 </body>
 </html>
