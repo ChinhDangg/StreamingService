@@ -151,7 +151,7 @@ function displaySearchResults(results, searchType, sortBy, sortOrder,
                 "height": 1080
             },
             {
-                "id": 2,
+                "id": 3,
                 "title": "Test Album",
                 "thumbnail": "/thumbnail-cache/p480/2_p480.jpg",
                 "uploadDate": "2025-10-28",
@@ -364,7 +364,7 @@ async function quickViewContentInOverlay(mediaId, mediaType) {
     const newUrl = url.pathname + '?' + urlParams.toString() + url.hash;
     window.history.pushState({ path: newUrl }, '', newUrl);
 
-    await displayContentPageForOverlay(mediaType);
+    await displayContentPageForOverlay(mediaType, mediaId);
 }
 
 const mediaDocMap = new Map();
@@ -410,7 +410,9 @@ async function getVideoPageContent() {
     return videoDoc;
 }
 
-async function displayContentPageForOverlay(mediaType) {
+let previousQuickViewMediaId = null;
+
+async function displayContentPageForOverlay(mediaType, mediaId) {
     const quickViewOverlay = document.getElementById('quickViewOverlay');
     const overlayWrapper = quickViewOverlay.querySelector('.overlayContent-inner-wrapper');
 
@@ -418,7 +420,10 @@ async function displayContentPageForOverlay(mediaType) {
         const { mod, node } = mediaDocMap.get(mediaType);
         overlayWrapper.innerHTML = '';
         overlayWrapper.appendChild(node);
-        mod.initialize();
+        if (previousPreviewVideoId !== null && previousPreviewVideoId !== mediaId) {
+            mod.initialize();
+            previousPreviewVideoId = mediaId;
+        }
         openOverlay();
         return;
     }
