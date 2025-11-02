@@ -22,7 +22,7 @@
 
 <!-- Header -->
 <header class="max-w-7xl mx-auto mb-6">
-    <h1 class="text-2xl font-semibold mb-4">Search Page</h1>
+    <h1 class="text-2xl font-semibold mb-4 w-full text-center">Search Page</h1>
     <form id="search-form" class="flex gap-3">
         <input id="search-input" type="text" placeholder="Search..."
                class="flex-1 px-4 py-2 rounded-lg bg-gray-800 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
@@ -32,6 +32,44 @@
         <div class="text-sm"><span id="bold-status" class="font-semibold">Invalid</span><span>: </span><span id="normal-text">Search String</span></div>
     </div>
 </header>
+
+<div class="flex flex-col text-gray-200">
+    <!-- Sort By Section -->
+    <div class="flex items-center space-x-2">
+        <span class="text-sm font-medium text-gray-400">Sort by:</span>
+
+        <div class="flex items-center space-x-2">
+            <!-- Active -->
+            <button class="px-3 py-1.5 text-sm rounded-md bg-indigo-600 text-white font-medium border border-indigo-500 shadow-md">
+                Upload
+            </button>
+            <!-- Inactive -->
+            <button class="px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:border-purple-400 hover:text-white transition">
+                Year
+            </button>
+            <button class="px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:border-purple-400 hover:text-white transition">
+                Length
+            </button>
+            <button class="px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:border-purple-400 hover:text-white transition">
+                Size
+            </button>
+        </div>
+    </div>
+
+    <!-- Sort Order Section -->
+    <div id="sortDirection" class="flex items-center space-x-2 mt-3">
+        <span class="text-sm font-medium text-gray-400">Order:</span>
+        <button id="directionToggle"
+                class="px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
+            <span id="directionLabel">Ascending</span>
+            <svg id="directionIcon" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transform transition-transform rotate-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+            </svg>
+        </button>
+    </div>
+</div>
+
+
 
 <div id="pagination-node-top" class="flex flex-col items-center justify-center mt-8 mb-8 select-none text-gray-300 space-y-3">
 </div>
