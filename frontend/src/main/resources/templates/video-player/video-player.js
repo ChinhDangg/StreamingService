@@ -1,19 +1,19 @@
 lucide.createIcons();
 
-const video = document.getElementById('video');
-const container = document.getElementById('videoContainer');
-const controls = document.getElementById('controls');
-const playPauseBtn = document.getElementById('playPause');
-const seekSlider = document.getElementById('seekSlider');
-const currentTimeEl = document.getElementById('currentTime');
-const totalTimeEl = document.getElementById('totalTime');
-const muteBtn = document.getElementById('muteBtn');
-const volumeSlider = document.getElementById('volumeSlider');
-const fullscreenBtn = document.getElementById('fullscreenBtn');
-const speedButton = document.getElementById('speedButton');
-const speedMenu = document.getElementById('speedMenu');
-const resButton = document.getElementById('resButton');
-const resMenu = document.getElementById('resMenu');
+const container = document.querySelector('[data-player="videoPlayerContainer"]');
+const video = container.querySelector('.video-node');
+const controls = container.querySelector('.video-controls');
+const seekSlider = container.querySelector('.seek-slider');
+const playPauseBtn = container.querySelector('.play-pause');
+const currentTimeEl = container.querySelector('.current-time');
+const totalTimeEl = container.querySelector('.total-time');
+const muteBtn = container.querySelector('.mute-button');
+const volumeSlider = container.querySelector('.volume-slider');
+const speedButton = container.querySelector('.speed-button');
+const speedMenu = container.querySelector('.speed-menu');
+const resButton = container.querySelector('.res-button');
+const resMenu = container.querySelector('.res-menu');
+const fullscreenBtn = container.querySelector('.fullscreen-button');
 
 const formatTime = s => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 

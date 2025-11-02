@@ -75,23 +75,22 @@
 
     <div th:insert="video-player/video-player :: video-player-html">
 
-        <div id="videoContainer" tabindex="0" class="relative w-full aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg select-none">
-            <video id="video" class="w-full h-full bg-black cursor-pointer"></video>
+        <div data-player="videoPlayerContainer" tabindex="0" class="relative aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg select-none">
+            <video class="video-node w-full h-full bg-black cursor-pointer"></video>
 
             <!-- Controls -->
-            <div id="controls"
-                 class="absolute bottom-0 left-0 right-0 flex flex-col bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4
-            opacity-0 transition-opacity duration-300 pointer-events-none">
+            <div class="video-controls absolute bottom-0 left-0 right-0 flex flex-col bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4
+                 opacity-0 transition-opacity duration-300 pointer-events-none">
 
                 <!-- Seek Slider -->
                 <div class="w-full mb-3">
-                    <input type="range" id="seekSlider" class="seek-slider" min="0" max="100" value="0" step="0.1">
+                    <input type="range" class="seek-slider" min="0" max="100" value="0" step="0.1">
                 </div>
 
                 <!-- Control Buttons -->
                 <div class="flex items-center justify-between text-sm">
                     <div class="flex items-center space-x-3">
-                        <button id="playPause" class="p-2 rounded-full bg-white/20 hover:bg-white/40 transition">
+                        <button class="play-pause p-2 rounded-full bg-white/20 hover:bg-white/40 transition">
                             <i data-lucide="play" class="w-5 h-5"></i>
                         </button>
 
@@ -107,24 +106,24 @@
                     </div>
 
                     <div class="flex items-center space-x-3">
-                        <span id="currentTime" class="text-gray-300">0:00</span>
+                        <span class="current-time text-gray-300">0:00</span>
                         <span class="text-gray-400">/</span>
-                        <span id="totalTime" class="text-gray-300">0:00</span>
+                        <span class="total-time text-gray-300">0:00</span>
 
                         <!-- Volume -->
                         <div class="flex items-center space-x-2">
-                            <button id="muteBtn" class="p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Mute/Unmute">
+                            <button class="mute-button p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Mute/Unmute">
                                 <i data-lucide="volume-2" class="w-5 h-5"></i>
                             </button>
-                            <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="1"
-                                   class="w-24 h-[3px] accent-purple-500 cursor-pointer">
+                            <input type="range" min="0" max="1" step="0.01" value="1"
+                                   class="volume-slider w-24 h-[3px] accent-purple-500 cursor-pointer">
                         </div>
 
                         <!-- Compact Speed & Resolution -->
                         <div class="flex items-center space-x-3 relative">
                             <div class="relative">
-                                <button id="speedButton" class="text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1">1x</button>
-                                <div id="speedMenu" class="absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs">
+                                <button class="speed-button text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1">1x</button>
+                                <div class="speed-menu absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs">
                                     <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="0.5">0.5x</button>
                                     <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="0.75">0.75x</button>
                                     <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="1">1x</button>
@@ -135,8 +134,8 @@
                             </div>
 
                             <div class="relative">
-                                <button id="resButton" class="text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1">720p</button>
-                                <div id="resMenu" class="absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs">
+                                <button class="res-button text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1">720p</button>
+                                <div class="res-menu absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs">
                                     <button class="px-3 py-1 hover:bg-purple-600 w-full" data-res="1080p">1080p</button>
                                     <button class="px-3 py-1 hover:bg-purple-600 w-full" data-res="720p">720p</button>
                                     <button class="px-3 py-1 hover:bg-purple-600 w-full" data-res="480p">480p</button>
@@ -146,7 +145,7 @@
                         </div>
 
                         <!-- Fullscreen -->
-                        <button id="fullscreenBtn" class="p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Fullscreen">
+                        <button class="fullscreen-button p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Fullscreen">
                             <i data-lucide="maximize" class="w-5 h-5"></i>
                         </button>
                     </div>
@@ -154,7 +153,7 @@
             </div>
         </div>
 
-    </div> <!-- End of video fragment div -->
+    </div> <!-- End of video player insert div -->
 
     <div class="universes-info-container flex items-center mt-5 mb-5 pb-3 border-b border-gray-700">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 mr-2 text-cyan-400 inline-block align-text-bottom">

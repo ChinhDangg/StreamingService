@@ -63,5 +63,7 @@ async function getVideoUrl(videoId) {
     // }
     // const videoUrl = await response.text();
     // setVideoUrl(videoUrl);
-    setVideoUrl();
+    const container = document.querySelector('[data-player="videoPlayerContainer"]');
+    container.dataset.player = 'videoPagePlayerContainer';
+    setVideoUrl(container);
 }

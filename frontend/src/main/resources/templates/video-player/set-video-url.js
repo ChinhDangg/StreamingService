@@ -1,5 +1,6 @@
-export function setVideoUrl(playlistUrl = "p720/master.m3u8") {
-    const video = document.getElementById('video');
+
+export function setVideoUrl(videoContainerNode, playlistUrl = "p720/master.m3u8") {
+    const video = videoContainerNode.querySelector('video');
     if (playlistUrl.endsWith(".m3u8")) {
         if (video.canPlayType('application/vnd.apple.mpegurl')) {
             video.src = playlistUrl + '?_=' + Date.now(); // cache-buster
