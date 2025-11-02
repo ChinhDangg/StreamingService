@@ -2,10 +2,43 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Streaming Service Video</title>
+    <title>SS Video</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <style th:insert="video-player/video-player :: video-player-style"></style>
+    <style th:fragment="video-page-style" th:remove="tag">
+        input[type="range"].seek-slider {
+            appearance: none;
+            width: 100%;
+            height: 5px;
+            border-radius: 4px;
+            background: linear-gradient(to right, #a855f7 0%, #a855f7 0%, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.25) 100%);
+            outline: none;
+            cursor: pointer;
+            transition: background-size 0.1s linear;
+        }
+        input[type="range"].seek-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #a855f7;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        input[type="range"].seek-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        input[type="range"].seek-slider::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #a855f7;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body class="max-w-8xl mx-auto p-4 bg-gray-900 text-gray-100 flex flex-col md:flex-row gap-4">
 
@@ -34,156 +67,121 @@
 
 </aside>
 
-<main id="main-container" class="order-1 md:order-2 flex-1 p-4 rounded-lg">
+<main id="main-container" th:fragment="video-page-html" class="order-1 md:order-2 flex-1 p-4 rounded-lg">
 
     <div class="mt-3 space-y-4 mb-5">
-        <h3 class="text-xl font-semibold">Video title number one</h3>
+        <h3 class="main-title text-xl font-semibold">Video title number one</h3>
     </div>
 
-    <div id="video-main-container">
+    <div th:insert="video-player/video-player :: video-player-html">
 
-        <!-- Media Preview -->
-        <div class="w-full rounded-lg overflow-hidden shadow-lg bg-gray-800 aspect-video flex items-center justify-center">
+        <div id="videoContainer" tabindex="0" class="relative w-full aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg select-none">
+            <video id="video" class="w-full h-full bg-black cursor-pointer"></video>
 
-            <style>
-                /* ===== Custom Seek Slider ===== */
-                input[type="range"].seek-slider {
-                    appearance: none;
-                    width: 100%;
-                    height: 5px;
-                    border-radius: 4px;
-                    background: linear-gradient(to right, #a855f7 0%, #a855f7 0%, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.25) 100%);
-                    outline: none;
-                    cursor: pointer;
-                    transition: background-size 0.1s linear;
-                }
-                input[type="range"].seek-slider::-webkit-slider-thumb {
-                    appearance: none;
-                    width: 12px;
-                    height: 12px;
-                    border-radius: 50%;
-                    background: #a855f7;
-                    cursor: pointer;
-                    transition: transform 0.1s;
-                }
-                input[type="range"].seek-slider::-webkit-slider-thumb:hover {
-                    transform: scale(1.2);
-                }
-                input[type="range"].seek-slider::-moz-range-thumb {
-                    width: 12px;
-                    height: 12px;
-                    border-radius: 50%;
-                    background: #a855f7;
-                    border: none;
-                    cursor: pointer;
-                }
-            </style>
+            <!-- Controls -->
+            <div id="controls"
+                 class="absolute bottom-0 left-0 right-0 flex flex-col bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4
+            opacity-0 transition-opacity duration-300 pointer-events-none">
 
-            <div id="videoContainer" tabindex="0" class="relative w-full aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg select-none">
-                <video id="video" class="w-full h-full bg-black cursor-pointer"></video>
+                <!-- Seek Slider -->
+                <div class="w-full mb-3">
+                    <input type="range" id="seekSlider" class="seek-slider" min="0" max="100" value="0" step="0.1">
+                </div>
 
-                <!-- Controls -->
-                <div id="controls"
-                     class="absolute bottom-0 left-0 right-0 flex flex-col bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4
-                opacity-0 transition-opacity duration-300 pointer-events-none">
+                <!-- Control Buttons -->
+                <div class="flex items-center justify-between text-sm">
+                    <div class="flex items-center space-x-3">
+                        <button id="playPause" class="p-2 rounded-full bg-white/20 hover:bg-white/40 transition">
+                            <i data-lucide="play" class="w-5 h-5"></i>
+                        </button>
 
-                    <!-- Seek Slider -->
-                    <div class="w-full mb-3">
-                        <input type="range" id="seekSlider" class="seek-slider" min="0" max="100" value="0" step="0.1">
+                        <button onclick="replay()" class="relative p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Replay 5s">
+                            <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
+                            <span class="absolute bottom-0 right-1 text-[10px] font-bold">5</span>
+                        </button>
+
+                        <button onclick="skip()" class="relative p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Forward 5s">
+                            <i data-lucide="rotate-cw" class="w-5 h-5"></i>
+                            <span class="absolute bottom-0 right-1 text-[10px] font-bold">5</span>
+                        </button>
                     </div>
 
-                    <!-- Control Buttons -->
-                    <div class="flex items-center justify-between text-sm">
-                        <div class="flex items-center space-x-3">
-                            <button id="playPause" class="p-2 rounded-full bg-white/20 hover:bg-white/40 transition">
-                                <i data-lucide="play" class="w-5 h-5"></i>
-                            </button>
+                    <div class="flex items-center space-x-3">
+                        <span id="currentTime" class="text-gray-300">0:00</span>
+                        <span class="text-gray-400">/</span>
+                        <span id="totalTime" class="text-gray-300">0:00</span>
 
-                            <button onclick="replay()" class="relative p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Replay 5s">
-                                <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
-                                <span class="absolute bottom-0 right-1 text-[10px] font-bold">5</span>
+                        <!-- Volume -->
+                        <div class="flex items-center space-x-2">
+                            <button id="muteBtn" class="p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Mute/Unmute">
+                                <i data-lucide="volume-2" class="w-5 h-5"></i>
                             </button>
-
-                            <button onclick="skip()" class="relative p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Forward 5s">
-                                <i data-lucide="rotate-cw" class="w-5 h-5"></i>
-                                <span class="absolute bottom-0 right-1 text-[10px] font-bold">5</span>
-                            </button>
+                            <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="1"
+                                   class="w-24 h-[3px] accent-purple-500 cursor-pointer">
                         </div>
 
-                        <div class="flex items-center space-x-3">
-                            <span id="currentTime" class="text-gray-300">0:00</span>
-                            <span class="text-gray-400">/</span>
-                            <span id="totalTime" class="text-gray-300">0:00</span>
-
-                            <!-- Volume -->
-                            <div class="flex items-center space-x-2">
-                                <button id="muteBtn" class="p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Mute/Unmute">
-                                    <i data-lucide="volume-2" class="w-5 h-5"></i>
-                                </button>
-                                <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="1"
-                                       class="w-24 h-[3px] accent-purple-500 cursor-pointer">
-                            </div>
-
-                            <!-- Compact Speed & Resolution -->
-                            <div class="flex items-center space-x-3 relative">
-                                <div class="relative">
-                                    <button id="speedButton" class="text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1">1x</button>
-                                    <div id="speedMenu" class="absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs">
-                                        <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="0.5">0.5x</button>
-                                        <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="0.75">0.75x</button>
-                                        <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="1">1x</button>
-                                        <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="1.25">1.25x</button>
-                                        <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="1.5">1.5x</button>
-                                        <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="2">2x</button>
-                                    </div>
-                                </div>
-
-                                <div class="relative">
-                                    <button id="resButton" class="text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1">720p</button>
-                                    <div id="resMenu" class="absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs">
-                                        <button class="px-3 py-1 hover:bg-purple-600 w-full" data-res="1080p">1080p</button>
-                                        <button class="px-3 py-1 hover:bg-purple-600 w-full" data-res="720p">720p</button>
-                                        <button class="px-3 py-1 hover:bg-purple-600 w-full" data-res="480p">480p</button>
-                                        <button class="px-3 py-1 hover:bg-purple-600 w-full" data-res="360p">360p</button>
-                                    </div>
+                        <!-- Compact Speed & Resolution -->
+                        <div class="flex items-center space-x-3 relative">
+                            <div class="relative">
+                                <button id="speedButton" class="text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1">1x</button>
+                                <div id="speedMenu" class="absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs">
+                                    <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="0.5">0.5x</button>
+                                    <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="0.75">0.75x</button>
+                                    <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="1">1x</button>
+                                    <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="1.25">1.25x</button>
+                                    <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="1.5">1.5x</button>
+                                    <button class="px-3 py-1 hover:bg-purple-600 w-full" data-speed="2">2x</button>
                                 </div>
                             </div>
 
-                            <!-- Fullscreen -->
-                            <button id="fullscreenBtn" class="p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Fullscreen">
-                                <i data-lucide="maximize" class="w-5 h-5"></i>
-                            </button>
+                            <div class="relative">
+                                <button id="resButton" class="text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1">720p</button>
+                                <div id="resMenu" class="absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs">
+                                    <button class="px-3 py-1 hover:bg-purple-600 w-full" data-res="1080p">1080p</button>
+                                    <button class="px-3 py-1 hover:bg-purple-600 w-full" data-res="720p">720p</button>
+                                    <button class="px-3 py-1 hover:bg-purple-600 w-full" data-res="480p">480p</button>
+                                    <button class="px-3 py-1 hover:bg-purple-600 w-full" data-res="360p">360p</button>
+                                </div>
+                            </div>
                         </div>
+
+                        <!-- Fullscreen -->
+                        <button id="fullscreenBtn" class="p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Fullscreen">
+                            <i data-lucide="maximize" class="w-5 h-5"></i>
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Description -->
-        <div class="mt-8 space-y-4">
-            <h3 class="text-xl font-semibold border-b border-gray-700 pb-1">Universes</h3>
-            <p class="text-gray-300 leading-relaxed text-sm">
-                Genshin Impact
-            </p>
+    </div> <!-- End of video fragment div -->
+
+    <div class="universes-info-container flex items-center mt-5 mb-5 pb-3 border-b border-gray-700">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 mr-2 text-cyan-400 inline-block align-text-bottom">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21v-4.5m0 0H3.328a9.004 9.004 0 0 1 7.85-4.887M12 16.5V9a2.25 2.25 0 0 0-2.25-2.25V4.5m2.25 12V19.5" />
+        </svg>
+        <a href="#" class="universe-info hidden text-gray-300 font-semibold hover:text-cyan-400 transition">
+            Celestial / Cityscape
+        </a>
+    </div>
+
+    <div class="authors-info-container flex items-center mt-5 mb-5 pb-3 border-b border-gray-700">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 mr-2 text-indigo-400 inline-block align-text-bottom">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.58-7.499-1.632Z" />
+        </svg>
+        <a href="#" class="author-info hidden mr-3 text-gray-300 font-semibold hover:text-indigo-400 transition">
+            Jane Doe
+        </a>
+    </div>
+
+    <div class="mt-4">
+        <span class="text-sm font-bold uppercase text-gray-500 mr-3">Tags:</span>
+        <div class="tags-info-container inline-flex flex-wrap gap-2">
+            <a href="#" class="tag-info hidden text-xs font-medium px-3 py-1 rounded-full bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white transition cursor-pointer">
+                #Astrophotography
+            </a>
         </div>
-
-        <div class="mt-8 space-y-4">
-            <h3 class="text-xl font-semibold border-b border-gray-700 pb-1">Author(s)</h3>
-            <p class="text-gray-300 leading-relaxed text-sm">
-                Jahn Doe, Jane Doe
-            </p>
-        </div>
-
-        <div class="mt-8 space-y-4">
-            <h3 class="text-xl font-semibold border-b border-gray-700 pb-1">Tags</h3>
-            <p class="text-gray-300 leading-relaxed text-sm">
-                Jahn Doe, Jane Doe
-            </p>
-        </div>
-
-        <script type="module" src="video-player.js"></script>
-    </div> <!-- End of video-main-container -->
-
+    </div>
 
 </main>
 
@@ -211,6 +209,16 @@
     </article>
 
 </aside>
+
+<div th:fragment="video-page-script" th:remove="tag" class="hidden">
+    video-player.js
+    video-page.js
+</div>
+
+<script type="module" src="video-player.js"></script>
+<script type="module" th:src="@{video-player.js}"></script>
+<script type="module" src="video-page.js"></script>
+<script type="module" th:src="@{video-page.js}"></script>
 
 </body>
 </html>
