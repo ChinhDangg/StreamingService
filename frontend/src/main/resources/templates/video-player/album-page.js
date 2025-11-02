@@ -87,7 +87,12 @@ async function displayAlbumItems(albumId) {
     ]
 
     const videoContainer = document.getElementById('album-video-container');
+    const firstVideo = videoContainer.firstElementChild;
+    if (firstVideo) videoContainer.replaceChildren(firstVideo);
+
     const imageContainer = document.getElementById('album-image-container');
+    const firstImage = imageContainer.firstElementChild;
+    if (firstImage) imageContainer.replaceChildren(firstImage);
 
     const imageWrapperTem = imageContainer.querySelector('.image-container-wrapper');
     const videoWrapperTem = videoContainer.querySelector('.video-container-wrapper');
