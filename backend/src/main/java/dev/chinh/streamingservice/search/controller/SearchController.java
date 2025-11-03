@@ -7,7 +7,6 @@ import dev.chinh.streamingservice.search.data.MediaSearchResult;
 import dev.chinh.streamingservice.search.service.MediaSearchService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.search.sort.SortOrder;
@@ -31,13 +30,6 @@ public class SearchController {
             String field,
             @NotNull
             List<Object> text
-    ) {}
-
-    public record MediaMatchSearchRequest(
-            @NotNull @NotBlank
-            String field,
-            @NotNull
-            String text
     ) {}
 
     @PostMapping
@@ -101,12 +93,10 @@ public class SearchController {
                 mediaSearchService.searchByKeywords(ContentMetaData.TAGS, Collections.singleton(tags), page, pageSize, sortBy, sortOrder));
     }
 
-    @PostMapping("/match")
-    public ResponseEntity<MediaSearchResult> matchSearch(@Valid @RequestBody MediaMatchSearchRequest searchRequest,
-                                                         @RequestParam(required = false) int page,
+    @PostMapping("/match-all")
+    public ResponseEntity<MediaSearchResult> matchAllSearch(@RequestParam(required = false) int page,
                                                          @RequestParam(required = false) SortBy sortBy,
-                                                         @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
-        return ResponseEntity.ok().body(
-                mediaSearchService.searchMatch(searchRequest.field, searchRequest.text, page, pageSize, sortBy, sortOrder));
+                                                         @RequestParam(required = false) SortOrder sortOrder) throws IOException {
+        return ResponseEntity.ok().body(mediaSearchService.searchMatchAll(page, pageSize, sortBy, sortOrder));
     }
 }

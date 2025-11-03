@@ -219,9 +219,8 @@ public class OpenSearchService {
         return searchWithQueryBuilder(q, page, size, sortBy, sortOrder);
     }
 
-    public SearchResponse searchMatchByOneField(String field, Object text, int page, int size,
-                                                SortBy sortBy, SortOrder sortOrder) throws IOException {
-        QueryBuilder q = QueryBuilders.matchQuery(field, text);
+    public SearchResponse searchMatchAll(int page, int size, SortBy sortBy, SortOrder sortOrder) throws IOException {
+        QueryBuilder q = QueryBuilders.matchAllQuery();
         return searchWithQueryBuilder(q, page, size, sortBy, sortOrder);
     }
 

@@ -117,11 +117,9 @@ public class MediaSearchService {
         return mapSearchResult.searchResult;
     }
 
-    public MediaSearchResult searchMatch(String field, Object searchStrings, int page, int size,
-                                         SortBy sortBy, SortOrder sortOrder) throws IOException, IllegalAccessException {
-        ContentMetaData.validateSearchFieldName(field);
+    public MediaSearchResult searchMatchAll(int page, int size, SortBy sortBy, SortOrder sortOrder) throws IOException {
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.searchMatchByOneField(field, searchStrings, page, size, sortBy, sortOrder), page, size);
+                openSearchService.searchMatchAll(page, size, sortBy, sortOrder), page, size);
 
         processThumbnails(mapSearchResult.searchItems);
         cacheMediaSearchItems(mapSearchResult.searchItems);
