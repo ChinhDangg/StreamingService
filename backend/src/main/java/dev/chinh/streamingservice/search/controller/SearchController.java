@@ -83,6 +83,15 @@ public class SearchController {
                 mediaSearchService.searchByKeywords(ContentMetaData.CHARACTERS, Collections.singleton(characters), page, pageSize, sortBy, sortOrder));
     }
 
+    @PostMapping("/authors")
+    public ResponseEntity<MediaSearchResult> authorsSearch(@RequestParam List<String> authors,
+                                                           @RequestParam(required = false) int page,
+                                                           @RequestParam(required = false) SortBy sortBy,
+                                                           @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
+        return ResponseEntity.ok().body(
+                mediaSearchService.searchByKeywords(ContentMetaData.AUTHORS, Collections.singleton(authors), page, pageSize, sortBy, sortOrder));
+    }
+
     @PostMapping("/tags")
     public ResponseEntity<MediaSearchResult> tagsSearch(@RequestParam List<String> tags,
                                                               @RequestParam(required = false) int page,
