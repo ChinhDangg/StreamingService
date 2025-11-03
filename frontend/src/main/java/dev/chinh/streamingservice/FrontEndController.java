@@ -12,4 +12,14 @@ public class FrontEndController {
     public String searchPage(){
         return "video-player/search-result-test2";
     }
+
+    @GetMapping("/video")
+    public String videoPage() {
+        return "video-player/video-page";
+    }
+
+    @GetMapping("/album")
+    public String albumPage() {
+        return "video-player/album-page";
+    }
 }

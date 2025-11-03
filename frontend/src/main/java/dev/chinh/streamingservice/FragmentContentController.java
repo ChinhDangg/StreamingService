@@ -11,7 +11,7 @@ import java.util.*;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/page")
+@RequestMapping("/page/frag")
 public class FragmentContentController {
 
     private final TemplateEngine templateEngine;
