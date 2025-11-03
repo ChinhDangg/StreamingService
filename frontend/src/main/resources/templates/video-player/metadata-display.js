@@ -11,7 +11,7 @@ export function displayContentInfo(mediaInfo) {
         const authorNodeTem = authorContainer.querySelector('.author-info');
         mediaInfo.authors.forEach(author => {
             const authorNode = helperCloneAndUnHideNode(authorNodeTem);
-            authorNode.href = '/search-page/author/' + author;
+            authorNode.href = `/page/search?authors=${author}`;
             authorNode.textContent = author;
             authorContainer.appendChild(authorNode);
         });
@@ -25,9 +25,23 @@ export function displayContentInfo(mediaInfo) {
         const universeNodeTem = universeContainer.querySelector('.universe-info');
         mediaInfo.universes.forEach(universe => {
             const universeNode = helperCloneAndUnHideNode(universeNodeTem);
-            universeNode.href = '/search-page/universe/' + universe;
+            universeNode.href = `/page/search?universes=${universe}`;
             universeNode.textContent = universe;
             universeContainer.appendChild(universeNode);
+        });
+    }
+
+    if (mediaInfo.characters) {
+        const characterContainer = mainContainer.querySelector('.characters-info-container');
+        const first = characterContainer.firstElementChild;
+        if (first) characterContainer.replaceChildren(first);
+
+        const characterNodeTem = characterContainer.querySelector('.character-info');
+        mediaInfo.characters.forEach(character => {
+            const characterNode = helperCloneAndUnHideNode(characterNodeTem);
+            characterNode.href = `/page/search?characters=${character}`;
+            characterNode.textContent = character;
+            characterContainer.appendChild(characterNode);
         });
     }
 
@@ -39,7 +53,7 @@ export function displayContentInfo(mediaInfo) {
         const tagNodeTem = tagContainer.querySelector('.tag-info');
         mediaInfo.tags.forEach(tag => {
             const tagNode = helperCloneAndUnHideNode(tagNodeTem);
-            tagNode.href = '/search-page/tag/' + tag;
+            tagNode.href = `/page/search?tags=${tag}`;
             tagNode.textContent = tag;
             tagContainer.appendChild(tagNode);
         });

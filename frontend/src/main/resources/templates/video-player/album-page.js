@@ -184,7 +184,7 @@ async function getVideoPlayer() {
     if (videoPlayer)
         return true;
 
-    // const response = await fetch('/page/video-player');
+    // const response = await fetch('/page/frag/video-player');
     // if (!response.ok) {
     //     alert("Failed to fetch video player");
     //     return;
