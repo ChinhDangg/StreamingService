@@ -37,34 +37,30 @@
     <!-- Sort By Section -->
     <div class="flex items-center space-x-2">
         <span class="text-sm font-medium text-gray-400">Sort by:</span>
-
-        <div class="flex items-center space-x-2">
+        <div id="sortByOptions" class="flex items-center space-x-2">
             <!-- Active -->
-            <button class="px-3 py-1.5 text-sm rounded-md bg-indigo-600 text-white font-medium border border-indigo-500 shadow-md">
+            <button class="upload-btn px-3 py-1.5 text-sm rounded-md bg-indigo-600 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:bg-purple-600 transition">
                 Upload
             </button>
             <!-- Inactive -->
-            <button class="px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:border-purple-400 hover:text-white transition">
+            <button class="year-btn px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:bg-purple-600 transition">
                 Year
             </button>
-            <button class="px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:border-purple-400 hover:text-white transition">
+            <button class="length-btn px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:bg-purple-600 transition">
                 Length
             </button>
-            <button class="px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:border-purple-400 hover:text-white transition">
+            <button class="size-btn px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:bg-purple-600 transition">
                 Size
             </button>
         </div>
     </div>
 
     <!-- Sort Order Section -->
-    <div id="sortDirection" class="flex items-center space-x-2 mt-3">
+    <div class="flex items-center space-x-2 mt-3">
         <span class="text-sm font-medium text-gray-400">Order:</span>
-        <button id="directionToggle"
-                class="px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
-            <span id="directionLabel">Ascending</span>
-            <svg id="directionIcon" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transform transition-transform rotate-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-            </svg>
+        <button id="sortOrderButton"
+                class="select-none px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
+            <span>Descending</span>
         </button>
     </div>
 </div>
@@ -200,7 +196,7 @@
 
     <!-- Fixed Top Bar -->
     <div class="fixed top-0 left-0 w-full z-20 bg-gray-900/90 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-6 py-4">
-        <h2 class="quick-view-title text-lg font-semibold tracking-wide">Preview: Media Title</h2>
+        <h2 class="quick-view-title text-lg font-semibold tracking-wide">Quick View</h2>
         <button id="closeOverlayBtn"
                 class="text-gray-400 hover:text-gray-200 transition">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -212,7 +208,7 @@
 
     <!-- Scrollable Content Area -->
     <div id="overlayContent" class="flex-1 overflow-y-auto pt-[72px] pb-10 flex justify-center">
-        <div class="overlayContent-inner-wrapper relative bg-gray-900/90 rounded-lg shadow-xl w-[90%] max-w-5xl mt-6 mb-16 animate-slideIn"
+        <div class="overlayContent-inner-wrapper relative bg-gray-900/90 rounded-lg shadow-xl w-[90%] max-w-5xl mt-6 mb-16 animate-slideIn self-start"
              onclick="event.stopPropagation();">
 
         </div>
