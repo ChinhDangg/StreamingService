@@ -10,7 +10,7 @@ public class FrontEndController {
 
     @GetMapping("/search")
     public String searchPage(){
-        return "video-player/search-result-test2";
+        return "video-player/search-page";
     }
 
     @GetMapping("/video")

@@ -107,7 +107,7 @@ public class MediaSearchService {
     }
 
     public MediaSearchResult searchByKeywords(String field, Collection<Object> keywords, int page, int size,
-                                              SortBy sortBy, SortOrder sortOrder) throws IOException, IllegalAccessException {
+                                              SortBy sortBy, SortOrder sortOrder) throws IOException {
         ContentMetaData.validateSearchFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 openSearchService.searchTermByOneField(field, keywords, page, size, sortBy, sortOrder), page, size);
