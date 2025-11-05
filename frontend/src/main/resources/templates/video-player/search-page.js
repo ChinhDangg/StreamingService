@@ -32,13 +32,14 @@ const SEARCH_INFO = Object.freeze({
     ADVANCE_REQUEST_BODY: 'advanceRequestBody',
     SEARCH_TYPE: 'searchType'
 });
-let currentSearchInfo = new Map();
+const currentSearchInfo = new Map();
+const keywordSearchMap = new Map();
 
 let previousSortByButton = null;
 
 async function initialize() {
     initializeSortByOptions();
-    initializeKeywordSearchArea();
+    initializeAdvanceSearchArea();
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     currentSearchInfo.set(SEARCH_INFO.PAGE, urlParams.get(SEARCH_INFO.PAGE) || 0);
@@ -62,12 +63,43 @@ async function initialize() {
     await sendSearchRequestOnCurrentInfo();
 }
 
-const keywordSearchMap = new Map();
-let keywordSearchTimeOut = null;
-
 initialize();
 
+const searchForm = document.querySelector('#search-form');
+searchForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const searchString = document.querySelector('#search-input').value;
+    validateSearchString(searchString);
+});
+
+function validateSearchString(searchString) {
+    if (searchString.length < 2) {
+        setAlertStatus('Invalid search string', 'Search string must be at least 2 characters');
+    } else if (searchString.length > 200) {
+        setAlertStatus('Invalid search string', 'Search string exceeded 200 characters');
+    }
+}
+
+function initializeAdvanceSearchArea() {
+    const advanceSearchForm = document.getElementById('advanceSearchForm');
+    advanceSearchForm.querySelector('#advancedSearchBtn').addEventListener('click', () => {
+        advanceSearchForm.querySelector('#advanceSearchSubmitBtn').classList.toggle('hidden');
+        advanceSearchForm.querySelector('#advanceSearchContentContainer').classList.toggle('hidden');
+        initializeKeywordSearchArea();
+    });
+
+    advanceSearchForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+    });
+}
+
+let keywordSearchAreaInitialized = false;
+let keywordSearchTimeOut = null;
+
 function initializeKeywordSearchArea() {
+    if (keywordSearchAreaInitialized) return;
+    keywordSearchAreaInitialized = true;
     const fnKeywordSearch = async (pathVariable, value) => {
         // const response = await fetch(`/api/search-suggestion/${pathVariable}?s=${value}`);
         // if (!response.ok) {
@@ -79,15 +111,17 @@ function initializeKeywordSearchArea() {
     };
     const makeSearchFn = (path) => async (value) => fnKeywordSearch(path, value);
 
+    const keywordSearchContainer = document.getElementById('keywordSearchContainer');
+    const keywordSearchTem = keywordSearchContainer.querySelector('.keyword-search');
 
     const authorMap = new Map();
-    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.AUTHOR), authorMap, document.getElementById('author-search'));
+    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.AUTHOR), authorMap, KEYWORDS.AUTHOR, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
     const characterMap = new Map();
-    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.CHARACTER), authorMap, document.getElementById('character-search'));
+    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.CHARACTER), authorMap, KEYWORDS.CHARACTER, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
     const universeMap = new Map();
-    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.UNIVERSE), authorMap, document.getElementById('universe-search'));
+    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.UNIVERSE), authorMap, KEYWORDS.UNIVERSE, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
     const tagMap = new Map();
-    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.TAG), authorMap, document.getElementById('tag-search'));
+    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.TAG), authorMap, KEYWORDS.TAG, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
 
     keywordSearchMap.set(KEYWORDS.AUTHOR, authorMap);
     keywordSearchMap.set(KEYWORDS.CHARACTER, characterMap);
@@ -95,9 +129,12 @@ function initializeKeywordSearchArea() {
     keywordSearchMap.set(KEYWORDS.TAG, tagMap);
 }
 
-function addEventKeywordSearchArea(fnKeywordSearch, addedMap, searchContainer) {
+function addEventKeywordSearchArea(fnKeywordSearch, addedMap, searchLabel, searchContainer) {
+    searchLabel = searchLabel.charAt(0).toUpperCase() + searchLabel.slice(1);
+    searchContainer.querySelector('.search-label-text').textContent = searchLabel;
 
     const searchInput = searchContainer.querySelector('.search-input');
+    searchInput.placeholder = 'Search ' + searchLabel;
     const searchDropDownUl = searchContainer.querySelector('.search-dropdown-ul');
     const searchDropDownLiTem = searchDropDownUl.querySelector('li');
     const selectedCount = searchContainer.querySelector('.selected-count');
@@ -204,8 +241,6 @@ function addEventKeywordSearchArea(fnKeywordSearch, addedMap, searchContainer) {
     });
 }
 
-
-
 function initializeSortByOptions() {
     const sortByOptions = document.getElementById('sortByOptions');
     previousSortByButton = sortByOptions.querySelector('.upload-btn');
@@ -265,23 +300,6 @@ document.getElementById('sortOrderButton').addEventListener('click', (e) => {
         e.target.disabled = false;
     });
 });
-
-const searchForm = document.querySelector('#search-form');
-searchForm.addEventListener('submit', (e) => {
-   e.preventDefault();
-
-   const searchString = document.querySelector('#search-input').value;
-   validateSearchString(searchString);
-
-});
-
-function validateSearchString(searchString) {
-    if (searchString.length < 2) {
-        setAlertStatus('Invalid search string', 'Search string must be at least 2 characters');
-    } else if (searchString.length > 200) {
-        setAlertStatus('Invalid search string', 'Search string exceeded 200 characters');
-    }
-}
 
 let alertStatusTimer = null;
 const alertStatus = document.getElementById('alert-status');
