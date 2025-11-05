@@ -91,6 +91,65 @@ function initializeAdvanceSearchArea() {
 
     advanceSearchForm.addEventListener('submit', (e) => {
         e.preventDefault();
+        const sortBy = advanceSearchForm.querySelector('input[name="sortBy"]:checked')?.value;
+        const orderBy = advanceSearchForm.querySelector('input[name="orderBy"]:checked')?.value;
+        const yearFrom = advanceSearchForm.querySelector('.year-from-input').value;
+        const yearTo = advanceSearchForm.querySelector('.year-to-input').value;
+        const uploadFrom = advanceSearchForm.querySelector('.upload-from-input').value;
+        const uploadTo = advanceSearchForm.querySelector('.upload-to-input').value;
+
+        const getRangeField = (field, from, to) => {
+            return {
+                field: field,
+                from: from,
+                to: to
+            }
+        }
+
+        const rangeFields = [];
+        if (yearFrom || yearTo) {
+            rangeFields.push(getRangeField(SORT_BY.YEAR, yearFrom, yearTo));
+        }
+        if (uploadFrom || uploadTo) {
+            rangeFields.push(getRangeField(SORT_BY.UPLOAD_DATE, uploadFrom, uploadTo));
+        }
+
+        const includeFields = [];
+        const excludeFields = [];
+
+        const getSearchField = (field, values, mustAll) => {
+            return {
+                field: field,
+                values: values,
+                mustAll: mustAll
+            }
+        }
+
+        Object.keys(KEYWORDS).forEach(key => {
+            const value = KEYWORDS[key];
+            const keywordMap = keywordSearchMap.get(value);
+            if (keywordMap.size !== 0) {
+                const include = [];
+                const exclude = [];
+                keywordMap.forEach((value, key) => {
+                   if (value.included)
+                       include.push(key);
+                   else
+                       exclude.push(key);
+                });
+                if (include.length)
+                    includeFields.push(getSearchField(value, include, true));
+                if (exclude.length)
+                    excludeFields.push(getSearchField(value, exclude, false));
+            }
+        });
+
+        const advanceRequestBody = {
+            includeFields: includeFields,
+            excludeFields: excludeFields,
+            rangeFields: rangeFields
+        }
+        console.log(advanceRequestBody);
     });
 }
 
@@ -401,6 +460,8 @@ function getSearchUrl(searchType, page, sortBy, sortOrder,
             return getBasicSearchUrl(searchString, page, sortBy, sortOrder);
         case SEARCH_TYPES.KEYWORD:
             return getKeywordSearchUrl(keywordField, keywordValueList, page, sortBy, sortOrder);
+        case SEARCH_TYPES.ADVANCE:
+            return getAdvanceSearchUrl(page, sortBy, sortOrder);
         default:
             console.log('default to search match all');
             return getMatchAllSearchUrl(page, sortBy, sortOrder);
@@ -434,6 +495,15 @@ function getKeywordSearchUrl(keywordField, valueList, page, sortBy, sortOrder) {
         sortOrder: sortOrder
     });
     return `/api/${keywordField}?${queryParams}`;
+}
+
+function getAdvanceSearchUrl(page, sortBy, sortOrder) {
+    const queryParams = new URLSearchParams({
+        page: page,
+        sortBy: sortBy,
+        sortOrder: sortOrder
+    });
+    return `/api/search/advance?${queryParams}`;
 }
 
 displaySearchResults(null, SEARCH_TYPES.BASIC, SORT_BY.YEAR, SORT_ORDERS.DESC, "Genshin Impact");
@@ -841,60 +911,53 @@ function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
     const goFirstControl = leftControl.querySelector('.page-first-control');
     const goLastControl = rightControl.querySelector('.page-last-control');
 
+    // --- prev / first ---
     if (page > 0) {
         const prevControl = leftControl.querySelector('.page-prev-control');
         prevControl.classList.remove('hidden');
         const prevIndex = page - 1;
         prevControl.href = getPageSearchUrl(searchType, prevIndex, sortBy, sortOrder, searchString, keywordField, keywordValueList);
-        prevControl.addEventListener("click", async (e) => {
-            await pageClickHandler(e, prevIndex);
-        });
+        prevControl.onclick = async (e) => await pageClickHandler(e, prevIndex);
+
         const prevControlDup = helperCloneAndUnHideNode(prevControl);
-        prevControlDup.addEventListener("click", async (e) => {
-            await pageClickHandler(e, prevIndex);
-        });
+        prevControlDup.onclick = async (e) => await pageClickHandler(e, prevIndex);
         rightControl.appendChild(prevControlDup);
 
         goFirstControl.href = getPageSearchUrl(searchType, 0, sortBy, sortOrder, searchString, keywordField, keywordValueList);
-        goFirstControl.addEventListener("click", async (e) => {
-            await pageClickHandler(e, 0);
-        });
+        goFirstControl.onclick = async (e) => await pageClickHandler(e, 0);
     } else {
         leftControl.querySelector('.page-prev-control').classList.add('hidden');
         goFirstControl.classList.add('hidden');
     }
 
+    // --- next / last ---
     if (page < totalPages - 1) {
         const nextControl = leftControl.querySelector('.page-next-control');
         nextControl.classList.remove('hidden');
         const nextIndex = page + 1;
         nextControl.href = getPageSearchUrl(searchType, nextIndex, sortBy, sortOrder, searchString, keywordField, keywordValueList);
-        nextControl.addEventListener("click", async (e) => {
-            await pageClickHandler(e, nextIndex);
-        });
+        nextControl.onclick = async (e) => await pageClickHandler(e, nextIndex);
+
         const nextControlDup = helperCloneAndUnHideNode(nextControl);
-        nextControlDup.addEventListener("click", async (e) => {
-            await pageClickHandler(e, nextIndex);
-        });
+        nextControlDup.onclick = async (e) => await pageClickHandler(e, nextIndex);
         rightControl.appendChild(nextControlDup);
 
-        goLastControl.href = getPageSearchUrl(searchType, totalPages-1, sortBy, sortOrder, searchString, keywordField, keywordValueList);
-        goLastControl.addEventListener("click", async (e) => {
-            await pageClickHandler(e, totalPages-1);
-        });
+        goLastControl.href = getPageSearchUrl(searchType, totalPages - 1, sortBy, sortOrder, searchString, keywordField, keywordValueList);
+        goLastControl.onclick = async (e) => await pageClickHandler(e, totalPages - 1);
     } else {
         leftControl.querySelector('.page-next-control').classList.add('hidden');
         goLastControl.classList.add('hidden');
     }
 
+    // --- numbered pages ---
     const start = Math.max(page - 2, 0);
     const maxPageShow = start + 5;
 
     pageNumContainer.innerHTML = '';
     for (let i = start; i < totalPages; i++) {
         let currentPage = i;
-
         let reachedMax = false;
+
         if (currentPage === maxPageShow) {
             if (maxPageShow < totalPages - 1) {
                 const threeDots = helperCloneAndUnHideNode(pageContainer.querySelector('.page-dots'));
@@ -904,28 +967,42 @@ function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
             reachedMax = true;
         }
 
-        const pageLinkNode = (currentPage !== page) ? helperCloneAndUnHideNode(pageLinkNodeTem)
-                            : helperCloneAndUnHideNode(pageContainer.querySelector('.page-selected-link-node'));
+        const pageLinkNode = (currentPage !== page)
+            ? helperCloneAndUnHideNode(pageLinkNodeTem)
+            : helperCloneAndUnHideNode(pageContainer.querySelector('.page-selected-link-node'));
+
         pageLinkNode.innerText = currentPage + 1;
         pageLinkNode.href = getPageSearchUrl(searchType, currentPage, sortBy, sortOrder, searchString, keywordField, keywordValueList);
+
         if (currentPage === page) {
-            pageLinkNode.addEventListener('click', (e) => {
-                e.preventDefault();
-            });
+            pageLinkNode.onclick = (e) => e.preventDefault();
         } else {
-            pageLinkNode.addEventListener('click', async (e) => {
-                await pageClickHandler(e, currentPage);
-            });
+            pageLinkNode.onclick = async (e) => await pageClickHandler(e, currentPage);
         }
+
         pageNumContainer.appendChild(pageLinkNode);
 
-        if (reachedMax)
-            break;
+        if (reachedMax) break;
     }
 
+    // --- clone bottom block to top and preserve click handlers ---
     paginationTop.innerHTML = '';
     const paginationNodeDup = helperCloneAndUnHideNode(pageNodeBottom.firstElementChild);
     paginationTop.appendChild(paginationNodeDup);
+
+    // copy hrefs and onclicks from bottom to top anchors
+    const bottomAnchors = pageNodeBottom.querySelectorAll('a');
+    const topAnchors = paginationTop.querySelectorAll('a');
+    topAnchors.forEach((topA, i) => {
+        const bottomA = bottomAnchors[i];
+        if (bottomA) {
+            topA.href = bottomA.href;
+            topA.onclick = bottomA.onclick;
+        }
+    });
+
+    paginationTop.classList.remove('hidden');
+    pageNodeBottom.classList.remove('hidden');
 }
 
 async function pageClickHandler(e, page) {
