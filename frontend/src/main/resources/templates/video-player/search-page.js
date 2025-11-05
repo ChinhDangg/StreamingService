@@ -1,3 +1,5 @@
+import {setVideoUrl} from "./set-video-url.js";
+
 const SORT_BY = Object.freeze({
     UPLOAD_DATE: 'UPLOAD_DATE',
     YEAR: 'YEAR',
@@ -36,6 +38,7 @@ let previousSortByButton = null;
 
 async function initialize() {
     initializeSortByOptions();
+    initializeKeywordSearchArea();
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     currentSearchInfo.set(SEARCH_INFO.PAGE, urlParams.get(SEARCH_INFO.PAGE) || 0);
@@ -59,7 +62,149 @@ async function initialize() {
     await sendSearchRequestOnCurrentInfo();
 }
 
+const keywordSearchMap = new Map();
+let keywordSearchTimeOut = null;
+
 initialize();
+
+function initializeKeywordSearchArea() {
+    const fnKeywordSearch = async (pathVariable, value) => {
+        // const response = await fetch(`/api/search-suggestion/${pathVariable}?s=${value}`);
+        // if (!response.ok) {
+        //     setAlertStatus('Search Suggestion Failed', response.statusText);
+        //     return [];
+        // }
+        // return await response.json();
+        return ['Author 1', 'Author 2', 'Author 3'];
+    };
+    const makeSearchFn = (path) => async (value) => fnKeywordSearch(path, value);
+
+
+    const authorMap = new Map();
+    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.AUTHOR), authorMap, document.getElementById('author-search'));
+    const characterMap = new Map();
+    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.CHARACTER), authorMap, document.getElementById('character-search'));
+    const universeMap = new Map();
+    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.UNIVERSE), authorMap, document.getElementById('universe-search'));
+    const tagMap = new Map();
+    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.TAG), authorMap, document.getElementById('tag-search'));
+
+    keywordSearchMap.set(KEYWORDS.AUTHOR, authorMap);
+    keywordSearchMap.set(KEYWORDS.CHARACTER, characterMap);
+    keywordSearchMap.set(KEYWORDS.UNIVERSE, universeMap);
+    keywordSearchMap.set(KEYWORDS.TAG, tagMap);
+}
+
+function addEventKeywordSearchArea(fnKeywordSearch, addedMap, searchContainer) {
+
+    const searchInput = searchContainer.querySelector('.search-input');
+    const searchDropDownUl = searchContainer.querySelector('.search-dropdown-ul');
+    const searchDropDownLiTem = searchDropDownUl.querySelector('li');
+    const selectedCount = searchContainer.querySelector('.selected-count');
+
+    const selectedToggleBtn = searchContainer.querySelector('.selected-toggle-btn');
+    const selectedDropDownUl = searchContainer.querySelector('.selected-dropdown-ul');
+    const selectedDropDownLiTem = selectedDropDownUl.querySelector('li');
+    const unselectedCount = searchContainer.querySelector('.unselected-count');
+
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(keywordSearchTimeOut);
+        const value = e.target.value.trim();
+        if (value.length < 2) {
+            searchDropDownUl.classList.add('hidden');
+            return;
+        }
+
+        keywordSearchTimeOut = setTimeout(async () => {
+            const foundValue = await fnKeywordSearch(value);
+            if (!foundValue.length) {
+                searchDropDownUl.classList.add('hidden');
+                return;
+            }
+            const first = searchDropDownUl.firstElementChild;
+            if (first) searchDropDownUl.replaceChildren(first);
+            foundValue.forEach(item => {
+                const searchDropDownLi = helperCloneAndUnHideNode(searchDropDownLiTem);
+                searchDropDownLi.textContent = item;
+                const style = addedMap.has(item) ? 'bg-indigo-700' : 'hover:bg-gray-700';
+                searchDropDownLi.classList.add(style);
+                searchDropDownUl.appendChild(searchDropDownLi);
+                searchDropDownLi.addEventListener('click', () => {
+                    if (addedMap.has(item)) {
+                        addedMap.get(item).selectedDropDownLi.remove();
+                        addedMap.delete(item);
+                        if (addedMap.size === 0) {
+                            selectedToggleBtn.classList.add('hidden');
+                            selectedDropDownUl.classList.add('hidden');
+                        }
+                    } else {
+                        selectedToggleBtn.classList.remove('hidden');
+                        const selectedDropDownLi = helperCloneAndUnHideNode(selectedDropDownLiTem);
+                        selectedDropDownLi.querySelector('span').textContent = item;
+                        selectedDropDownLi.classList.remove('hover:bg-gray-700');
+                        addedMap.set(item, { included: true, selectedDropDownLi: selectedDropDownLi });
+                        selectedDropDownUl.appendChild(selectedDropDownLi);
+
+                        const inclusionBtn = selectedDropDownLi.querySelector('.inclusion-btn');
+                        inclusionBtn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            const included = addedMap.get(item).included;
+                            inclusionBtn.textContent = included ? 'Excluded' : 'Included';
+                            const styleList = ['bg-green-600', 'hover:bg-green-700', 'bg-red-600', 'hover:bg-red-700']
+                            styleList.forEach(style => inclusionBtn.classList.toggle(style));
+                            addedMap.get(item).included = !included;
+                            let falseCount = 0;
+                            for (const value of addedMap.values()) {
+                                if (value === false)
+                                    falseCount++;
+                            }
+                            unselectedCount.textContent = falseCount;
+                        });
+                        selectedDropDownLi.querySelector('.remove-btn').addEventListener('click', (e) => {
+                            e.preventDefault();
+                            addedMap.get(item).selectedDropDownLi.remove();
+                            addedMap.delete(item);
+                            selectedCount.textContent = addedMap.size;
+                            if (addedMap.size === 0) {
+                                selectedToggleBtn.classList.add('hidden');
+                                selectedDropDownUl.classList.add('hidden');
+                            }
+                        });
+                    }
+                    selectedCount.textContent = addedMap.size;
+                    searchDropDownLi.classList.toggle('bg-indigo-700');
+                    searchDropDownLi.classList.toggle('hover:bg-gray-700');
+                });
+            });
+            searchDropDownUl.classList.remove('hidden');
+        }, 500);
+
+    });
+    searchInput.addEventListener('blur', () => {
+        setTimeout(() => {
+            if (document.activeElement !== searchDropDownUl)
+                searchDropDownUl.classList.add('hidden');
+        }, 150);
+        clearTimeout(keywordSearchTimeOut);
+    });
+    searchDropDownUl.addEventListener('blur', () => {
+        setTimeout(() => {
+            searchDropDownUl.classList.add('hidden');
+        }, 150);
+        clearTimeout(keywordSearchTimeOut);
+    });
+
+    selectedToggleBtn.addEventListener('click', () => {
+        selectedDropDownUl.classList.toggle('hidden');
+    });
+    selectedDropDownUl.addEventListener('blur', () => {
+        setTimeout(() => {
+            selectedDropDownUl.classList.add('hidden');
+        }, 150);
+    });
+}
+
+
 
 function initializeSortByOptions() {
     const sortByOptions = document.getElementById('sortByOptions');
@@ -154,7 +299,6 @@ async function sendSearchRequest(searchType, page, sortBy, sortOrder,
                                  searchString = null,
                                  keywordField = null, keywordValueList = null,
                                  advanceRequestBody = null) {
-    currentSearchInfo.set(SEARCH_INFO.PAGE, page);
     switch (searchType) {
         case SEARCH_TYPES.BASIC:
             return requestSearch(searchString, page, sortBy, sortOrder);
@@ -221,7 +365,7 @@ async function requestAdvanceSearch(advanceRequestBody, page, sortBy, sortOrder)
         return;
     }
     const results = await response.json();
-    displaySearchResults(results, SEARCH_TYPES.ADVANCE, sortBy, sortOrder, null, null, null, advanceRequestBody);
+    displaySearchResults(results, SEARCH_TYPES.ADVANCE, sortBy, sortOrder);
 }
 
 function getPageSearchUrl(searchType, page, sortBy, sortOrder,
@@ -278,8 +422,7 @@ displaySearchResults(null, SEARCH_TYPES.BASIC, SORT_BY.YEAR, SORT_ORDERS.DESC, "
 
 function displaySearchResults(results, searchType, sortBy, sortOrder,
                               searchString,
-                              keywordField, keywordValueList,
-                              advanceRequestBody) {
+                              keywordField, keywordValueList) {
     results = {
         "searchItems": [
             {
@@ -330,7 +473,7 @@ function displaySearchResults(results, searchType, sortBy, sortOrder,
         "total": 2
     }
     displayPagination(results.page, results.totalPages, searchType, sortBy, sortOrder,
-        searchString, keywordField, keywordValueList, advanceRequestBody);
+        searchString, keywordField, keywordValueList);
 
     displaySearchItems(results.searchItems);
 }
@@ -486,19 +629,13 @@ async function requestVideoPreview(videoId, itemNode) {
 
     playlistUrl = "p720/master.m3u8";
 
-    const video = document.getElementById('video-preview');
+    const video = videoContainer.querySelector('video');
 
     video.pause();
     video.removeAttribute('src');
-    video.load(); // force media element reset
+    video.load();
 
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = playlistUrl + '?_=' + Date.now(); // cache-buster
-    } else if (Hls.isSupported()) {
-        const hls = new Hls({ startPosition: 0 });
-        hls.loadSource(playlistUrl + '?_=' + Date.now());
-        hls.attachMedia(video);
-    }
+    setVideoUrl(videoContainer, playlistUrl);
 
     video.addEventListener('mouseenter', () => {
         video.play();
@@ -537,7 +674,6 @@ async function getAlbumPageContent() {
     // }
     //
     // let albumDoc = await response.json();
-
     let albumDoc = {
         "style": "\n        /* 1. Base style for the image wrapper when it is in full screen */\n        .image-container-wrapper:fullscreen {\n            background-color: black;\n            display: flex;\n            justify-content: center;\n            align-items: center;\n        }\n\n        /* 2. Style the IMAGE element when the class is applied (toggled by JS) */\n        .is-fullscreen-target {\n            /* Crucial: Override any previous size constraints to allow the image to use 100% of the wrapper */\n            width: 100vw !important;\n            height: 100vh !important;\n            max-width: 100vw !important;\n            max-height: 100vh !important;\n\n            /* The key property to preserve aspect ratio */\n            object-fit: contain !important;\n\n            /* Center image visually */\n            margin: auto;\n        }\n\n        /* 3. Hide the button when in full screen (prevents accidental clicks) */\n        .image-container-wrapper:fullscreen .fullscreen-trigger {\n            display: none;\n        }\n    ",
         "html": "<main id=\"main-container\" class=\"max-w-4xl mx-auto px-4 py-8\">\n\n    <div class=\"px-4 py-4 sm:px-0\">\n\n        <h1 class=\"main-title text-4xl font-extrabold tracking-tight text-white\">\n            C\n        </h1>\n\n        <div class=\"flex items-center space-x-4 mt-2 text-lg\">\n\n            <div class=\"flex items-center\">\n                <svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\" class=\"w-5 h-5 mr-2 text-indigo-400 inline-block align-text-bottom\">\n                    <path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.58-7.499-1.632Z\" />\n                </svg>\n                <div class=\"authors-info-container\">\n                    <a href=\"#\" class=\"author-info hidden mr-3 text-gray-300 font-semibold hover:text-indigo-400 transition\">\n                        Jane Doe\n                    </a>\n                </div>\n            </div>\n\n            <span class=\"text-gray-600\">|</span>\n\n            <div class=\"flex items-center\">\n                <svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\" class=\"w-5 h-5 mr-2 text-cyan-400 inline-block align-text-bottom\">\n                    <path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21v-4.5m0 0H3.328a9.004 9.004 0 0 1 7.85-4.887M12 16.5V9a2.25 2.25 0 0 0-2.25-2.25V4.5m2.25 12V19.5\" />\n                </svg>\n                <div class=\"universes-info-container\">\n                    <a href=\"#\" class=\"universe-info hidden mr-3 text-gray-300 font-semibold hover:text-cyan-400 transition\">\n                        Celestial / Cityscape\n                    </a>\n                </div>\n            </div>\n        </div>\n\n        <div class=\"border-t border-gray-700 mt-4\"></div>\n\n        <div class=\"flex items-center mt-3\">\n            <svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"white\" class=\"w-5 h-5 mr-2 inline-block align-text-bottom\" stroke=\"white\">\n                <path d=\"M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V20h14v-3.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05C16.48 13.6 19 14.86 19 16.5V20h4v-3.5c0-2.33-4.67-3.5-7-3.5z\"/>\n            </svg>\n            <div class=\"characters-info-container\">\n                <a href=\"#\" class=\"character-info hidden mr-3 text-gray-300 font-semibold hover:text-cyan-400 transition\">\n                    John Doe\n                </a>\n            </div>\n        </div>\n\n        <div class=\"mt-4\">\n            <span class=\"text-sm font-bold uppercase text-gray-500 mr-3\">Tags:</span>\n            <div class=\"tags-info-container inline-flex flex-wrap gap-2\">\n                <a href=\"#\" class=\"tag-info hidden text-xs font-medium px-3 py-1 rounded-full bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white transition cursor-pointer\">\n                    #Astrophotography\n                </a>\n            </div>\n        </div>\n    </div>\n\n    <div class=\"border-t border-gray-700 mt-4\"></div>\n\n    <div class=\"px-4 py-8 sm:px-0\">\n        <div id=\"album-video-container\" class=\"grid grid-cols-1 gap-6 mb-5\">\n            <div class=\"aspect-[16/9] w-2/3 mx-auto relative hidden video-container-wrapper\">\n                <div class=\"temp-video-holder relative w-full h-full\">\n                    <video class=\"w-full h-full bg-black cursor-pointer\"></video>\n                    <div class=\"play-overlay absolute inset-0 flex items-center justify-center cursor-pointer\">\n                        <svg class=\"play-icon w-20 h-20 text-white opacity-90 transition-opacity duration-300 hover:opacity-100\" viewBox=\"0 0 24 24\" fill=\"currentColor\">\n                            <path d=\"M8 5v14l11-7z\"/>\n                        </svg>\n                    </div>\n                </div>\n                <div class=\"video-holder\"></div>\n            </div>\n        </div> <!-- End of album-video-container -->\n\n        <div id=\"album-image-container\" class=\"grid grid-cols-1 gap-6\">\n            <div id=\"image-wrapper-1\" class=\"image-container-wrapper hidden group relative overflow-hidden rounded-xl shadow-lg bg-gray-800 hover:shadow-2xl transition-shadow duration-300\">\n                <img class=\"image-to-fix object-cover w-full h-auto max-w-full transition-transform duration-500 group-hover:scale-105\"\n                        src=\"https://placehold.co/1920x1080\"\n                        alt=\"A beautiful landscape view\"\n                />\n\n                <button aria-label=\"View image in full screen\"\n                        data-target-id=\"image-wrapper-1\"\n                        class=\"fullscreen-trigger absolute top-4 right-4\n                              p-3 rounded-full bg-black/50 text-white\n                              opacity-0 group-hover:opacity-100\n                              transition-opacity duration-300\n                              hover:bg-black/70 hover:scale-110\">\n\n                    <svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" class=\"w-6 h-6 pointer-events-none\">\n                        <path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 16.5h-4.5m4.5 0v-4.5m0 4.5L15 15\" />\n                    </svg>\n                </button>\n            </div>\n        </div> <!-- End of album-image-container -->\n    </div>\n</main>",
@@ -545,7 +681,6 @@ async function getAlbumPageContent() {
             "album-page.js"
         ]
     };
-
     return albumDoc;
 }
 
@@ -557,7 +692,6 @@ async function getVideoPageContent() {
     // }
     //
     // let videoDoc = await response.json();
-
     let videoDoc = {
         "style": "\n        input[type=\"range\"].seek-slider {\n            appearance: none;\n            width: 100%;\n            height: 5px;\n            border-radius: 4px;\n            background: linear-gradient(to right, #a855f7 0%, #a855f7 0%, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.25) 100%);\n            outline: none;\n            cursor: pointer;\n            transition: background-size 0.1s linear;\n        }\n        input[type=\"range\"].seek-slider::-webkit-slider-thumb {\n            appearance: none;\n            width: 12px;\n            height: 12px;\n            border-radius: 50%;\n            background: #a855f7;\n            cursor: pointer;\n            transition: transform 0.1s;\n        }\n        input[type=\"range\"].seek-slider::-webkit-slider-thumb:hover {\n            transform: scale(1.2);\n        }\n        input[type=\"range\"].seek-slider::-moz-range-thumb {\n            width: 12px;\n            height: 12px;\n            border-radius: 50%;\n            background: #a855f7;\n            border: none;\n            cursor: pointer;\n        }\n    ",
         "html": "<main id=\"main-container\" class=\"order-1 md:order-2 flex-1 p-4 rounded-lg\">\n\n    <div class=\"mt-3 space-y-4 mb-5\">\n        <h3 class=\"main-title text-xl font-semibold\">Video title number one</h3>\n    </div>\n\n    <div>\n        <div data-player=\"videoPlayerContainer\" tabindex=\"0\" class=\"relative aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg select-none\">\n            <video class=\"video-node w-full h-full bg-black cursor-pointer\"></video>\n\n            <!-- Controls -->\n            <div class=\"video-controls absolute bottom-0 left-0 right-0 flex flex-col bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4\n                 opacity-0 transition-opacity duration-300 pointer-events-none\">\n\n                <!-- Seek Slider -->\n                <div class=\"w-full mb-3\">\n                    <input type=\"range\" class=\"seek-slider\" min=\"0\" max=\"100\" value=\"0\" step=\"0.1\">\n                </div>\n\n                <!-- Control Buttons -->\n                <div class=\"flex items-center justify-between text-sm\">\n                    <div class=\"flex items-center space-x-3\">\n                        <button class=\"play-pause p-2 rounded-full bg-white/20 hover:bg-white/40 transition\">\n                            <i data-lucide=\"play\" class=\"w-5 h-5\"></i>\n                        </button>\n\n                        <button onclick=\"replay()\" class=\"relative p-2 rounded-full bg-white/20 hover:bg-white/40 transition\" title=\"Replay 5s\">\n                            <i data-lucide=\"rotate-ccw\" class=\"w-5 h-5\"></i>\n                            <span class=\"absolute bottom-0 right-1 text-[10px] font-bold\">5</span>\n                        </button>\n\n                        <button onclick=\"skip()\" class=\"relative p-2 rounded-full bg-white/20 hover:bg-white/40 transition\" title=\"Forward 5s\">\n                            <i data-lucide=\"rotate-cw\" class=\"w-5 h-5\"></i>\n                            <span class=\"absolute bottom-0 right-1 text-[10px] font-bold\">5</span>\n                        </button>\n                    </div>\n\n                    <div class=\"flex items-center space-x-3\">\n                        <span class=\"current-time text-gray-300\">0:00</span>\n                        <span class=\"text-gray-400\">/</span>\n                        <span class=\"total-time text-gray-300\">0:00</span>\n\n                        <!-- Volume -->\n                        <div class=\"flex items-center space-x-2\">\n                            <button class=\"mute-button p-2 rounded-full bg-white/20 hover:bg-white/40 transition\" title=\"Mute/Unmute\">\n                                <i data-lucide=\"volume-2\" class=\"w-5 h-5\"></i>\n                            </button>\n                            <input type=\"range\" min=\"0\" max=\"1\" step=\"0.01\" value=\"1\"\n                                   class=\"volume-slider w-24 h-[3px] accent-purple-500 cursor-pointer\">\n                        </div>\n\n                        <!-- Compact Speed & Resolution -->\n                        <div class=\"flex items-center space-x-3 relative\">\n                            <div class=\"relative\">\n                                <button class=\"speed-button text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1\">1x</button>\n                                <div class=\"speed-menu absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs\">\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"0.5\">0.5x</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"0.75\">0.75x</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"1\">1x</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"1.25\">1.25x</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"1.5\">1.5x</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"2\">2x</button>\n                                </div>\n                            </div>\n\n                            <div class=\"relative\">\n                                <button class=\"res-button text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1\">720p</button>\n                                <div class=\"res-menu absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs\">\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-res=\"1080p\">1080p</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-res=\"720p\">720p</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-res=\"480p\">480p</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-res=\"360p\">360p</button>\n                                </div>\n                            </div>\n                        </div>\n\n                        <!-- Fullscreen -->\n                        <button class=\"fullscreen-button p-2 rounded-full bg-white/20 hover:bg-white/40 transition\" title=\"Fullscreen\">\n                            <i data-lucide=\"maximize\" class=\"w-5 h-5\"></i>\n                        </button>\n                    </div>\n                </div>\n            </div>\n        </div>\n    </div> <!-- End of video player insert div -->\n\n    <div class=\"flex items-center mt-5 pb-3 border-b border-gray-700\">\n        <svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\" class=\"w-5 h-5 mr-2 text-cyan-400 inline-block align-text-bottom\">\n            <path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21v-4.5m0 0H3.328a9.004 9.004 0 0 1 7.85-4.887M12 16.5V9a2.25 2.25 0 0 0-2.25-2.25V4.5m2.25 12V19.5\" />\n        </svg>\n        <div class=\"universes-info-container\">\n            <a href=\"#\" class=\"universe-info hidden text-gray-300 font-semibold hover:text-cyan-400 transition\">\n                Celestial / Cityscape\n            </a>\n        </div>\n    </div>\n\n    <div class=\"flex items-center mt-3 mb-5 pb-3 border-b border-gray-700\">\n        <svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\" class=\"w-5 h-5 mr-2 text-indigo-400 inline-block align-text-bottom\">\n            <path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.58-7.499-1.632Z\" />\n        </svg>\n        <div class=\"authors-info-container \">\n            <a href=\"#\" class=\"author-info hidden mr-3 text-gray-300 font-semibold hover:text-indigo-400 transition\">\n                Jane Doe\n            </a>\n        </div>\n    </div>\n\n    <div class=\"mt-1\">\n        <div class=\"flex items-center mb-3\">\n            <svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"white\" class=\"w-5 h-5 mr-2 inline-block align-text-bottom\" stroke=\"white\">\n                <path d=\"M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V20h14v-3.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05C16.48 13.6 19 14.86 19 16.5V20h4v-3.5c0-2.33-4.67-3.5-7-3.5z\"/>\n            </svg>\n            <div class=\"characters-info-container\">\n                <a href=\"#\" class=\"character-info hidden mr-3 text-gray-300 font-semibold hover:text-cyan-400 transition\">\n                    John Doe\n                </a>\n            </div>\n        </div>\n\n        <span class=\"text-sm font-bold uppercase text-gray-500 mr-3\">Tags:</span>\n        <div class=\"tags-info-container inline-flex flex-wrap gap-2\">\n            <a href=\"#\" class=\"tag-info hidden text-xs font-medium px-3 py-1 rounded-full bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white transition cursor-pointer\">\n                #Astrophotography\n            </a>\n        </div>\n    </div>\n\n</main>",
@@ -566,7 +700,6 @@ async function getVideoPageContent() {
             "video-page.js"
         ]
     };
-
     return videoDoc;
 }
 
@@ -669,8 +802,7 @@ document.addEventListener('keydown', (e) => {
 
 function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
                            searchString = null,
-                           keywordField = null, keywordValueList = null,
-                           advanceRequestBody = null) {
+                           keywordField = null, keywordValueList = null) {
     const paginationTop = document.getElementById('pagination-node-top');
     const pageNodeBottom = document.getElementById('pagination-node-bottom');
 
@@ -697,17 +829,17 @@ function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
         const prevIndex = page - 1;
         prevControl.href = getPageSearchUrl(searchType, prevIndex, sortBy, sortOrder, searchString, keywordField, keywordValueList);
         prevControl.addEventListener("click", async (e) => {
-            await pageClickHandler(e, prevIndex, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+            await pageClickHandler(e, prevIndex);
         });
         const prevControlDup = helperCloneAndUnHideNode(prevControl);
         prevControlDup.addEventListener("click", async (e) => {
-            await pageClickHandler(e, prevIndex, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+            await pageClickHandler(e, prevIndex);
         });
         rightControl.appendChild(prevControlDup);
 
         goFirstControl.href = getPageSearchUrl(searchType, 0, sortBy, sortOrder, searchString, keywordField, keywordValueList);
         goFirstControl.addEventListener("click", async (e) => {
-            await pageClickHandler(e, 0, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+            await pageClickHandler(e, 0);
         });
     } else {
         leftControl.querySelector('.page-prev-control').classList.add('hidden');
@@ -720,17 +852,17 @@ function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
         const nextIndex = page + 1;
         nextControl.href = getPageSearchUrl(searchType, nextIndex, sortBy, sortOrder, searchString, keywordField, keywordValueList);
         nextControl.addEventListener("click", async (e) => {
-            await pageClickHandler(e, nextIndex, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+            await pageClickHandler(e, nextIndex);
         });
         const nextControlDup = helperCloneAndUnHideNode(nextControl);
         nextControlDup.addEventListener("click", async (e) => {
-            await pageClickHandler(e, nextIndex, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+            await pageClickHandler(e, nextIndex);
         });
         rightControl.appendChild(nextControlDup);
 
         goLastControl.href = getPageSearchUrl(searchType, totalPages-1, sortBy, sortOrder, searchString, keywordField, keywordValueList);
         goLastControl.addEventListener("click", async (e) => {
-            await pageClickHandler(e, totalPages-1, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+            await pageClickHandler(e, totalPages-1);
         });
     } else {
         leftControl.querySelector('.page-next-control').classList.add('hidden');
@@ -764,7 +896,7 @@ function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
             });
         } else {
             pageLinkNode.addEventListener('click', async (e) => {
-                await pageClickHandler(e, currentPage, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+                await pageClickHandler(e, currentPage);
             });
         }
         pageNumContainer.appendChild(pageLinkNode);
@@ -778,14 +910,13 @@ function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
     paginationTop.appendChild(paginationNodeDup);
 }
 
-async function pageClickHandler(e, page,
-                                searchType, sortBy, sortOrder,
-                                searchString = null,
-                                keywordField = null, keywordValueList = null,
-                                advanceRequestBody = null) {
+async function pageClickHandler(e, page) {
     e.preventDefault();
-    const result = await sendSearchRequest(searchType, page, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
-    displaySearchResults(result, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, advanceRequestBody);
+    currentSearchInfo.set(SEARCH_INFO.PAGE, page);
+    e.target.disabled = true;
+    sendSearchRequestOnCurrentInfo().then(() => {
+        e.target.disabled = false;
+    });
 }
 
 function helperCloneAndUnHideNode(node) {
