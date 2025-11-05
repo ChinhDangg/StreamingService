@@ -8,10 +8,10 @@ import lombok.Setter;
 public class MediaSearchRangeField {
 
     private String field;
-    private Object fromValue;
-    private Object toValue;
+    private Object from;
+    private Object to;
 
     public boolean hasAny() {
-        return field != null && !field.isBlank() && (fromValue != null || toValue != null);
+        return field != null && !field.isBlank() && (from != null || to != null);
     }
 }

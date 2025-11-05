@@ -149,8 +149,8 @@ public class OpenSearchService {
         if (mediaSearchRanges != null) {
             for (MediaSearchRangeField mediaSearchRange : mediaSearchRanges) {
                 RangeQueryBuilder rangeQuery = QueryBuilders.rangeQuery(mediaSearchRange.getField());
-                if (mediaSearchRange.getFromValue() != null) rangeQuery.gte(mediaSearchRange.getFromValue());
-                if (mediaSearchRange.getToValue() != null) rangeQuery.lte(mediaSearchRange.getToValue());
+                if (mediaSearchRange.getFrom() != null) rangeQuery.gte(mediaSearchRange.getFrom());
+                if (mediaSearchRange.getTo() != null) rangeQuery.lte(mediaSearchRange.getTo());
                 rootQuery.must(rangeQuery);
             }
         }
