@@ -47,7 +47,7 @@ public class MediaSearchService {
     }
 
     public MediaSearchResult advanceSearch(MediaSearchRequest request, int page, int size,
-                                           SortBy sortBy, SortOrder sortOrder) throws IOException, IllegalAccessException {
+                                           SortBy sortBy, SortOrder sortOrder) throws IOException {
 
         boolean hasAnyField = request.hasAny();
         if (!hasAnyField) {
@@ -61,8 +61,7 @@ public class MediaSearchService {
 
         if (request.getRangeFields() != null) {
             for (MediaSearchRangeField rangeField : request.getRangeFields()) {
-                if (!rangeField.getField().equals(ContentMetaData.UPLOAD_DATE) &&
-                        !rangeField.getField().equals(ContentMetaData.YEAR))
+                if (!rangeField.getField().equals(ContentMetaData.UPLOAD_DATE) && !rangeField.getField().equals(ContentMetaData.YEAR))
                     throw new IllegalArgumentException("Range query not support for field: " + rangeField.getField());
             }
         }
@@ -75,7 +74,7 @@ public class MediaSearchService {
         return mapSearchResult.searchResult;
     }
 
-    private List<SearchFieldGroup> mapMediaSearchFieldsToSearchFieldGroups(List<MediaSearchField> searchFields) throws IllegalAccessException {
+    private List<SearchFieldGroup> mapMediaSearchFieldsToSearchFieldGroups(List<MediaSearchField> searchFields) {
         List<SearchFieldGroup> searchFieldGroups = new ArrayList<>();
         for (MediaSearchField includeField : searchFields) {
             ContentMetaData.validateSearchFieldName(includeField.getField());
