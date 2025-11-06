@@ -139,10 +139,10 @@
 </main>
 
 <div th:fragment="album-script" th:remove="tag" class="hidden">
-    album-page.js
+    /static/js/album/album-page.js
 </div>
 
-<script type="module" src="album-page.js"></script>
+<script type="module" th:src="@{/static/js/album/album-page.js}" src="/static/js/album/album-page.js"></script>
 
 </body>
 </html>

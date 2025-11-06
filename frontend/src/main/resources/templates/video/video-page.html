@@ -225,12 +225,12 @@
 </aside>
 
 <div th:fragment="video-page-script" th:remove="tag" class="hidden">
-    video-player.js
-    video-page.js
+    /static/js/video-player/video-player.js
+    /static/js/video/video-page.js
 </div>
 
-<script type="module" th:src="@{video-player.js}" src="video-player.js"></script>
-<script type="module" th:src="@{video-page.js}" src="video-page.js"></script>
+<script type="module" th:src="@{/static/js/video-player/video-player.js}" src="/static/js/video-player/video-player.js"></script>
+<script type="module" th:src="@{/static/js/video/video-page.js}" src="/static/js/video/video-page.js"></script>
 
 </body>
 </html>

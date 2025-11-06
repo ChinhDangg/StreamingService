@@ -122,10 +122,10 @@
     </main> <!-- End of video fragment -->
 
     <div th:fragment="video-player-script" th:remove="tag" class="hidden">
-        video-player.js
+        /static/js/video-player/video-player.js
     </div>
 
-    <script src="video-player.js"></script>
+    <script th:src="@{/static/js/video-player/video-player.js}" src="/static/js/video-player/video-player.js"></script>
 
 </body>
 </html>
