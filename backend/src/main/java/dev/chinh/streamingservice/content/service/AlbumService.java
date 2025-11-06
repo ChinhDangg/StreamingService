@@ -25,8 +25,6 @@ import org.springframework.web.util.UriUtils;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -52,7 +50,7 @@ public class AlbumService extends MediaService {
         var cacheUrls = getCacheAlbumCreationInfo(albumId, albumCreationId);
         cacheLastAccessForAlbum(albumCreationId, albumId);
         if (cacheUrls != null) {
-            return cacheUrls.mediaUrlList;
+            return reformatMediaUrlList(cacheUrls.mediaUrlList);
         }
 
         AlbumUrlInfo albumUrlInfo = getAlbumUrlInfo(albumId, resolution, request);
@@ -60,6 +58,12 @@ public class AlbumService extends MediaService {
 
         processResizedAlbumImages(albumId, resolution, 0, 5, request);
         return albumUrlInfo.mediaUrlList;
+    }
+
+    private List<MediaUrl> reformatMediaUrlList(List<MediaUrl> mediaUrlList) {
+        return mediaUrlList.stream()
+                .map(m -> new MediaUrl(m.type, "/stream" + m.url.replaceFirst("/chunks", "")))
+                .toList();
     }
 
     private AlbumUrlInfo getAlbumUrlInfo(long albumId, Resolution resolution, HttpServletRequest request) throws Exception {
@@ -87,12 +91,14 @@ public class AlbumService extends MediaService {
         if (isInitial) {
             String bucketJson = objectMapper.writeValueAsString(albumUrlInfo.buckets);
             redisTemplate.opsForHash().put(albumHashId, "buckets", bucketJson);
+            if (albumUrlInfo.pathList != null) {
+                String pathListJson = objectMapper.writeValueAsString(albumUrlInfo.pathList);
+                redisTemplate.opsForHash().put(albumHashId, "pathList", pathListJson);
+            }
         }
         albumUrlInfo.buckets.clear();
 
-        if (isInitial && albumUrlInfo.pathList != null) {
-            String pathListJson = objectMapper.writeValueAsString(albumUrlInfo.pathList);
-            redisTemplate.opsForHash().put(albumHashId, "pathList", pathListJson);
+        if (albumUrlInfo.pathList != null) {
             albumUrlInfo.pathList.clear();
         }
 
