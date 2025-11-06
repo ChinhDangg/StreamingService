@@ -176,11 +176,11 @@ function initializeKeywordSearchArea() {
     const authorMap = new Map();
     addEventKeywordSearchArea(makeSearchFn(KEYWORDS.AUTHOR), authorMap, KEYWORDS.AUTHOR, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
     const characterMap = new Map();
-    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.CHARACTER), authorMap, KEYWORDS.CHARACTER, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
+    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.CHARACTER), characterMap, KEYWORDS.CHARACTER, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
     const universeMap = new Map();
-    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.UNIVERSE), authorMap, KEYWORDS.UNIVERSE, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
+    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.UNIVERSE), universeMap, KEYWORDS.UNIVERSE, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
     const tagMap = new Map();
-    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.TAG), authorMap, KEYWORDS.TAG, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
+    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.TAG), tagMap, KEYWORDS.TAG, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
 
     keywordSearchMap.set(KEYWORDS.AUTHOR, authorMap);
     keywordSearchMap.set(KEYWORDS.CHARACTER, characterMap);
