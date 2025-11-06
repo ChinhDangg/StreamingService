@@ -33,5 +33,5 @@ build/
 .vscode/
 
 minio-data
-
 opensearch-data
+postgres_data
