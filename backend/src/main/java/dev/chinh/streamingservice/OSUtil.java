@@ -24,13 +24,14 @@ public class OSUtil {
     public static long MEMORY_TOTAL = 0;
     public static AtomicLong MEMORY_USABLE;
 
-    public OSUtil() throws Exception {
+    public static void init() throws Exception {
         currentOS = detectOS();
         RAMDISK = getRAMDISKName();
         OSUtil.createRamDisk();
+        OSUtil.startDockerCompose();
     }
 
-    public static OS detectOS() {
+    private static OS detectOS() {
         String osName = System.getProperty("os.name").toLowerCase();
         if (osName.contains("win")) {
             return OS.WINDOWS;
@@ -48,7 +49,7 @@ public class OSUtil {
         MEMORY_USABLE = new AtomicLong(getActualMemoryUsableSpace());
     }
 
-    private String getRAMDISKName() {
+    private static String getRAMDISKName() {
         if (currentOS == OS.WINDOWS) {
             return "R:";
         } else if (currentOS == OS.MAC) {
