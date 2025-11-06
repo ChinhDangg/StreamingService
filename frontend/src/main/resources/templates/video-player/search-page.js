@@ -60,7 +60,7 @@ async function initialize() {
     currentSearchInfo.set(SEARCH_INFO.KEYWORD_VALUE_LIST, values?.split(','));
     currentSearchInfo.set(SEARCH_INFO.ADVANCE_REQUEST_BODY, null);
     currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, urlParams.get(SEARCH_INFO.SEARCH_TYPE));
-    await sendSearchRequestOnCurrentInfo();
+    await sendSearchRequestOnCurrentInfo(false);
 }
 
 initialize();
@@ -333,7 +333,7 @@ async function sortByClick(e, SORT_BY) {
     });
 }
 
-async function sendSearchRequestOnCurrentInfo() {
+async function sendSearchRequestOnCurrentInfo(updatePage = true) {
     await sendSearchRequest(
         currentSearchInfo.get(SEARCH_INFO.SEARCH_TYPE),
         currentSearchInfo.get(SEARCH_INFO.PAGE),
@@ -342,7 +342,8 @@ async function sendSearchRequestOnCurrentInfo() {
         currentSearchInfo.get(SEARCH_INFO.SEARCH_STRING),
         currentSearchInfo.get(SEARCH_INFO.KEYWORD_FIELD),
         currentSearchInfo.get(SEARCH_INFO.KEYWORD_VALUE_LIST),
-        currentSearchInfo.get(SEARCH_INFO.ADVANCE_REQUEST_BODY)
+        currentSearchInfo.get(SEARCH_INFO.ADVANCE_REQUEST_BODY),
+        updatePage
     );
 }
 
@@ -375,7 +376,10 @@ function setAlertStatus(boldStatus, normalText) {
 async function sendSearchRequest(searchType, page, sortBy, sortOrder,
                                  searchString = null,
                                  keywordField = null, keywordValueList = null,
-                                 advanceRequestBody = null) {
+                                 advanceRequestBody = null,
+                                 updatePage = true) {
+    if (updatePage)
+        updatePageUrl(searchType, page, sortBy, sortOrder, searchString, keywordField, keywordValueList);
     switch (searchType) {
         case SEARCH_TYPES.BASIC:
             return requestSearch(searchString, page, sortBy, sortOrder);
@@ -443,6 +447,15 @@ async function requestAdvanceSearch(advanceRequestBody, page, sortBy, sortOrder)
     }
     const results = await response.json();
     displaySearchResults(results, SEARCH_TYPES.ADVANCE, sortBy, sortOrder);
+}
+
+function updatePageUrl(searchType, page, sortBy, sortOrder,
+                       searchString = null,
+                       keywordField = null, keywordValueList = null) {
+    const url = new URL(window.location.href);
+    const pageSearchUrl = getPageSearchUrl(searchType, page, sortBy, sortOrder, searchString, keywordField, keywordValueList);
+    const newUrl = url.origin + pageSearchUrl;
+    window.history.pushState({ path: newUrl }, '', newUrl);
 }
 
 function getPageSearchUrl(searchType, page, sortBy, sortOrder,
