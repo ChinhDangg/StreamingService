@@ -63,23 +63,41 @@ async function initialize() {
     await sendSearchRequestOnCurrentInfo(false);
 }
 
-initialize();
+window.addEventListener('DOMContentLoaded', async () => {
+    await initialize();
+});
 
-const searchForm = document.querySelector('#search-form');
-searchForm.addEventListener('submit', (e) => {
+let searchIsSubmitting = false;
+document.querySelector('#search-form').addEventListener('submit', (e) => {
     e.preventDefault();
+    if (searchIsSubmitting)
+        return;
 
-    const searchString = document.querySelector('#search-input').value;
-    validateSearchString(searchString);
+    const searchString = validateSearchString(document.querySelector('#search-input').value);
+    if (!searchString)
+        return;
+    currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, SEARCH_TYPES.BASIC);
+    currentSearchInfo.set(SEARCH_INFO.SEARCH_STRING, searchString);
+
+    searchIsSubmitting = true;
+    sendSearchRequestOnCurrentInfo().then(() => {
+        searchIsSubmitting = false;
+    });
 });
 
 function validateSearchString(searchString) {
+    searchString = searchString.trim();
     if (searchString.length < 2) {
         setAlertStatus('Invalid search string', 'Search string must be at least 2 characters');
+        return false;
     } else if (searchString.length > 200) {
         setAlertStatus('Invalid search string', 'Search string exceeded 200 characters');
+        return false;
     }
+    return searchString;
 }
+
+let advanceIsSubmitting = false;
 
 function initializeAdvanceSearchArea() {
     const advanceSearchForm = document.getElementById('advanceSearchForm');
@@ -91,6 +109,8 @@ function initializeAdvanceSearchArea() {
 
     advanceSearchForm.addEventListener('submit', (e) => {
         e.preventDefault();
+        if (advanceIsSubmitting)
+            return;
         const sortBy = advanceSearchForm.querySelector('input[name="sortBy"]:checked')?.value;
         const orderBy = advanceSearchForm.querySelector('input[name="orderBy"]:checked')?.value;
         const yearFrom = advanceSearchForm.querySelector('.year-from-input').value;
@@ -125,6 +145,7 @@ function initializeAdvanceSearchArea() {
             }
         }
 
+        let keywordCount = 0;
         Object.keys(KEYWORDS).forEach(key => {
             const value = KEYWORDS[key];
             const keywordMap = keywordSearchMap.get(value);
@@ -141,15 +162,39 @@ function initializeAdvanceSearchArea() {
                     includeFields.push(getSearchField(value, include, true));
                 if (exclude.length)
                     excludeFields.push(getSearchField(value, exclude, false));
+                keywordCount++;
             }
         });
+
+        // only one keyword field entered and no range field entered
+        // perform simple keyword search instead.
+        if (keywordCount === 1 && includeFields.length === 1 && rangeFields.length === 0) {
+            currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, SEARCH_TYPES.KEYWORD);
+            currentSearchInfo.set(SEARCH_INFO.SORT_BY, sortBy);
+            currentSearchInfo.set(SEARCH_INFO.SORT_BY, orderBy);
+            currentSearchInfo.set(SEARCH_INFO.KEYWORD_FIELD, includeFields[0].field);
+            currentSearchInfo.set(SEARCH_INFO.KEYWORD_VALUE_LIST, includeFields[0].values);
+            advanceIsSubmitting = true;
+            sendSearchRequestOnCurrentInfo().then(() => {
+                advanceIsSubmitting = false;
+            });
+            return;
+        }
 
         const advanceRequestBody = {
             includeFields: includeFields,
             excludeFields: excludeFields,
             rangeFields: rangeFields
         }
-        console.log(advanceRequestBody);
+
+        currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, SEARCH_TYPES.ADVANCE);
+        currentSearchInfo.set(SEARCH_INFO.SORT_BY, sortBy);
+        currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, orderBy);
+        currentSearchInfo.set(SEARCH_INFO.ADVANCE_REQUEST_BODY, advanceRequestBody);
+        advanceIsSubmitting = true;
+        sendSearchRequestOnCurrentInfo().then(() => {
+            advanceIsSubmitting = false;
+        });
     });
 }
 
@@ -380,12 +425,21 @@ async function sendSearchRequest(searchType, page, sortBy, sortOrder,
                                  updatePage = true) {
     if (updatePage)
         updatePageUrl(searchType, page, sortBy, sortOrder, searchString, keywordField, keywordValueList);
+    currentSearchInfo.clear();
+    currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, searchType);
+    currentSearchInfo.set(SEARCH_INFO.PAGE, page);
+    currentSearchInfo.set(SEARCH_INFO.SORT_BY, sortBy);
+    currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, sortOrder);
     switch (searchType) {
         case SEARCH_TYPES.BASIC:
+            currentSearchInfo.set(SEARCH_INFO.SEARCH_STRING, searchString);
             return requestSearch(searchString, page, sortBy, sortOrder);
         case SEARCH_TYPES.KEYWORD:
+            currentSearchInfo.set(SEARCH_INFO.KEYWORD_FIELD, keywordField);
+            currentSearchInfo.set(SEARCH_INFO.KEYWORD_VALUE_LIST, keywordValueList);
             return requestKeywordSearch(keywordField, keywordValueList, page, sortBy, sortOrder);
         case SEARCH_TYPES.ADVANCE:
+            currentSearchInfo.set(SEARCH_INFO.ADVANCE_REQUEST_BODY, advanceRequestBody);
             return requestAdvanceSearch(advanceRequestBody, page, sortBy, sortOrder);
         default:
             console.log('default to search match all');
@@ -502,12 +556,12 @@ function getBasicSearchUrl(searchString, page, sortBy, sortOrder) {
 
 function getKeywordSearchUrl(keywordField, valueList, page, sortBy, sortOrder) {
     const queryParams = new URLSearchParams({
-        [keywordField]: valueList.join(','),
+        [keywordField]: valueList,
         page: page,
         sortBy: sortBy,
         sortOrder: sortOrder
     });
-    return `/api/${keywordField}?${queryParams}`;
+    return `/api/search/${keywordField}?${queryParams}`;
 }
 
 function getAdvanceSearchUrl(page, sortBy, sortOrder) {
