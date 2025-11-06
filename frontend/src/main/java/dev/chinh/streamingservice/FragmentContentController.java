@@ -34,7 +34,7 @@ public class FragmentContentController {
     public Map<String, Object> getVideoContent() {
         Context context = new Context();
 
-        String templateName = "video-player/video-page";
+        String templateName = "video/video-page";
 
         Map<String, String> fragmentMap = new HashMap<>();
         fragmentMap.put("style", "video-page-style");
@@ -48,7 +48,7 @@ public class FragmentContentController {
     public Map<String, Object> getAlbumContent() {
         Context context = new Context();
 
-        String templateName = "video-player/album-page";
+        String templateName = "album/album-page";
 
         Map<String, String> fragmentMap = new HashMap<>();
         fragmentMap.put("style", "album-style");
@@ -66,7 +66,6 @@ public class FragmentContentController {
             Set<String> selectors = Collections.singleton(entry.getValue());
             String fragmentHtml = templateEngine.process(templateName, selectors, context);
             response.put(entry.getKey(), fragmentHtml);
-            System.out.println(fragmentHtml);
         }
 
         if (response.get("script") != null) {
