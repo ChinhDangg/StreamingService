@@ -2,6 +2,7 @@ package dev.chinh.streamingservice;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
@@ -21,5 +22,10 @@ public class FrontEndController {
     @GetMapping("/album")
     public String albumPage() {
         return "video-player/album-page";
+    }
+
+    @GetMapping("/search/{extra}")
+    public String searchPage2(@PathVariable String extra) {
+        return "video-player/search-page";
     }
 }
