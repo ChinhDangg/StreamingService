@@ -1,7 +1,6 @@
 package dev.chinh.streamingservice.data.entity;
 
 import jakarta.persistence.*;
-import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -14,14 +13,7 @@ import java.util.Set;
 @NoArgsConstructor
 @Entity
 @Table(name = "universes")
-public class MediaUniverse {
-
-    @Setter(AccessLevel.NONE)
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
-
-    @Column(unique = true, nullable = false)
-    private String name;
+public class MediaUniverse extends MediaNameEntity {
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
