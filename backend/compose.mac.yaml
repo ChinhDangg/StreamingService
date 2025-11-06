@@ -63,6 +63,18 @@ services:
       - "6379:6379"
     command: [ "redis-server", "--save", "", "--appendonly", "no" ]
 
+  postgres:
+    image: postgres:18
+    container_name: postgres
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: media_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+
 #  logstash:
 #    image: docker.elastic.co/logstash/logstash:8.17.10
 #    container_name: logstash
@@ -75,12 +87,3 @@ services:
 #      - opensearch
 #      - postgres
 #
-#  postgres:
-#    image: postgres:18
-#    container_name: postgres
-#    environment:
-#      POSTGRES_USER: myuser
-#      POSTGRES_PASSWORD: secret
-#      POSTGRES_DB: media_db
-#    ports:
-#      - "5432:5432"
