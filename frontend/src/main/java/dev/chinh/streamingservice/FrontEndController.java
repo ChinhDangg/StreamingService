@@ -11,21 +11,21 @@ public class FrontEndController {
 
     @GetMapping("/search")
     public String searchPage(){
-        return "video-player/search-page";
+        return "search/search-page";
     }
 
     @GetMapping("/video")
     public String videoPage() {
-        return "video-player/video-page";
+        return "video/video-page";
     }
 
     @GetMapping("/album")
     public String albumPage() {
-        return "video-player/album-page";
+        return "album/album-page";
     }
 
     @GetMapping("/search/{extra}")
     public String searchPage2(@PathVariable String extra) {
-        return "video-player/search-page";
+        return "search/search-page";
     }
 }
