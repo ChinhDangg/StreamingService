@@ -1,4 +1,4 @@
-import {setVideoUrl} from "./set-video-url.js";
+import {setVideoUrl} from "/static/js/set-video-url.js";
 
 const SORT_BY = Object.freeze({
     UPLOAD_DATE: 'UPLOAD_DATE',
@@ -636,11 +636,14 @@ function displaySearchItems(searchItems) {
     searchItems.forEach(item => {
         const itemContainer = (item.width >= item.height) ? helperCloneAndUnHideNode(horizontalItemTem)
                                         : helperCloneAndUnHideNode(verticalItemTem);
-        itemContainer.querySelector('.thumbnail-image').src = item.thumbnail;
-        itemContainer.querySelector('.resolution-note').textContent = `${item.width}x${item.height}`;
+        if (item.thumbnail)
+            itemContainer.querySelector('.thumbnail-image').src = item.thumbnail;
+        if (item.width && item.height)
+            itemContainer.querySelector('.resolution-note').textContent = `${item.width}x${item.height}`;
         itemContainer.querySelector('.media-title').textContent = item.title;
         itemContainer.querySelector('.date-note').textContent = item.uploadDate;
-        itemContainer.querySelector('.name-note').textContent = item.authors.join(", ");
+        if (item.authors && item.authors.length)
+            itemContainer.querySelector('.name-note').textContent = item.authors.join(", ");
         const itemLink = itemContainer.querySelector('.item-link');
         itemLink.href = `/api/media/content-page/${item.id}`;
         itemLink.addEventListener('click', async (e) => {
