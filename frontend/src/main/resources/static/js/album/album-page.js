@@ -246,16 +246,20 @@ document.addEventListener("keydown", (e) => {
 });
 
 function showNextFullScreen() {
-    const id = parseInt(currentFullScreen[currentFullScreen.length - 1]);
+    const dashIndex = currentFullScreen.lastIndexOf('-')+1;
+    const idStr = currentFullScreen.slice(dashIndex, currentFullScreen.length);
+    const id = parseInt(idStr);
     if (id >= albumItems.length) return;
-    const nextId = currentFullScreen.slice(0, -1) + (id + 1);
+    const nextId = currentFullScreen.slice(0, dashIndex) + (id + 1);
     showFullScreen(nextId);
 }
 
 function showPreviousFullScreen() {
-    const id = parseInt(currentFullScreen[currentFullScreen.length - 1]);
+    const dashIndex = currentFullScreen.lastIndexOf('-')+1;
+    const idStr = currentFullScreen.slice(dashIndex, currentFullScreen.length);
+    const id = parseInt(idStr);
     if (id <= 1) return;
-    const prevId = currentFullScreen.slice(0, -1) + (id - 1);
+    const prevId = currentFullScreen.slice(0, dashIndex) + (id - 1);
     showFullScreen(prevId);
 }
 
