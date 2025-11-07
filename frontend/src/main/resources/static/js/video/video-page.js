@@ -15,7 +15,7 @@ export async function initialize() {
     ]);
 }
 
-await initialize();
+initialize();
 
 async function displayVideoInfo(videoId) {
     const response = await fetch(`/api/media/content/${videoId}`);
