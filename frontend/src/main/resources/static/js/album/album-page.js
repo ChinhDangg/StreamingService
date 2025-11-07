@@ -12,7 +12,7 @@ export async function initialize() {
     ]);
 }
 
-await initialize();
+initialize();
 
 async function displayAlbumInfo(albumId) {
     const response = await fetch(`/api/media/content/${albumId}`);
@@ -20,7 +20,6 @@ async function displayAlbumInfo(albumId) {
         alert("Failed to fetch album info");
         return;
     }
-
     const albumInfo = await response.json();
 
     // const albumInfo = {
@@ -55,26 +54,22 @@ async function displayAlbumInfo(albumId) {
     displayContentInfo(albumInfo);
 }
 
+const BATCH_SIZE = 5;
+let currentBatch = 0;
+let albumItems = [];
+
 async function displayAlbumItems(albumId) {
     const response = await fetch(`/api/album/${albumId}/p1080`);
     if (!response.ok) {
         alert("Failed to fetch album items");
         return;
     }
-    const albumItems = await response.json();
+    albumItems = await response.json();
 
     // const albumItems = [
     //     {
     //         "type": "VIDEO",
     //         "url": "/api/album/2/vid/0"
-    //     },
-    //     {
-    //         "type": "VIDEO",
-    //         "url": "/api/album/2/vid/0"
-    //     },
-    //     {
-    //         "type": "IMAGE",
-    //         "url": "https://placehold.co/1920x1080"
     //     },
     //     {
     //         "type": "IMAGE",
@@ -97,36 +92,87 @@ async function displayAlbumItems(albumId) {
     const imageWrapperTem = imageContainer.querySelector('.image-container-wrapper');
     const videoWrapperTem = videoContainer.querySelector('.video-container-wrapper');
 
-    let count = 0;
-    albumItems.forEach(item => {
+    const addImageItem = (item) => {
+        const imageId = `image-wrapper-${currentBatch}`;
+        const imageWrapper = helperCloneAndUnHideNode(imageWrapperTem);
+        imageWrapper.id = imageId;
+        const imageElement = imageWrapper.querySelector('img');
+        imageElement.src = item.url;
+        imageElement.alt = `image-${currentBatch}`;
+        const buttonElement = imageWrapper.querySelector('button');
+        buttonElement.addEventListener('click', (e) => clickFullScreen(e, imageId));
+        imageContainer.appendChild(imageWrapper);
+    }
+
+    const addVideoItem = (item) => {
+        const videoWrapper = helperCloneAndUnHideNode(videoWrapperTem);
+        videoWrapper.querySelector('.temp-video-holder').addEventListener('click', async () => {
+            console.log('clicked');
+            await requestVideo(item.url, videoWrapper);
+        });
+        videoContainer.appendChild(videoWrapper);
+    }
+
+    for (let i = 0; i < BATCH_SIZE; i++) {
+        if (currentBatch >= albumItems.length)
+            break;
+        const item = albumItems[i];
         if (item.type === 'IMAGE') {
-            const imageId = `image-wrapper-${count}`;
-            const imageWrapper = helperCloneAndUnHideNode(imageWrapperTem);
-            imageWrapper.id = imageId;
-            const imageElement = imageWrapper.querySelector('img');
-            imageElement.src = item.url;
-            imageElement.alt = `image-${count}`;
-            const buttonElement = imageWrapper.querySelector('button');
-            buttonElement.setAttribute('data-target-id', imageId);
-            buttonElement.addEventListener('click', (e) => clickFullScreen(e));
-            imageContainer.appendChild(imageWrapper);
+            addImageItem(item);
         } else if (item.type === 'VIDEO') {
-            const videoWrapper = helperCloneAndUnHideNode(videoWrapperTem);
-            videoWrapper.querySelector('.temp-video-holder').addEventListener('click', async () => {
-                console.log('clicked');
-                await requestVideo(item.url, videoWrapper);
-            });
-            videoContainer.appendChild(videoWrapper);
+            addVideoItem(item);
         }
-        count++;
-    });
+        currentBatch++;
+    }
+
+    if (currentBatch >= albumItems.length) {
+        return;
+    }
+
+    const sentinel = document.createElement("div");
+    document.getElementById('main-container').appendChild(sentinel);
+
+    const observer = new IntersectionObserver(async (entries) => {
+        if (entries[0].isIntersecting) {
+            console.log('intersecting');
+            if (currentBatch >= albumItems.length) {
+                console.log('no more items');
+                observer.unobserve(sentinel);
+                return;
+            }
+            const response = await fetch(`/api/album/${albumId}/p1080/${currentBatch}/check-resized`, {
+                method: 'POST',
+            });
+            if (!response.ok) {
+                alert("Failed to fetch album items");
+                observer.unobserve(sentinel);
+                return;
+            }
+            const start = currentBatch;
+            const end = Math.min(currentBatch + BATCH_SIZE, albumItems.length);
+            for (let i = start; i < end; i++) {
+                const item = albumItems[i];
+                if (item.type === 'IMAGE') {
+                    addImageItem(item);
+                } else if (item.type === 'VIDEO') {
+                    addVideoItem(item);
+                }
+                currentBatch++;
+                console.log('currentBatch', currentBatch);
+            }
+            if (currentBatch >= albumItems.length) {
+                console.log('looped and reached end')
+                observer.unobserve(sentinel);
+            }
+        }
+    }, { rootMargin: '900px' }); // start prefetching before user reaches bottom
+    observer.observe(sentinel);
 }
 
-function clickFullScreen(e) {
+function clickFullScreen(e, imageWrapperId) {
     e.stopPropagation();
 
-    const targetId = e.currentTarget.getAttribute('data-target-id');
-    const wrapperElement = document.getElementById(targetId);
+    const wrapperElement = document.getElementById(imageWrapperId);
     const imageElement = wrapperElement ? wrapperElement.querySelector('img') : null;
 
     if (wrapperElement && imageElement) {
@@ -169,14 +215,14 @@ async function requestVideo(videoUrlRequest, videoWrapper) {
         return;
     }
     const videoUrl = await response.text();
-    setVideoUrl(videoUrl);
     if (previousVideoWrapper) {
         previousVideoWrapper.querySelector('.temp-video-holder').classList.remove('hidden');
     }
+
     previousVideoWrapper = videoWrapper;
     videoWrapper.querySelector('.temp-video-holder').classList.add('hidden');
     videoWrapper.querySelector('.video-holder').appendChild(videoPlayer);
-    setVideoUrl(videoPlayer);
+    setVideoUrl(videoPlayer, videoUrl);
 }
 
 let videoPlayer = null;
@@ -193,11 +239,11 @@ async function getVideoPlayer() {
 
     // let videoPlayerDoc = {
     //     "style": "\n        input[type=\"range\"].seek-slider {\n            appearance: none;\n            width: 100%;\n            height: 5px;\n            border-radius: 4px;\n            background: linear-gradient(to right, #a855f7 0%, #a855f7 0%, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.25) 100%);\n            outline: none;\n            cursor: pointer;\n            transition: background-size 0.1s linear;\n        }\n        input[type=\"range\"].seek-slider::-webkit-slider-thumb {\n            appearance: none;\n            width: 12px;\n            height: 12px;\n            border-radius: 50%;\n            background: #a855f7;\n            cursor: pointer;\n            transition: transform 0.1s;\n        }\n        input[type=\"range\"].seek-slider::-webkit-slider-thumb:hover {\n            transform: scale(1.2);\n        }\n        input[type=\"range\"].seek-slider::-moz-range-thumb {\n            width: 12px;\n            height: 12px;\n            border-radius: 50%;\n            background: #a855f7;\n            border: none;\n            cursor: pointer;\n        }\n    ",
-    //     "html": "\n            <div data-player=\"videoPlayerContainer\" tabindex=\"0\" class=\"relative aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg select-none\">\n            <video class=\"video-node w-full h-full bg-black cursor-pointer\"></video>\n\n            <!-- Controls -->\n            <div class=\"video-controls absolute bottom-0 left-0 right-0 flex flex-col bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4\n                 opacity-0 transition-opacity duration-300 pointer-events-none\">\n\n                <!-- Seek Slider -->\n                <div class=\"w-full mb-3\">\n                    <input type=\"range\" class=\"seek-slider\" min=\"0\" max=\"100\" value=\"0\" step=\"0.1\">\n                </div>\n\n                <!-- Control Buttons -->\n                <div class=\"flex items-center justify-between text-sm\">\n                    <div class=\"flex items-center space-x-3\">\n                        <button class=\"play-pause p-2 rounded-full bg-white/20 hover:bg-white/40 transition\">\n                            <i data-lucide=\"play\" class=\"w-5 h-5\"></i>\n                        </button>\n\n                        <button onclick=\"replay()\" class=\"relative p-2 rounded-full bg-white/20 hover:bg-white/40 transition\" title=\"Replay 5s\">\n                            <i data-lucide=\"rotate-ccw\" class=\"w-5 h-5\"></i>\n                            <span class=\"absolute bottom-0 right-1 text-[10px] font-bold\">5</span>\n                        </button>\n\n                        <button onclick=\"skip()\" class=\"relative p-2 rounded-full bg-white/20 hover:bg-white/40 transition\" title=\"Forward 5s\">\n                            <i data-lucide=\"rotate-cw\" class=\"w-5 h-5\"></i>\n                            <span class=\"absolute bottom-0 right-1 text-[10px] font-bold\">5</span>\n                        </button>\n                    </div>\n\n                    <div class=\"flex items-center space-x-3\">\n                        <span class=\"current-time text-gray-300\">0:00</span>\n                        <span class=\"text-gray-400\">/</span>\n                        <span class=\"total-time text-gray-300\">0:00</span>\n\n                        <!-- Volume -->\n                        <div class=\"flex items-center space-x-2\">\n                            <button class=\"mute-button p-2 rounded-full bg-white/20 hover:bg-white/40 transition\" title=\"Mute/Unmute\">\n                                <i data-lucide=\"volume-2\" class=\"w-5 h-5\"></i>\n                            </button>\n                            <input type=\"range\" min=\"0\" max=\"1\" step=\"0.01\" value=\"1\"\n                                   class=\"volume-slider w-24 h-[3px] accent-purple-500 cursor-pointer\">\n                        </div>\n\n                        <!-- Compact Speed & Resolution -->\n                        <div class=\"flex items-center space-x-3 relative\">\n                            <div class=\"relative\">\n                                <button class=\"speed-button text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1\">1x</button>\n                                <div class=\"speed-menu absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs\">\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"0.5\">0.5x</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"0.75\">0.75x</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"1\">1x</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"1.25\">1.25x</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"1.5\">1.5x</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"2\">2x</button>\n                                </div>\n                            </div>\n\n                            <div class=\"relative\">\n                                <button class=\"res-button text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1\">720p</button>\n                                <div class=\"res-menu absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs\">\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-res=\"1080p\">1080p</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-res=\"720p\">720p</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-res=\"480p\">480p</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-res=\"360p\">360p</button>\n                                </div>\n                            </div>\n                        </div>\n\n                        <!-- Fullscreen -->\n                        <button class=\"fullscreen-button p-2 rounded-full bg-white/20 hover:bg-white/40 transition\" title=\"Fullscreen\">\n                            <i data-lucide=\"maximize\" class=\"w-5 h-5\"></i>\n                        </button>\n                    </div>\n                </div>\n            </div>\n        </div>\n    ",
+    //     "html": "\n        <div data-player=\"videoPlayerContainer\" tabindex=\"0\" class=\"relative aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg select-none\">\n            <video class=\"video-node w-full h-full bg-black cursor-pointer\"></video>\n\n            <!-- Controls -->\n            <div class=\"video-controls absolute bottom-0 left-0 right-0 flex flex-col bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4\n                 opacity-0 transition-opacity duration-300 pointer-events-none\">\n\n                <!-- Seek Slider -->\n                <div class=\"w-full mb-3\">\n                    <input type=\"range\" class=\"seek-slider\" min=\"0\" max=\"100\" value=\"0\" step=\"0.1\">\n                </div>\n\n                <!-- Control Buttons -->\n                <div class=\"flex items-center justify-between text-sm\">\n                    <div class=\"flex items-center space-x-3\">\n                        <button class=\"play-pause p-2 rounded-full bg-white/20 hover:bg-white/40 transition\">\n                            <i data-lucide=\"play\" class=\"w-5 h-5\"></i>\n                        </button>\n\n                        <button onclick=\"replay()\" class=\"relative p-2 rounded-full bg-white/20 hover:bg-white/40 transition\" title=\"Replay 5s\">\n                            <i data-lucide=\"rotate-ccw\" class=\"w-5 h-5\"></i>\n                            <span class=\"absolute bottom-0 right-1 text-[10px] font-bold\">5</span>\n                        </button>\n\n                        <button onclick=\"skip()\" class=\"relative p-2 rounded-full bg-white/20 hover:bg-white/40 transition\" title=\"Forward 5s\">\n                            <i data-lucide=\"rotate-cw\" class=\"w-5 h-5\"></i>\n                            <span class=\"absolute bottom-0 right-1 text-[10px] font-bold\">5</span>\n                        </button>\n                    </div>\n\n                    <div class=\"flex items-center space-x-3\">\n                        <span class=\"current-time text-gray-300\">0:00</span>\n                        <span class=\"text-gray-400\">/</span>\n                        <span class=\"total-time text-gray-300\">0:00</span>\n\n                        <!-- Volume -->\n                        <div class=\"flex items-center space-x-2\">\n                            <button class=\"mute-button p-2 rounded-full bg-white/20 hover:bg-white/40 transition\" title=\"Mute/Unmute\">\n                                <i data-lucide=\"volume-2\" class=\"w-5 h-5\"></i>\n                            </button>\n                            <input type=\"range\" min=\"0\" max=\"1\" step=\"0.01\" value=\"1\"\n                                   class=\"volume-slider w-24 h-[3px] accent-purple-500 cursor-pointer\">\n                        </div>\n\n                        <!-- Compact Speed & Resolution -->\n                        <div class=\"flex items-center space-x-3 relative\">\n                            <div class=\"relative\">\n                                <button class=\"speed-button text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1\">1x</button>\n                                <div class=\"speed-menu absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs\">\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"0.5\">0.5x</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"0.75\">0.75x</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"1\">1x</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"1.25\">1.25x</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"1.5\">1.5x</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-speed=\"2\">2x</button>\n                                </div>\n                            </div>\n\n                            <div class=\"relative\">\n                                <button class=\"res-button text-sm text-gray-200 bg-white/10 hover:bg-white/25 rounded px-2 py-1\">720p</button>\n                                <div class=\"res-menu absolute bottom-full mb-1 hidden flex-col bg-black/80 backdrop-blur-sm rounded text-xs\">\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-res=\"1080p\">1080p</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-res=\"720p\">720p</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-res=\"480p\">480p</button>\n                                    <button class=\"px-3 py-1 hover:bg-purple-600 w-full\" data-res=\"360p\">360p</button>\n                                </div>\n                            </div>\n                        </div>\n\n                        <!-- Fullscreen -->\n                        <button class=\"fullscreen-button p-2 rounded-full bg-white/20 hover:bg-white/40 transition\" title=\"Fullscreen\">\n                            <i data-lucide=\"maximize\" class=\"w-5 h-5\"></i>\n                        </button>\n                    </div>\n                </div>\n            </div>\n        </div>\n    ",
     //     "script": [
-    //         "video-player.js"
+    //         "/static/js/video-player/video-player.js"
     //     ]
-    // }
+    // };
 
     if (!videoPlayerDoc.html) {
         alert("Failed to fetch video player");
@@ -237,8 +283,8 @@ async function getVideoPlayer() {
     videoPlayer = videoPlayerContainer.firstElementChild;
     videoScript.onload = () => {
         videoPlayer.dataset.player = 'albumVideoPlayerContainer';
+        videoPlayerContainer.remove();
     };
-    videoPlayerContainer.remove();
 
     return true;
 }
