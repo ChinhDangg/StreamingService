@@ -12,8 +12,6 @@ export async function initialize() {
     ]);
 }
 
-initialize();
-
 async function displayAlbumInfo(albumId) {
     const response = await fetch(`/api/media/content/${albumId}`);
     if (!response.ok) {
@@ -66,7 +64,7 @@ async function displayAlbumItems(albumId) {
     }
     albumItems = await response.json();
 
-    // const albumItems = [
+    // albumItems = [
     //     {
     //         "type": "VIDEO",
     //         "url": "/api/album/2/vid/0"
@@ -78,7 +76,7 @@ async function displayAlbumItems(albumId) {
     //     {
     //         "type": "IMAGE",
     //         "url": "https://placehold.co/1080x1920"
-    //     },
+    //     }
     // ]
 
     const videoContainer = document.getElementById('album-video-container');
@@ -100,7 +98,10 @@ async function displayAlbumItems(albumId) {
         imageElement.src = item.url;
         imageElement.alt = `image-${currentBatch}`;
         const buttonElement = imageWrapper.querySelector('button');
-        buttonElement.addEventListener('click', (e) => clickFullScreen(e, imageId));
+        buttonElement.addEventListener('click', () => {
+            enterFullScreen();
+            showFullScreen(imageId);
+        });
         imageContainer.appendChild(imageWrapper);
     }
 
@@ -169,39 +170,130 @@ async function displayAlbumItems(albumId) {
     observer.observe(sentinel);
 }
 
-function clickFullScreen(e, imageWrapperId) {
-    e.stopPropagation();
+let currentFullScreen = null;
+const wrapperImageFullScreen = document.getElementById('image-wrapper-fullscreen');
 
-    const wrapperElement = document.getElementById(imageWrapperId);
-    const imageElement = wrapperElement ? wrapperElement.querySelector('img') : null;
+function showFullScreen(imageWrapperId) {
+    const imageToShow = document.getElementById(imageWrapperId);
+    if (!imageToShow) {
+        return;
+    }
+    currentFullScreen = imageWrapperId;
 
-    if (wrapperElement && imageElement) {
+    const imageElement = wrapperImageFullScreen.querySelector('img');
+    imageElement.src = imageToShow.querySelector('img').src;
+}
 
-        // 1. Add the class to enforce aspect ratio CSS
-        imageElement.classList.add('is-fullscreen-target');
+function enterFullScreen() {
+    const imageElement = wrapperImageFullScreen.querySelector('img');
+    // 1. Add the class to enforce aspect ratio CSS
+    imageElement.classList.add('is-fullscreen-target');
 
-        // 2. Request full screen on the WRAPPER element
-        enterFullScreen(wrapperElement);
+    wrapperImageFullScreen.classList.remove('hidden');
 
-        // 3. Revert state when exiting full screen
-        document.addEventListener('fullscreenchange', function handler() {
-            if (!document.fullscreenElement) {
-                // Remove the temporary class
-                imageElement.classList.remove('is-fullscreen-target');
+    // 2. Request full screen on the WRAPPER element
+    if (wrapperImageFullScreen.requestFullscreen) {
+        wrapperImageFullScreen.requestFullscreen();
+    } else if (wrapperImageFullScreen.webkitRequestFullscreen) {
+        wrapperImageFullScreen.webkitRequestFullscreen();
+    } else if (wrapperImageFullScreen.msRequestFullscreen) {
+        wrapperImageFullScreen.msRequestFullscreen();
+    }
 
-                document.removeEventListener('fullscreenchange', handler);
-            }
-        });
+    wrapperImageFullScreen.addEventListener('touchstart', fullScreenTouchStart);
+    wrapperImageFullScreen.addEventListener('touchend', fullScreenTouchEnd);
+    wrapperImageFullScreen.addEventListener('click', fullScreenClick);
+
+    // 3. Revert state when exiting full screen
+    document.addEventListener('fullscreenchange', function handler() {
+        if (!document.fullscreenElement) {
+            // Remove the temporary class
+            imageElement.classList.remove('is-fullscreen-target');
+
+            document.removeEventListener('fullscreenchange', handler);
+
+            wrapperImageFullScreen.classList.add('hidden');
+
+            wrapperImageFullScreen.removeEventListener('touchstart', fullScreenTouchStart);
+            wrapperImageFullScreen.removeEventListener('touchend', fullScreenTouchEnd);
+            wrapperImageFullScreen.removeEventListener('click', fullScreenClick);
+        }
+    });
+}
+
+const fullScreenClick = (e) => {
+    const rect = wrapperImageFullScreen.getBoundingClientRect();
+
+    const clickY = e.clientY - rect.top;
+    const half = rect.height / 2;
+
+    if (clickY < half) { // top half
+        showNextFullScreen();
+    } else {
+        showPreviousFullScreen();
     }
 }
 
-function enterFullScreen(element) {
-    if (element.requestFullscreen) {
-        element.requestFullscreen();
-    } else if (element.webkitRequestFullscreen) {
-        element.webkitRequestFullscreen();
-    } else if (element.msRequestFullscreen) {
-        element.msRequestFullscreen();
+document.addEventListener("keydown", (e) => {
+    if (!document.fullscreenElement) return;
+
+    if (e.key === "ArrowRight") {
+        showNextFullScreen();
+    }
+    if (e.key === "ArrowLeft") {
+        showPreviousFullScreen();
+    }
+});
+
+function showNextFullScreen() {
+    const id = parseInt(currentFullScreen[currentFullScreen.length - 1]);
+    if (id >= albumItems.length) return;
+    const nextId = currentFullScreen.slice(0, -1) + (id + 1);
+    showFullScreen(nextId);
+}
+
+function showPreviousFullScreen() {
+    const id = parseInt(currentFullScreen[currentFullScreen.length - 1]);
+    if (id <= 1) return;
+    const prevId = currentFullScreen.slice(0, -1) + (id - 1);
+    showFullScreen(prevId);
+}
+
+let touchStartX = 0;
+let touchStartY = 0;
+let touchEndX = 0;
+let touchEndY = 0;
+
+const SWIPE_MIN_DISTANCE = 50;    // min horizontal movement
+const SWIPE_MAX_OFF_AXIS = 70;    // max vertical drift allowed
+
+const fullScreenTouchStart = (e) => {
+    if (!document.fullscreenElement) return;
+    const t = e.changedTouches[0];
+    touchStartX = t.screenX;
+    touchStartY = t.screenY;
+};
+
+const fullScreenTouchEnd = (e) => {
+    if (!document.fullscreenElement) return;
+    const t = e.changedTouches[0];
+    touchEndX = t.screenX;
+    touchEndY = t.screenY;
+
+    const dx = touchEndX - touchStartX;
+    const dy = touchEndY - touchStartY;
+
+    // Ignore mostly vertical movements
+    if (Math.abs(dy) > SWIPE_MAX_OFF_AXIS) return;
+
+    // Horizontal swipe left
+    if (dx < -SWIPE_MIN_DISTANCE) {
+        showNextFullScreen();
+    }
+
+    // Horizontal swipe right
+    if (dx > SWIPE_MIN_DISTANCE) {
+        showPreviousFullScreen();
     }
 }
 
@@ -288,3 +380,5 @@ async function getVideoPlayer() {
 
     return true;
 }
+
+initialize();
