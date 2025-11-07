@@ -166,7 +166,7 @@ async function displayAlbumItems(albumId) {
                 observer.unobserve(sentinel);
             }
         }
-    }, { rootMargin: '900px' }); // start prefetching before user reaches bottom
+    }, { rootMargin: '1000px' }); // start prefetching before user reaches bottom
     observer.observe(sentinel);
 }
 
