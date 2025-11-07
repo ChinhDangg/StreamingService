@@ -7,8 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -25,7 +25,7 @@ public class MediaMetaData extends MediaDescription {
             joinColumns = @JoinColumn(name = "media_id"),
             inverseJoinColumns = @JoinColumn(name = "tags_id")
     )
-    private List<MediaTag> tags;
+    private Set<MediaTag> tags;
 
     @JsonProperty(ContentMetaData.CHARACTERS)
     @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE }, fetch = FetchType.LAZY)
@@ -34,7 +34,7 @@ public class MediaMetaData extends MediaDescription {
             joinColumns = @JoinColumn(name = "media_id"),
             inverseJoinColumns = @JoinColumn(name = "characters_id")
     )
-    private List<MediaCharacter> characters;
+    private Set<MediaCharacter> characters;
 
     @JsonProperty(ContentMetaData.UNIVERSES)
     @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE }, fetch = FetchType.LAZY)
@@ -43,7 +43,7 @@ public class MediaMetaData extends MediaDescription {
             joinColumns = @JoinColumn(name = "media_id"),
             inverseJoinColumns = @JoinColumn(name = "universes_id")
     )
-    private List<MediaUniverse> universes;
+    private Set<MediaUniverse> universes;
 
     @JsonProperty(ContentMetaData.AUTHORS)
     @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE }, fetch = FetchType.LAZY)
@@ -52,7 +52,7 @@ public class MediaMetaData extends MediaDescription {
             joinColumns = @JoinColumn(name = "media_id"),
             inverseJoinColumns = @JoinColumn(name = "authors_id")
     )
-    private List<MediaAuthor> authors;
+    private Set<MediaAuthor> authors;
 
     // Technical
     @Column(nullable = false)
