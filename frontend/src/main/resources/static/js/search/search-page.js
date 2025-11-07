@@ -629,6 +629,8 @@ function displaySearchItems(searchItems) {
         mainItemContainer.innerHTML = 'No results found.';
         return;
     }
+    mainItemContainer.innerHTML = '';
+
     const searchItemsContainer = document.getElementById('search-item-container');
     const horizontalItemTem = searchItemsContainer.querySelector('.horizontal-item');
     const verticalItemTem = searchItemsContainer.querySelector('.vertical-item');
@@ -950,9 +952,7 @@ function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
 
     if (page === 0 && page === totalPages) {
         paginationTop.classList.add('hidden');
-        paginationTop.innerHTML = '';
         pageNodeBottom.classList.add('hidden');
-        pageNodeBottom.innerHTML = '';
         return;
     }
 
