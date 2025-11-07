@@ -62,7 +62,12 @@ public class AlbumService extends MediaService {
 
     private List<MediaUrl> reformatMediaUrlList(List<MediaUrl> mediaUrlList) {
         return mediaUrlList.stream()
-                .map(m -> new MediaUrl(m.type, "/stream" + m.url.replaceFirst("/chunks", "")))
+                .map(m -> {
+                    if (MediaType.IMAGE.equals(m.type)) {
+                        return new MediaUrl(m.type, "/stream" + m.url.replaceFirst("/chunks", ""));
+                    }
+                    return m; // keep original
+                })
                 .toList();
     }
 
@@ -145,7 +150,7 @@ public class AlbumService extends MediaService {
             MediaType mediaType = MediaType.detectMediaType(key);
 
             if (mediaType == MediaType.VIDEO) {
-                String videoDir = "/api/album/" + albumId + "/vid/" + albumUrlList.size();
+                String videoDir = "/api/album/" + albumId + "/vid/" + albumUrlList.size() + "/" + Resolution.p720;
                 albumUrlList.add(new MediaUrl(mediaType, videoDir));
                 continue;
             }
