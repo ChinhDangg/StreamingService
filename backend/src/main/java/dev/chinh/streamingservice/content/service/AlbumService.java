@@ -57,14 +57,16 @@ public class AlbumService extends MediaService {
         addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo, true);
 
         processResizedAlbumImages(albumId, resolution, 0, 5, request);
-        return albumUrlInfo.mediaUrlList;
+        return reformatMediaUrlList(albumUrlInfo.mediaUrlList);
     }
 
     private List<MediaUrl> reformatMediaUrlList(List<MediaUrl> mediaUrlList) {
         return mediaUrlList.stream()
                 .map(m -> {
                     if (MediaType.IMAGE.equals(m.type)) {
-                        return new MediaUrl(m.type, "/stream" + m.url.replaceFirst("/chunks", ""));
+                        if (m.url.startsWith("/chunks"))
+                            return new MediaUrl(m.type, "/stream" + m.url.substring("/chunks".length()));
+                        return new MediaUrl(m.type, "/stream" + m.url);
                     }
                     return m; // keep original
                 })
