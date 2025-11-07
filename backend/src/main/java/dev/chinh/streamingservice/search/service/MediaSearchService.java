@@ -139,16 +139,14 @@ public class MediaSearchService {
         }
         if (newThumbnails.isEmpty())
             return;
-        new Thread(() -> {
-            var albumUrlInfo = albumService.getMixThumbnailImagesAsAlbumUrls(newThumbnails, thumbnailResolution);
-            try {
-                if (albumUrlInfo.mediaUrlList().isEmpty())
-                    return;
-                albumService.processResizedImagesInBatch(albumUrlInfo, 0, newThumbnails.size(), false);
-            } catch (InterruptedException | IOException e) {
-                throw new RuntimeException(e);
-            }
-        }).start();
+        var albumUrlInfo = albumService.getMixThumbnailImagesAsAlbumUrls(newThumbnails, thumbnailResolution);
+        try {
+            if (albumUrlInfo.mediaUrlList().isEmpty())
+                return;
+            albumService.processResizedImagesInBatch(albumUrlInfo, 0, newThumbnails.size(), false);
+        } catch (InterruptedException | IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private Boolean addCacheThumbnails(String thumbnailFileName, long expiry) {
