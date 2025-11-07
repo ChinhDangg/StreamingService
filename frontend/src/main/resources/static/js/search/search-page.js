@@ -1,7 +1,7 @@
 import {setVideoUrl} from "/static/js/set-video-url.js";
 
 const SORT_BY = Object.freeze({
-    UPLOAD_DATE: 'UPLOAD_DATE',
+    UPLOAD: 'UPLOAD_DATE',
     YEAR: 'YEAR',
     LENGTH: 'LENGTH',
     SIZE: 'SIZE'
@@ -38,12 +38,10 @@ const keywordSearchMap = new Map();
 let previousSortByButton = null;
 
 async function initialize() {
-    initializeSortByOptions();
-    initializeAdvanceSearchArea();
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     currentSearchInfo.set(SEARCH_INFO.PAGE, urlParams.get(SEARCH_INFO.PAGE) || 0);
-    currentSearchInfo.set(SEARCH_INFO.SORT_BY, urlParams.get(SEARCH_INFO.SORT_BY) || SORT_BY.UPLOAD_DATE);
+    currentSearchInfo.set(SEARCH_INFO.SORT_BY, urlParams.get(SEARCH_INFO.SORT_BY) || SORT_BY.UPLOAD);
     currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, urlParams.get(SEARCH_INFO.SORT_ORDER) || SORT_ORDERS.DESC);
     currentSearchInfo.set(SEARCH_INFO.SEARCH_STRING, urlParams.get(SEARCH_INFO.SEARCH_STRING));
 
@@ -60,6 +58,11 @@ async function initialize() {
     currentSearchInfo.set(SEARCH_INFO.KEYWORD_VALUE_LIST, values?.split(','));
     currentSearchInfo.set(SEARCH_INFO.ADVANCE_REQUEST_BODY, null);
     currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, urlParams.get(SEARCH_INFO.SEARCH_TYPE));
+
+    initializeSortByOptions();
+    initializeSortOrderOptions();
+    initializeAdvanceSearchArea();
+
     await sendSearchRequestOnCurrentInfo(false);
 }
 
@@ -131,7 +134,7 @@ function initializeAdvanceSearchArea() {
             rangeFields.push(getRangeField(SORT_BY.YEAR, yearFrom, yearTo));
         }
         if (uploadFrom || uploadTo) {
-            rangeFields.push(getRangeField(SORT_BY.UPLOAD_DATE, uploadFrom, uploadTo));
+            rangeFields.push(getRangeField(SORT_BY.UPLOAD, uploadFrom, uploadTo));
         }
 
         const includeFields = [];
@@ -347,9 +350,12 @@ function addEventKeywordSearchArea(fnKeywordSearch, addedMap, searchLabel, searc
 
 function initializeSortByOptions() {
     const sortByOptions = document.getElementById('sortByOptions');
-    previousSortByButton = sortByOptions.querySelector('.upload-btn');
+    let foundKey= Object.keys(SORT_BY).find(key => SORT_BY[key] === currentSearchInfo.get(SEARCH_INFO.SORT_BY)).toLowerCase();
+    previousSortByButton = sortByOptions.querySelector(`.${foundKey}-btn`);
+    setSortByStyleToSelected(previousSortByButton);
+
     sortByOptions.querySelector('.upload-btn').addEventListener('click',async (e) => {
-        await sortByClick(e, SORT_BY.UPLOAD_DATE);
+        await sortByClick(e, SORT_BY.UPLOAD);
     });
     sortByOptions.querySelector('.year-btn').addEventListener('click', async (e) => {
         await sortByClick(e, SORT_BY.YEAR);
@@ -369,12 +375,35 @@ async function sortByClick(e, SORT_BY) {
         previousSortByButton.classList.remove('bg-indigo-600');
         previousSortByButton.classList.add('bg-gray-800');
     }
-    target.classList.add('bg-indigo-600');
-    target.classList.remove('bg-gray-800');
+    setSortByStyleToSelected(target);
     previousSortByButton = target;
     target.disabled = true;
     sendSearchRequestOnCurrentInfo().then(() => {
         target.disabled = false;
+    });
+}
+
+function setSortByStyleToSelected(target) {
+    target.classList.add('bg-indigo-600');
+    target.classList.remove('bg-gray-800');
+}
+
+function initializeSortOrderOptions() {
+    const sortOrderButton = document.getElementById('sortOrderButton');
+    sortOrderButton.innerText = currentSearchInfo.get(SEARCH_INFO.SORT_ORDER) === SORT_ORDERS.DESC ? 'Descending' : 'Ascending';
+
+    sortOrderButton.addEventListener('click', (e) => {
+        if (currentSearchInfo.get(SEARCH_INFO.SORT_ORDER) === SORT_ORDERS.DESC) {
+            e.target.innerText = 'Ascending';
+            currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, SORT_ORDERS.ASC);
+        } else {
+            e.target.innerText = 'Descending';
+            currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, SORT_ORDERS.DESC);
+        }
+        e.target.disabled = true;
+        sendSearchRequestOnCurrentInfo().then(() => {
+            e.target.disabled = false;
+        });
     });
 }
 
@@ -391,20 +420,6 @@ async function sendSearchRequestOnCurrentInfo(updatePage = true) {
         updatePage
     );
 }
-
-document.getElementById('sortOrderButton').addEventListener('click', (e) => {
-    if (currentSearchInfo.get(SEARCH_INFO.SORT_ORDER) === SORT_ORDERS.DESC) {
-        e.target.innerText = 'Ascending';
-        currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, SORT_ORDERS.ASC);
-    } else {
-        e.target.innerText = 'Descending';
-        currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, SORT_ORDERS.DESC);
-    }
-    e.target.disabled = true;
-    sendSearchRequestOnCurrentInfo().then(() => {
-        e.target.disabled = false;
-    });
-});
 
 let alertStatusTimer = null;
 const alertStatus = document.getElementById('alert-status');
