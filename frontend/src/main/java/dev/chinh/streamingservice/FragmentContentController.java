@@ -68,12 +68,19 @@ public class FragmentContentController {
             response.put(entry.getKey(), fragmentHtml);
         }
 
+        if (response.get("style") != null) {
+            String styles = response.get("style").toString();
+            if (styles.startsWith("<style>")) styles = styles.substring(7);
+            if (styles.endsWith("</style>")) styles = styles.substring(0, styles.length() - 8);
+            response.put("style", styles);
+        }
+
         if (response.get("script") != null) {
             String scripts = response.get("script").toString();
             String[] parts = scripts.split("\n");
             String[] scriptOnly = Arrays.stream(parts)
                     .map(String::trim)
-                    .filter(s -> !s.isBlank())
+                    .filter(s -> !s.isBlank() && !s.startsWith("<"))
                     .toArray(String[]::new);
             response.put("script", scriptOnly);
         }
