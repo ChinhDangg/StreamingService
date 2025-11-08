@@ -11,9 +11,9 @@ import dev.chinh.streamingservice.search.constant.SortBy;
 import dev.chinh.streamingservice.search.data.*;
 import lombok.RequiredArgsConstructor;
 import org.apache.coyote.BadRequestException;
-import org.opensearch.action.search.SearchResponse;
-import org.opensearch.search.SearchHit;
-import org.opensearch.search.sort.SortOrder;
+import org.opensearch.client.opensearch._types.SortOrder;
+import org.opensearch.client.opensearch.core.SearchResponse;
+import org.opensearch.client.opensearch.core.search.Hit;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -105,7 +105,7 @@ public class MediaSearchService {
         return mapSearchResult.searchResult;
     }
 
-    public MediaSearchResult searchByKeywords(String field, Collection<Object> keywords, int page, int size,
+    public MediaSearchResult searchByKeywords(String field, List<Object> keywords, int page, int size,
                                               SortBy sortBy, SortOrder sortOrder) throws IOException {
         ContentMetaData.validateSearchFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
@@ -177,11 +177,11 @@ public class MediaSearchService {
             Collection<MediaSearchItem> searchItems
     ) {}
 
-    private MapSearchResult mapResponseToMediaSearchResult(SearchResponse response, int page, int size) {
+    private MapSearchResult mapResponseToMediaSearchResult(SearchResponse<Object> response, int page, int size) {
         List<MediaSearchItem> items = new ArrayList<>();
         List<MediaSearchItemResponse> itemResponses = new ArrayList<>();
-        for (SearchHit hit : response.getHits()) {
-            MediaSearchItem searchItem = mapper.convertValue(hit.getSourceAsMap(),  MediaSearchItem.class);
+        for (Hit<Object> hit : response.hits().hits()) {
+            MediaSearchItem searchItem = mapper.convertValue(hit.source(),  MediaSearchItem.class);
             items.add(searchItem);
             MediaSearchItemResponse itemResponse = mediaMapper.map(searchItem);
             itemResponse.setThumbnail(searchItem.hasThumbnail() ? getThumbnailPath(
@@ -193,7 +193,7 @@ public class MediaSearchService {
         MediaSearchResult result = new MediaSearchResult(itemResponses);
         result.setPage(page);
         result.setPageSize(size);
-        result.setTotal(Objects.requireNonNull(response.getHits().getTotalHits()).value());
+        result.setTotal(response.hits().hits().size());
         result.setTotalPages((result.getTotal() + size -1) / size);
 
         return new MapSearchResult(result, items);
