@@ -4,7 +4,9 @@ const container = document.querySelector('[data-player="videoPlayerContainer"]')
 const video = container.querySelector('.video-node');
 const controls = container.querySelector('.video-controls');
 const seekSlider = container.querySelector('.seek-slider');
-const playPauseBtn = container.querySelector('.play-pause');
+const playPauseBtn = container.querySelector('.play-pause-button');
+const replayBtn = container.querySelector('.replay-button');
+const forwardBtn = container.querySelector('.forward-button');
 const currentTimeEl = container.querySelector('.current-time');
 const totalTimeEl = container.querySelector('.total-time');
 const muteBtn = container.querySelector('.mute-button');
@@ -106,11 +108,7 @@ resMenu.querySelectorAll('button').forEach(btn => {
 
 // --- Fullscreen ---
 fullscreenBtn.addEventListener('click', () => {
-    if (!document.fullscreenElement) {
-        container.requestFullscreen();
-    } else {
-        document.exitFullscreen();
-    }
+    requestFullscreenVideo();
 });
 document.addEventListener('fullscreenchange', () => {
     const icon = document.fullscreenElement ? 'minimize' : 'maximize';
@@ -120,6 +118,14 @@ document.addEventListener('fullscreenchange', () => {
     // Reset visibility when leaving fullscreen
     if (!document.fullscreenElement) showControls();
 });
+
+function requestFullscreenVideo() {
+    if (!document.fullscreenElement) {
+        container.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
+}
 
 // --- Auto-hide Controls (all screen sizes) ---
 let hideTimer;
@@ -147,13 +153,6 @@ container.addEventListener('mouseenter', showControls);
 
 // --- Unified Skip Controls ---
 const SKIP_SECONDS = 5;
-function replay() {
-    video.currentTime = Math.max(video.currentTime - SKIP_SECONDS, 0);
-}
-function skip() {
-    video.currentTime = Math.min(video.currentTime + SKIP_SECONDS, video.duration);
-}
-
 let lastClickTime = 0;
 let lastTouchTime = 0;
 const DOUBLE_TAP_THRESHOLD = 250; // ms
@@ -162,6 +161,59 @@ let skipTimeTotalTimer = null;
 let skipTimeTotal = 0;
 let replayTimeTotalTimer = null;
 let replayTimeTotal = 0;
+
+function replay() {
+    clearInterval(replayTimeTotalTimer);
+    video.currentTime = Math.max(video.currentTime - SKIP_SECONDS, 0);
+    replayTimeTotal -= SKIP_SECONDS;
+    showFeedback("⏪ " + replayTimeTotal + "s");
+    replayTimeTotalTimer = setTimeout(() => {
+        replayTimeTotal = 0;
+    }, 500);
+}
+function skip() {
+    clearInterval(skipTimeTotalTimer);
+    video.currentTime = Math.min(video.currentTime + SKIP_SECONDS, video.duration);
+    skipTimeTotal += SKIP_SECONDS;
+    showFeedback("⏩ " + skipTimeTotal + "s");
+    skipTimeTotalTimer = setTimeout(() => {
+        skipTimeTotal = 0;
+    }, 500);
+}
+
+replayBtn.addEventListener('click', () => {
+    resetHideTimer()
+    replay();
+});
+forwardBtn.addEventListener('click', () => {
+    resetHideTimer()
+    skip();
+});
+
+function handleDouble(clientX) {
+    const rect = container.getBoundingClientRect();
+    const relativeX = clientX - rect.left;
+
+    if (relativeX < rect.width / 2) {
+        replay();
+    } else {
+        skip();
+    }
+}
+
+video.addEventListener('click', e => {
+    handleClickOrTap(e.clientX, e.timeStamp, false);
+});
+// Mobile touch support
+video.addEventListener('touchstart', () => {
+    showControls();
+    resetHideTimer();
+});
+video.addEventListener('touchend', () => {
+    resetHideTimer();
+    const touch = e.changedTouches[0];
+    handleClickOrTap(touch.clientX, e.timeStamp, true);
+});
 
 function handleClickOrTap(clientX, time, isTouch) {
     const now = time;
@@ -182,45 +234,6 @@ function handleClickOrTap(clientX, time, isTouch) {
     }
 }
 
-function handleDouble(clientX) {
-    const rect = container.getBoundingClientRect();
-    const relativeX = clientX - rect.left;
-
-
-    if (relativeX < rect.width / 2) {
-        clearInterval(replayTimeTotalTimer);
-        replay();
-        replayTimeTotal -= SKIP_SECONDS;
-        showFeedback("⏪ " + replayTimeTotal + "s");
-        replayTimeTotalTimer = setTimeout(() => {
-            replayTimeTotal = 0;
-        }, 500);
-    } else {
-        clearInterval(skipTimeTotalTimer);
-        skip();
-        skipTimeTotal += SKIP_SECONDS;
-        showFeedback("⏩ " + skipTimeTotal + "s");
-        skipTimeTotalTimer = setTimeout(() => {
-            skipTimeTotal = 0;
-        }, 500);
-    }
-}
-
-video.addEventListener('click', e => {
-    handleClickOrTap(e.clientX, e.timeStamp, false);
-});
-
-// Mobile touch support
-video.addEventListener('touchstart', (e) => {
-    showControls();
-    resetHideTimer();
-});
-video.addEventListener('touchend', () => {
-    resetHideTimer();
-    const touch = e.changedTouches[0];
-    handleClickOrTap(touch.clientX, e.timeStamp, true);
-});
-
 document.addEventListener('keydown', e => {
     // Avoid interfering with form inputs or system shortcuts
     if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
@@ -229,25 +242,15 @@ document.addEventListener('keydown', e => {
         case 'arrowleft':
             e.preventDefault();
             replay(); // reuse unified function
-            showFeedback("⏪ 5s");
             break;
 
         case 'arrowright':
             e.preventDefault();
             skip(); // reuse unified function
-            showFeedback("⏩ 5s");
             break;
 
         case 'f':
-            if (video.requestFullscreen) {
-                video.requestFullscreen();
-            } else if (video.webkitRequestFullscreen) { /* Safari */
-                video.webkitRequestFullscreen();
-            } else if (video.msRequestFullscreen) { /* IE11 */
-                video.msRequestFullscreen();
-            } else if (video.mozRequestFullScreen) { /* Firefox */
-                video.mozRequestFullScreen();
-            }
+            requestFullscreenVideo()
             break;
 
         case ' ': // Space
