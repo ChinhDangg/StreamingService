@@ -7,8 +7,8 @@ const SORT_BY = Object.freeze({
     SIZE: 'SIZE'
 });
 const SORT_ORDERS = Object.freeze({
-   ASC: 'ASC',
-   DESC: 'DESC',
+   ASC: 'Asc',
+   DESC: 'Desc',
 });
 const KEYWORDS = Object.freeze({
     UNIVERSE: 'universes',
