@@ -5,54 +5,46 @@ import dev.chinh.streamingservice.search.constant.SortBy;
 import dev.chinh.streamingservice.search.data.MediaSearchRangeField;
 import dev.chinh.streamingservice.search.data.SearchFieldGroup;
 import lombok.RequiredArgsConstructor;
-import org.opensearch.action.DocWriteRequest;
-import org.opensearch.action.delete.DeleteRequest;
-import org.opensearch.action.delete.DeleteResponse;
-import org.opensearch.action.index.IndexRequest;
-import org.opensearch.action.index.IndexResponse;
-import org.opensearch.action.search.SearchRequest;
-import org.opensearch.action.search.SearchResponse;
-import org.opensearch.action.support.clustermanager.AcknowledgedResponse;
-import org.opensearch.action.update.UpdateRequest;
-import org.opensearch.action.update.UpdateResponse;
-import org.opensearch.client.RequestOptions;
-import org.opensearch.client.RestHighLevelClient;
-import org.opensearch.client.indices.CreateIndexRequest;
-import org.opensearch.client.indices.CreateIndexResponse;
-import org.opensearch.client.indices.PutMappingRequest;
-import org.opensearch.common.unit.Fuzziness;
-import org.opensearch.common.xcontent.XContentFactory;
-import org.opensearch.common.xcontent.XContentType;
-import org.opensearch.core.xcontent.XContentBuilder;
-import org.opensearch.index.query.*;
-import org.opensearch.script.Script;
-import org.opensearch.script.ScriptType;
-import org.opensearch.search.builder.SearchSourceBuilder;
-import org.opensearch.search.sort.FieldSortBuilder;
-import org.opensearch.search.sort.SortBuilders;
-import org.opensearch.search.sort.SortOrder;
+import org.apache.hc.core5.http.ParseException;
+import org.opensearch.client.json.JsonData;
+import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch._types.*;
+import org.opensearch.client.opensearch._types.mapping.Property;
+import org.opensearch.client.opensearch._types.query_dsl.BoolQuery;
+import org.opensearch.client.opensearch._types.query_dsl.Query;
+import org.opensearch.client.opensearch._types.query_dsl.RangeQuery;
+import org.opensearch.client.opensearch._types.query_dsl.TextQueryType;
+import org.opensearch.client.opensearch.core.*;
+import org.opensearch.client.opensearch.indices.CreateIndexResponse;
+import org.opensearch.client.opensearch.indices.DeleteIndexResponse;
+import org.opensearch.client.opensearch.indices.PutMappingResponse;
+import org.opensearch.client.opensearch.indices.UpdateAliasesResponse;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class OpenSearchService {
 
-    private final RestHighLevelClient client;
+    private final OpenSearchClient client;
+
+    public static final String INDEX_NAME = "media";
 
     // http://localhost:9200/media
-    public void createIndexWithMapping() throws IOException {
+    public void createIndexWithMapping(String indexName) throws IOException {
         String mappingJson = loadMapping("mapping/media-mapping.json");
 
-        CreateIndexRequest request = new CreateIndexRequest("media");
-        request.mapping(mappingJson, XContentType.JSON);
-
-        CreateIndexResponse createIndexResponse = client.indices().create(request, RequestOptions.DEFAULT);
+        CreateIndexResponse createIndexResponse = client.indices().create(c -> c
+                .index(indexName)
+                .mappings(m -> m.withJson(new StringReader(mappingJson)))
+        );
 
         System.out.println("Index created: " + createIndexResponse.index());
     }
@@ -64,49 +56,48 @@ public class OpenSearchService {
         }
     }
 
-    public void updateMapping(String fieldName, String fieldType) throws IOException {
-
-        // Build JSON mapping programmatically
-        XContentBuilder builder = XContentFactory.jsonBuilder();
-        builder.startObject();
-        {
-            builder.startObject("properties");
-            {
-                builder.startObject(fieldName);
-                builder.field("type", fieldType);
-                builder.endObject();
-            }
-            builder.endObject();
-        }
-        builder.endObject();
-
-        PutMappingRequest request = new PutMappingRequest("media");
-        request.source(builder);
-
-        AcknowledgedResponse response = client.indices().putMapping(request, RequestOptions.DEFAULT);
-        System.out.println("Mapping updated? " + response.isAcknowledged());
+    public void deleteIndex(String indexName) throws IOException {
+        DeleteIndexResponse response = client.indices().delete(d -> d.index(indexName));
+        System.out.println("Index deleted: " + response.acknowledged());
     }
 
-    public void deleteDocument(long id) throws IOException {
-        DeleteRequest request = new DeleteRequest("media", String.valueOf(id));
-        DeleteResponse response = client.delete(request, RequestOptions.DEFAULT);
-        System.out.println("Deleted doc id=" + id + " result=" + response.getResult());
+    /**
+     * Example:
+     * Map<String, Property> newProperties = Map.of(
+     *     // NOTE: We now use Property.of() instead of TypeMapping.of()
+     *     "description", Property.of(m -> m.text(t -> t.analyzer("english"))),
+     *     "sku",         Property.of(m -> m.keyword(k -> k))
+     * );
+     */
+    public void updateMapping(String indexName, Map<String, Property> properties) throws IOException {
+        PutMappingResponse response = client.indices().putMapping(p -> p
+                .index(indexName)
+                .properties(properties)
+        );
+        System.out.println("Mapping updated? " + response.acknowledged());
+    }
+
+    public void deleteDocument(String indexName, long id) throws IOException {
+        DeleteResponse response = client.delete(d -> d
+                .index(indexName)
+                .id(String.valueOf(id))
+        );
+        System.out.println("Deleted doc id=" + id + " result=" + response.result());
     }
 
     // http://localhost:9200/media/_doc/1?pretty
-
     /**
      * Add a new doc to the index with given id.
      * Will only pass if the id doesn't exist yet.
      */
-    public void indexDocument(long id, Map<String, Object> doc) throws IOException {
-        IndexRequest request = new IndexRequest("media")
+    public void indexDocument(String indexName, long id, Map<String, Object> doc) throws IOException {
+        IndexResponse response = client.index(i -> i
+                .index(indexName)
                 .id(String.valueOf(id))
-                .source(doc)
-                .opType(DocWriteRequest.OpType.CREATE); // give error if an id already exist
-
-        IndexResponse response = client.index(request, RequestOptions.DEFAULT);
-        System.out.println("Indexed with id: " + response.getId());
+                .document(doc)
+                .opType(OpType.Create)
+        );
+        System.out.println("Indexed with id: " + response.id());
     }
 
     /**
@@ -114,72 +105,79 @@ public class OpenSearchService {
      * Will add new fields if doesn't exist previously.
      * @param updateFields String-name of the field; Object-values
      */
-    public void partialUpdateDocument(long id, Map<String, Object> updateFields) throws IOException {
-        UpdateRequest request = new UpdateRequest("media", String.valueOf(id))
-                .doc(updateFields);
-
-        UpdateResponse response = client.update(request, RequestOptions.DEFAULT);
-        System.out.println("Document updated, result: " + response.getResult());
+    public void partialUpdateDocument(String indexName, long id, Map<String, Object> updateFields) throws IOException {
+        UpdateResponse<Object> response = client.update(u -> u
+                .index(indexName)
+                .id(String.valueOf(id))
+                .doc(updateFields), Object.class
+        );
+        System.out.println("Document updated, result: " + response.result());
     }
 
     /**
      * Adding new values to one existing field for given document id.
      * @param id the id of the doc.
      */
-    public void appendValueToFieldInDocument(long id, String field, Object values) throws IOException {
-        Map<String, Object> params = new HashMap<>();
-        params.put(field, values);
+    public void appendValueToFieldInDocument(String indexName, long id, String field, Object values) throws IOException {
+        Map<String, JsonData> params = Collections.singletonMap(field, values)
+                .entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> JsonData.of(e.getValue())));
 
-        UpdateRequest request = new UpdateRequest("media", String.valueOf(id))
-                .script(new Script(ScriptType.INLINE,
-                        "painless",
-                        "ctx._source." + field + ".add(params." + field + ")",
-                        params));
+        Script inlineScript = Script.of(s -> s
+                .inline(i -> i
+                        .source("ctx._source." + field + ".add(params." + values + ")")
+                        .lang(l -> l.builtin(BuiltinScriptLanguage.Painless))
+                        .params(params)
+                )
+        );
 
-        UpdateResponse response = client.update(request, RequestOptions.DEFAULT);
-        System.out.println("Scripted update done, result: " + response.getResult());
+        UpdateResponse<Object> response = client.update(u -> u
+                .index(indexName)
+                .id(String.valueOf(id))
+                .script(inlineScript), Object.class
+        );
+        System.out.println("Scripted update done, result: " + response.result());
     }
 
-    public SearchResponse advanceSearch(List<SearchFieldGroup> includeGroups, List<SearchFieldGroup> excludeGroups,
+    public SearchResponse<Object> advanceSearch(List<SearchFieldGroup> includeGroups, List<SearchFieldGroup> excludeGroups,
                                         List<MediaSearchRangeField> mediaSearchRanges,
                                         int page, int size, SortBy sortBy, SortOrder sortOrder) throws IOException {
-        BoolQueryBuilder rootQuery = QueryBuilders.boolQuery();
+        BoolQuery.Builder rootBool = new BoolQuery.Builder();
 
-        // Handle range requests
         if (mediaSearchRanges != null) {
             for (MediaSearchRangeField mediaSearchRange : mediaSearchRanges) {
-                RangeQueryBuilder rangeQuery = QueryBuilders.rangeQuery(mediaSearchRange.getField());
-                if (mediaSearchRange.getFrom() != null) rangeQuery.gte(mediaSearchRange.getFrom());
-                if (mediaSearchRange.getTo() != null) rangeQuery.lte(mediaSearchRange.getTo());
-                rootQuery.must(rangeQuery);
+                RangeQuery.Builder rangeBuilder = new RangeQuery.Builder();
+                rangeBuilder.field(mediaSearchRange.getField());
+                if (mediaSearchRange.getFrom() != null)
+                    rangeBuilder.gte(JsonData.of(mediaSearchRange.getFrom()));
+                if (mediaSearchRange.getTo() != null)
+                    rangeBuilder.lte(JsonData.of(mediaSearchRange.getTo()));
+                rootBool.filter(Query.of(q -> q.range(rangeBuilder.build())));
             }
         }
 
-        // Handle include groups
         if (includeGroups != null) {
             for (SearchFieldGroup group : includeGroups) {
                 String field = group.getField();
                 Set<Object> values = group.getValues();
                 if (values == null || values.isEmpty()) continue;
 
-                BoolQueryBuilder groupQuery = QueryBuilders.boolQuery();
+                BoolQuery.Builder groupBool = new BoolQuery.Builder();
 
-                if (group.isMustAll()) { // AND logic: must include all values
+                if (group.isMustAll()) {
                     for (Object value : values) {
-                        groupQuery.must(buildTermOrMatch(field, value, group.isSearchTerm()));
+                        groupBool.must(buildTermOrMatch(field, value, group.isSearchTerm()));
                     }
-                } else { // OR logic: match any
+                } else {
                     for (Object value : values) {
-                        groupQuery.should(buildTermOrMatch(field, value, group.isSearchTerm()));
+                        groupBool.should(buildTermOrMatch(field, value, group.isSearchTerm()));
                     }
-                    groupQuery.minimumShouldMatch(1);
+                    groupBool.minimumShouldMatch("1");
                 }
-
-                rootQuery.must(groupQuery); // each group combined with AND at root level
+                rootBool.must(Query.of(q -> q.bool(groupBool.build())));
             }
         }
 
-        // Handle exclude groups (no range)
         if (excludeGroups != null) {
             for (SearchFieldGroup group : excludeGroups) {
                 String field = group.getField();
@@ -187,75 +185,106 @@ public class OpenSearchService {
                 if (values == null || values.isEmpty()) continue;
 
                 for (Object value : values) {
-                    rootQuery.mustNot(buildTermOrMatch(field, value, group.isSearchTerm()));
+                    rootBool.mustNot(buildTermOrMatch(field, value, group.isSearchTerm()));
                 }
             }
         }
 
-        return searchWithQueryBuilder(rootQuery, page, size, sortBy, sortOrder);
+        Query rootQuery = Query.of(q -> q.bool(rootBool.build()));
+
+        return searchWithQuery(rootQuery, page, size, sortBy, sortOrder);
     }
 
-    private QueryBuilder buildTermOrMatch(String field, Object value, boolean searchTerm) {
+    private Query buildTermOrMatch(String field, Object value, boolean searchTerm) {
         if (searchTerm) {
-            return QueryBuilders.termQuery(field, value);
+            // Term Query
+            return Query.of(q -> q
+                    .term(t -> t
+                            .field(field)
+                            .value(FieldValue.of(value.toString()))
+                    )
+            );
         } else {
-            return QueryBuilders.matchQuery(field, value);
+            // Match Query
+            return Query.of(q -> q
+                    .match(m -> m
+                            .field(field)
+                            .query(FieldValue.of(value.toString()))
+                    )
+            );
         }
     }
 
-    public SearchResponse search(Object text, int page, int size, SortBy sortBy,
+    public SearchResponse<Object> search(Object text, int page, int size, SortBy sortBy,
                                     SortOrder sortOrder) throws IOException {
-        QueryBuilder q = QueryBuilders
-                .multiMatchQuery(text)
-                .field("title", 3.0f)
-                .field("universes", 2.0f)
-                .field("characters", 2.0f)
-                .field("tags", 1.5f)
-                .field("authors", 1.0f)
-                .prefixLength(1)
-                .fuzziness(Fuzziness.AUTO)
-                .type(MultiMatchQueryBuilder.Type.BEST_FIELDS);
-
-        return searchWithQueryBuilder(q, page, size, sortBy, sortOrder);
+        Query multiMatch = Query.of(q -> q
+                .multiMatch(m -> m
+                        .query(text.toString())
+                        .fields(
+                                ContentMetaData.TITLE + "^3.0",
+                                ContentMetaData.UNIVERSES + ".search^2.0",
+                                ContentMetaData.CHARACTERS + ".search^2.0",
+                                ContentMetaData.TAGS + ".search^1.5",
+                                ContentMetaData.AUTHORS + ".search^1.0"
+                        )
+                        .prefixLength(1)
+                        .fuzziness("AUTO")
+                        .type(TextQueryType.BestFields)
+                )
+        );
+        return searchWithQuery(multiMatch, page, size, sortBy, sortOrder);
     }
 
-    public SearchResponse searchMatchAll(int page, int size, SortBy sortBy, SortOrder sortOrder) throws IOException {
-        QueryBuilder q = QueryBuilders.matchAllQuery();
-        return searchWithQueryBuilder(q, page, size, sortBy, sortOrder);
+    public SearchResponse<Object> searchMatchAll(int page, int size, SortBy sortBy, SortOrder sortOrder) throws IOException {
+        Query matchAll = Query.of(q -> q
+                .matchAll(m -> m)
+        );
+        return searchWithQuery(matchAll, page, size, sortBy, sortOrder);
     }
 
     /**
      * Search exactly with given search strings by field.
      * Does not work with fields that have text type. Use search match for that.
      */
-    public SearchResponse searchTermByOneField(String field, Collection<Object> text, int page, int size,
+    public SearchResponse<Object> searchTermByOneField(String field, List<Object> text, int page, int size,
                                                SortBy sortBy, SortOrder sortOrder) throws IOException {
-        QueryBuilder q = QueryBuilders.termsQuery(field, text);
-        return searchWithQueryBuilder(q, page, size, sortBy, sortOrder);
+        Query termQuery = Query.of(q -> q
+                .terms(t -> t
+                        .field(field)
+                        .terms(terms -> terms
+                                .value(text.stream().map(o -> FieldValue.of(o.toString())).toList())
+                        )
+                )
+        );
+        return searchWithQuery(termQuery, page, size, sortBy, sortOrder);
     }
 
-    private SearchResponse searchWithQueryBuilder(QueryBuilder queryBuilder, int page, int size, SortBy sortBy,
-                                               SortOrder sortOrder) throws IOException {
+    private SearchResponse<Object> searchWithQuery(Query query, int page, int size, SortBy sortBy,
+                                                   SortOrder sortOrder) throws IOException {
 
-        SearchRequest searchRequest = new SearchRequest("media");
-        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder()
-                .query(queryBuilder)
-                .from(page * size)   // e.g., page 2 → offset 20 if size=10
-                .size(size);
+        String sortByField = switch (sortBy) {
+            case UPLOAD_DATE -> ContentMetaData.UPLOAD_DATE;
+            case LENGTH -> ContentMetaData.LENGTH;
+            case SIZE -> ContentMetaData.SIZE;
+            case YEAR -> ContentMetaData.YEAR;
+            default -> null;
+        };
 
-        // Sorting
-        switch (sortBy) {
-            case UPLOAD_DATE -> sourceBuilder.sort(new FieldSortBuilder(ContentMetaData.UPLOAD_DATE).order(sortOrder));
-            case LENGTH -> sourceBuilder.sort(new FieldSortBuilder(ContentMetaData.LENGTH).order(sortOrder));
-            case SIZE -> sourceBuilder.sort(SortBuilders.fieldSort(ContentMetaData.SIZE).order(sortOrder));
-            case YEAR -> sourceBuilder.sort(SortBuilders.fieldSort(ContentMetaData.YEAR).order(sortOrder));
-        }
-        // tie-breaker then sort with score
-        sourceBuilder.sort(SortBuilders.scoreSort().order(sortOrder));
+        SortOptions scoreTieBreaker = SortOptions.of(o -> o.score(s -> s.order(sortOrder)));
 
-        searchRequest.source(sourceBuilder);
-        SearchResponse response = client.search(searchRequest, RequestOptions.DEFAULT);
-        response.getHits().forEach(hit -> System.out.println(hit.getSourceAsString()));
+        SortOptions primarySort = (sortByField == null)
+                ? scoreTieBreaker
+                : SortOptions.of(o -> o.field(f -> f.field(sortByField).order(sortOrder)));
+
+        SearchResponse<Object> response = client.search(s -> s
+                .index(INDEX_NAME)
+                .from(page * size)
+                .size(size)
+                .query(query)
+                .sort(primarySort, scoreTieBreaker), Object.class
+        );
+
+        response.hits().hits().forEach(hit -> System.out.println(hit.source()));
 
         return response;
     }
