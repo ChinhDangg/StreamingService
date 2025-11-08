@@ -678,12 +678,10 @@ function displaySearchItems(searchItems) {
                                         : helperCloneAndUnHideNode(verticalItemTem);
         if (item.thumbnail)
             itemContainer.querySelector('.thumbnail-image').src = item.thumbnail;
-        if (item.width && item.height)
-            itemContainer.querySelector('.resolution-note').textContent = `${item.width}x${item.height}`;
+        itemContainer.querySelector('.resolution-note').textContent = (item.width && item.height) ? `${item.width}x${item.height}` : '';
         itemContainer.querySelector('.media-title').textContent = item.title;
         itemContainer.querySelector('.date-note').textContent = item.uploadDate;
-        if (item.authors && item.authors.length)
-            itemContainer.querySelector('.name-note').textContent = item.authors.join(", ");
+        itemContainer.querySelector('.name-note').textContent = (item.authors && item.authors.length) ? item.authors.join(", ") : 'Unknown';
         const itemLink = itemContainer.querySelector('.item-link');
         itemLink.href = `/api/media/content-page/${item.id}`;
         itemLink.addEventListener('click', async (e) => {
@@ -774,7 +772,6 @@ function createLoader(container) {
     // Return the loader so caller can remove it later
     return loader;
 }
-
 
 async function requestVideoPreview(videoId, itemNode) {
     const thumbnailContainer = itemNode.querySelector('.thumbnail-container');
