@@ -1,21 +1,46 @@
 {
   "properties": {
     "title":       { "type": "text" },
-    "tags":        { "type": "keyword" },
-    "characters":  { "type": "keyword" },
-    "universes":   { "type": "keyword"},
-    "authors":     { "type": "keyword" },
-    "uploadDate":  { "type": "date" },
-    "year":        { "type": "integer" },
-    "width":       { "type": "integer" },
-    "height":      { "type": "integer" },
+
+    "tags": {
+      "type": "keyword",
+      "fields": {
+        "search": { "type": "text", "analyzer": "standard" }
+      }
+    },
+
+    "characters": {
+      "type": "keyword",
+      "fields": {
+        "search": { "type": "text", "analyzer": "standard" }
+      }
+    },
+
+    "universes": {
+      "type": "keyword",
+      "fields": {
+        "search": { "type": "text", "analyzer": "standard" }
+      }
+    },
+
+    "authors": {
+      "type": "keyword",
+      "fields": {
+        "search": { "type": "text", "analyzer": "standard" }
+      }
+    },
+
+    "uploadDate": { "type": "date" },
+    "year":       { "type": "integer" },
+    "width":      { "type": "integer" },
+    "height":     { "type": "integer" },
 
     "id":         { "type": "long" },
     "bucket":     { "type": "text" },
     "parentPath": { "type": "text" },
     "key":        { "type": "text" },
     "thumbnail":  { "type": "text" },
-    "length":     { "type": "integer"},
-    "size":       { "type": "long"}
+    "length":     { "type": "integer" },
+    "size":       { "type": "long" }
   }
 }
