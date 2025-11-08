@@ -21,7 +21,10 @@ const formatTime = s => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().p
 
 // --- Play / Pause ---
 const togglePlay = () => video.paused ? video.play() : video.pause();
-playPauseBtn.addEventListener('click', togglePlay);
+playPauseBtn.addEventListener('click', () => {
+    resetHideTimer();
+    togglePlay();
+});
 
 video.addEventListener('play', () => {
     playPauseBtn.innerHTML = '<i data-lucide="pause" class="w-5 h-5"></i>';
@@ -51,6 +54,7 @@ video.addEventListener('loadedmetadata', () => {
 }, { once: true });
 
 seekSlider.addEventListener('input', e => {
+    resetHideTimer();
     isSeeking = true;
     const val = e.target.value;
     updateSliderColor(val);
@@ -65,6 +69,7 @@ volumeSlider.addEventListener('input', () => {
     updateVolumeIcon();
 });
 muteBtn.addEventListener('click', () => {
+    resetHideTimer();
     video.muted = !video.muted;
     if (!video.muted && video.volume === 0) video.volume = 0.5;
     volumeSlider.value = video.muted ? 0 : video.volume;
@@ -80,6 +85,7 @@ function updateVolumeIcon() {
 
 // --- Speed Menu ---
 speedButton.addEventListener('click', () => {
+    resetHideTimer();
     speedMenu.classList.toggle('hidden');
     resMenu.classList.add('hidden');
 });
@@ -94,6 +100,7 @@ speedMenu.querySelectorAll('button').forEach(btn => {
 
 // --- Resolution Menu (UI only) ---
 resButton.addEventListener('click', () => {
+    resetHideTimer();
     resMenu.classList.toggle('hidden');
     speedMenu.classList.add('hidden');
 });
@@ -181,6 +188,20 @@ function skip() {
     }, 500);
 }
 
+// --- visual feedback overlay (like YouTube pulse) ---
+const feedbackEl = document.createElement("div");
+feedbackEl.className = "absolute inset-0 flex items-center justify-center text-white text-3xl font-semibold opacity-0 select-none pointer-events-none transition-opacity duration-300";
+container.appendChild(feedbackEl);
+
+function showFeedback(text) {
+    feedbackEl.textContent = text;
+    feedbackEl.style.opacity = "1";
+    clearTimeout(feedbackEl._timer);
+    feedbackEl._timer = setTimeout(() => {
+        feedbackEl.style.opacity = "0";
+    }, 400);
+}
+
 replayBtn.addEventListener('click', () => {
     resetHideTimer()
     replay();
@@ -263,20 +284,6 @@ document.addEventListener('keydown', e => {
             break;
     }
 });
-
-// --- visual feedback overlay (like YouTube pulse) ---
-const feedbackEl = document.createElement("div");
-feedbackEl.className = "absolute inset-0 flex items-center justify-center text-white text-3xl font-semibold opacity-0 select-none pointer-events-none transition-opacity duration-300";
-container.appendChild(feedbackEl);
-
-function showFeedback(text) {
-    feedbackEl.textContent = text;
-    feedbackEl.style.opacity = "1";
-    clearTimeout(feedbackEl._timer);
-    feedbackEl._timer = setTimeout(() => {
-        feedbackEl.style.opacity = "0";
-    }, 400);
-}
 
 // Start timer immediately
 resetHideTimer();
