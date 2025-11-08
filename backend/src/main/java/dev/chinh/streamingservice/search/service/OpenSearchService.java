@@ -61,6 +61,58 @@ public class OpenSearchService {
         System.out.println("Index deleted: " + response.acknowledged());
     }
 
+    public void reindex(String sourceIndex, String targetIndex) throws IOException {
+        ReindexResponse reindexResponse = client.reindex(r -> r
+                .source(s -> s.index(sourceIndex))
+                .dest(d -> d.index(targetIndex))
+        );
+        System.out.println("Reindex completed.");
+        System.out.println("Documents created: " + reindexResponse.created());
+        System.out.println("Documents updated: " + reindexResponse.updated());
+        System.out.println("Time taken (millis): " + reindexResponse.took());
+    }
+
+    public void verifyIndexCount(String indexName1, String indexName2) throws IOException {
+        CountResponse countResponse1 = client.count(c -> c.index(indexName1));
+        System.out.println(indexName1 + " index count = " + countResponse1.count());
+        if (indexName2 != null) {
+            CountResponse countResponse2 = client.count(c -> c.index(indexName2));
+            System.out.println(indexName2 + " index count = " + countResponse2.count());
+        }
+    }
+
+    public void addAliasToIndex(String indexName, String alias) throws IOException {
+        UpdateAliasesResponse response = client.indices().updateAliases(a -> a
+                .actions(act -> act
+                        .add(addAlias -> addAlias
+                                .index(indexName)
+                                .alias(alias)
+                        )
+                )
+        );
+        if (response.acknowledged()) {
+            System.out.println("Successfully added alias '" + alias + "' to index '" + indexName + "'.");
+        } else {
+            System.err.println("Failed to acknowledge alias creation for index '" + indexName + "'.");
+        }
+    }
+
+    public void removeAliasFromIndex(String indexName, String alias) throws IOException {
+        UpdateAliasesResponse response = client.indices().updateAliases(a -> a
+                .actions(act -> act
+                        .remove(removeAlias -> removeAlias
+                                .index(indexName)
+                                .alias(alias)
+                        )
+                )
+        );
+        if (response.acknowledged()) {
+            System.out.println("Successfully removed alias '" + alias + "' from index '" + indexName + "'.");
+        } else {
+            System.err.println("Failed to acknowledge alias removal for index '" + indexName + "'.");
+        }
+    }
+
     /**
      * Example:
      * Map<String, Property> newProperties = Map.of(
