@@ -1,9 +1,9 @@
 ###
 # @no-log
-POST http://localhost:8080/api/search/advance?
+POST http://localhost/api/search/advance?
     page=0&
     sortBy=YEAR&
-    sortOrder=DESC
+    sortOrder=Desc
 Content-Type: application/json
 
 {
@@ -24,7 +24,7 @@ Content-Type: application/json
   "rangeFields": [
     {
       "field": "uploadDate",
-      "fromValue": "2025-10-25"
+      "from": "2025-10-25"
     }
   ]
 }
@@ -35,14 +35,14 @@ POST http://localhost/api/search?
     searchString=Nier Automata&
     page=0&
     sortBy=YEAR&
-    sortOrder=DESC
+    sortOrder=Desc
 
 ###
 # @no-log
 POST http://localhost/api/search/keyword?
     page=0&
     sortBy=YEAR&
-    sortOrder=DESC
+    sortOrder=Desc
 Content-Type: application/json
 
 {
@@ -52,16 +52,10 @@ Content-Type: application/json
 
 ###
 # @no-log
-POST http://localhost/api/search/match?
+POST http://localhost/api/search/match-all?
     page=0&
     sortBy=YEAR&
-    sortOrder=DESC
-Content-Type: application/json
-
-{
-  "field": "universes",
-  "text": "Genshin Impact"
-}
+    sortOrder=Desc
 
 ###
 # @no-log
@@ -85,7 +79,7 @@ GET http://localhost/api/album/2/p1080
 
 ###
 # @no-log
-GET http://localhost/api/album/2/vid/79/p720
+GET http://localhost/api/album/2/vid/0/p720
 
 ###
 # @no-log
@@ -93,7 +87,15 @@ POST http://localhost/api/album/2/p1080/0/check-resized
 
 ###
 # @no-log
-GET http://localhost/stream/2/p1080/0_1080.jpg
+GET http://localhost/api/media/content/1
+
+###
+# @no-log
+GET http://localhost/api/media/content-page/2
+
+###
+# @no-log
+GET http://localhost/stream/2/p1080/1_1080.jpg
 
 ###
 # @no-log
@@ -102,3 +104,18 @@ GET http://localhost/api/album/resize/2?res=p1080&key=0_1080.jpg
 ###
 # @no-log
 GET http://localhost/api/album/original/2?res=p1080&key=0_1080.jpg
+
+
+
+
+###
+# @no-log
+GET http://localhost:8081/page/frag/video-player
+
+###
+# @no-log
+GET http://localhost:8081/page/frag/album
+
+###
+# @no-log
+GET http://localhost:8081/page/frag/video

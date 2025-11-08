@@ -17,6 +17,14 @@ import java.util.Map;
 @SpringBootApplication
 public class StreamingServiceApplication {
 
+    static {
+        try {
+            OSUtil.init();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to start init OSUtil", e);
+        }
+    }
+
     public static void main(String[] args) {
         SpringApplication.run(StreamingServiceApplication.class, args);
     }
@@ -44,8 +52,8 @@ public class StreamingServiceApplication {
 //            document.put("title", "Test Album");
 //            document.put("universes", List.of("Genshin Impact"));
 //            document.put("bucket", "cos");
-//            document.put("parentPath", "aqua/Legion/Aqua水淼Clorinde");
-              // document.put("thumbnail", "aqua/Legion/Aqua水淼Clorinde/Aqua水淼 - Clorinde (78).jpg");
+//            document.put("parentPath", "aqua/legion/AA - Jade - HonkaiStar Rail");
+//            document.put("thumbnail", "aqua/legion/AA - Jade - HonkaiStar Rail/水淼Aqua cosplay Jade - HonkaiStar Rail (1).jpg");
 //            document.put("uploadDate", LocalDate.now());
 //            document.put("year", 2025);
 //            document.put("length", 92);
@@ -53,9 +61,15 @@ public class StreamingServiceApplication {
 //            document.put("id", 2);
 //            openSearchService.indexDocument(2, document);
 
-            //openSearchService.partialUpdateDocument(1, Map.of("width", 3840, "height", 2160));
-            //openSearchService.partialUpdateDocument(2, Map.of("thumbnail", "aqua/Legion/Aqua水淼Clorinde/Aqua水淼 - Clorinde (78).jpg"));
             //openSearchService.createIndexWithMapping();
+
+//            String oldIndex = OpenSearchService.INDEX_NAME + "_v1";
+//            String newIndex = OpenSearchService.INDEX_NAME + "_v2";
+//            openSearchService.createIndexWithMapping(newIndex);
+//            openSearchService.reindex(oldIndex, newIndex);
+//            openSearchService.addAliasToIndex(newIndex, OpenSearchService.INDEX_NAME);
+//            openSearchService.verifyIndexCount(oldIndex, newIndex);
+//            openSearchService.deleteIndex(oldIndex);
         };
     }
 }
