@@ -59,6 +59,7 @@ async function initialize() {
     currentSearchInfo.set(SEARCH_INFO.ADVANCE_REQUEST_BODY, null);
     currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, urlParams.get(SEARCH_INFO.SEARCH_TYPE));
 
+    initializeSearchPageTitle();
     initializeSortByOptions();
     initializeSortOrderOptions();
     initializeAdvanceSearchArea();
@@ -69,6 +70,24 @@ async function initialize() {
 window.addEventListener('DOMContentLoaded', async () => {
     await initialize();
 });
+
+function initializeSearchPageTitle() {
+    const searchPageTitle = document.getElementById('search-page-title');
+    searchPageTitle.href = '/page/search';
+    searchPageTitle.addEventListener('click', async (e) => {
+        e.preventDefault();
+        currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, null);
+        currentSearchInfo.set(SEARCH_INFO.PAGE, 0);
+        currentSearchInfo.set(SEARCH_INFO.SORT_BY, SORT_BY.UPLOAD);
+        currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, SORT_ORDERS.DESC);
+        e.target.disabled = true;
+        await sendSearchRequestOnCurrentInfo().then(() => {
+            e.target.disabled = false;
+            initializeSortByOptions();
+            initializeSortOrderOptions();
+        });
+    });
+}
 
 let searchIsSubmitting = false;
 document.querySelector('#search-form').addEventListener('submit', (e) => {
@@ -351,6 +370,10 @@ function addEventKeywordSearchArea(fnKeywordSearch, addedMap, searchLabel, searc
 function initializeSortByOptions() {
     const sortByOptions = document.getElementById('sortByOptions');
     let foundKey= Object.keys(SORT_BY).find(key => SORT_BY[key] === currentSearchInfo.get(SEARCH_INFO.SORT_BY)).toLowerCase();
+    if (previousSortByButton) {
+        previousSortByButton.classList.remove('bg-indigo-600');
+        previousSortByButton.classList.add('bg-gray-800');
+    }
     previousSortByButton = sortByOptions.querySelector(`.${foundKey}-btn`);
     setSortByStyleToSelected(previousSortByButton);
 
@@ -752,21 +775,18 @@ function createLoader(container) {
     return loader;
 }
 
-let previousPreviewVideoId = null;
 
 async function requestVideoPreview(videoId, itemNode) {
     const thumbnailContainer = itemNode.querySelector('.thumbnail-container');
     thumbnailContainer.querySelector('.image-container').classList.add('hidden');
     videoContainer.classList.remove('hidden');
 
-    if (previousPreviewVideoId === videoId) {
+    if (thumbnailContainer.contains(videoContainer)) {
         thumbnailContainer.querySelector('.image-container').classList.add('hidden');
         return;
-    }
-    previousPreviewVideoId = videoId;
-
-    if (!thumbnailContainer.contains(videoContainer))
+    } else {
         thumbnailContainer.appendChild(videoContainer);
+    }
 
     const loader = createLoader(thumbnailContainer);
     let playlistUrl;
