@@ -16,7 +16,7 @@ services:
     build:
       context: ./nginx
       dockerfile: Dockerfile
-    image: openresty/openresty:1.27.1.2-0-bookworm-fat
+    image: my-nginx/openresty:1.27.1.2-0-bookworm-fat
     container_name: nginx
     ports:
       - "80:80"
