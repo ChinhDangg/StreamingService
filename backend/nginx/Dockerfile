@@ -1,7 +1,6 @@
-# Extend the official OpenResty image
-FROM openresty/openresty:latest
+FROM openresty/openresty:1.27.1.2-0-bookworm-fat
 
-# Install git + luarocks so we can install lua-resty-http
+# Install git + luarocks to install lua-resty-http
 RUN apt-get update && \
     apt-get install -y git luarocks && \
     luarocks install lua-resty-http && \

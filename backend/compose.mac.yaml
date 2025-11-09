@@ -1,6 +1,6 @@
 services:
   minio:
-    image: quay.io/minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
     container_name: minio
     ports:
       - "9000:9000"   # S3 API
@@ -13,7 +13,10 @@ services:
     command: server /data --console-address ":9001"
 
   nginx:
-    build: ./nginx
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    image: openresty/openresty:1.27.1.2-0-bookworm-fat
     container_name: nginx
     ports:
       - "80:80"
@@ -28,7 +31,7 @@ services:
     # docker exec -it nginx nginx -V #check for config being applied or not - --config-path=
 
   ffmpeg:
-    image: linuxserver/ffmpeg:latest
+    image: linuxserver/ffmpeg:arm64v8-version-8.0-cli
     container_name: ffmpeg
     depends_on:
       - minio
@@ -38,7 +41,7 @@ services:
       - /Volumes/RAMDISK:/chunks      # mount same RAM disk
 
   opensearch:
-    image: opensearchproject/opensearch:2.15.0
+    image: opensearchproject/opensearch:3.3.2
     container_name: opensearch
     environment:
       - discovery.type=single-node
