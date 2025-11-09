@@ -1,10 +1,16 @@
 import { setVideoUrl} from "/static/js/set-video-url.js";
 import { displayContentInfo, helperCloneAndUnHideNode} from "/static/js/metadata-display.js";
 
+let albumId = null;
+
 export async function initialize() {
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
-    const albumId = urlParams.get('mediaId');
+    albumId = urlParams.get('mediaId');
+
+    if (!albumId) {
+        window.location.href = '/';
+    }
 
     await Promise.all([
         displayAlbumInfo(albumId),
@@ -16,6 +22,7 @@ async function displayAlbumInfo(albumId) {
     const response = await fetch(`/api/media/content/${albumId}`);
     if (!response.ok) {
         alert("Failed to fetch album info");
+        window.location.href = '/';
         return;
     }
     const albumInfo = await response.json();
@@ -56,10 +63,68 @@ const BATCH_SIZE = 5;
 let currentBatch = 0;
 let albumItems = [];
 
+const videoContainer = document.getElementById('album-video-container');
+const imageContainer = document.getElementById('album-image-container');
+
+const addImageItem = (item, imageContainer, imageWrapperTem) => {
+    const imageId = `image-wrapper-${currentBatch}`;
+    const imageWrapper = helperCloneAndUnHideNode(imageWrapperTem);
+    imageWrapper.id = imageId;
+    const imageElement = imageWrapper.querySelector('img');
+    imageElement.src = item.url;
+    imageElement.alt = `image-${currentBatch}`;
+    const buttonElement = imageWrapper.querySelector('button');
+    buttonElement.addEventListener('click', () => {
+        enterFullScreen();
+        showFullScreen(imageId);
+    });
+    imageWrapper.addEventListener('click', () => {
+        enterFullScreen();
+        showFullScreen(imageId);
+    });
+    imageContainer.appendChild(imageWrapper);
+}
+
+const addVideoItem = (item, videoContainer, videoWrapperTem) => {
+    const videoWrapper = helperCloneAndUnHideNode(videoWrapperTem);
+    videoWrapper.querySelector('.temp-video-holder').addEventListener('click', async () => {
+        console.log('clicked');
+        await requestVideo(item.url, videoWrapper);
+    });
+    videoContainer.appendChild(videoWrapper);
+}
+
+const addMediaItem = (start, end) => {
+    const imageWrapperTem = imageContainer.querySelector('.image-container-wrapper');
+    const videoWrapperTem = videoContainer.querySelector('.video-container-wrapper');
+    for (let i = start; i < end; i++) {
+        const item = albumItems[i];
+        if (item.type === 'IMAGE') {
+            addImageItem(item, imageContainer, imageWrapperTem);
+        } else if (item.type === 'VIDEO') {
+            addVideoItem(item, videoContainer, videoWrapperTem);
+        }
+        currentBatch++;
+        //console.log('currentBatch', currentBatch);
+    }
+}
+
+const fetchCheckResized = async (albumId, start) => {
+    const response = await fetch(`/api/album/${albumId}/p1080/${start}/check-resized`, {
+        method: 'POST',
+    });
+    if (!response.ok) {
+        alert("Failed to fetch album items");
+        return false;
+    }
+    return true;
+};
+
 async function displayAlbumItems(albumId) {
     const response = await fetch(`/api/album/${albumId}/p1080`);
     if (!response.ok) {
         alert("Failed to fetch album items");
+        window.location.href = '/';
         return;
     }
     albumItems = await response.json();
@@ -79,52 +144,13 @@ async function displayAlbumItems(albumId) {
     //     }
     // ]
 
-    const videoContainer = document.getElementById('album-video-container');
     const firstVideo = videoContainer.firstElementChild;
     if (firstVideo) videoContainer.replaceChildren(firstVideo);
 
-    const imageContainer = document.getElementById('album-image-container');
     const firstImage = imageContainer.firstElementChild;
     if (firstImage) imageContainer.replaceChildren(firstImage);
 
-    const imageWrapperTem = imageContainer.querySelector('.image-container-wrapper');
-    const videoWrapperTem = videoContainer.querySelector('.video-container-wrapper');
-
-    const addImageItem = (item) => {
-        const imageId = `image-wrapper-${currentBatch}`;
-        const imageWrapper = helperCloneAndUnHideNode(imageWrapperTem);
-        imageWrapper.id = imageId;
-        const imageElement = imageWrapper.querySelector('img');
-        imageElement.src = item.url;
-        imageElement.alt = `image-${currentBatch}`;
-        const buttonElement = imageWrapper.querySelector('button');
-        buttonElement.addEventListener('click', () => {
-            enterFullScreen();
-            showFullScreen(imageId);
-        });
-        imageContainer.appendChild(imageWrapper);
-    }
-
-    const addVideoItem = (item) => {
-        const videoWrapper = helperCloneAndUnHideNode(videoWrapperTem);
-        videoWrapper.querySelector('.temp-video-holder').addEventListener('click', async () => {
-            console.log('clicked');
-            await requestVideo(item.url, videoWrapper);
-        });
-        videoContainer.appendChild(videoWrapper);
-    }
-
-    for (let i = 0; i < BATCH_SIZE; i++) {
-        if (currentBatch >= albumItems.length)
-            break;
-        const item = albumItems[i];
-        if (item.type === 'IMAGE') {
-            addImageItem(item);
-        } else if (item.type === 'VIDEO') {
-            addVideoItem(item);
-        }
-        currentBatch++;
-    }
+    addMediaItem(0, Math.min(BATCH_SIZE, albumItems.length));
 
     if (currentBatch >= albumItems.length) {
         return;
@@ -135,34 +161,22 @@ async function displayAlbumItems(albumId) {
 
     const observer = new IntersectionObserver(async (entries) => {
         if (entries[0].isIntersecting) {
-            console.log('intersecting');
+            //console.log('intersecting');
             if (currentBatch >= albumItems.length) {
-                console.log('no more items');
+                //console.log('no more items');
                 observer.unobserve(sentinel);
                 return;
             }
-            const response = await fetch(`/api/album/${albumId}/p1080/${currentBatch}/check-resized`, {
-                method: 'POST',
-            });
-            if (!response.ok) {
-                alert("Failed to fetch album items");
+            const resized = await fetchCheckResized(albumId, currentBatch);
+            if (!resized) {
                 observer.unobserve(sentinel);
                 return;
             }
             const start = currentBatch;
             const end = Math.min(currentBatch + BATCH_SIZE, albumItems.length);
-            for (let i = start; i < end; i++) {
-                const item = albumItems[i];
-                if (item.type === 'IMAGE') {
-                    addImageItem(item);
-                } else if (item.type === 'VIDEO') {
-                    addVideoItem(item);
-                }
-                currentBatch++;
-                console.log('currentBatch', currentBatch);
-            }
+            addMediaItem(start, end);
             if (currentBatch >= albumItems.length) {
-                console.log('looped and reached end')
+                //console.log('looped and reached end')
                 observer.unobserve(sentinel);
             }
         }
@@ -223,7 +237,6 @@ function enterFullScreen() {
 
 const fullScreenClick = (e) => {
     const rect = wrapperImageFullScreen.getBoundingClientRect();
-
     const clickY = e.clientY - rect.top;
     const half = rect.height / 2;
 
@@ -239,8 +252,7 @@ document.addEventListener("keydown", (e) => {
 
     if (e.key === "ArrowRight") {
         showNextFullScreen();
-    }
-    if (e.key === "ArrowLeft") {
+    } else if (e.key === "ArrowLeft") {
         showPreviousFullScreen();
     }
 });
@@ -252,6 +264,19 @@ function showNextFullScreen() {
     if (id >= albumItems.length) return;
     const nextId = currentFullScreen.slice(0, dashIndex) + (id + 1);
     showFullScreen(nextId);
+
+    if (currentBatch >= albumItems.length)
+        return;
+    if (id < currentBatch-2)
+        return;
+    const resized = fetchCheckResized(albumId, currentBatch).then(() => {
+        if (!resized) {
+            return;
+        }
+        const start = currentBatch;
+        const end = Math.min(currentBatch + BATCH_SIZE, albumItems.length);
+        addMediaItem(start, end);
+    });
 }
 
 function showPreviousFullScreen() {
