@@ -9,10 +9,11 @@ export function setVideoUrl(videoContainerNode, playlistUrl = "p720/master.m3u8"
             const hls = new Hls({ startPosition: 0 });
             hls.loadSource(playlistUrl + '?_=' + Date.now());
             hls.attachMedia(video);
+
+            if (!totalTime)
+                return;
             const onLevelLoaded = (event, data) => {
                 const d = data.details;
-                console.log('HLS details:', d);
-                console.log('live: ', d.live);
                 if (!d.live) {
                     hls.off(Hls.Events.LEVEL_LOADED, onLevelLoaded);
                     totalTime.textContent = formatTime(video.duration);

@@ -5,7 +5,6 @@ import dev.chinh.streamingservice.search.constant.SortBy;
 import dev.chinh.streamingservice.search.data.MediaSearchRangeField;
 import dev.chinh.streamingservice.search.data.SearchFieldGroup;
 import lombok.RequiredArgsConstructor;
-import org.apache.hc.core5.http.ParseException;
 import org.opensearch.client.json.JsonData;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.opensearch._types.*;
