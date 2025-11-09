@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
 @RequestMapping("/page")
-public class FrontEndController {
+public class PageController {
 
     @GetMapping("/search")
     public String searchPage(){
