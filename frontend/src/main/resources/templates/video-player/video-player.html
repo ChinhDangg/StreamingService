@@ -56,34 +56,34 @@
 
                 <!-- Control Buttons -->
                 <div class="flex items-center justify-between text-sm">
-                    <div class="flex items-center space-x-3">
+                    <div class="flex items-center space-x-1 sm:space-x-3">
                         <button class="play-pause-button p-2 rounded-full bg-white/20 hover:bg-white/40 transition">
-                            <i data-lucide="play" class="w-5 h-5"></i>
+                            <i data-lucide="play" class="w-4 h-4 sm:w-5 sm:h-5"></i>
                         </button>
 
                         <button class="replay-button relative p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Replay 5s">
-                            <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
+                            <i data-lucide="rotate-ccw" class="w-4 h-4 sm:w-5 sm:h-5"></i>
                             <span class="absolute bottom-0 right-1 text-[10px] font-bold">5</span>
                         </button>
 
                         <button class="forward-button relative p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Forward 5s">
-                            <i data-lucide="rotate-cw" class="w-5 h-5"></i>
+                            <i data-lucide="rotate-cw" class="w-4 h-4 sm:w-5 sm:h-5"></i>
                             <span class="absolute bottom-0 right-1 text-[10px] font-bold">5</span>
                         </button>
                     </div>
 
-                    <div class="flex items-center space-x-3">
-                        <span class="current-time text-gray-300">0:00</span>
-                        <span class="text-gray-400">/</span>
-                        <span class="total-time text-gray-300">0:00</span>
+                    <div class="flex items-center space-x-1 sm:space-x-3">
+                        <span class="current-time text-gray-300 sm:text-xs">0:00</span>
+                        <span class="text-gray-400 sm:text-xs">/</span>
+                        <span class="total-time text-gray-300 sm:text-xs">0:00</span>
 
                         <!-- Volume -->
                         <div class="flex items-center space-x-2">
                             <button class="mute-button p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Mute/Unmute">
-                                <i data-lucide="volume-2" class="w-5 h-5"></i>
+                                <i data-lucide="volume-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>
                             </button>
                             <input type="range" min="0" max="1" step="0.01" value="1"
-                                   class="volume-slider w-24 h-[3px] accent-purple-500 cursor-pointer">
+                                   class="volume-slider w-12 sm:w-16 h-[3px] accent-purple-500 cursor-pointer">
                         </div>
 
                         <!-- Compact Speed & Resolution -->
@@ -113,7 +113,7 @@
 
                         <!-- Fullscreen -->
                         <button class="fullscreen-button p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Fullscreen">
-                            <i data-lucide="maximize" class="w-5 h-5"></i>
+                            <i data-lucide="maximize" class="w-4 h-4 sm:w-5 sm:h-5"></i>
                         </button>
                     </div>
                 </div>

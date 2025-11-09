@@ -27,11 +27,12 @@ playPauseBtn.addEventListener('click', () => {
 });
 
 video.addEventListener('play', () => {
-    playPauseBtn.innerHTML = '<i data-lucide="pause" class="w-5 h-5"></i>';
+    playPauseBtn.innerHTML = `<i data-lucide="pause" class="w-4 h-4 sm:w-5 sm:h-5"></i>`;
     lucide.createIcons();
 });
+
 video.addEventListener('pause', () => {
-    playPauseBtn.innerHTML = '<i data-lucide="play" class="w-5 h-5"></i>';
+    playPauseBtn.innerHTML = `<i data-lucide="play" class="w-4 h-4 sm:w-5 sm:h-5"></i>`;
     lucide.createIcons();
 });
 
@@ -230,7 +231,7 @@ video.addEventListener('touchstart', () => {
     showControls();
     resetHideTimer();
 });
-video.addEventListener('touchend', () => {
+video.addEventListener('touchend', (e) => {
     resetHideTimer();
     const touch = e.changedTouches[0];
     handleClickOrTap(touch.clientX, e.timeStamp, true);
