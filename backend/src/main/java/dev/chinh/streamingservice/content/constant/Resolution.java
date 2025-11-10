@@ -4,7 +4,7 @@ import lombok.Getter;
 
 @Getter
 public enum Resolution {
-    original(-1),
+    original(99999),  // big number to supersede other resolutions (prevent re-encoding)
     p2160(2160),
     p1440(1440),
     p1080(1080),
