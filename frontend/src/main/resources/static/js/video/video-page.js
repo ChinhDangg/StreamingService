@@ -1,4 +1,4 @@
-import { setVideoUrl} from "/static/js/set-video-url.js";
+import { setVideoUrl, setVideoResolution } from "/static/js/set-video-url.js";
 import { displayContentInfo } from "/static/js/metadata-display.js";
 
 const container = document.querySelector('[data-player="videoPlayerContainer"]');
@@ -10,7 +10,6 @@ export async function initialize() {
     const videoId = urlParams.get('mediaId');
 
     await Promise.all([
-        getVideoUrl(videoId),
         displayVideoInfo(videoId),
     ]);
 }
@@ -20,7 +19,7 @@ initialize();
 async function displayVideoInfo(videoId) {
     const response = await fetch(`/api/media/content/${videoId}`);
     if (!response.ok) {
-        alert("Failed to fetch album info");
+        alert("Failed to fetch video info");
         return;
     }
 
@@ -56,10 +55,14 @@ async function displayVideoInfo(videoId) {
     // };
 
     displayContentInfo(videoInfo);
+    const originalRes = videoInfo.width > videoInfo.height ? videoInfo.height : videoInfo.width;
+    await getVideoUrl(videoId, originalRes);
 }
 
-async function getVideoUrl(videoId) {
-    const response = await fetch(`/api/videos/partial/${videoId}/p720`);
+async function getVideoUrl(videoId, originalRes) {
+    const baseUrl = `/api/videos/partial/${videoId}`;
+    let defaultRes = 'p' + (originalRes > 720 ? 720 : originalRes);
+    const response = await fetch(baseUrl + "/" + defaultRes);
     if (!response.ok) {
         alert("Failed to fetch video");
         return;
@@ -67,4 +70,5 @@ async function getVideoUrl(videoId) {
     const videoUrl = await response.text();
     const container = document.querySelector('[data-player="videoPagePlayerContainer"]');
     setVideoUrl(container, videoUrl);
+    setVideoResolution(container, baseUrl, originalRes, defaultRes);
 }
