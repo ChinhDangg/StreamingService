@@ -1,4 +1,4 @@
-import { setVideoUrl} from "/static/js/set-video-url.js";
+import { setVideoUrl, setVideoResolution } from "/static/js/set-video-url.js";
 import { displayContentInfo, helperCloneAndUnHideNode} from "/static/js/metadata-display.js";
 
 let albumId = null;
@@ -88,7 +88,6 @@ const addImageItem = (item, imageContainer, imageWrapperTem) => {
 const addVideoItem = (item, videoContainer, videoWrapperTem) => {
     const videoWrapper = helperCloneAndUnHideNode(videoWrapperTem);
     videoWrapper.querySelector('.temp-video-holder').addEventListener('click', async () => {
-        console.log('clicked');
         await requestVideo(item.url, videoWrapper);
     });
     videoContainer.appendChild(videoWrapper);
@@ -343,7 +342,10 @@ async function requestVideo(videoUrlRequest, videoWrapper) {
     previousVideoWrapper = videoWrapper;
     videoWrapper.querySelector('.temp-video-holder').classList.add('hidden');
     videoWrapper.querySelector('.video-holder').appendChild(videoPlayer);
+
+    const baseUrl = videoUrlRequest.split('/').slice(0, -1).join('/');
     setVideoUrl(videoPlayer, videoUrl);
+    setVideoResolution(videoPlayer, baseUrl, 1080, 'p720');
 }
 
 let videoPlayer = null;
