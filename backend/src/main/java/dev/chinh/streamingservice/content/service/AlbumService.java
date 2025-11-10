@@ -319,6 +319,12 @@ public class AlbumService extends MediaService {
         addCacheLastAccess(albumVidCacheJobId, now);
         cacheLastAccessForAlbum(albumCreationId, albumId);
 
+        String bucket = albumUrlInfo.buckets.getFirst();
+
+        if (res == Resolution.original) {
+            return minIOService.getSignedUrlForHostNginx(bucket, videoPath, 60 * 60);
+        }
+
         final String videoDir = albumVidCacheJobId.replace(":", "/");
 
         MediaJobStatus mediaJobStatus = getJobStatus(albumVidCacheJobId);
@@ -330,7 +336,6 @@ public class AlbumService extends MediaService {
                 prevJobStopped = true;
         }
 
-        String bucket = albumUrlInfo.buckets.getFirst();
         String input = minIOService.getSignedUrlForContainerNginx(bucket, videoPath, 60 * 60);
 
         OSUtil.createTempDir(videoDir);
