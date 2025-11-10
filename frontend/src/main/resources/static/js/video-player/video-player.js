@@ -105,14 +105,6 @@ resButton.addEventListener('click', () => {
     resMenu.classList.toggle('hidden');
     speedMenu.classList.add('hidden');
 });
-resMenu.querySelectorAll('button').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const res = btn.dataset.res;
-        resButton.textContent = res;
-        resMenu.classList.add('hidden');
-        console.log('Change resolution to', res);
-    });
-});
 
 // --- Fullscreen ---
 fullscreenBtn.addEventListener('click', () => {
