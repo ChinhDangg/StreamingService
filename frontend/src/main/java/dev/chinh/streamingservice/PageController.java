@@ -24,6 +24,11 @@ public class PageController {
         return "album/album-page";
     }
 
+    @GetMapping("/album-grouper")
+    public String albumGrouperPage() {
+        return "album-grouper/album-grouper-page";
+    }
+
     @GetMapping("/search/{extra}")
     public String searchPage2(@PathVariable String extra) {
         return "search/search-page";
