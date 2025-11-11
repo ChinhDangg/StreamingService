@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.serve.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.MediaMapper;
 import dev.chinh.streamingservice.content.service.AlbumService;
@@ -12,15 +13,25 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+
+import java.net.URI;
+import java.time.Duration;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class MediaDisplayService {
 
     private final AlbumService albumService;
+    private final ObjectMapper objectMapper;
     private final MediaMapper mediaMapper;
+    private final RedisTemplate<String, Object> redisTemplate;
     private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
 
     private final int maxBatchSize = 10;
@@ -33,45 +44,65 @@ public class MediaDisplayService {
             mediaDisplayContent.setThumbnail(MediaSearchService.getThumbnailPath(mediaId, MediaSearchService.thumbnailResolution, mediaItem.getThumbnail()));
 
         if (mediaItem.isGrouper()) {
-            Pageable pageable = PageRequest.of(0, maxBatchSize);
-            Slice<Long> mediaIds = mediaGroupMetaDataRepository.findMediaMetadataIdsByGrouperMetaDataId(mediaId, pageable);
+            Slice<Long> mediaIds = getNextGroupOfMedia(mediaId, 0);
             mediaDisplayContent.setChildMediaIds(mediaIds);
         }
         return mediaDisplayContent;
     }
 
+    private void cacheGroupOfMedia(long mediaId, int offset, Slice<Long> mediaIds) {
+        redisTemplate.opsForValue().set("grouper::" + mediaId + ":" + offset, mediaIds, Duration.ofMinutes(15));
+    }
+
+    public Slice<Long> getCacheGroupOfMedia(long mediaId, int offset) {
+        String key = "grouper::" + mediaId + ":" + offset;
+        Object json = redisTemplate.opsForValue().get(key);
+
+        if (json == null)
+            return null;
+        try {
+            List<Long> list = objectMapper.readValue(json.toString(), new TypeReference<>() {});
+            return new SliceImpl<>(list);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse cached Slice<Long>", e);
+        }
+    }
+
     public Slice<Long> getNextGroupOfMedia(long mediaId, int offset) {
+        Slice<Long> cachedGroupOfMedia = getCacheGroupOfMedia(mediaId, offset);
+        if (cachedGroupOfMedia != null) {
+            return cachedGroupOfMedia;
+        }
+
         MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(mediaId);
         if (!mediaItem.isGrouper()) {
             throw new ResourceNotFoundException("No media grouper found with id: " + mediaId);
         }
 
         Pageable pageable = PageRequest.of(offset, maxBatchSize);
-        return mediaGroupMetaDataRepository.findMediaMetadataIdsByGrouperMetaDataId(mediaId, pageable);
+        Slice<Long> groupOfMedia = mediaGroupMetaDataRepository.findMediaMetadataIdsByGrouperMetaDataId(mediaId, pageable);
+        cacheGroupOfMedia(mediaId, offset, groupOfMedia);
+        return groupOfMedia;
     }
 
     public ResponseEntity<Void> getServePageTypeFromMedia(long mediaId) {
         MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(mediaId);
 
-        System.out.println(mediaItem.toString());
-        // get media display content to display extra info about album media
-
+        String mediaPage;
         if (mediaItem.isGrouper()) {
-            System.out.println("Grouper page");
-            // display media info content
-            // should display link to other inner media if none that raise alert
+            mediaPage = "/page/album-grouper?mediaId=" + mediaId;
         } else if (!mediaItem.hasKey()) {
             System.out.println("Album page");
-            // call GET http://localhost/api/album/2/p1080 to get all media in album with given url
-            // if image type then display image with full screen mode
-            // if video type then display video. Has to request video url first (at different resolution)
+            mediaPage = "/page/album?mediaId=" + mediaId;
         } else if (mediaItem.hasKey()) {
-            System.out.println("Video page");
-            // call GET http://localhost/api/videos/partial/1/p360 to actually request actual video url at different resolution
-            // call GET http://localhost/api/videos/original/1 to request video at original url
+            mediaPage = "/page/video?mediaId=" + mediaId;
+        } else {
+            throw new IllegalStateException("Unknown page type with mediaId: " + mediaId);
         }
 
-        throw new IllegalStateException("Unknown page type with mediaId: " + mediaId);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setLocation(URI.create(mediaPage));
+        return new ResponseEntity<>(headers, HttpStatus.FOUND);
     }
 
 }
