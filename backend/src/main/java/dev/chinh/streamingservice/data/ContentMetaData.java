@@ -31,8 +31,12 @@ public class ContentMetaData {
     public static final String LENGTH = "length";
     public static final String SIZE = "size";
     public static final String GROUP_INFO = "groupInfo";
+    // Group Info
     public static final String GROUPER_ID = "grouperId";
     public static final String NUM_INFO = "numInfo";
+
+    // Name entity
+    public static final String NAME = "name";
 
     public static void validateFieldName(String fieldNameCheck) throws IllegalAccessException {
         ContentMetaData contentMetaData = new ContentMetaData();
@@ -63,6 +67,16 @@ public class ContentMetaData {
         if (!(fieldNameCheck.equals(UPLOAD_DATE) || fieldNameCheck.equals(YEAR)
                 || fieldNameCheck.equals(SIZE) || fieldNameCheck.equals(LENGTH))) {
             throw new IllegalArgumentException("Invalid search range field name: " + fieldNameCheck);
+        }
+    }
+
+    public static void validateNameText(String text) {
+        text = text.trim();
+        if (text.length() < 2) {
+            throw new IllegalArgumentException("Text must be at least 2 chars: " + text);
+        }
+        if (text.length() > 100) {
+            throw new IllegalArgumentException("Text must be at most 100 chars");
         }
     }
 
