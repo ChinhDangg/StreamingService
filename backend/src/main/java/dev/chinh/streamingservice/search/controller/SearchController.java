@@ -9,12 +9,11 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
-import org.opensearch.search.sort.SortOrder;
+import org.opensearch.client.opensearch._types.SortOrder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -58,39 +57,39 @@ public class SearchController {
     }
 
     @PostMapping("/universes")
-    public ResponseEntity<MediaSearchResult> universesSearch(@RequestParam List<String> universes,
+    public ResponseEntity<MediaSearchResult> universesSearch(@RequestParam List<Object> universes,
                                                            @RequestParam(required = false) int page,
                                                            @RequestParam(required = false) SortBy sortBy,
                                                            @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
         return ResponseEntity.ok().body(
-                mediaSearchService.searchByKeywords(ContentMetaData.UNIVERSES, Collections.singleton(universes), page, pageSize, sortBy, sortOrder));
+                mediaSearchService.searchByKeywords(ContentMetaData.UNIVERSES, universes, page, pageSize, sortBy, sortOrder));
     }
 
     @PostMapping("/characters")
-    public ResponseEntity<MediaSearchResult> charactersSearch(@RequestParam List<String> characters,
+    public ResponseEntity<MediaSearchResult> charactersSearch(@RequestParam List<Object> characters,
                                                              @RequestParam(required = false) int page,
                                                              @RequestParam(required = false) SortBy sortBy,
                                                              @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
         return ResponseEntity.ok().body(
-                mediaSearchService.searchByKeywords(ContentMetaData.CHARACTERS, Collections.singleton(characters), page, pageSize, sortBy, sortOrder));
+                mediaSearchService.searchByKeywords(ContentMetaData.CHARACTERS, characters, page, pageSize, sortBy, sortOrder));
     }
 
     @PostMapping("/authors")
-    public ResponseEntity<MediaSearchResult> authorsSearch(@RequestParam List<String> authors,
+    public ResponseEntity<MediaSearchResult> authorsSearch(@RequestParam List<Object> authors,
                                                            @RequestParam(required = false) int page,
                                                            @RequestParam(required = false) SortBy sortBy,
                                                            @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
         return ResponseEntity.ok().body(
-                mediaSearchService.searchByKeywords(ContentMetaData.AUTHORS, Collections.singleton(authors), page, pageSize, sortBy, sortOrder));
+                mediaSearchService.searchByKeywords(ContentMetaData.AUTHORS, authors, page, pageSize, sortBy, sortOrder));
     }
 
     @PostMapping("/tags")
-    public ResponseEntity<MediaSearchResult> tagsSearch(@RequestParam List<String> tags,
+    public ResponseEntity<MediaSearchResult> tagsSearch(@RequestParam List<Object> tags,
                                                               @RequestParam(required = false) int page,
                                                               @RequestParam(required = false) SortBy sortBy,
                                                               @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
         return ResponseEntity.ok().body(
-                mediaSearchService.searchByKeywords(ContentMetaData.TAGS, Collections.singleton(tags), page, pageSize, sortBy, sortOrder));
+                mediaSearchService.searchByKeywords(ContentMetaData.TAGS, tags, page, pageSize, sortBy, sortOrder));
     }
 
     @PostMapping("/match-all")
@@ -98,5 +97,25 @@ public class SearchController {
                                                          @RequestParam(required = false) SortBy sortBy,
                                                          @RequestParam(required = false) SortOrder sortOrder) throws IOException {
         return ResponseEntity.ok().body(mediaSearchService.searchMatchAll(page, pageSize, sortBy, sortOrder));
+    }
+
+    @GetMapping("/suggestion/authors")
+    public List<String> getAuthorList(@RequestParam(name = "s") String authorSearchString) throws IOException {
+        return mediaSearchService.searchAuthorContaining(authorSearchString);
+    }
+
+    @GetMapping("/suggestion/characters")
+    public List<String> getCharacterList(@RequestParam(name = "s") String characterSearchString) throws IOException {
+        return mediaSearchService.searchCharacterContaining(characterSearchString);
+    }
+
+    @GetMapping("/suggestion/universes")
+    public List<String> getUniverseList(@RequestParam(name = "s") String universeSearchString) throws IOException {
+        return mediaSearchService.searchUniverseContaining(universeSearchString);
+    }
+
+    @GetMapping("/suggestion/tags")
+    public List<String> getTagList(@RequestParam(name = "s") String tagSearchString) throws IOException {
+        return mediaSearchService.searchTagContaining(tagSearchString);
     }
 }
