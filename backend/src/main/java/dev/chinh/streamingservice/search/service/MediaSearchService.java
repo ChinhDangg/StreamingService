@@ -37,6 +37,40 @@ public class MediaSearchService {
 
     public static final Resolution thumbnailResolution = Resolution.p480;
 
+    record NameEntry(String name) {}
+
+    public List<String> searchAuthorContaining(String text) throws IOException {
+        return searchContaining(ContentMetaData.AUTHORS, ContentMetaData.NAME, text);
+    }
+
+    public List<String> searchCharacterContaining(String text) throws IOException {
+        return searchContaining(ContentMetaData.CHARACTERS, ContentMetaData.NAME, text);
+    }
+
+    public List<String> searchUniverseContaining(String text) throws IOException {
+        return searchContaining(ContentMetaData.UNIVERSES, ContentMetaData.NAME, text);
+    }
+
+    public List<String> searchTagContaining(String text) throws IOException {
+        return searchContaining(ContentMetaData.TAGS, ContentMetaData.NAME, text);
+    }
+
+    private List<String> searchContaining(String index, String field, String text) throws IOException {
+        ContentMetaData.validateNameText(text);
+        SearchResponse<NameEntry> response = openSearchService.searchContaining(
+                index, field, text, NameEntry.class);
+        return mapSearchReponseNameEntryToList(response);
+    }
+
+    private List<String> mapSearchReponseNameEntryToList(SearchResponse<NameEntry> response) {
+        return response.hits().hits().stream()
+                .map(h -> {
+                    assert h.source() != null;
+                    return h.source().name;
+                })
+                .toList();
+    }
+
     private void cacheMediaSearchItems(Collection<MediaSearchItem> items) {
         for (MediaSearchItem item : items) {
             mediaMetadataService.cacheMediaSearchItem(item, Duration.ofMinutes(15));
