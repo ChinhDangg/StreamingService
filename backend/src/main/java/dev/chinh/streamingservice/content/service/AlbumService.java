@@ -47,6 +47,8 @@ public class AlbumService extends MediaService {
         this.videoService = videoService;
     }
 
+    private final int expirySeconds = 60 * 60; // 1 hour
+
     public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, List<String> buckets, Resolution resolution, List<String> pathList) {}
     public record MediaUrl(MediaType type, String url) {}
 
@@ -87,7 +89,7 @@ public class AlbumService extends MediaService {
     }
 
     public void cacheLastAccessForAlbum(String albumCreationId, long albumId) {
-        long now = System.currentTimeMillis() + 60 * 60 * 1000;
+        long now = System.currentTimeMillis() + expirySeconds * 1000;
         addCacheLastAccess(albumCreationId, now);
         addCacheLastAccess(getAlbumCacheHashId(albumId), now);
     }
@@ -179,7 +181,7 @@ public class AlbumService extends MediaService {
 
             MediaType mediaType = MediaType.detectMediaType(item.objectName());
             String originalVideoUrl = minIOService.getSignedUrlForHostNginx(mediaDescription.getBucket(),
-                    item.objectName(), 60 * 60);
+                    item.objectName(), expirySeconds);
             albumUrls.add(new MediaUrl(mediaType, originalVideoUrl));
         }
         return new AlbumUrlInfo(albumUrls, new ArrayList<>(List.of(mediaDescription.getBucket())), Resolution.original, null);
@@ -269,8 +271,7 @@ public class AlbumService extends MediaService {
                 }
 
                 String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(i);
-                String input = minIOService.getSignedUrlForContainerNginx(bucket, albumUrlInfo.pathList.get(i),
-                        60 * 60);
+                String input = minIOService.getSignedUrlForContainerNginx(bucket, albumUrlInfo.pathList.get(i), expirySeconds);
 
                 String ffmpegCmd = String.format(
                         "ffmpeg -n -hide_banner -loglevel info " +
@@ -327,7 +328,7 @@ public class AlbumService extends MediaService {
         String bucket = albumUrlInfo.buckets.getFirst();
 
         if (res == Resolution.original) {
-            return minIOService.getSignedUrlForHostNginx(bucket, videoPath, 60 * 60);
+            return minIOService.getSignedUrlForHostNginx(bucket, videoPath, expirySeconds);
         }
 
         final String videoDir = albumVidCacheJobId.replace(":", "/");
@@ -341,7 +342,7 @@ public class AlbumService extends MediaService {
                 prevJobStopped = true;
         }
 
-        String input = minIOService.getSignedUrlForContainerNginx(bucket, videoPath, 60 * 60);
+        String input = minIOService.getSignedUrlForContainerNginx(bucket, videoPath, expirySeconds);
 
         OSUtil.createTempDir(videoDir);
 
@@ -374,8 +375,7 @@ public class AlbumService extends MediaService {
             throw new ResourceNotFoundException("Object not found: " + key);
         }
 
-        String nginxUrl = minIOService.getSignedUrlForContainerNginx(
-                mediaDescription.getBucket(), mediaPath, 30 * 60);
+        String nginxUrl = minIOService.getSignedUrlForContainerNginx(mediaDescription.getBucket(), mediaPath, expirySeconds);
 
         // 2. Build cache path {temp dir}/{albumId}/{res}/{key}_{res}.{format}
         String albumDir = OSUtil.normalizePath(String.valueOf(albumId), res.name());
