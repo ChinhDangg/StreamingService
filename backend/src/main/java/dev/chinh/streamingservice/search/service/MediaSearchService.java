@@ -7,6 +7,7 @@ import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.content.service.AlbumService;
 import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
+import dev.chinh.streamingservice.data.service.MediaMetadataService;
 import dev.chinh.streamingservice.search.constant.SortBy;
 import dev.chinh.streamingservice.search.data.*;
 import lombok.RequiredArgsConstructor;
@@ -28,21 +29,17 @@ import java.util.*;
 public class MediaSearchService {
 
     private final RedisTemplate<String, Object> redisTemplate;
-    private final OpenSearchService openSearchService;
     private final ObjectMapper mapper;
-    private final AlbumService albumService;
     private final MediaMapper mediaMapper;
+    private final OpenSearchService openSearchService;
+    private final AlbumService albumService;
+    private final MediaMetadataService mediaMetadataService;
 
     public static final Resolution thumbnailResolution = Resolution.p480;
 
-    private void cacheMediaSearchItem(MediaSearchItem item) {
-        String id = "media::" + item.getId();
-        redisTemplate.opsForValue().set(id, item, Duration.ofHours(1));
-    }
-
     private void cacheMediaSearchItems(Collection<MediaSearchItem> items) {
         for (MediaSearchItem item : items) {
-            cacheMediaSearchItem(item);
+            mediaMetadataService.cacheMediaSearchItem(item, Duration.ofMinutes(15));
         }
     }
 
@@ -61,8 +58,7 @@ public class MediaSearchService {
 
         if (request.getRangeFields() != null) {
             for (MediaSearchRangeField rangeField : request.getRangeFields()) {
-                if (!rangeField.getField().equals(ContentMetaData.UPLOAD_DATE) && !rangeField.getField().equals(ContentMetaData.YEAR))
-                    throw new IllegalArgumentException("Range query not support for field: " + rangeField.getField());
+                ContentMetaData.validateSearchRangeFieldName(rangeField.getField());
             }
         }
 
