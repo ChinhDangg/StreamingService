@@ -1,5 +1,7 @@
 package dev.chinh.streamingservice.data.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import dev.chinh.streamingservice.data.ContentMetaData;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -14,5 +16,6 @@ public abstract class MediaNameEntity {
     protected Integer id;
 
     @Column(unique = true, nullable = false)
+    @JsonProperty(value = ContentMetaData.NAME)
     protected String name;
 }
