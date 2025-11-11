@@ -27,12 +27,12 @@ public class VideoService extends MediaService {
         super(redisTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaMetadataService);
     }
 
-    private final int extraExpireSeconds = 30 * 60; // 30 minutes
+    private final int extraExpirySeconds = 30 * 60; // 30 minutes
 
     public String getOriginalVideoUrl(Long videoId) throws Exception {
         MediaDescription mediaDescription = getMediaDescription(videoId);
         return minIOService.getSignedUrlForHostNginx(mediaDescription.getBucket(), mediaDescription.getPath(),
-                mediaDescription.getLength() + extraExpireSeconds); // video duration + 30 minutes extra
+                mediaDescription.getLength() + extraExpirySeconds); // video duration + 30 minutes extra
     }
 
     public String getPreviewVideoUrl(Long videoId) throws Exception {
@@ -56,7 +56,7 @@ public class VideoService extends MediaService {
         OSUtil.createTempDir(videoDir);
 
         // === resolution control ===
-        final Resolution resolution = Resolution.p360;
+        final Resolution resolution = Resolution.p240;
 
         MediaDescription mediaDescription = getMediaDescription(videoId);
 
@@ -97,7 +97,7 @@ public class VideoService extends MediaService {
         String filterComplex = fc.toString();
 
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(
-                mediaDescription.getBucket(), mediaDescription.getPath(), mediaDescription.getLength() + extraExpireSeconds);
+                mediaDescription.getBucket(), mediaDescription.getPath(), mediaDescription.getLength() + extraExpirySeconds);
 
         int segmentDuration = 4;
         String partialVideoJobId = UUID.randomUUID().toString();
@@ -174,7 +174,7 @@ public class VideoService extends MediaService {
         // 2. Get a presigned URL with container Nginx so ffmpeg can access in container
         // 3. Rewrite URL to go through Nginx proxy instead of direct MinIO
         String nginxUrl = minIOService.getSignedUrlForContainerNginx(mediaDescription.getBucket(),
-                mediaDescription.getPath(), mediaDescription.getLength() + extraExpireSeconds);
+                mediaDescription.getPath(), mediaDescription.getLength() + extraExpirySeconds);
 
         String scale = getFfmpegScaleString(
                 mediaDescription.getWidth(), mediaDescription.getHeight(), res.getResolution());
