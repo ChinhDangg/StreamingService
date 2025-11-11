@@ -31,6 +31,8 @@ public class ContentMetaData {
     public static final String LENGTH = "length";
     public static final String SIZE = "size";
     public static final String GROUP_INFO = "groupInfo";
+    public static final String GROUPER_ID = "grouperId";
+    public static final String NUM_INFO = "numInfo";
 
     public static void validateFieldName(String fieldNameCheck) throws IllegalAccessException {
         ContentMetaData contentMetaData = new ContentMetaData();

@@ -1,5 +1,7 @@
 package dev.chinh.streamingservice.data.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import dev.chinh.streamingservice.data.ContentMetaData;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -31,8 +33,11 @@ public class MediaGroupMetaData {
     @JoinColumn(name = "grouper_id")
     private MediaGroupMetaData grouperMetaData;
 
+    @JsonProperty(ContentMetaData.GROUPER_ID)
     @Column(name = "grouper_id", insertable = false, updatable = false)
     private Long grouperMetaDataId;
 
+    @JsonProperty(ContentMetaData.NUM_INFO)
+    @Column(nullable = false)
     private Integer numInfo;    // episode/chapter for single media item or total episode/chapter for is grouper media metadata
 }
