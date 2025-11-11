@@ -18,17 +18,19 @@ export function setVideoUrl(videoContainerNode, playlistUrl = "p720/master.m3u8"
             hls.loadSource(playlistUrl + '?_=' + Date.now());
             hls.attachMedia(video);
 
-            if (!restart) {
-                const onManifestParsed = () => {
-                    video.addEventListener("loadedmetadata", () => {
+            const onManifestParsed = () => {
+                video.addEventListener("loadedmetadata", () => {
+                    if (restart) {
+                        video.currentTime = 0;
+                    } else {
                         if (video.duration && video.duration >= currentTime) {
                             video.currentTime = currentTime;
                         }
-                        hls.off(Hls.Events.MANIFEST_PARSED, onManifestParsed);
-                    }, { once: true });
-                }
-                hls.on(Hls.Events.MANIFEST_PARSED, onManifestParsed);
+                    }
+                    hls.off(Hls.Events.MANIFEST_PARSED, onManifestParsed);
+                }, { once: true });
             }
+            hls.on(Hls.Events.MANIFEST_PARSED, onManifestParsed);
 
             if (!totalTime)
                 return;
