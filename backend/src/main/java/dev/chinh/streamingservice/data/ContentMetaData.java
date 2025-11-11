@@ -59,6 +59,13 @@ public class ContentMetaData {
         }
     }
 
+    public static void validateSearchRangeFieldName(String fieldNameCheck) {
+        if (!(fieldNameCheck.equals(UPLOAD_DATE) || fieldNameCheck.equals(YEAR)
+                || fieldNameCheck.equals(SIZE) || fieldNameCheck.equals(LENGTH))) {
+            throw new IllegalArgumentException("Invalid search range field name: " + fieldNameCheck);
+        }
+    }
+
     public static void main(String[] args) throws IOException {
         walkAndStopIfHasFile(new File("E:\\Readonly\\3D"));
     }
