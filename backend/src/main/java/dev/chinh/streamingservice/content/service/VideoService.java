@@ -7,6 +7,7 @@ import dev.chinh.streamingservice.content.constant.MediaJobStatus;
 import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
+import dev.chinh.streamingservice.data.service.MediaMetadataService;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -18,9 +19,12 @@ import java.util.regex.Pattern;
 @Service
 public class VideoService extends MediaService {
 
-    public VideoService(RedisTemplate<String, Object> redisTemplate, MinIOService minIOService,
-                        ObjectMapper objectMapper, MediaMapper mediaMapper, MediaMetaDataRepository mediaRepository) {
-        super(redisTemplate, minIOService, objectMapper, mediaMapper, mediaRepository);
+    public VideoService(RedisTemplate<String, Object> redisTemplate,
+                        ObjectMapper objectMapper, MediaMapper mediaMapper,
+                        MediaMetaDataRepository mediaRepository,
+                        MinIOService minIOService,
+                        MediaMetadataService mediaMetadataService) {
+        super(redisTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaMetadataService);
     }
 
     private final int extraExpireSeconds = 30 * 60; // 30 minutes

@@ -8,6 +8,7 @@ import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
+import dev.chinh.streamingservice.data.service.MediaMetadataService;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.compress.MemoryLimitException;
@@ -23,10 +24,12 @@ import java.util.Set;
 public abstract class MediaService {
 
     protected final RedisTemplate<String, Object> redisTemplate;
-    protected final MinIOService minIOService;
     protected final ObjectMapper objectMapper;
     protected final MediaMapper mediaMapper;
     private final MediaMetaDataRepository mediaRepository;
+    protected final MinIOService minIOService;
+    protected final MediaMetadataService mediaMetadataService;
+
     protected final String masterFileName = "/master.m3u8";
 
     public boolean makeMemorySpaceForSize(long size) throws IOException, InterruptedException {
@@ -119,25 +122,16 @@ public abstract class MediaService {
     }
 
     protected MediaDescription getMediaDescription(long mediaId) {
-        MediaDescription mediaDescription = getCachedMediaSearchItem(String.valueOf(mediaId));
+        MediaDescription mediaDescription = mediaMetadataService.getCachedMediaSearchItem(String.valueOf(mediaId));
         if (mediaDescription == null)
             mediaDescription = findMediaMetaDataAllInfo(mediaId);
         return mediaDescription;
     }
 
-    protected MediaSearchItem getCachedMediaSearchItem(String id) {
-        return objectMapper.convertValue(redisTemplate.opsForValue().get("media::" + id), MediaSearchItem.class);
-    }
-
-    private void cacheMediaSearchItem(MediaSearchItem item) {
-        String id = "media::" + item.getId();
-        redisTemplate.opsForValue().set(id, item, Duration.ofHours(1));
-    }
-
     protected MediaMetaData findMediaMetaDataAllInfo(long id) {
         MediaMetaData mediaMetaData = mediaRepository.findByIdWithAllInfo(id).orElseThrow(() ->
                 new IllegalArgumentException("Media not found with id " + id));
-        cacheMediaSearchItem(mediaMapper.map(mediaMetaData));
+        mediaMetadataService.cacheMediaSearchItem(mediaMapper.map(mediaMetaData));
         return mediaMetaData;
     }
 

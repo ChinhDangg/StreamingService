@@ -10,6 +10,7 @@ import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
+import dev.chinh.streamingservice.data.service.MediaMetadataService;
 import dev.chinh.streamingservice.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.search.service.MediaSearchService;
 import io.minio.Result;
@@ -36,10 +37,13 @@ public class AlbumService extends MediaService {
 
     private final VideoService videoService;
 
-    public AlbumService(RedisTemplate<String, Object> redisTemplate, MinIOService minIOService,
-                        ObjectMapper objectMapper, MediaMapper mediaMapper, MediaMetaDataRepository mediaRepository,
+    public AlbumService(RedisTemplate<String, Object> redisTemplate,
+                        ObjectMapper objectMapper, MediaMapper mediaMapper,
+                        MediaMetaDataRepository mediaRepository,
+                        MinIOService minIOService,
+                        MediaMetadataService mediaMetadataService,
                         VideoService videoService) {
-        super(redisTemplate, minIOService, objectMapper, mediaMapper, mediaRepository);
+        super(redisTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaMetadataService);
         this.videoService = videoService;
     }
 
