@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.content.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.chinh.streamingservice.MediaMapper;
 import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.MediaJobStatus;
 import dev.chinh.streamingservice.content.constant.Resolution;
@@ -18,8 +19,8 @@ import java.util.regex.Pattern;
 public class VideoService extends MediaService {
 
     public VideoService(RedisTemplate<String, Object> redisTemplate, MinIOService minIOService,
-                        ObjectMapper objectMapper, MediaMetaDataRepository mediaRepository) {
-        super(redisTemplate, minIOService, objectMapper, mediaRepository);
+                        ObjectMapper objectMapper, MediaMapper mediaMapper, MediaMetaDataRepository mediaRepository) {
+        super(redisTemplate, minIOService, objectMapper, mediaMapper, mediaRepository);
     }
 
     private final int extraExpireSeconds = 30 * 60; // 30 minutes
@@ -289,6 +290,10 @@ public class VideoService extends MediaService {
         if (!OSUtil.checkTempFileExists(playlist)) {
             throw new RuntimeException("ffmpeg did not create playlist in time: " + playlist);
         }
+    }
+
+    private String getFfmpegScaleString(int width, int height, int target) {
+        return (width >= height) ? "scale=-2:" + target : "scale=" + target + ":-2";
     }
 
     private void runAndLogAsync(String[] cmd, String videoId, String videoMasterFilePath) throws Exception {
