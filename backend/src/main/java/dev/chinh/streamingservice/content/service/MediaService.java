@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.content.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.chinh.streamingservice.MediaMapper;
 import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.MediaJobStatus;
 import dev.chinh.streamingservice.content.constant.Resolution;
@@ -24,6 +25,7 @@ public abstract class MediaService {
     protected final RedisTemplate<String, Object> redisTemplate;
     protected final MinIOService minIOService;
     protected final ObjectMapper objectMapper;
+    protected final MediaMapper mediaMapper;
     private final MediaMetaDataRepository mediaRepository;
     protected final String masterFileName = "/master.m3u8";
 
@@ -127,20 +129,16 @@ public abstract class MediaService {
         return objectMapper.convertValue(redisTemplate.opsForValue().get("media::" + id), MediaSearchItem.class);
     }
 
-    protected MediaMetaData findMediaMetaDataAllInfo(long id) {
-        MediaMetaData mediaMetaData = mediaRepository.findByIdWithAllInfo(id).orElseThrow(() ->
-                new IllegalArgumentException("Media not found with id " + id));
-        cacheMediaSearchItem(objectMapper.convertValue(mediaMetaData, MediaSearchItem.class));
-        return mediaMetaData;
-    }
-
     private void cacheMediaSearchItem(MediaSearchItem item) {
         String id = "media::" + item.getId();
         redisTemplate.opsForValue().set(id, item, Duration.ofHours(1));
     }
 
-    protected String getFfmpegScaleString(int width, int height, int target) {
-        return (width >= height) ? "scale=-2:" + target : "scale=" + target + ":-2";
+    protected MediaMetaData findMediaMetaDataAllInfo(long id) {
+        MediaMetaData mediaMetaData = mediaRepository.findByIdWithAllInfo(id).orElseThrow(() ->
+                new IllegalArgumentException("Media not found with id " + id));
+        cacheMediaSearchItem(mediaMapper.map(mediaMetaData));
+        return mediaMetaData;
     }
 
     protected boolean checkSrcSmallerThanTarget(int width, int height, int target) {

@@ -3,6 +3,7 @@ package dev.chinh.streamingservice.content.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.chinh.streamingservice.MediaMapper;
 import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.MediaJobStatus;
 import dev.chinh.streamingservice.content.constant.MediaType;
@@ -36,9 +37,9 @@ public class AlbumService extends MediaService {
     private final VideoService videoService;
 
     public AlbumService(RedisTemplate<String, Object> redisTemplate, MinIOService minIOService,
-                        ObjectMapper objectMapper, MediaMetaDataRepository mediaRepository,
+                        ObjectMapper objectMapper, MediaMapper mediaMapper, MediaMetaDataRepository mediaRepository,
                         VideoService videoService) {
-        super(redisTemplate, minIOService, objectMapper, mediaRepository);
+        super(redisTemplate, minIOService, objectMapper, mediaMapper, mediaRepository);
         this.videoService = videoService;
     }
 
