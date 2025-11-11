@@ -37,8 +37,8 @@ public class OpenSearchService {
     public static final String INDEX_NAME = "media";
 
     // http://localhost:9200/media
-    public void createIndexWithMapping(String indexName) throws IOException {
-        String mappingJson = loadMapping("mapping/media-mapping.json");
+    public void createIndexWithMapping(String indexName, String mappingPath) throws IOException {
+        String mappingJson = loadMapping(mappingPath);
 
         CreateIndexResponse createIndexResponse = client.indices().create(c -> c
                 .index(indexName)
@@ -188,6 +188,22 @@ public class OpenSearchService {
                 .script(inlineScript), Object.class
         );
         System.out.println("Scripted update done, result: " + response.result());
+    }
+
+    public <T> SearchResponse<T> searchContaining(String index, String field, String text, Class<T> clazz) throws IOException {
+        SearchResponse<T> response = client.search(s -> s
+                        .index(index)
+                        .query(q -> q
+                                .wildcard(w -> w
+                                        .field(field)
+                                        .value("*" + text.toLowerCase() + "*")
+                                )
+                        )
+                , clazz
+        );
+        response.hits().hits().forEach(hit -> System.out.println(hit.source()));
+
+        return response;
     }
 
     public SearchResponse<Object> advanceSearch(List<SearchFieldGroup> includeGroups, List<SearchFieldGroup> excludeGroups,
