@@ -7,6 +7,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDate;
+
 @Getter
 @MappedSuperclass
 public abstract class MediaNameEntity {
@@ -18,4 +20,14 @@ public abstract class MediaNameEntity {
     @Column(unique = true, nullable = false)
     @JsonProperty(value = ContentMetaData.NAME)
     protected String name;
+
+    @JsonProperty(ContentMetaData.LENGTH)
+    protected int length;
+
+    @Column(nullable = false)
+    @JsonProperty(ContentMetaData.UPLOAD_DATE)
+    protected LocalDate uploadDate;
+
+    @JsonProperty(ContentMetaData.THUMBNAIL)
+    protected String thumbnail;
 }
