@@ -345,7 +345,7 @@ async function requestVideo(videoUrlRequest, videoWrapper) {
 
     const baseUrl = videoUrlRequest.split('/').slice(0, -1).join('/');
     setVideoUrl(videoPlayer, videoUrl);
-    setVideoResolution(videoPlayer, baseUrl, 1080, 'p720');
+    setVideoResolution(videoPlayer, baseUrl, 1080, 'p480');
 }
 
 let videoPlayer = null;

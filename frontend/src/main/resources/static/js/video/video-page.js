@@ -61,7 +61,7 @@ async function displayVideoInfo(videoId) {
 
 async function getVideoUrl(videoId, originalRes) {
     const baseUrl = `/api/videos/partial/${videoId}`;
-    let defaultRes = 'p' + (originalRes > 720 ? 720 : originalRes);
+    let defaultRes = 'p' + (originalRes > 480 ? 480 : originalRes);
     const response = await fetch(baseUrl + "/" + defaultRes);
     if (!response.ok) {
         alert("Failed to fetch video");
