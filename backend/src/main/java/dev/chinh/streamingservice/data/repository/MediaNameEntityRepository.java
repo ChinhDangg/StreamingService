@@ -1,6 +1,9 @@
 package dev.chinh.streamingservice.data.repository;
 
+import dev.chinh.streamingservice.data.dto.MediaNameEntry;
 import dev.chinh.streamingservice.data.entity.MediaNameEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.NoRepositoryBean;
@@ -13,4 +16,7 @@ public interface MediaNameEntityRepository<T extends MediaNameEntity, ID> extend
 
     @Query("SELECT e.name FROM #{#entityName} e WHERE LOWER(e.name) LIKE LOWER(CONCAT('%', :name, '%'))")
     List<String> findNamesContaining(@Param("name") String name);
+
+    @Query("SELECT e.name, e.length, e.uploadDate, e.thumbnail FROM #{#entityName} e")
+    Page<MediaNameEntry> findAllNames(Pageable pageable);
 }
