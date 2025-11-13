@@ -72,7 +72,7 @@
             <h3 class="main-title text-xl font-semibold">Video title number one</h3>
         </div>
 
-        <div th:insert="video-player/video-player :: video-player-html">
+        <div th:insert="video-player/video-player :: video-player-html" th:remove="tag">
 
             <div data-player="videoPlayerContainer" tabindex="0" class="relative aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg select-none">
                 <video class="video-node w-full h-full bg-black cursor-pointer"></video>
