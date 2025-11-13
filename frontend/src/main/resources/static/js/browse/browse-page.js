@@ -40,10 +40,12 @@ async function initialize() {
 
     initializeNameBrowseOptions();
     removeRedirectBrowseOptions();
+
+    const fetched = await fetchNameItems(currentNameEntry, currentPage, currentSortBy, currentSortOrder);
+    if (!fetched) return;
+
     initializeSortByOptions();
     initializeSortByOrderOptions();
-
-    await fetchNameItems(currentNameEntry, currentPage, currentSortBy, currentSortOrder);
 }
 
 initialize();
@@ -84,6 +86,7 @@ function removeRedirectBrowseOptions () {
 
 function initializeSortByOptions() {
     const sortByContainer = document.getElementById('sort-by-option-container');
+    sortByContainer.classList.remove('hidden');
     const optionBtnTem = sortByContainer.querySelector('button');
     for (const [key, value] of Object.entries(SortBy)) {
         const optionBtn = helperCloneAndUnHideNode(optionBtnTem);
@@ -109,6 +112,7 @@ function initializeSortByOptions() {
 
 function initializeSortByOrderOptions() {
     const sortOrderContainer = document.getElementById('sort-order-option-container');
+    sortOrderContainer.classList.remove('hidden');
     const optionBtn = sortOrderContainer.querySelector('button');
     optionBtn.textContent = getSortOrderText(currentSortOrder);
     optionBtn.addEventListener('click', async () => {
@@ -166,6 +170,8 @@ async function fetchNameItems(nameEntry, p, by, order) {
     displayPagination(nameItems.pageable.pageNumber,
         Math.trunc((nameItems.total + nameItems.pageable.pageSize - 1) / nameItems.pageable.pageSize),
         getBrowsePageUrl, pageClickHandler);
+
+    return true;
 }
 
 async function displayItem(nameItems) {

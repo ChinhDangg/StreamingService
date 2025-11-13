@@ -23,7 +23,7 @@
     </h1>
 
     <!-- Sort Order Section -->
-    <div id="sort-by-option-container" class="flex items-center space-x-2 mt-3 border-t border-gray-700 pt-3">
+    <div id="sort-by-option-container" class="hidden flex items-center space-x-2 mt-3 border-t border-gray-700 pt-3">
         <span class="text-sm font-medium text-gray-400">Sort by:</span>
         <button class="hidden select-none px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
             <span>Name</span>
@@ -31,7 +31,7 @@
     </div>
 
     <!-- Sort Order Section -->
-    <div id="sort-order-option-container" class="flex items-center space-x-2 mt-3">
+    <div id="sort-order-option-container" class="hidden flex items-center space-x-2 mt-3">
         <span class="text-sm font-medium text-gray-400">Order:</span>
         <button class="select-none px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
             <span>Ascending</span>
@@ -95,64 +95,66 @@
     </article>
 </div>
 
+<div th:insert="pagination :: pagination-html" th:remove="tag">
 
-<!-- Pagination Node -->
-<div id="pagination-node-bottom" class="flex flex-col items-center justify-center mt-8 mb-8 select-none text-gray-300 space-y-3">
-    <div class="flex flex-col gap-2">
-        <!-- Control Buttons (Top Row) -->
-        <div class="flex items-center justify-between w-full max-w-xs mx-auto gap-4">
+    <!-- Pagination Node -->
+    <div id="pagination-node-bottom" class="flex flex-col items-center justify-center mt-8 mb-8 select-none text-gray-300 space-y-3">
+        <div class="flex flex-col gap-2">
+            <!-- Control Buttons (Top Row) -->
+            <div class="flex items-center justify-between w-full max-w-xs mx-auto gap-4">
 
-            <!-- Left Controls -->
-            <div class="page-left-control flex items-center gap-2">
-                <!-- Previous -->
-                <a href="#" class="page-prev-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Previous Page">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                         stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-                    </svg>
-                </a>
+                <!-- Left Controls -->
+                <div class="page-left-control flex items-center gap-2">
+                    <!-- Previous -->
+                    <a href="#" class="page-prev-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Previous Page">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                             stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </a>
 
-                <!-- Next -->
-                <a href="#" class="page-next-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Next Page">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                         stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                </a>
+                    <!-- Next -->
+                    <a href="#" class="page-next-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Next Page">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                             stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </a>
 
-                <!-- Go to First -->
-                <a href="#" class="page-first-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="First Page">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                         stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
-                    </svg>
-                </a>
+                    <!-- Go to First -->
+                    <a href="#" class="page-first-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="First Page">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                             stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+                        </svg>
+                    </a>
+                </div>
+
+                <!-- Right Controls -->
+                <div class="page-right-control flex items-center gap-2">
+                    <!-- Go to Last -->
+                    <a href="#" class="page-last-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Last Page">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                             stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 19l7-7-7-7M13 19l7-7-7-7" />
+                        </svg>
+                    </a>
+                </div>
             </div>
 
-            <!-- Right Controls -->
-            <div class="page-right-control flex items-center gap-2">
-                <!-- Go to Last -->
-                <a href="#" class="page-last-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Last Page">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                         stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 19l7-7-7-7M13 19l7-7-7-7" />
-                    </svg>
+            <!-- Page Numbers (Bottom Row) -->
+            <div class="page-container flex items-center gap-1">
+                <a href="#" class="page-link-node hidden px-3 py-1 rounded-md bg-gray-800 hover:bg-gray-700 text-sm font-medium"></a>
+                <a href="#" class="page-selected-link-node hidden px-3 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-sm font-medium text-white ring-1 ring-indigo-500">
                 </a>
-            </div>
-        </div>
-
-        <!-- Page Numbers (Bottom Row) -->
-        <div class="page-container flex items-center gap-1">
-            <a href="#" class="page-link-node hidden px-3 py-1 rounded-md bg-gray-800 hover:bg-gray-700 text-sm font-medium"></a>
-            <a href="#" class="page-selected-link-node hidden px-3 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-sm font-medium text-white ring-1 ring-indigo-500">
-            </a>
-            <span class="page-dots hidden px-2 text-gray-500">...</span>
-            <div class="page-num-container w-full flex items-center justify-center gap-1">
+                <span class="page-dots hidden px-2 text-gray-500">...</span>
+                <div class="page-num-container w-full flex items-center justify-center gap-1">
+                </div>
             </div>
         </div>
     </div>
 
-</div>
+</div> <!-- end pagination -->
 
 
 <script type="module" th:src="@{/static/js/browse/browse-page.js}" src="/static/js/browse/browse-page.js"></script>
