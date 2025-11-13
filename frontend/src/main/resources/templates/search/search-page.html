@@ -22,19 +22,22 @@
 
 <!-- Header -->
 <header class="max-w-7xl mx-auto mb-6">
-    <h1 class="text-2xl font-semibold mb-4 w-full text-center">
-        <a id="search-page-title" href="#">Search Page</a>
-    </h1>
-    <form id="search-form">
-        <div class="flex gap-3">
-            <input id="search-input" type="text" placeholder="Search..."
-                   class="flex-1 px-4 py-2 rounded-lg bg-gray-800 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
-            <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium">Search</button>
-        </div>
-    </form>
 
-    <div id="alert-status" role="status" class="hidden mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
-        <div class="text-sm"><span id="bold-status" class="font-semibold">Invalid</span><span>: </span><span id="normal-text">Search String</span></div>
+    <div th:insert="header :: header-html" th:remove="tag">
+        <h1 class="text-2xl font-semibold mb-4 w-full text-center">
+            <a id="header-page-title" href="#">Search Page</a>
+        </h1>
+        <form id="search-form">
+            <div class="flex gap-3">
+                <input id="search-input" type="text" placeholder="Search..."
+                       class="flex-1 px-4 py-2 rounded-lg bg-gray-800 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium">Search</button>
+            </div>
+        </form>
+
+        <div id="alert-status" role="status" class="hidden mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+            <div class="text-sm"><span id="bold-status" class="font-semibold">Invalid</span><span>: </span><span id="normal-text">Search String</span></div>
+        </div>
     </div>
 
     <form id="advanceSearchForm">
@@ -375,7 +378,8 @@
     </div>
 </div>
 
-
+<!-- make sure header is loaded before search page -->
+<script type="module" th:src="@{/static/js/header.js}" src="/static/js/header.js"></script>
 <script type="module" th:src="@{/static/js/search/search-page.js}" src="/static/js/search/search-page.js"></script>
 
 

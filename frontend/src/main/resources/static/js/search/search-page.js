@@ -1,5 +1,6 @@
 import {setVideoUrl} from "/static/js/set-video-url.js";
 import { displayPagination } from "/static/js/pagination.js";
+import { validateSearchString, setAlertStatus, helperCloneAndUnHideNode } from "/static/js/header.js";
 
 const SORT_BY = Object.freeze({
     UPLOAD: 'UPLOAD_DATE',
@@ -67,6 +68,7 @@ async function initialize() {
         currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, urlParams.get(SEARCH_INFO.SEARCH_TYPE));
 
     initializeSearchPageTitle();
+    initializeBasicSearchArea();
     initializeSortByOptions();
     initializeSortOrderOptions();
     initializeAdvanceSearchArea();
@@ -74,8 +76,10 @@ async function initialize() {
     await sendSearchRequestOnCurrentInfo(false);
 }
 
-window.addEventListener('DOMContentLoaded', async () => {
-    await initialize();
+window.addEventListener('DOMContentLoaded',() => {
+   initialize().then(() => {
+       console.log('DOM fully loaded and parsed');
+   });
 });
 
 function initializeSearchPageTitle() {
@@ -97,33 +101,29 @@ function initializeSearchPageTitle() {
 }
 
 let searchIsSubmitting = false;
-document.querySelector('#search-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (searchIsSubmitting)
-        return;
+function initializeBasicSearchArea() {
+    const basicSearchForm = document.querySelector('#search-form');
+    const newBasicSearchForm = basicSearchForm.cloneNode(true);
+    basicSearchForm.parentNode.replaceChild(newBasicSearchForm, basicSearchForm);
 
-    const searchString = validateSearchString(document.querySelector('#search-input').value);
-    if (!searchString)
-        return;
-    currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, SEARCH_TYPES.BASIC);
-    currentSearchInfo.set(SEARCH_INFO.SEARCH_STRING, searchString);
+    if (currentSearchInfo.get(SEARCH_INFO.SEARCH_STRING))
+        newBasicSearchForm.querySelector('#search-input').value = currentSearchInfo.get(SEARCH_INFO.SEARCH_STRING);
+    newBasicSearchForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (searchIsSubmitting)
+            return;
 
-    searchIsSubmitting = true;
-    sendSearchRequestOnCurrentInfo().then(() => {
-        searchIsSubmitting = false;
+        const searchString = validateSearchString(document.querySelector('#search-input').value);
+        if (!searchString)
+            return;
+        currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, SEARCH_TYPES.BASIC);
+        currentSearchInfo.set(SEARCH_INFO.SEARCH_STRING, searchString);
+
+        searchIsSubmitting = true;
+        sendSearchRequestOnCurrentInfo().then(() => {
+            searchIsSubmitting = false;
+        });
     });
-});
-
-function validateSearchString(searchString) {
-    searchString = searchString.trim();
-    if (searchString.length < 2) {
-        setAlertStatus('Invalid search string', 'Search string must be at least 2 characters');
-        return false;
-    } else if (searchString.length > 200) {
-        setAlertStatus('Invalid search string', 'Search string exceeded 200 characters');
-        return false;
-    }
-    return searchString;
 }
 
 let advanceIsSubmitting = false;
@@ -449,18 +449,6 @@ async function sendSearchRequestOnCurrentInfo(updatePage = true) {
         currentSearchInfo.get(SEARCH_INFO.ADVANCE_REQUEST_BODY),
         updatePage
     );
-}
-
-let alertStatusTimer = null;
-const alertStatus = document.getElementById('alert-status');
-function setAlertStatus(boldStatus, normalText) {
-    clearTimeout(alertStatusTimer);
-    alertStatus.querySelector('#bold-status').innerText = boldStatus;
-    alertStatus.querySelector('#normal-text').innerText = normalText;
-    alertStatus.classList.remove('hidden');
-    alertStatusTimer = setTimeout(() => {
-        alertStatus.classList.add('hidden');
-    }, 10000);
 }
 
 async function sendSearchRequest(searchType, page, sortBy, sortOrder,
@@ -985,9 +973,3 @@ document.addEventListener('keydown', (e) => {
         document.body.style.overflow = '';
     }
 });
-
-function helperCloneAndUnHideNode(node) {
-    const clone = node.cloneNode(true);
-    clone.classList.remove('hidden');
-    return clone;
-}
