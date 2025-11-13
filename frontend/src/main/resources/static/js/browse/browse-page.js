@@ -38,35 +38,22 @@ function getCurrentNameEntry(url = window.location.href) {
 async function initialize() {
     initializeCurrentOptions();
 
-    initializeNameBrowseOptions();
     removeRedirectBrowseOptions();
 
-    const fetched = await fetchNameItems(currentNameEntry, currentPage, currentSortBy, currentSortOrder);
+    const fetched = await fetchNameItems(NameEntry[currentNameEntry], currentPage, currentSortBy, currentSortOrder);
     if (!fetched) return;
 
     initializeSortByOptions();
     initializeSortByOrderOptions();
 }
 
-initialize();
+window.addEventListener('DOMContentLoaded', initialize);
 
 function initializeCurrentOptions() {
     const urlParams = new URLSearchParams(window.location.search);
     currentPage = Number(urlParams.get('p')) || 0;
     currentSortBy = urlParams.get('by') || SortBy.Name;
     currentSortOrder = urlParams.get('order') || SortOrder.Ascending;
-}
-
-function initializeNameBrowseOptions() {
-    const browseOptionContainer = document.getElementById('browse-option-container');
-    const first = browseOptionContainer.firstElementChild;
-    if (first) browseOptionContainer.replaceChildren(first);
-    for (const [key, value] of Object.entries(NameEntry)) {
-        const browseOption = helperCloneAndUnHideNode(first);
-        browseOption.href = `/page/browse/${value}`;
-        browseOption.textContent = key;
-        browseOptionContainer.appendChild(browseOption);
-    }
 }
 
 function removeRedirectBrowseOptions () {
@@ -104,7 +91,7 @@ function initializeSortByOptions() {
             optionBtn.classList.add('bg-indigo-600');
             optionBtn.classList.remove('bg-gray-800');
             previousSortByButton = optionBtn;
-            await fetchNameItems(currentNameEntry, currentPage, currentSortBy, currentSortOrder);
+            await fetchNameItems(NameEntry[currentNameEntry], currentPage, currentSortBy, currentSortOrder);
         });
         sortByContainer.appendChild(optionBtn);
     }
@@ -118,7 +105,7 @@ function initializeSortByOrderOptions() {
     optionBtn.addEventListener('click', async () => {
         currentSortOrder = currentSortOrder === SortOrder.Ascending ? SortOrder.Descending : SortOrder.Ascending;
         optionBtn.textContent = getSortOrderText(currentSortOrder);
-        await fetchNameItems(currentNameEntry, currentPage, currentSortBy, currentSortOrder);
+        await fetchNameItems(NameEntry[currentNameEntry], currentPage, currentSortBy, currentSortOrder);
     });
 }
 
@@ -130,12 +117,12 @@ function getSortOrderText(order) {
 
 async function fetchNameItems(nameEntry, p, by, order) {
     const urlParams = new URLSearchParams({ p, by, order });
-    const response = fetch(`/api/media/${nameEntry}?${urlParams}`);
+    const response = await fetch(`/api/media/${nameEntry}?${urlParams}`);
     if (!response.ok) {
         alert("Failed to fetch name items");
-        return;
+        return false;
     }
-    const nameItems = response.json();
+    const nameItems = await response.json();
 
     const url = new URL(window.location.href);
     const pageBrowseUrl = getBrowsePageUrl(currentPage);
@@ -229,7 +216,7 @@ async function pageClickHandler(e, page) {
     e.preventDefault();
     currentPage = page;
     e.target.disabled = true;
-    fetchNameItems().then(() => {
+    fetchNameItems(NameEntry[currentNameEntry], page, currentSortBy, currentSortOrder).then(() => {
         e.target.disabled = false;
     });
 }
