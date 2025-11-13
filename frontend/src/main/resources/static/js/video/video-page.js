@@ -9,12 +9,17 @@ export async function initialize() {
     const urlParams = new URLSearchParams(queryString);
     const videoId = urlParams.get('mediaId');
 
+    if (!videoId) {
+        alert("No videoId provided");
+        return;
+    }
+
     await Promise.all([
         displayVideoInfo(videoId),
     ]);
 }
 
-initialize();
+window.addEventListener('DOMContentLoaded', initialize);
 
 async function displayVideoInfo(videoId) {
     const response = await fetch(`/api/media/content/${videoId}`);

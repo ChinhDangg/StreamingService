@@ -928,6 +928,7 @@ async function displayContentPageForOverlay(mediaType, mediaId) {
                     const mod = await import(scriptElement.src);
                     if (typeof mod.initialize === 'function') {
                         mediaDocMap.set(mediaType, { mod: mod, node: overlayWrapper.firstElementChild });
+                        mod.initialize();
                     }
                 };
             }

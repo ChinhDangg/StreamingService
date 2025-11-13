@@ -9,7 +9,8 @@ export async function initialize() {
     albumId = urlParams.get('mediaId');
 
     if (!albumId) {
-        window.location.href = '/';
+        alert("No albumId provided");
+        return;
     }
 
     await Promise.all([
@@ -18,11 +19,12 @@ export async function initialize() {
     ]);
 }
 
+window.addEventListener('DOMContentLoaded', initialize);
+
 async function displayAlbumInfo(albumId) {
     const response = await fetch(`/api/media/content/${albumId}`);
     if (!response.ok) {
         alert("Failed to fetch album info");
-        window.location.href = '/';
         return;
     }
     const albumInfo = await response.json();
@@ -411,5 +413,3 @@ async function getVideoPlayer() {
 
     return true;
 }
-
-initialize();

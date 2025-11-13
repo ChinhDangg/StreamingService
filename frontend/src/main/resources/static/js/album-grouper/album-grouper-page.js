@@ -7,7 +7,7 @@ async function initialize() {
 
     if (!albumGrouperId) {
         alert('Media Id not found');
-        window.location.href = '/';
+        return;
     }
 
     await Promise.all([
@@ -18,44 +18,43 @@ async function initialize() {
 window.addEventListener('DOMContentLoaded', initialize);
 
 async function displayAlbumGrouperInfo(albumGrouperId) {
-    const response = await fetch(`/api/media/content/${albumGrouperId}`);
-    if (!response.ok) {
-        alert("Failed to fetch album grouper info");
-        window.location.href = '/';
-        return;
-    }
-    const albumGrouperInfo = await response.json();
+    // const response = await fetch(`/api/media/content/${albumGrouperId}`);
+    // if (!response.ok) {
+    //     alert("Failed to fetch album grouper info");
+    //     return;
+    // }
+    // const albumGrouperInfo = await response.json();
 
-    // const albumGrouperInfo = {
-    //     "childMediaIds": [
-    //         5, 4, 3, 2, 1
-    //     ],
-    //     "id": 1,
-    //     "title": "Test Album Sample 1",
-    //     "thumbnail": "https://placehold.co/1080x1920",
-    //     "tags": [
-    //         "Astrophotography",
-    //         "LongExposure",
-    //         "Urban"
-    //     ],
-    //     "characters": [
-    //         "Jane Doe",
-    //         "John Doe",
-    //     ],
-    //     "universes": [
-    //         "One Piece"
-    //     ],
-    //     "authors": [
-    //         "Jane Doe",
-    //         "John Doe",
-    //     ],
-    //     "length": 60,
-    //     "size": 400111222,
-    //     "width": 1080,
-    //     "height": 1920,
-    //     "uploadDate": "2025-10-30",
-    //     "year": null
-    // };
+    const albumGrouperInfo = {
+        "childMediaIds": [
+            5, 4, 3, 2, 1
+        ],
+        "id": 1,
+        "title": "Test Album Sample 1",
+        "thumbnail": "https://placehold.co/1080x1920",
+        "tags": [
+            "Astrophotography",
+            "LongExposure",
+            "Urban"
+        ],
+        "characters": [
+            "Jane Doe",
+            "John Doe",
+        ],
+        "universes": [
+            "One Piece"
+        ],
+        "authors": [
+            "Jane Doe",
+            "John Doe",
+        ],
+        "length": 60,
+        "size": 400111222,
+        "width": 1080,
+        "height": 1920,
+        "uploadDate": "2025-10-30",
+        "year": null
+    };
 
     displayContentInfo(albumGrouperInfo);
     displayListSectionInfo(albumGrouperInfo);
@@ -111,7 +110,7 @@ function displayListSectionInfo(albumGrouperInfo) {
 
     showMoreBtn.classList.remove('hidden');
     showMoreBtn.addEventListener('click', async () => {
-        const response = await fetch(`/api/media/grouper-next/${albumGrouperInfo.id}`);
+        const response = await fetch(`/api/media/grouper-next/${albumGrouperInfo.id}?o=${albumGrouperLength}`);
         if (!response.ok) {
             alert("Failed to grouper next list");
             return;
