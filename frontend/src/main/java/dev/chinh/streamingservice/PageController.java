@@ -14,6 +14,21 @@ public class PageController {
         return "search/search-page";
     }
 
+    @GetMapping("/search/{extra}")
+    public String searchPage2(@PathVariable String extra) {
+        return "search/search-page";
+    }
+
+    @GetMapping("/browse")
+    public String browsePage() {
+        return "browse/browse-page";
+    }
+
+    @GetMapping("/browse/{extra}")
+    public String browsePage2(@PathVariable String extra) {
+        return "browse/browse-page";
+    }
+
     @GetMapping("/video")
     public String videoPage() {
         return "video/video-page";
@@ -27,10 +42,5 @@ public class PageController {
     @GetMapping("/album-grouper")
     public String albumGrouperPage() {
         return "album-grouper/album-grouper-page";
-    }
-
-    @GetMapping("/search/{extra}")
-    public String searchPage2(@PathVariable String extra) {
-        return "search/search-page";
     }
 }
