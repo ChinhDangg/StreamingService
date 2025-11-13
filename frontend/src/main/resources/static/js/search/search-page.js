@@ -55,9 +55,16 @@ async function initialize() {
         }
     }
     currentSearchInfo.set(SEARCH_INFO.KEYWORD_FIELD, field);
-    currentSearchInfo.set(SEARCH_INFO.KEYWORD_VALUE_LIST, values?.split(','));
+    currentSearchInfo.set(SEARCH_INFO.KEYWORD_VALUE_LIST, values);
     currentSearchInfo.set(SEARCH_INFO.ADVANCE_REQUEST_BODY, null);
-    currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, urlParams.get(SEARCH_INFO.SEARCH_TYPE));
+    if (currentSearchInfo.get(SEARCH_INFO.SEARCH_STRING))
+        currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, SEARCH_TYPES.BASIC);
+    else if (currentSearchInfo.get(SEARCH_INFO.KEYWORD_FIELD) && currentSearchInfo.get(SEARCH_INFO.KEYWORD_VALUE_LIST))
+        currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, SEARCH_TYPES.KEYWORD);
+    else if (currentSearchInfo.get(SEARCH_INFO.ADVANCE_REQUEST_BODY))
+        currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, SEARCH_TYPES.ADVANCE);
+    else
+        currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, urlParams.get(SEARCH_INFO.SEARCH_TYPE));
 
     initializeSearchPageTitle();
     initializeSortByOptions();
@@ -72,7 +79,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 function initializeSearchPageTitle() {
-    const searchPageTitle = document.getElementById('search-page-title');
+    const searchPageTitle = document.getElementById('header-page-title');
     searchPageTitle.href = '/page/search';
     searchPageTitle.addEventListener('click', async (e) => {
         e.preventDefault();
@@ -193,7 +200,7 @@ function initializeAdvanceSearchArea() {
         if (keywordCount === 1 && includeFields.length === 1 && rangeFields.length === 0) {
             currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, SEARCH_TYPES.KEYWORD);
             currentSearchInfo.set(SEARCH_INFO.SORT_BY, sortBy);
-            currentSearchInfo.set(SEARCH_INFO.SORT_BY, orderBy);
+            currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, orderBy);
             currentSearchInfo.set(SEARCH_INFO.KEYWORD_FIELD, includeFields[0].field);
             currentSearchInfo.set(SEARCH_INFO.KEYWORD_VALUE_LIST, includeFields[0].values);
             advanceIsSubmitting = true;
@@ -594,7 +601,7 @@ function getBasicSearchUrl(searchString, page, sortBy, sortOrder) {
 
 function getKeywordSearchUrl(keywordField, valueList, page, sortBy, sortOrder) {
     const queryParams = new URLSearchParams({
-        [keywordField]: valueList,
+        s: valueList,
         page: page,
         sortBy: sortBy,
         sortOrder: sortOrder
