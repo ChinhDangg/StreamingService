@@ -15,7 +15,6 @@ public interface MediaGroupMetaDataRepository extends JpaRepository<MediaGroupMe
         SELECT m.mediaMetaDataId
         FROM MediaGroupMetaData m
         WHERE m.grouperMetaDataId = :grouperId
-        ORDER BY m.numInfo
     """)
     Slice<Long> findMediaMetadataIdsByGrouperMetaDataId(@Param("grouperId") Long grouperId, Pageable pageable);
 }

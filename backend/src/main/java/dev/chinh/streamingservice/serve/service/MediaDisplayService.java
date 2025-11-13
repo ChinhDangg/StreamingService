@@ -4,16 +4,14 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.MediaMapper;
 import dev.chinh.streamingservice.content.service.AlbumService;
+import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.data.repository.MediaGroupMetaDataRepository;
 import dev.chinh.streamingservice.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.search.service.MediaSearchService;
 import dev.chinh.streamingservice.serve.data.MediaDisplayContent;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
-import org.springframework.data.domain.SliceImpl;
+import org.springframework.data.domain.*;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -34,7 +32,7 @@ public class MediaDisplayService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
 
-    private final int maxBatchSize = 10;
+    private final int maxBatchSize = 20;
 
     public MediaDisplayContent getMediaContentInfo(long mediaId) {
         MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(mediaId);
@@ -44,7 +42,7 @@ public class MediaDisplayService {
             mediaDisplayContent.setThumbnail(MediaSearchService.getThumbnailPath(mediaId, MediaSearchService.thumbnailResolution, mediaItem.getThumbnail()));
 
         if (mediaItem.isGrouper()) {
-            Slice<Long> mediaIds = getNextGroupOfMedia(mediaId, 0);
+            Slice<Long> mediaIds = getNextGroupOfMedia(mediaId, 0, Sort.Direction.DESC);
             mediaDisplayContent.setChildMediaIds(mediaIds);
         }
         return mediaDisplayContent;
@@ -68,7 +66,7 @@ public class MediaDisplayService {
         }
     }
 
-    public Slice<Long> getNextGroupOfMedia(long mediaId, int offset) {
+    public Slice<Long> getNextGroupOfMedia(long mediaId, int offset, Sort.Direction sortOrder) {
         Slice<Long> cachedGroupOfMedia = getCacheGroupOfMedia(mediaId, offset);
         if (cachedGroupOfMedia != null) {
             return cachedGroupOfMedia;
@@ -79,7 +77,7 @@ public class MediaDisplayService {
             throw new ResourceNotFoundException("No media grouper found with id: " + mediaId);
         }
 
-        Pageable pageable = PageRequest.of(offset, maxBatchSize);
+        Pageable pageable = PageRequest.of(offset, maxBatchSize, Sort.by(sortOrder, ContentMetaData.NUM_INFO));
         Slice<Long> groupOfMedia = mediaGroupMetaDataRepository.findMediaMetadataIdsByGrouperMetaDataId(mediaId, pageable);
         cacheGroupOfMedia(mediaId, offset, groupOfMedia);
         return groupOfMedia;
