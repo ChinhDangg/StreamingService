@@ -1,4 +1,5 @@
 import {setVideoUrl} from "/static/js/set-video-url.js";
+import { displayPagination } from "/static/js/pagination.js";
 
 const SORT_BY = Object.freeze({
     UPLOAD: 'UPLOAD_DATE',
@@ -544,12 +545,12 @@ function updatePageUrl(searchType, page, sortBy, sortOrder,
                        searchString = null,
                        keywordField = null, keywordValueList = null) {
     const url = new URL(window.location.href);
-    const pageSearchUrl = getPageSearchUrl(searchType, page, sortBy, sortOrder, searchString, keywordField, keywordValueList);
+    const pageSearchUrl = getPageSearchUrl(page, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList);
     const newUrl = url.origin + pageSearchUrl;
     window.history.pushState({ path: newUrl }, '', newUrl);
 }
 
-function getPageSearchUrl(searchType, page, sortBy, sortOrder,
+function getPageSearchUrl(page, searchType, sortBy, sortOrder,
                           searchString = null,
                           keywordField = null, keywordValueList = null) {
     const searchUrl = getSearchUrl(searchType, page, sortBy, sortOrder, searchString, keywordField, keywordValueList);
@@ -648,10 +649,19 @@ function displaySearchResults(results, searchType, sortBy, sortOrder,
     //     "totalPages": 20,
     //     "total": 2
     // }
-    displayPagination(results.page, results.totalPages, searchType, sortBy, sortOrder,
-        searchString, keywordField, keywordValueList);
+    const getPageUrl = (page) => getPageSearchUrl(page, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList);
+    displayPagination(results.page, results.totalPages, getPageUrl, pageClickHandler);
 
     displaySearchItems(results.searchItems);
+}
+
+async function pageClickHandler(e, page) {
+    e.preventDefault();
+    currentSearchInfo.set(SEARCH_INFO.PAGE, page);
+    e.target.disabled = true;
+    sendSearchRequestOnCurrentInfo().then(() => {
+        e.target.disabled = false;
+    });
 }
 
 function formatTime(s) {
@@ -801,8 +811,6 @@ async function requestVideoPreview(videoId, itemNode) {
     } finally {
         loader.remove(); // remove loading indicator
     }
-
-    //playlistUrl = "p720/master.m3u8";
 
     const video = videoContainer.querySelector('video');
 
@@ -974,130 +982,6 @@ document.addEventListener('keydown', (e) => {
         document.body.style.overflow = '';
     }
 });
-
-function displayPagination(page, totalPages, searchType, sortBy, sortOrder,
-                           searchString = null,
-                           keywordField = null, keywordValueList = null) {
-    const paginationTop = document.getElementById('pagination-node-top');
-    const pageNodeBottom = document.getElementById('pagination-node-bottom');
-
-    if (page === 0 && page === totalPages) {
-        paginationTop.classList.add('hidden');
-        pageNodeBottom.classList.add('hidden');
-        return;
-    }
-
-    const pageContainer = pageNodeBottom.querySelector('.page-container');
-    const pageLinkNodeTem = pageContainer.querySelector('.page-link-node');
-    const pageNumContainer = pageNodeBottom.querySelector('.page-num-container');
-
-    const leftControl = pageNodeBottom.querySelector('.page-left-control');
-    const rightControl = pageNodeBottom.querySelector('.page-right-control');
-    const goFirstControl = leftControl.querySelector('.page-first-control');
-    const goLastControl = rightControl.querySelector('.page-last-control');
-
-    // --- prev / first ---
-    if (page > 0) {
-        const prevControl = leftControl.querySelector('.page-prev-control');
-        prevControl.classList.remove('hidden');
-        const prevIndex = page - 1;
-        prevControl.href = getPageSearchUrl(searchType, prevIndex, sortBy, sortOrder, searchString, keywordField, keywordValueList);
-        prevControl.onclick = async (e) => await pageClickHandler(e, prevIndex);
-
-        const prevControlDup = helperCloneAndUnHideNode(prevControl);
-        prevControlDup.onclick = async (e) => await pageClickHandler(e, prevIndex);
-        rightControl.appendChild(prevControlDup);
-
-        goFirstControl.href = getPageSearchUrl(searchType, 0, sortBy, sortOrder, searchString, keywordField, keywordValueList);
-        goFirstControl.onclick = async (e) => await pageClickHandler(e, 0);
-    } else {
-        leftControl.querySelector('.page-prev-control').classList.add('hidden');
-        goFirstControl.classList.add('hidden');
-    }
-
-    // --- next / last ---
-    if (page < totalPages - 1) {
-        const nextControl = leftControl.querySelector('.page-next-control');
-        nextControl.classList.remove('hidden');
-        const nextIndex = page + 1;
-        nextControl.href = getPageSearchUrl(searchType, nextIndex, sortBy, sortOrder, searchString, keywordField, keywordValueList);
-        nextControl.onclick = async (e) => await pageClickHandler(e, nextIndex);
-
-        const nextControlDup = helperCloneAndUnHideNode(nextControl);
-        nextControlDup.onclick = async (e) => await pageClickHandler(e, nextIndex);
-        rightControl.appendChild(nextControlDup);
-
-        goLastControl.href = getPageSearchUrl(searchType, totalPages - 1, sortBy, sortOrder, searchString, keywordField, keywordValueList);
-        goLastControl.onclick = async (e) => await pageClickHandler(e, totalPages - 1);
-    } else {
-        leftControl.querySelector('.page-next-control').classList.add('hidden');
-        goLastControl.classList.add('hidden');
-    }
-
-    // --- numbered pages ---
-    const start = Math.max(page - 2, 0);
-    const maxPageShow = start + 5;
-
-    pageNumContainer.innerHTML = '';
-    for (let i = start; i < totalPages; i++) {
-        let currentPage = i;
-        let reachedMax = false;
-
-        if (currentPage === maxPageShow) {
-            if (maxPageShow < totalPages - 1) {
-                const threeDots = helperCloneAndUnHideNode(pageContainer.querySelector('.page-dots'));
-                pageNumContainer.appendChild(threeDots);
-                currentPage = totalPages - 1;
-            }
-            reachedMax = true;
-        }
-
-        const pageLinkNode = (currentPage !== page)
-            ? helperCloneAndUnHideNode(pageLinkNodeTem)
-            : helperCloneAndUnHideNode(pageContainer.querySelector('.page-selected-link-node'));
-
-        pageLinkNode.innerText = currentPage + 1;
-        pageLinkNode.href = getPageSearchUrl(searchType, currentPage, sortBy, sortOrder, searchString, keywordField, keywordValueList);
-
-        if (currentPage === page) {
-            pageLinkNode.onclick = (e) => e.preventDefault();
-        } else {
-            pageLinkNode.onclick = async (e) => await pageClickHandler(e, currentPage);
-        }
-
-        pageNumContainer.appendChild(pageLinkNode);
-
-        if (reachedMax) break;
-    }
-
-    // --- clone bottom block to top and preserve click handlers ---
-    paginationTop.innerHTML = '';
-    const paginationNodeDup = helperCloneAndUnHideNode(pageNodeBottom.firstElementChild);
-    paginationTop.appendChild(paginationNodeDup);
-
-    // copy hrefs and onclicks from bottom to top anchors
-    const bottomAnchors = pageNodeBottom.querySelectorAll('a');
-    const topAnchors = paginationTop.querySelectorAll('a');
-    topAnchors.forEach((topA, i) => {
-        const bottomA = bottomAnchors[i];
-        if (bottomA) {
-            topA.href = bottomA.href;
-            topA.onclick = bottomA.onclick;
-        }
-    });
-
-    paginationTop.classList.remove('hidden');
-    pageNodeBottom.classList.remove('hidden');
-}
-
-async function pageClickHandler(e, page) {
-    e.preventDefault();
-    currentSearchInfo.set(SEARCH_INFO.PAGE, page);
-    e.target.disabled = true;
-    sendSearchRequestOnCurrentInfo().then(() => {
-        e.target.disabled = false;
-    });
-}
 
 function helperCloneAndUnHideNode(node) {
     const clone = node.cloneNode(true);
