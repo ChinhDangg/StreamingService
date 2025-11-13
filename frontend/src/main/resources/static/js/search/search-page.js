@@ -814,10 +814,6 @@ async function requestVideoPreview(videoId, itemNode) {
 
     const video = videoContainer.querySelector('video');
 
-    video.pause();
-    video.removeAttribute('src');
-    video.load();
-
     setVideoUrl(videoContainer, playlistUrl);
 
     video.addEventListener('mouseenter', () => {
