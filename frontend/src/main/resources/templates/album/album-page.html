@@ -30,9 +30,11 @@
         }
     </style>
 </head>
-<body class="bg-gray-900 min-h-screen">
+<body class="bg-gray-900 min-h-screen pt-6 p-4">
 
-<main th:fragment="album-html" id="main-container" class="max-w-4xl mx-auto px-4 py-8">
+<header th:insert="header :: header-html" th:remove="tag"></header>
+
+<main th:fragment="album-html" id="main-container" class="max-w-7xl mx-auto px-4 py-8">
 
     <div class="px-4 py-4 sm:px-0">
 
@@ -92,7 +94,7 @@
 
     <div class="border-t border-gray-700 mt-4"></div>
 
-    <div class="px-4 py-8 sm:px-0">
+    <div class="max-w-4xl mx-auto px-4 py-8 sm:px-0">
         <div id="album-video-container" class="grid grid-cols-1 gap-6 mb-5">
             <div class="aspect-[16/9] w-2/3 mx-auto relative hidden video-container-wrapper">
                 <div class="temp-video-holder relative w-full h-full">
@@ -139,7 +141,8 @@
     /static/js/album/album-page.js
 </div>
 
-<script type="module" th:src="@{/static/js/album/album-page.js}" src="album-page.js"></script>
+<script type="module" th:src="@{/static/js/header.js}" src="/static/js/header.js"></script>
+<script type="module" th:src="@{/static/js/album/album-page.js}" src="/static/js/album/album-page.js"></script>
 
 </body>
 </html>
