@@ -3,7 +3,6 @@ package dev.chinh.streamingservice.data.controller;
 import dev.chinh.streamingservice.data.service.MediaMetadataService;
 import dev.chinh.streamingservice.search.constant.SortBy;
 import lombok.RequiredArgsConstructor;
-import org.opensearch.client.opensearch._types.SortOrder;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
