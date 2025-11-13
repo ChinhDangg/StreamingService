@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Browse Page</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-6">
+
+<!-- Header -->
+<header class="max-w-7xl mx-auto mb-6">
+
+    <div id="browse-option-container" class="flex items-center space-x-2 mt-3">
+        <a class="hidden select-none cursor-pointer px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
+            <span>Characters</span>
+        </a>
+    </div>
+
+    <h1 class="text-2xl font-semibold mb-4 mt-10">
+        <a id="browse-page-title" href=""><span class="title">Character</span><span> (</span><span class="total">0</span><span>)</span></a>
+    </h1>
+
+    <!-- Sort Order Section -->
+    <div id="sort-by-option-container" class="flex items-center space-x-2 mt-3 border-t border-gray-700 pt-3">
+        <span class="text-sm font-medium text-gray-400">Sort by:</span>
+        <button class="hidden select-none px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
+            <span>Name</span>
+        </button>
+    </div>
+
+    <!-- Sort Order Section -->
+    <div id="sort-order-option-container" class="flex items-center space-x-2 mt-3">
+        <span class="text-sm font-medium text-gray-400">Order:</span>
+        <button class="select-none px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
+            <span>Ascending</span>
+        </button>
+    </div>
+</header>
+
+
+<div id="pagination-node-top" class="flex flex-col items-center justify-center mt-8 mb-8 select-none text-gray-300 space-y-3">
+</div>
+
+<main id="main-text-item-container" class="hidden max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-0">
+</main>
+
+<main id="main-item-container" class="hidden max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0">
+</main>
+
+<div id="browse-item-container">
+    <!-- Horizontal -->
+    <article class="horizontal-item hidden bg-gray-800 flex flex-col border border-gray-900">
+        <a href="#" class="item-link">
+            <div class="relative w-full aspect-[16/9] bg-gray-700 overflow-hidden">
+                <img src="" alt="Horizontal" class="thumbnail-image w-full h-full object-contain" />
+            </div>
+            <div class="p-3">
+                <h2 class="name-title text-sm font-medium truncate">Another Horizontal Example</h2>
+                <div class="flex justify-between text-xs text-gray-400">
+                    <span class="date-note truncate">Oct 26, 2025</span>
+                    <span class="total-note truncate">80</span>
+                </div>
+            </div>
+        </a>
+    </article>
+
+    <!-- Vertical -->
+    <article class="vertical-item hidden bg-gray-800 flex flex-col border border-gray-900 row-span-2">
+        <a href="" class="item-link">
+            <div class="relative w-full aspect-[2/3] bg-gray-700 flex justify-center items-center overflow-visible">
+                <img src="" alt="Vertical" class="thumbnail-image w-full h-full object-contain"/>
+            </div>
+            <div class="p-3">
+                <h2 class="name-title text-sm font-medium truncate">Another Horizontal Example</h2>
+                <div class="flex justify-between text-xs text-gray-400">
+                    <span class="date-note truncate">Oct 26, 2025</span>
+                    <span class="total-note truncate">105</span>
+                </div>
+            </div>
+        </a>
+    </article>
+
+    <article class="text-item hidden bg-gray-800 flex flex-col border border-gray-900">
+        <a href="#" class="item-link">
+            <div class="p-3">
+                <h2 class="name-title text-sm font-medium truncate">Tsukishiro Yanagi</h2>
+                <div class="flex justify-between text-xs text-gray-400">
+                    <span class="date-note truncate">Oct 26, 2025</span>
+                    <span class="total-note truncate">80</span>
+                </div>
+            </div>
+        </a>
+    </article>
+</div>
+
+
+<!-- Pagination Node -->
+<div id="pagination-node-bottom" class="flex flex-col items-center justify-center mt-8 mb-8 select-none text-gray-300 space-y-3">
+    <div class="flex flex-col gap-2">
+        <!-- Control Buttons (Top Row) -->
+        <div class="flex items-center justify-between w-full max-w-xs mx-auto gap-4">
+
+            <!-- Left Controls -->
+            <div class="page-left-control flex items-center gap-2">
+                <!-- Previous -->
+                <a href="#" class="page-prev-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Previous Page">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                         stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </a>
+
+                <!-- Next -->
+                <a href="#" class="page-next-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Next Page">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                         stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                </a>
+
+                <!-- Go to First -->
+                <a href="#" class="page-first-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="First Page">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                         stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+                    </svg>
+                </a>
+            </div>
+
+            <!-- Right Controls -->
+            <div class="page-right-control flex items-center gap-2">
+                <!-- Go to Last -->
+                <a href="#" class="page-last-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Last Page">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                         stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 19l7-7-7-7M13 19l7-7-7-7" />
+                    </svg>
+                </a>
+            </div>
+        </div>
+
+        <!-- Page Numbers (Bottom Row) -->
+        <div class="page-container flex items-center gap-1">
+            <a href="#" class="page-link-node hidden px-3 py-1 rounded-md bg-gray-800 hover:bg-gray-700 text-sm font-medium"></a>
+            <a href="#" class="page-selected-link-node hidden px-3 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-sm font-medium text-white ring-1 ring-indigo-500">
+            </a>
+            <span class="page-dots hidden px-2 text-gray-500">...</span>
+            <div class="page-num-container w-full flex items-center justify-center gap-1">
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+<script type="module" th:src="@{/static/js/browse/browse-page.js}" src="/static/js/browse/browse-page.js"></script>
+
+
+</body>
+</html>
