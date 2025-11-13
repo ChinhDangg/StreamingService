@@ -2,7 +2,6 @@ export function displayPagination(page, totalPages, getPageUrl, pageClickHandler
     const paginationTop = document.getElementById('pagination-node-top');
     const pageNodeBottom = document.getElementById('pagination-node-bottom');
 
-    console.log(page, totalPages);
     if (page === 0 && page === totalPages) {
         if (paginationTop)
             paginationTop.classList.add('hidden');
