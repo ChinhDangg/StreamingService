@@ -57,7 +57,7 @@ public class SearchController {
     }
 
     @PostMapping("/universes")
-    public ResponseEntity<MediaSearchResult> universesSearch(@RequestParam List<Object> universes,
+    public ResponseEntity<MediaSearchResult> universesSearch(@RequestParam(name = "s") List<Object> universes,
                                                            @RequestParam(required = false) int page,
                                                            @RequestParam(required = false) SortBy sortBy,
                                                            @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
@@ -66,7 +66,7 @@ public class SearchController {
     }
 
     @PostMapping("/characters")
-    public ResponseEntity<MediaSearchResult> charactersSearch(@RequestParam List<Object> characters,
+    public ResponseEntity<MediaSearchResult> charactersSearch(@RequestParam(name = "s") List<Object> characters,
                                                              @RequestParam(required = false) int page,
                                                              @RequestParam(required = false) SortBy sortBy,
                                                              @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
@@ -75,7 +75,7 @@ public class SearchController {
     }
 
     @PostMapping("/authors")
-    public ResponseEntity<MediaSearchResult> authorsSearch(@RequestParam List<Object> authors,
+    public ResponseEntity<MediaSearchResult> authorsSearch(@RequestParam(name = "s") List<Object> authors,
                                                            @RequestParam(required = false) int page,
                                                            @RequestParam(required = false) SortBy sortBy,
                                                            @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
@@ -84,10 +84,10 @@ public class SearchController {
     }
 
     @PostMapping("/tags")
-    public ResponseEntity<MediaSearchResult> tagsSearch(@RequestParam List<Object> tags,
+    public ResponseEntity<MediaSearchResult> tagsSearch(@RequestParam(name = "s") List<Object> tags,
                                                               @RequestParam(required = false) int page,
                                                               @RequestParam(required = false) SortBy sortBy,
-                                                              @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
+                                                              @RequestParam(required = false) SortOrder sortOrder) throws IOException {
         return ResponseEntity.ok().body(
                 mediaSearchService.searchByKeywords(ContentMetaData.TAGS, tags, page, pageSize, sortBy, sortOrder));
     }
