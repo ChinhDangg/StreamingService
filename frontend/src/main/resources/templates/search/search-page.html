@@ -292,7 +292,6 @@
 </div>
 
 <div th:insert="pagination :: pagination-html" th:remove="tag">
-
     <!-- Pagination Node -->
     <div id="pagination-node-bottom" class="hidden flex flex-col items-center justify-center mt-8 mb-8 select-none text-gray-300 space-y-3">
         <div class="flex flex-col gap-2">
@@ -349,31 +348,31 @@
             </div>
         </div>
     </div>
-
 </div> <!-- End of Pagination -->
 
+<div th:insert="overlay :: overlay-html" th:remove="tag">
+    <!-- Full Page Overlay -->
+    <div id="quickViewOverlay"
+         class="fixed hidden inset-0 z-50 bg-gray-950/50 text-gray-100 border border-gray-800/50 flex flex-col transition-all duration-300">
 
-<!-- Full Page Overlay -->
-<div id="quickViewOverlay"
-     class="fixed hidden inset-0 z-50 bg-gray-950/50 text-gray-100 border border-gray-800/50 flex flex-col transition-all duration-300">
+        <!-- Fixed Top Bar -->
+        <div class="fixed top-0 left-0 w-full z-20 bg-gray-900/90 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-6 py-4">
+            <h2 class="quick-view-title text-lg font-semibold tracking-wide">Quick View</h2>
+            <button id="closeOverlayBtn"
+                    class="text-gray-400 hover:text-gray-200 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                     stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
 
-    <!-- Fixed Top Bar -->
-    <div class="fixed top-0 left-0 w-full z-20 bg-gray-900/90 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-6 py-4">
-        <h2 class="quick-view-title text-lg font-semibold tracking-wide">Quick View</h2>
-        <button id="closeOverlayBtn"
-                class="text-gray-400 hover:text-gray-200 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                 stroke-width="2" stroke="currentColor" class="w-6 h-6">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-        </button>
-    </div>
+        <!-- Scrollable Content Area -->
+        <div id="overlayContent" class="flex-1 overflow-y-auto pt-[72px] pb-10 flex justify-center">
+            <div class="overlayContent-inner-wrapper relative bg-gray-900/90 rounded-lg shadow-xl w-[90%] max-w-5xl mt-6 mb-16 animate-slideIn self-start"
+                 onclick="event.stopPropagation();">
 
-    <!-- Scrollable Content Area -->
-    <div id="overlayContent" class="flex-1 overflow-y-auto pt-[72px] pb-10 flex justify-center">
-        <div class="overlayContent-inner-wrapper relative bg-gray-900/90 rounded-lg shadow-xl w-[90%] max-w-5xl mt-6 mb-16 animate-slideIn self-start"
-             onclick="event.stopPropagation();">
-
+            </div>
         </div>
     </div>
 </div>
