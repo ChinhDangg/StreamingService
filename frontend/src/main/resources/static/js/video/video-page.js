@@ -1,13 +1,16 @@
+import { initializeHeader } from "/static/js/header.js";
 import { setVideoUrl, setVideoResolution } from "/static/js/set-video-url.js";
 import { displayContentInfo } from "/static/js/metadata-display.js";
 
 const container = document.querySelector('[data-player="videoPlayerContainer"]');
 container.dataset.player = 'videoPagePlayerContainer';
 
-export async function initialize() {
-    const queryString = window.location.search;
-    const urlParams = new URLSearchParams(queryString);
-    const videoId = urlParams.get('mediaId');
+export async function initialize(videoId = null, videoInfo = null) {
+    if (!videoId) {
+        const queryString = window.location.search;
+        const urlParams = new URLSearchParams(queryString);
+        videoId = urlParams.get('mediaId');
+    }
 
     if (!videoId) {
         alert("No videoId provided");
@@ -15,20 +18,24 @@ export async function initialize() {
     }
 
     await Promise.all([
-        displayVideoInfo(videoId),
+        displayVideoInfo(videoId, videoInfo),
     ]);
 }
 
-window.addEventListener('DOMContentLoaded', initialize);
+window.addEventListener('DOMContentLoaded', () => {
+    initializeHeader();
+    initialize();
+});
 
-async function displayVideoInfo(videoId) {
-    const response = await fetch(`/api/media/content/${videoId}`);
-    if (!response.ok) {
-        alert("Failed to fetch video info");
-        return;
+async function displayVideoInfo(videoId, videoInfo = null) {
+    if (!videoInfo) {
+        const response = await fetch(`/api/media/content/${videoId}`);
+        if (!response.ok) {
+            alert("Failed to fetch video info");
+            return;
+        }
+        videoInfo = await response.json();
     }
-
-    const videoInfo = await response.json();
 
     // const videoInfo = {
     //     "childMediaIds": null,
