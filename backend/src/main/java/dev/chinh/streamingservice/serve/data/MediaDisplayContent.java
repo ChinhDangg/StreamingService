@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.serve.data;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.data.ContentMetaData;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -56,6 +57,8 @@ public class MediaDisplayContent {
     @JsonProperty(ContentMetaData.YEAR)
     private Integer year;
 
-    // optional inner child media ids if the current media is just a grouper (not individual content itself)
+    private MediaType mediaType;
+
+    // optional inner child media ids if the current media is just a grouper (not individual video item or album)
     Slice<Long> childMediaIds;
 }

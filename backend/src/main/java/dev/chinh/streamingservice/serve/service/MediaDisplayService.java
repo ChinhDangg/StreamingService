@@ -3,6 +3,7 @@ package dev.chinh.streamingservice.serve.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.MediaMapper;
+import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.content.service.AlbumService;
 import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
@@ -44,6 +45,9 @@ public class MediaDisplayService {
         if (mediaItem.isGrouper()) {
             Slice<Long> mediaIds = getNextGroupOfMedia(mediaId, 0, Sort.Direction.DESC);
             mediaDisplayContent.setChildMediaIds(mediaIds);
+            mediaDisplayContent.setMediaType(MediaType.GROUPER);
+        } else {
+            mediaDisplayContent.setMediaType(mediaItem.hasKey() ? MediaType.VIDEO : MediaType.ALBUM);
         }
         return mediaDisplayContent;
     }
