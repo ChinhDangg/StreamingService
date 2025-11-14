@@ -5,6 +5,8 @@ import java.util.Set;
 public enum MediaType {
     VIDEO,
     IMAGE,
+    ALBUM,
+    GROUPER,
     OTHER;
 
     public static MediaType detectMediaType(String fileName) {
