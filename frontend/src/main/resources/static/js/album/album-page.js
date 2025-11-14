@@ -66,8 +66,8 @@ async function displayAlbumInfo(albumId, albumInfo = null) {
     //     "uploadDate": "2025-10-30",
     //     "year": null
     // };
-
-    displayContentInfo(albumInfo);
+    const albumMainContainer = document.getElementById('main-album-container');
+    displayContentInfo(albumInfo, albumMainContainer);
 }
 
 const BATCH_SIZE = 5;

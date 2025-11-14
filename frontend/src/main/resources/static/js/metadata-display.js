@@ -1,6 +1,5 @@
 
-export function displayContentInfo(mediaInfo) {
-    const mainContainer = document.getElementById('main-container');
+export function displayContentInfo(mediaInfo, mainContainer) {
     mainContainer.querySelector('.main-title').textContent = mediaInfo.title;
 
     if (mediaInfo.authors) {

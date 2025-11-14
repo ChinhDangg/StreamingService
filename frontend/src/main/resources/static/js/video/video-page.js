@@ -66,7 +66,8 @@ async function displayVideoInfo(videoId, videoInfo = null) {
     //     "year": null
     // };
 
-    displayContentInfo(videoInfo);
+    const videoMainContainer = document.getElementById('main-video-container');
+    displayContentInfo(videoInfo, videoMainContainer);
     const originalRes = videoInfo.width > videoInfo.height ? videoInfo.height : videoInfo.width;
     await getVideoUrl(videoId, originalRes);
 }
