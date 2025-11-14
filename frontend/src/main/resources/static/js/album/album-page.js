@@ -1,12 +1,16 @@
+import { initializeHeader } from "/static/js/header.js";
 import { setVideoUrl, setVideoResolution } from "/static/js/set-video-url.js";
-import { displayContentInfo, helperCloneAndUnHideNode} from "/static/js/metadata-display.js";
+import { displayContentInfo, helperCloneAndUnHideNode } from "/static/js/metadata-display.js";
 
 let albumId = null;
 
-export async function initialize() {
-    const queryString = window.location.search;
-    const urlParams = new URLSearchParams(queryString);
-    albumId = urlParams.get('mediaId');
+export async function initialize(id = null, albumInfo = null) {
+    if (id) albumId = id;
+    else {
+        const queryString = window.location.search;
+        const urlParams = new URLSearchParams(queryString);
+        albumId = urlParams.get('mediaId');
+    }
 
     if (!albumId) {
         alert("No albumId provided");
@@ -14,20 +18,25 @@ export async function initialize() {
     }
 
     await Promise.all([
-        displayAlbumInfo(albumId),
+        displayAlbumInfo(albumId, albumInfo),
         displayAlbumItems(albumId),
     ]);
 }
 
-window.addEventListener('DOMContentLoaded', initialize);
+window.addEventListener('DOMContentLoaded', () => {
+    initializeHeader();
+    initialize();
+});
 
-async function displayAlbumInfo(albumId) {
-    const response = await fetch(`/api/media/content/${albumId}`);
-    if (!response.ok) {
-        alert("Failed to fetch album info");
-        return;
+async function displayAlbumInfo(albumId, albumInfo = null) {
+    if (!albumInfo) {
+        const response = await fetch(`/api/media/content/${albumId}`);
+        if (!response.ok) {
+            alert("Failed to fetch album info");
+            return;
+        }
+        albumInfo = await response.json();
     }
-    const albumInfo = await response.json();
 
     // const albumInfo = {
     //     "childMediaIds": null,

@@ -1,5 +1,5 @@
 
-function initializeHeader() {
+export function initializeHeader() {
     console.log('initialize header');
     initializeHeaderPageTitle();
     initializeSearchForm();
@@ -72,5 +72,3 @@ export function helperCloneAndUnHideNode(node) {
     clone.classList.remove('hidden');
     return clone;
 }
-
-window.addEventListener('DOMContentLoaded', initializeHeader);

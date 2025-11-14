@@ -1,3 +1,4 @@
+import { initializeHeader, helperCloneAndUnHideNode} from "/static/js/header.js";
 import { displayPagination } from "/static/js/pagination.js";
 
 const NameEntry = Object.freeze({
@@ -47,7 +48,10 @@ async function initialize() {
     initializeSortByOrderOptions();
 }
 
-window.addEventListener('DOMContentLoaded', initialize);
+window.addEventListener('DOMContentLoaded', () => {
+    initializeHeader();
+    initialize();
+});
 
 function initializeCurrentOptions() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -219,10 +223,4 @@ async function pageClickHandler(e, page) {
     fetchNameItems(NameEntry[currentNameEntry], page, currentSortBy, currentSortOrder).then(() => {
         e.target.disabled = false;
     });
-}
-
-function helperCloneAndUnHideNode(node) {
-    const clone = node.cloneNode(true);
-    clone.classList.remove('hidden');
-    return clone;
 }
