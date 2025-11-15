@@ -19,44 +19,44 @@ async function initialize() {
 window.addEventListener('DOMContentLoaded', initialize);
 
 async function displayAlbumGrouperInfo(albumGrouperId) {
-    const response = await fetch(`/api/media/content/${albumGrouperId}`);
-    if (!response.ok) {
-        alert("Failed to fetch album grouper info");
-        return;
-    }
-    const albumGrouperInfo = await response.json();
+    // const response = await fetch(`/api/media/content/${albumGrouperId}`);
+    // if (!response.ok) {
+    //     alert("Failed to fetch album grouper info");
+    //     return;
+    // }
+    // const albumGrouperInfo = await response.json();
 
-    // const albumGrouperInfo = {
-    //     "childMediaIds": [
-    //         2, 1
-    //     ],
-    //     "id": 1,
-    //     "title": "Test Album Sample 1",
-    //     "thumbnail": "https://placehold.co/1920x1080",
-    //     "tags": [
-    //         "Astrophotography",
-    //         "LongExposure",
-    //         "Urban"
-    //     ],
-    //     "characters": [
-    //         "Jane Doe",
-    //         "John Doe",
-    //     ],
-    //     "universes": [
-    //         "One Piece"
-    //     ],
-    //     "authors": [
-    //         "Jane Doe",
-    //         "John Doe",
-    //     ],
-    //     "length": 2,
-    //     "size": 400111222,
-    //     "width": 1920,
-    //     "height": 1080,
-    //     "uploadDate": "2025-10-30",
-    //     "year": null
-    //     "mediaType": "VIDEO"
-    // };
+    const albumGrouperInfo = {
+        "childMediaIds": [
+            2, 1
+        ],
+        "id": 1,
+        "title": "Test Album Sample 1",
+        "thumbnail": "https://placehold.co/1920x1080",
+        "tags": [
+            "Astrophotography",
+            "LongExposure",
+            "Urban"
+        ],
+        "characters": [
+            "Jane Doe",
+            "John Doe",
+        ],
+        "universes": [
+            "One Piece"
+        ],
+        "authors": [
+            "Jane Doe",
+            "John Doe",
+        ],
+        "length": 2,
+        "size": 400111222,
+        "width": 1920,
+        "height": 1080,
+        "uploadDate": "2025-10-30",
+        "year": null,
+        "mediaType": "VIDEO"
+    };
 
     const albumGrouperMainContainer = document.getElementById('main-grouper-container');
     displayContentInfo(albumGrouperInfo, albumGrouperMainContainer);
@@ -78,6 +78,7 @@ function displayThumbnailSectionInfo(albumGrouperInfo) {
 let albumGrouperCountLength = 0;
 let currentViewAlbumId = null;
 let albumGrouperChildAlbumIds = [];
+const albumInfoContentMap = new Map();
 let sortOrder = 'DESC';
 
 function displayListSectionInfo(albumGrouperInfo) {
@@ -130,7 +131,13 @@ function displayListSectionInfo(albumGrouperInfo) {
     };
 
     const getMediaContentAndShowInOverlay = async (itemId) => {
-        const mediaInfo = await getMediaContent(itemId);
+        let mediaInfo;
+        if (albumInfoContentMap.has(itemId)) {
+            mediaInfo = albumInfoContentMap.get(itemId);
+        } else {
+            mediaInfo = await fetchMediaContent(itemId);
+            albumInfoContentMap.set(itemId, mediaInfo);
+        }
         if (!mediaInfo) return;
         currentViewAlbumId = itemId;
         showStepControls(itemId);
@@ -154,7 +161,7 @@ function displayListSectionInfo(albumGrouperInfo) {
     }
 
     const getNextGrouperInfo = async (grouperId) => {
-        const grouperInfo = await getGrouperNext(grouperId);
+        const grouperInfo = await fetchGrouperNext(grouperId);
         if (!grouperInfo) return;
         grouperInfo.content.forEach(id => {
             addItem(id);
@@ -267,7 +274,7 @@ function displayListSectionInfo(albumGrouperInfo) {
     });
 }
 
-async function getMediaContent(mediaId) {
+async function fetchMediaContent(mediaId) {
     const response = await fetch(`/api/media/content/${mediaId}`);
     if (!response.ok) {
         alert("Failed to fetch media info");
@@ -276,7 +283,7 @@ async function getMediaContent(mediaId) {
     return await response.json();
 }
 
-async function getGrouperNext(albumGrouperId) {
+async function fetchGrouperNext(albumGrouperId) {
     const response = await fetch(`/api/media/grouper-next/${albumGrouperId}?o=${albumGrouperCountLength}`);
     if (!response.ok) {
         alert("Failed to grouper next list");
