@@ -15,9 +15,11 @@ import dev.chinh.streamingservice.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.search.service.MediaSearchService;
 import io.minio.Result;
 import io.minio.messages.Item;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.coyote.BadRequestException;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,35 +29,40 @@ import org.springframework.web.util.UriUtils;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
-public class AlbumService extends MediaService {
+public class AlbumService extends MediaService implements ResourceCleanable {
 
     private final VideoService videoService;
+    private final MemoryManager memoryManager;
 
     public AlbumService(RedisTemplate<String, Object> redisTemplate,
                         ObjectMapper objectMapper, MediaMapper mediaMapper,
                         MediaMetaDataRepository mediaRepository,
                         MinIOService minIOService,
                         MediaMetadataService mediaMetadataService,
-                        VideoService videoService) {
+                        VideoService videoService,
+                        MemoryManager memoryManager) {
         super(redisTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaMetadataService);
         this.videoService = videoService;
+        this.memoryManager = memoryManager;
+    }
+
+    @PostConstruct
+    public void registerWithMemoryManager() {
+        memoryManager.registerResourceCleanable(this);
     }
 
     private final int expirySeconds = 60 * 60; // 1 hour
 
-    public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, List<String> buckets, Resolution resolution, List<String> pathList) {}
+    public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, List<String> buckets, Long size, List<String> pathList) {}
     public record MediaUrl(MediaType type, String url) {}
 
     public List<MediaUrl> getAllMediaInAnAlbum(Long albumId, Resolution resolution, HttpServletRequest request) throws Exception {
         String albumCreationId = getCacheMediaJobId(albumId, resolution);
         var cacheUrls = getCacheAlbumCreationInfo(albumId, albumCreationId);
-        cacheLastAccessForAlbum(albumCreationId, albumId);
+        addCacheAlbumLastAccess(albumCreationId, albumId);
         if (cacheUrls != null) {
             return reformatMediaUrlList(cacheUrls.mediaUrlList);
         }
@@ -63,7 +70,7 @@ public class AlbumService extends MediaService {
         AlbumUrlInfo albumUrlInfo = getAlbumUrlInfo(albumId, resolution, request);
         addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo, true);
 
-        processResizedAlbumImages(albumId, resolution, 0, 5, request);
+        processResizedAlbumImagesInBatch(albumId, resolution, 0, 5, request);
         return reformatMediaUrlList(albumUrlInfo.mediaUrlList);
     }
 
@@ -72,8 +79,8 @@ public class AlbumService extends MediaService {
                 .map(m -> {
                     if (MediaType.IMAGE.equals(m.type)) {
                         if (m.url.startsWith("/chunks"))
-                            return new MediaUrl(m.type, "/stream" + m.url.substring("/chunks".length()));
-                        return new MediaUrl(m.type, "/stream" + m.url);
+                            return new MediaUrl(m.type, "/stream/album" + m.url.substring("/chunks".length()));
+                        return new MediaUrl(m.type, "/stream/album" + m.url);
                     }
                     return m; // keep original
                 })
@@ -88,10 +95,26 @@ public class AlbumService extends MediaService {
                 getAlbumResizedUrls(mediaDescription, albumId, resolution, results, request);
     }
 
-    public void cacheLastAccessForAlbum(String albumCreationId, long albumId) {
+    private final String albumLastAccessKey = "cache:lastAccess:album";
+    public void addCacheAlbumLastAccess(String albumCreationId, long albumId) {
         long now = System.currentTimeMillis() + expirySeconds * 1000;
-        addCacheLastAccess(albumCreationId, now);
-        addCacheLastAccess(getAlbumCacheHashId(albumId), now);
+        addCacheLastAccess(albumLastAccessKey, albumCreationId, now);
+        addCacheLastAccess(albumLastAccessKey, getAlbumCacheHashId(albumId), now);
+    }
+
+    public void addCacheAlbumVideoLastAccess(String albumVidCacheJobId, long albumId, Resolution albumRes) {
+        long now = System.currentTimeMillis() + expirySeconds * 1000;
+        addCacheLastAccess(albumLastAccessKey, albumVidCacheJobId, now);
+        addCacheLastAccess(albumLastAccessKey, getCacheMediaJobId(albumId, albumRes), now);
+        addCacheLastAccess(albumLastAccessKey, getAlbumCacheHashId(albumId), now);
+    }
+
+    private void removeAlbumCacheLastAccess(String albumMediaCreatedId) {
+        removeCacheLastAccess(albumLastAccessKey, albumMediaCreatedId);
+    }
+
+    public Set<ZSetOperations.TypedTuple<Object>> getAllAlbumCacheLastAccess(long max) {
+        return getAllCacheLastAccess(albumLastAccessKey, max);
     }
 
     private String getAlbumCacheHashId(long albumId) {
@@ -116,6 +139,8 @@ public class AlbumService extends MediaService {
             albumUrlInfo.pathList.clear();
         }
 
+        redisTemplate.opsForHash().put(albumHashId, "size", albumUrlInfo.size);
+
         String json = objectMapper.writeValueAsString(albumUrlInfo);
         redisTemplate.opsForHash().put(albumHashId, albumCreateId, json);
     }
@@ -139,6 +164,19 @@ public class AlbumService extends MediaService {
         return albumUrlInfo;
     }
 
+    private Long getCacheAlbumCreationSize(long albumId) {
+        String albumHashId = getAlbumCacheHashId(albumId);
+        Object value = redisTemplate.opsForHash().get(albumHashId, "size");
+        if (value == null)
+            return null;
+        return Long.parseLong((String) value);
+    }
+
+    private void removeCacheAlbumCreationInfo(long albumId, String albumCreationId) {
+        String albumHashId = getAlbumCacheHashId(albumId);
+        redisTemplate.opsForHash().delete(albumHashId, albumCreationId);
+    }
+
     /**
      * Return nginx urls for resized image - may not have actual image.
      * Get the url list first then call for actual images or videos resize later.
@@ -159,7 +197,7 @@ public class AlbumService extends MediaService {
             MediaType mediaType = MediaType.detectMediaType(key);
 
             if (mediaType == MediaType.VIDEO) {
-                String videoDir = "/api/album/" + albumId + "/vid/" + albumUrlList.size() + "/" + Resolution.p720;
+                String videoDir = "/api/album/" + albumId + "/" + res + "/vid/" + albumUrlList.size();
                 albumUrlList.add(new MediaUrl(mediaType, videoDir));
                 continue;
             }
@@ -171,7 +209,7 @@ public class AlbumService extends MediaService {
             String cachePath = OSUtil.normalizePath(albumDir, cacheFileName);
             albumUrlList.add(new MediaUrl(mediaType, cachePath));
         }
-        return new AlbumUrlInfo(albumUrlList, new ArrayList<>(List.of(mediaDescription.getBucket())), res, pathList);
+        return new AlbumUrlInfo(albumUrlList, new ArrayList<>(List.of(mediaDescription.getBucket())), mediaDescription.getSize(), pathList);
     }
 
     private AlbumUrlInfo getAlbumOriginalUrls(MediaDescription mediaDescription, Iterable<Result<Item>> results) throws Exception {
@@ -184,7 +222,7 @@ public class AlbumService extends MediaService {
                     item.objectName(), expirySeconds);
             albumUrls.add(new MediaUrl(mediaType, originalVideoUrl));
         }
-        return new AlbumUrlInfo(albumUrls, new ArrayList<>(List.of(mediaDescription.getBucket())), Resolution.original, null);
+        return new AlbumUrlInfo(albumUrls, new ArrayList<>(List.of(mediaDescription.getBucket())), mediaDescription.getSize(), null);
     }
 
     public AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList, Resolution resolution) {
@@ -201,20 +239,21 @@ public class AlbumService extends MediaService {
             String pathString = MediaSearchService.getThumbnailPath(mediaDescription.getId(), resolution, mediaDescription.getThumbnail());
             albumUrlList.add(new MediaUrl(MediaType.IMAGE, pathString));
         }
-        return new AlbumUrlInfo(albumUrlList, bucketList, resolution, pathList);
+        return new AlbumUrlInfo(albumUrlList, bucketList, null, pathList);
     }
 
-    public void processResizedAlbumImages(long albumId, Resolution resolution, int offset, int batch,
-                                          HttpServletRequest request) throws Exception {
+    public void processResizedAlbumImagesInBatch(long albumId, Resolution resolution, int offset, int batch,
+                                                 HttpServletRequest request) throws Exception {
         String albumCreationId = getCacheMediaJobId(albumId, resolution);
         AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumId, albumCreationId);
         if (albumUrlInfo == null) {
             System.out.println(("No cache found with albumId " + albumCreationId));
             albumUrlInfo = getAlbumUrlInfo(albumId, resolution, request);
+            addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo, true);
         }
 
-        boolean processed = processResizedImagesInBatch(albumUrlInfo, offset, batch, true);
-        cacheLastAccessForAlbum(albumCreationId, albumId);
+        boolean processed = processResizedImagesInBatch(albumUrlInfo, resolution, offset, batch, true);
+        addCacheAlbumLastAccess(albumCreationId, albumId);
 
         if (processed)
             addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo, false);
@@ -223,7 +262,7 @@ public class AlbumService extends MediaService {
     /**
      * Will modify the albumUrlInfo mediaUrlList in place to cache what image is already resized.
      */
-    public boolean processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, int offset, int batch, boolean isAlbum) throws InterruptedException, IOException {
+    public boolean processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, int offset, int batch, boolean isAlbum) throws InterruptedException, IOException {
         int size = albumUrlInfo.mediaUrlList.size();
         if (offset >= size)
             return false;
@@ -263,7 +302,7 @@ public class AlbumService extends MediaService {
                     .replaceFirst("/chunks", "");
             OSUtil.createTempDir(path.substring(0, path.lastIndexOf("/")));
 
-            String scale = getFfmpegScaleString(albumUrlInfo.resolution, true);
+            String scale = getFfmpegScaleString(resolution, true);
             for (int i = offset; i < stop; i++) {
                 String output = notResized.get(i);
                 if (output == null) {
@@ -306,13 +345,14 @@ public class AlbumService extends MediaService {
         return albumId + ":" + vidNum + ":" + resolution;
     }
 
-    public String getAlbumPartialVideoUrl(long albumId, int vidNum, Resolution res,
+    public String getAlbumPartialVideoUrl(long albumId, Resolution albumRes, int vidNum, Resolution res,
                                           HttpServletRequest request) throws Exception {
-        final String albumCreationId = getCacheMediaJobId(albumId, Resolution.p1080);
+        final String albumCreationId = getCacheMediaJobId(albumId, albumRes);
         AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumId, albumCreationId);
         if (albumUrlInfo == null) {
             System.out.println(("No cache found with albumId " + albumCreationId));
-            albumUrlInfo = getAlbumUrlInfo(albumId, Resolution.p1080, request);
+            albumUrlInfo = getAlbumUrlInfo(albumId, albumRes, request);
+            addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo, true);
         }
 
         final String albumVidCacheJobId = getAlbumVidCacheJobIdString(albumId, vidNum, res);
@@ -321,9 +361,7 @@ public class AlbumService extends MediaService {
         if (albumUrlInfo.mediaUrlList.get(vidNum).type != MediaType.VIDEO)
             throw new BadRequestException("Invalid video path: " + albumVidCacheJobId);
 
-        long now = System.currentTimeMillis();
-        addCacheLastAccess(albumVidCacheJobId, now);
-        cacheLastAccessForAlbum(albumCreationId, albumId);
+        addCacheAlbumVideoLastAccess(albumVidCacheJobId, albumId, albumRes);
 
         String bucket = albumUrlInfo.buckets.getFirst();
 
@@ -332,17 +370,21 @@ public class AlbumService extends MediaService {
         }
 
         final String videoDir = albumVidCacheJobId.replace(":", "/");
+        String streamUrl = getNginxVideoStreamUrl("album-vid/" + videoDir);
 
-        MediaJobStatus mediaJobStatus = getJobStatus(albumVidCacheJobId);
+        MediaJobStatus mediaJobStatus = videoService.getVideoJobStatus(albumVidCacheJobId);
         boolean prevJobStopped = false;
         if (mediaJobStatus != null) {
             if (!mediaJobStatus.equals(MediaJobStatus.STOPPED))
-                return getNginxVideoStreamUrl(videoDir);
+                return streamUrl;
             else
                 prevJobStopped = true;
         }
 
-        String input = minIOService.getSignedUrlForContainerNginx(bucket, videoPath, expirySeconds);
+        Long estimatedSize = getCacheAlbumCreationSize(albumId);
+        boolean enoughSpace = estimatedSize != null && memoryManager.freeMemoryForSize(estimatedSize);
+        if (!enoughSpace)
+            return minIOService.getSignedUrlForHostNginx(bucket, videoPath, expirySeconds);
 
         OSUtil.createTempDir(videoDir);
 
@@ -350,15 +392,15 @@ public class AlbumService extends MediaService {
         String outPath = containerDir + masterFileName;
 
         String scale = getFfmpegScaleString(res, false);
+        String input = minIOService.getSignedUrlForContainerNginx(bucket, videoPath, expirySeconds);
         String partialVideoJobId = videoService.createPartialVideo(input, scale, videoDir, outPath, prevJobStopped, albumVidCacheJobId);
 
         long objectSize = minIOService.getObjectSize(bucket, videoPath);
-        videoService.addCacheTempVideoJobStatus(albumVidCacheJobId, partialVideoJobId, objectSize, MediaJobStatus.RUNNING);
+        videoService.addCacheVideoJobStatus(albumVidCacheJobId, partialVideoJobId, objectSize, MediaJobStatus.RUNNING);
         videoService.addCacheRunningJob(albumVidCacheJobId);
 
         videoService.checkPlaylistCreated(videoDir + masterFileName);
-
-        return getNginxVideoStreamUrl("album-vid/" + videoDir);
+        return streamUrl;
     }
 
     public ResponseEntity<Void> processResizedImageURLAsRedirectResponse(Long albumId, String key, Resolution res,
@@ -442,5 +484,67 @@ public class AlbumService extends MediaService {
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(URI.create(encodedPath));
         return new ResponseEntity<>(headers, HttpStatus.FOUND);
+    }
+
+    public boolean freeMemorySpaceForSize(long size) {
+        if (OSUtil.getUsableMemory() >= size) {
+            OSUtil.updateUsableMemory(-size);
+            return true;
+        }
+        if (size > OSUtil.MEMORY_TOTAL) {
+            System.out.println("Memory limit reached: " + size / 1000 + " MB");
+            return false;
+        }
+
+        long headRoom = (long) (OSUtil.MEMORY_TOTAL * 0.1);
+        long neededSpace = size + headRoom - OSUtil.getUsableMemory();
+        neededSpace = (neededSpace > OSUtil.MEMORY_TOTAL) ? size : neededSpace;
+
+        long removingSpace = neededSpace;
+        boolean enough = false;
+
+        long now = System.currentTimeMillis();
+        Set<ZSetOperations.TypedTuple<Object>> lastAccessMediaJob = getAllAlbumCacheLastAccess(now);
+        for (ZSetOperations.TypedTuple<Object> mediaJob : lastAccessMediaJob) {
+            if (removingSpace <= 0) {
+                enough = true;
+                break;
+            }
+
+            long millisPassed = (long) (System.currentTimeMillis() - mediaJob.getScore());
+            if (millisPassed < 60_000) {
+                // zset is already sort, so if one found still being active - then the rest after is the same
+                if (removingSpace - headRoom > 0) {
+                    System.out.println("Most content is still being active, can't remove enough memory");
+                    System.out.println("Serve original size from disk instead or wait");
+                }
+                break;
+            }
+
+            String mediaJobId = Objects.requireNonNull(mediaJob.getValue()).toString();
+            System.out.println("Removing: " + mediaJobId);
+            long albumId = Long.parseLong(mediaJobId.split(":")[0]);
+
+            Long estimatedSize = getCacheAlbumCreationSize(albumId);
+            if (estimatedSize == null) {
+                System.out.println("Failed to get size for album creation info");
+                continue;
+            }
+            removingSpace = removingSpace - estimatedSize;
+
+            if (mediaJobId.endsWith(":album")) {
+                redisTemplate.opsForHash().delete(albumLastAccessKey);
+            } else {
+                String mediaMemoryPath = mediaJobId.replace(":", "/");
+                OSUtil.deleteForceMemoryDirectory(mediaMemoryPath);
+                removeCacheAlbumCreationInfo(albumId, mediaJobId);
+            }
+
+            removeAlbumCacheLastAccess(mediaJobId);
+        }
+        if (!enough && removingSpace - headRoom <= 0)
+            enough = true;
+        OSUtil.updateUsableMemory(neededSpace - removingSpace); // removingSpace is negative or 0
+        return enough;
     }
 }

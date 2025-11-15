@@ -8,7 +8,9 @@ import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.data.service.MediaMetadataService;
+import jakarta.annotation.PostConstruct;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
@@ -17,14 +19,23 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
-public class VideoService extends MediaService {
+public class VideoService extends MediaService implements ResourceCleanable {
+
+    private final MemoryManager memoryManager;
 
     public VideoService(RedisTemplate<String, Object> redisTemplate,
                         ObjectMapper objectMapper, MediaMapper mediaMapper,
                         MediaMetaDataRepository mediaRepository,
                         MinIOService minIOService,
-                        MediaMetadataService mediaMetadataService) {
+                        MediaMetadataService mediaMetadataService,
+                        MemoryManager memoryManager) {
         super(redisTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaMetadataService);
+        this.memoryManager = memoryManager;
+    }
+
+    @PostConstruct
+    public void registerWithMemoryManager() {
+        memoryManager.registerResourceCleanable(this);
     }
 
     private final int extraExpirySeconds = 30 * 60; // 30 minutes
@@ -42,9 +53,9 @@ public class VideoService extends MediaService {
 
         String cacheJobId = getCachePreviewJobId(videoId);
 
-        addCacheLastAccess(cacheJobId, null);
+        addCacheVideoLastAccess(cacheJobId, null);
 
-        MediaJobStatus mediaJobStatus = getJobStatus(cacheJobId);
+        MediaJobStatus mediaJobStatus = getVideoJobStatus(cacheJobId);
         boolean prevJobStopped = false;
         if (mediaJobStatus != null) {
             if (!mediaJobStatus.equals(MediaJobStatus.STOPPED))
@@ -69,7 +80,7 @@ public class VideoService extends MediaService {
         long estimatedSize = Resolution.getEstimatedSize(
                 mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight(), resolution)
                 / 10;
-        makeMemorySpaceForSize(estimatedSize);
+        memoryManager.freeMemoryForSize(estimatedSize);
 
         // Build trim chains
         StringBuilder fc = new StringBuilder();
@@ -134,7 +145,7 @@ public class VideoService extends MediaService {
         ));
         runAndLogAsync(command.toArray(new String[0]), cacheJobId, outPath);
 
-        addCacheTempVideoJobStatus(cacheJobId, null, estimatedSize, MediaJobStatus.RUNNING);
+        addCacheVideoJobStatus(cacheJobId, null, estimatedSize, MediaJobStatus.RUNNING);
         addCacheRunningJob(cacheJobId);
 
         checkPlaylistCreated(videoDir + masterFileName);
@@ -148,9 +159,9 @@ public class VideoService extends MediaService {
 
         String cacheJobId = getCacheMediaJobId(videoId, res);
 
-        addCacheLastAccess(cacheJobId, null);
+        addCacheVideoLastAccess(cacheJobId, null);
 
-        MediaJobStatus mediaJobStatus = getJobStatus(cacheJobId);
+        MediaJobStatus mediaJobStatus = getVideoJobStatus(cacheJobId);
         boolean prevJobStopped = false;
         if (mediaJobStatus != null) {
             if (!mediaJobStatus.equals(MediaJobStatus.STOPPED))
@@ -165,7 +176,7 @@ public class VideoService extends MediaService {
 
         long estimatedSize = Resolution.getEstimatedSize(
                 mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight(), res);
-        boolean enoughSpace = makeMemorySpaceForSize(estimatedSize);
+        boolean enoughSpace = memoryManager.freeMemoryForSize(estimatedSize);
         if (!enoughSpace)
             return getOriginalVideoUrl(videoId);
 
@@ -183,7 +194,7 @@ public class VideoService extends MediaService {
         String outPath = containerDir + masterFileName;
         String partialVideoJobId = createPartialVideo(nginxUrl, scale, videoDir, outPath, prevJobStopped, cacheJobId);
 
-        addCacheTempVideoJobStatus(cacheJobId, partialVideoJobId, estimatedSize, MediaJobStatus.RUNNING);
+        addCacheVideoJobStatus(cacheJobId, partialVideoJobId, estimatedSize, MediaJobStatus.RUNNING);
         addCacheRunningJob(cacheJobId);
 
         // check the master file has been created. maybe check first chunks being created for smoother experience
@@ -232,13 +243,45 @@ public class VideoService extends MediaService {
         return partialVideoJobId;
     }
 
-    public void addCacheTempVideoJobStatus(String id, String jobId, Long size, MediaJobStatus status) {
+    private final String videoLastAccessKey = "cache:lastAccess:video";
+    public void addCacheVideoLastAccess(String videoId, Long expiry) {
+        addCacheLastAccess(videoLastAccessKey, videoId, expiry);
+    }
+
+    public Double getCacheVideoLastAccess(String videoWorkId) {
+        return getCacheLastAccess(videoLastAccessKey, videoWorkId);
+    }
+
+    private void removeCacheVideoLastAccess(String videoId) {
+        removeCacheLastAccess(videoLastAccessKey, videoId);
+    }
+
+    public Set<ZSetOperations.TypedTuple<Object>> getAllVideoCacheLastAccess(long max) {
+        return getAllCacheLastAccess(videoLastAccessKey, max);
+    }
+
+    public void addCacheVideoJobStatus(String id, String jobId, Long size, MediaJobStatus status) {
         if (jobId != null)
             redisTemplate.opsForHash().put(id, "jobId", jobId);
         if (size != null) {
             redisTemplate.opsForHash().put(id, "size", size);
         }
         redisTemplate.opsForHash().put(id, "status", status);
+    }
+
+    public MediaJobStatus getVideoJobStatus(String videoJobId) {
+        Map<Object, Object> cachedJobStatus = getVideoJobStatusInfo(videoJobId);
+        if (!cachedJobStatus.isEmpty())
+            return (MediaJobStatus) cachedJobStatus.get("status");
+        return null;
+    }
+
+    public Map<Object, Object> getVideoJobStatusInfo(String videoJobId) {
+        return redisTemplate.opsForHash().entries(videoJobId);
+    }
+
+    private void removeCacheVideoJobStatus(String videoJobId) {
+        redisTemplate.delete(videoJobId);
     }
 
     public void addCacheRunningJob(String jobId) {
@@ -320,7 +363,7 @@ public class VideoService extends MediaService {
                 System.out.println("ffmpeg exited with code " + exit);
                 // mark as completed
                 if (videoId != null && exit == 0)
-                    addCacheTempVideoJobStatus(videoId, null, null, MediaJobStatus.COMPLETED);
+                    addCacheVideoJobStatus(videoId, null, null, MediaJobStatus.COMPLETED);
                 if (exit == 0)
                     OSUtil.writeTextToTempFile(videoMasterFilePath.replaceFirst("/chunks/", ""), List.of("#EXT-X-ENDLIST"), false);
             } catch (InterruptedException e) {
@@ -331,6 +374,57 @@ public class VideoService extends MediaService {
         }).start();
     }
 
+    public boolean freeMemorySpaceForSize(long size) {
+        if (OSUtil.getUsableMemory() >= size) {
+            OSUtil.updateUsableMemory(-size);
+            return true;
+        }
+        if (size > OSUtil.MEMORY_TOTAL) {
+            System.out.println("Memory limit reached: " + size / 1000 + " MB");
+            return false;
+        }
 
+        long headRoom = (long) (OSUtil.MEMORY_TOTAL * 0.1);
+        long neededSpace = size + headRoom - OSUtil.getUsableMemory();
+        neededSpace = (neededSpace > OSUtil.MEMORY_TOTAL) ? size : neededSpace;
+
+        long removingSpace = neededSpace;
+        boolean enough = false;
+
+        long now = System.currentTimeMillis();
+        Set<ZSetOperations.TypedTuple<Object>> lastAccessMediaJob = getAllVideoCacheLastAccess(now);
+        for (ZSetOperations.TypedTuple<Object> mediaJob : lastAccessMediaJob) {
+            if (removingSpace <= 0) {
+                enough = true;
+                break;
+            }
+
+            long millisPassed = (long) (System.currentTimeMillis() - mediaJob.getScore());
+            if (millisPassed < 60_000) {
+                // zset is already sort, so if one found still being active - then the rest after is the same
+                if (removingSpace - headRoom > 0) {
+                    System.out.println("Most content is still being active, can't remove enough memory");
+                    System.out.println("Serve original size from disk instead or wait");
+                }
+                break;
+            }
+
+            String mediaJobId = Objects.requireNonNull(mediaJob.getValue()).toString();
+            System.out.println("Removing: " + mediaJobId);
+
+            long estimatedSize = (long) getVideoJobStatusInfo(mediaJobId).get("size");
+            removingSpace = removingSpace - estimatedSize;
+
+            String mediaMemoryPath = mediaJobId.replace(":", "/");
+            OSUtil.deleteForceMemoryDirectory(mediaMemoryPath);
+
+            removeCacheVideoLastAccess(mediaJobId);
+            removeCacheVideoJobStatus(mediaJobId);
+        }
+        if (!enough && removingSpace - headRoom <= 0)
+            enough = true;
+        OSUtil.updateUsableMemory(neededSpace - removingSpace); // removingSpace is negative or 0
+        return enough;
+    }
 }
 
