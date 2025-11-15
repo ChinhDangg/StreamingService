@@ -26,7 +26,7 @@ public class AlbumController {
                                                   @PathVariable Resolution resolution,
                                                   @PathVariable Integer offset,
                                                   HttpServletRequest request) throws Exception {
-        albumService.processResizedAlbumImages(id, resolution, offset, 5, request);
+        albumService.processResizedAlbumImagesInBatch(id, resolution, offset, 5, request);
         return ResponseEntity.ok().build();
     }
 
