@@ -167,7 +167,7 @@ async function displayAlbumItems(albumId) {
     }
 
     const sentinel = document.createElement("div");
-    document.getElementById('main-container').appendChild(sentinel);
+    document.getElementById('main-album-container').appendChild(sentinel);
 
     const observer = new IntersectionObserver(async (entries) => {
         if (entries[0].isIntersecting) {
