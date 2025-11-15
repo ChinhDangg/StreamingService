@@ -2,6 +2,7 @@ package dev.chinh.streamingservice;
 
 import dev.chinh.streamingservice.content.constant.Resolution;
 import dev.chinh.streamingservice.content.service.AlbumService;
+import dev.chinh.streamingservice.content.service.VideoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -12,16 +13,27 @@ import org.springframework.web.bind.annotation.RestController;
 public class InternalController {
 
     private final AlbumService albumService;
+    private final VideoService videoService;
 
-    @PostMapping("/partial/{mediaId}/{resolution}")
-    public void cacheMediaLastAccess(@PathVariable long mediaId, @PathVariable Resolution resolution) {
-        albumService.addCacheLastAccess(albumService.getCacheMediaJobId(mediaId, resolution), null);
+    @PostMapping("/video/{mediaId}/{resolution}")
+    public void cacheVideoLastAccess(@PathVariable long mediaId, @PathVariable Resolution resolution) {
+        System.out.println("cached last access for video: " + mediaId);
+        videoService.addCacheVideoLastAccess(videoService.getCacheMediaJobId(mediaId, resolution), null);
     }
 
-    @PostMapping("/album-partial/{albumId}/{vidNum}/{resolution}")
-    public void cacheMediaLastAccess(@PathVariable long albumId, @PathVariable int vidNum,
-                                     @PathVariable Resolution resolution) {
-        albumService.addCacheLastAccess(albumService.getAlbumVidCacheJobIdString(albumId, vidNum, resolution), null);
-        albumService.cacheLastAccessForAlbum(albumService.getCacheMediaJobId(albumId, resolution), albumId);
+    @PostMapping("/album/{albumId}/{resolution}")
+    public void cacheAlbumImageLastAccess(@PathVariable long albumId, @PathVariable Resolution resolution) {
+        System.out.println("cached last access for album: " + albumId);
+        albumService.addCacheAlbumLastAccess(albumService.getCacheMediaJobId(albumId, resolution), albumId);
+    }
+
+    @PostMapping("/album-vid/{albumId}/{albumRes}/{vidNum}/{vidRes}")
+    public void cacheAlbumVideoLastAccess(@PathVariable long albumId,
+                                          @PathVariable Resolution albumRes,
+                                          @PathVariable int vidNum,
+                                          @PathVariable Resolution vidRes) {
+        System.out.println("cached last access for album video: " + albumId + ":" + vidNum);
+        albumService.addCacheAlbumVideoLastAccess(
+                albumService.getAlbumVidCacheJobIdString(albumId, vidNum, vidRes), albumId, albumRes);
     }
 }
