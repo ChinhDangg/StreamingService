@@ -5,11 +5,9 @@ import dev.chinh.streamingservice.content.service.VideoService;
 import dev.chinh.streamingservice.search.service.MediaSearchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.ZSetOperations;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.util.Set;
 
 @Service
@@ -34,13 +32,13 @@ public class ScheduleService {
         for (Object runningVideoJob : runningVideoJobs) {
 
             String videoJobId = (String) runningVideoJob;
-            double lastAccess = videoService.getCacheLastAccess(videoJobId);
+            double lastAccess = videoService.getCacheVideoLastAccess(videoJobId);
             long millisPassed = (long) (System.currentTimeMillis() - lastAccess);
             if (millisPassed < 60_000) {
                 continue;
             }
 
-            var cachedJobStatus = videoService.getCacheTempVideoJobStatus(videoJobId);
+            var cachedJobStatus = videoService.getVideoJobStatusInfo(videoJobId);
             if (cachedJobStatus.get("status") != MediaJobStatus.RUNNING) {
                 // running job probably completed or removed for space - remove running cache
                 videoService.removeCacheRunningJob(videoJobId);
@@ -48,11 +46,11 @@ public class ScheduleService {
             }
             String jobId = cachedJobStatus.get("jobId").toString(); // UUID
             videoService.stopFfmpegJob(jobId);
-            videoService.addCacheTempVideoJobStatus(videoJobId, null, null, MediaJobStatus.STOPPED);
+            videoService.addCacheVideoJobStatus(videoJobId, null, null, MediaJobStatus.STOPPED);
         }
     }
 
-    private void cleanThumbnails() throws IOException, InterruptedException {
+    private void cleanThumbnails() {
         long now = System.currentTimeMillis();
         Set<ZSetOperations.TypedTuple<Object>> lastAccessThumbnails = mediaSearchService.getAllThumbnailCacheLastAccess(now);
         for (ZSetOperations.TypedTuple<Object> thumbnail : lastAccessThumbnails) {
