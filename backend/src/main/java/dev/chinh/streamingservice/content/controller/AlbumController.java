@@ -30,12 +30,13 @@ public class AlbumController {
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/{albumId}/vid/{vidNum}/{resolution}")
+    @GetMapping("/{albumId}/{albumRes}/vid/{vidNum}/{vidRes}")
     public ResponseEntity<String> getAlbumVideoUrl(@PathVariable long albumId,
+                                                   @PathVariable Resolution albumRes,
                                                    @PathVariable int vidNum,
-                                                   @PathVariable Resolution resolution,
+                                                   @PathVariable Resolution vidRes,
                                                    HttpServletRequest request) throws Exception {
-        return ResponseEntity.ok().body(albumService.getAlbumPartialVideoUrl(albumId, vidNum, resolution, request));
+        return ResponseEntity.ok().body(albumService.getAlbumPartialVideoUrl(albumId, albumRes, vidNum, vidRes, request));
     }
 
     @GetMapping("/original/{id}")
