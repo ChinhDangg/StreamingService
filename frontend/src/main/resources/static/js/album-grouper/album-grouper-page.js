@@ -28,11 +28,11 @@ async function displayAlbumGrouperInfo(albumGrouperId) {
 
     // const albumGrouperInfo = {
     //     "childMediaIds": [
-    //         5, 4, 3, 2, 1
+    //         2, 1
     //     ],
     //     "id": 1,
     //     "title": "Test Album Sample 1",
-    //     "thumbnail": "https://placehold.co/1080x1920",
+    //     "thumbnail": "https://placehold.co/1920x1080",
     //     "tags": [
     //         "Astrophotography",
     //         "LongExposure",
@@ -49,12 +49,13 @@ async function displayAlbumGrouperInfo(albumGrouperId) {
     //         "Jane Doe",
     //         "John Doe",
     //     ],
-    //     "length": 60,
+    //     "length": 2,
     //     "size": 400111222,
-    //     "width": 1080,
-    //     "height": 1920,
+    //     "width": 1920,
+    //     "height": 1080,
     //     "uploadDate": "2025-10-30",
     //     "year": null
+    //     "mediaType": "VIDEO"
     // };
 
     const albumGrouperMainContainer = document.getElementById('main-grouper-container');
@@ -65,73 +66,173 @@ async function displayAlbumGrouperInfo(albumGrouperId) {
 
 function displayThumbnailSectionInfo(albumGrouperInfo) {
     const thumbnailSection = document.getElementById('thumbnailSection');
-    const horizontal = albumGrouperInfo.width > albumGrouperInfo.height;
-    const thumbnailItem = horizontal ? thumbnailSection.querySelector('.horizontal-item')
-        : thumbnailSection.querySelector('.vertical-item');
+    const vertical = albumGrouperInfo.height > albumGrouperInfo.width;
+    const thumbnailItem = vertical ? thumbnailSection.querySelector('.vertical-item')
+        : thumbnailSection.querySelector('.horizontal-item');
     thumbnailItem.classList.remove('hidden');
     thumbnailItem.querySelector('.length-note').innerText = albumGrouperInfo.length;
     thumbnailItem.querySelector('.resolution-note').innerText = `${albumGrouperInfo.width}x${albumGrouperInfo.height}`;
     thumbnailItem.querySelector('img').src = albumGrouperInfo.thumbnail;
 }
 
-let albumGrouperLength = 0;
+let albumGrouperCountLength = 0;
+let currentViewAlbumId = null;
+let albumGrouperChildAlbumIds = [];
+let sortOrder = 'DESC';
 
 function displayListSectionInfo(albumGrouperInfo) {
     const listSection = document.getElementById('listSection');
     listSection.querySelector('.list-title').textContent = `List (${albumGrouperInfo.length})`;
 
-    albumGrouperLength = albumGrouperInfo.length;
-
     const showMoreBtn = listSection.querySelector('.show-more-btn');
 
-    if (albumGrouperLength === 0) {
+    if (!albumGrouperInfo.childMediaIds) {
+        showMoreBtn.classList.add('hidden');
+        return;
+    }
+
+    albumGrouperCountLength = albumGrouperInfo.childMediaIds.length;
+
+    if (albumGrouperCountLength === 0) {
         showMoreBtn.classList.add('hidden');
         return;
     }
 
     const scrollContainer = listSection.querySelector('.list-scroll-container');
-
     const listItemTem = scrollContainer.querySelector('.list-item-node');
+
+    const quickViewOverlay = document.getElementById('quickViewOverlay');
+    const leftButtons = quickViewOverlay.querySelector('.left-buttons');
+    const rightButtons = quickViewOverlay.querySelector('.right-buttons');
+    const leftNextBtn = leftButtons.querySelector('.next-btn');
+    const rightNextBtn = rightButtons.querySelector('.next-btn');
+    const leftPrevBtn = leftButtons.querySelector('.prev-btn');
+    const rightPrevBtn = rightButtons.querySelector('.prev-btn');
+
+    const showStepControls = (itemId) => {
+        const albumIndex = albumGrouperChildAlbumIds.indexOf(itemId);
+        if ((sortOrder === 'ASC' && albumIndex >= albumGrouperInfo.length - 1)
+            || (sortOrder === 'DESC' && albumIndex === 0)) {
+            leftNextBtn.classList.add('hidden');
+            rightNextBtn.classList.add('hidden');
+        } else {
+            leftNextBtn.classList.remove('hidden');
+            rightNextBtn.classList.remove('hidden');
+        }
+        if ((sortOrder === 'ASC' && albumIndex === 0)
+            || (sortOrder === 'DESC' && albumIndex >= albumGrouperInfo.length - 1)) {
+            leftPrevBtn.classList.add('hidden');
+            rightPrevBtn.classList.add('hidden');
+        } else {
+            leftPrevBtn.classList.remove('hidden');
+            rightPrevBtn.classList.remove('hidden');
+        }
+    };
+
+    const getMediaContentAndShowInOverlay = async (itemId) => {
+        const mediaInfo = await getMediaContent(itemId);
+        if (!mediaInfo) return;
+        currentViewAlbumId = itemId;
+        showStepControls(itemId);
+        await quickViewContentInOverlay(itemId, mediaInfo.mediaType, mediaInfo);
+    };
 
     const addItem = (id) => {
         const listItem = helperCloneAndUnHideNode(listItemTem);
-        listItem.innerText = `Item: ${albumGrouperLength}`
+        listItem.innerText = `Item: ${albumGrouperCountLength}`
         listItem.href = `/api/media/content-page/${id}`;
-        albumGrouperLength--;
+        albumGrouperCountLength--;
         scrollContainer.appendChild(listItem);
+        albumGrouperChildAlbumIds.push(id);
         listItem.addEventListener('click', async (e) => {
             e.preventDefault();
             e.target.disabled = true;
-            const response = await fetch(`/api/media/content/${id}`);
-            if (!response.ok) {
-                alert("Failed to fetch video info");
-                e.target.disabled = false;
-                return;
-            }
-            const mediaInfo = await response.json();
-            quickViewContentInOverlay(id, mediaInfo.mediaType, mediaInfo).then(() => {
+            getMediaContentAndShowInOverlay(id).then(() => {
                 e.target.disabled = false;
             });
         });
     }
 
+    const getNextGrouperInfo = async (grouperId) => {
+        const grouperInfo = await getGrouperNext(grouperId);
+        if (!grouperInfo) return;
+        grouperInfo.content.forEach(id => {
+            addItem(id);
+        });
+        scrollContainer.scrollTo({
+            top: scrollContainer.scrollHeight,
+            behavior: 'smooth'
+        });
+        if (!grouperInfo.hasNext) {
+            this.remove();
+        }
+    }
+
+    const viewNextAlbum = async () => {
+        const currentAlbumIdIndex = albumGrouperChildAlbumIds.indexOf(currentViewAlbumId);
+        if (currentAlbumIdIndex === -1) return;
+        const dif = sortOrder === 'ASC' ? 1 : -1;
+        const nextAlbumIdIndex = currentAlbumIdIndex + dif;
+        if (sortOrder === 'ASC') {
+            if (nextAlbumIdIndex >= albumGrouperChildAlbumIds.length) {
+                await getNextGrouperInfo(albumGrouperInfo.id);
+            }
+            if (nextAlbumIdIndex >= albumGrouperChildAlbumIds.length) return;
+        }
+        else if (sortOrder === 'DESC') {
+            if (nextAlbumIdIndex < 0) {
+                await getNextGrouperInfo(albumGrouperInfo.id);
+            }
+            if (nextAlbumIdIndex < 0) return;
+        }
+        const nextAlbumId = albumGrouperChildAlbumIds[nextAlbumIdIndex];
+        await getMediaContentAndShowInOverlay(nextAlbumId);
+        const nextTwoAlbumIdIndex = nextAlbumIdIndex + dif;
+        if ((sortOrder === 'ASC' && nextTwoAlbumIdIndex >= albumGrouperInfo.length)
+            || (sortOrder === 'DESC' && nextTwoAlbumIdIndex < 0)) {
+            leftNextBtn.classList.add('hidden');
+            rightNextBtn.classList.add('hidden');
+        }
+        leftPrevBtn.classList.remove('hidden');
+        rightPrevBtn.classList.remove('hidden');
+    };
+
+    const viewPrevAlbum = async () => {
+        const currentAlbumIdIndex = albumGrouperChildAlbumIds.indexOf(currentViewAlbumId);
+        if (currentAlbumIdIndex === -1) return;
+        const dif = (sortOrder === 'ASC' ? 1 : -1);
+        const prevAlbumIdIndex = currentAlbumIdIndex - dif;
+        if (sortOrder === 'ASC' && prevAlbumIdIndex < 0) return;
+        else if (sortOrder === 'DESC' && prevAlbumIdIndex >= albumGrouperChildAlbumIds.length) return;
+        const prevAlbumId = albumGrouperChildAlbumIds[prevAlbumIdIndex];
+        await getMediaContentAndShowInOverlay(prevAlbumId);
+        const prevTwoAlbumIdIndex = prevAlbumIdIndex - dif;
+        if ((sortOrder === 'ASC' && prevTwoAlbumIdIndex < 0)
+            || (sortOrder === 'DESC' && prevTwoAlbumIdIndex >= albumGrouperInfo.length)) {
+            leftPrevBtn.classList.add('hidden');
+            rightPrevBtn.classList.add('hidden');
+        }
+        leftNextBtn.classList.remove('hidden');
+        rightNextBtn.classList.remove('hidden');
+    };
+
+    leftNextBtn.addEventListener('click', viewNextAlbum);
+    rightNextBtn.addEventListener('click', viewNextAlbum);
+    leftPrevBtn.addEventListener('click', viewPrevAlbum);
+    rightPrevBtn.addEventListener('click', viewPrevAlbum);
+
     albumGrouperInfo.childMediaIds.forEach(id => {
         addItem(id);
     });
 
-    if (albumGrouperLength === 0) {
+    if (albumGrouperCountLength === 0) {
         listSection.querySelector('.show-more-btn').classList.add('hidden');
         return;
     }
 
     showMoreBtn.classList.remove('hidden');
     showMoreBtn.addEventListener('click', async () => {
-        const response = await fetch(`/api/media/grouper-next/${albumGrouperInfo.id}?o=${albumGrouperLength}`);
-        if (!response.ok) {
-            alert("Failed to grouper next list");
-            return;
-        }
-        const grouperInfo = await response.json();
+        await getNextGrouperInfo(albumGrouperInfo.id);
         // const grouperInfo = {
         //     "content": [
         //         101,
@@ -163,15 +264,23 @@ function displayListSectionInfo(albumGrouperInfo) {
         //     "hasNext": true,
         //     "hasPrevious": false
         // };
-        grouperInfo.content.forEach(id => {
-            addItem(id);
-        });
-        scrollContainer.scrollTo({
-            top: scrollContainer.scrollHeight,
-            behavior: 'smooth'
-        });
-        if (!grouperInfo.hasNext) {
-            this.remove();
-        }
     });
+}
+
+async function getMediaContent(mediaId) {
+    const response = await fetch(`/api/media/content/${mediaId}`);
+    if (!response.ok) {
+        alert("Failed to fetch media info");
+        return false;
+    }
+    return await response.json();
+}
+
+async function getGrouperNext(albumGrouperId) {
+    const response = await fetch(`/api/media/grouper-next/${albumGrouperId}?o=${albumGrouperCountLength}`);
+    if (!response.ok) {
+        alert("Failed to grouper next list");
+        return null;
+    }
+    return await response.json();
 }
