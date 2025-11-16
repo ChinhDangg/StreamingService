@@ -35,7 +35,7 @@ public class MediaSearchService {
     private final AlbumService albumService;
     private final MediaMetadataService mediaMetadataService;
 
-    public static final Resolution thumbnailResolution = Resolution.p480;
+    public static final Resolution thumbnailResolution = Resolution.p360;
 
     record NameEntry(String name) {}
 
