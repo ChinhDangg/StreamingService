@@ -258,7 +258,8 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         if (notResized.isEmpty())
             return;
 
-        AlbumUrlInfo notResizedAlbumUrlInfo = new AlbumUrlInfo(new ArrayList<>(), new ArrayList<>(), 1L, new ArrayList<>());
+        AlbumUrlInfo notResizedAlbumUrlInfo = new AlbumUrlInfo(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
+        notResizedAlbumUrlInfo.buckets.add(albumUrlInfo.buckets.getFirst());
         for (int i : notResized) {
             notResizedAlbumUrlInfo.mediaUrlList.add(albumUrlInfo.mediaUrlList.get(i));
             notResizedAlbumUrlInfo.buckets.add(albumUrlInfo.buckets.get(i));
