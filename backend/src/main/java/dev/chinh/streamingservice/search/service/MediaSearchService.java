@@ -173,7 +173,7 @@ public class MediaSearchService {
         try {
             if (albumUrlInfo.mediaUrlList().isEmpty())
                 return;
-            albumService.processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, false);
+            albumService.processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), false);
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
         }
@@ -193,7 +193,7 @@ public class MediaSearchService {
             String pathString = "/chunks" + getThumbnailPath(mediaDescription.getId(), resolution, mediaDescription.getThumbnail());
             albumUrlList.add(new AlbumService.MediaUrl(MediaType.IMAGE, pathString));
         }
-        return new AlbumService.AlbumUrlInfo(albumUrlList, bucketList, null, pathList);
+        return new AlbumService.AlbumUrlInfo(albumUrlList, bucketList, pathList);
     }
 
     private Boolean addCacheThumbnails(String thumbnailFileName, long expiry) {
