@@ -292,7 +292,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             OSUtil.createTempDir(path.substring(0, path.lastIndexOf("/")));
 
             String scale = getFfmpegScaleString(resolution, true);
-            for (int i = 0; i < albumUrlInfo.size; i++) {
+            for (int i = 0; i < albumUrlInfo.mediaUrlList.size(); i++) {
                 String output = albumUrlInfo.mediaUrlList.get(i).url;
 
                 String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(i);
@@ -300,7 +300,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
 
                 String ffmpegCmd = String.format(
                         "ffmpeg -n -hide_banner -loglevel info " +
-                                "-i \"%s\" -vf %s -q:v 2 \"%s\"",
+                        "-i \"%s\" -vf %s -q:v 2 -frames:v 1 \"%s\"",
                         input, scale, output
                 );
                 writer.write(ffmpegCmd + "\n");
