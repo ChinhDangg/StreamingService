@@ -55,6 +55,22 @@ public class OpenSearchService {
         }
     }
 
+    /**
+     * Example:
+     * Map<String, Property> newProperties = Map.of(
+     *     // NOTE: We now use Property.of() instead of TypeMapping.of()
+     *     "description", Property.of(m -> m.text(t -> t.analyzer("english"))),
+     *     "sku",         Property.of(m -> m.keyword(k -> k))
+     * );
+     */
+    public void updateIndexMapping(String indexName, Map<String, Property> properties) throws IOException {
+        PutMappingResponse response = client.indices().putMapping(p -> p
+                .index(indexName)
+                .properties(properties)
+        );
+        System.out.println("Mapping updated? " + response.acknowledged());
+    }
+
     public void deleteIndex(String indexName) throws IOException {
         DeleteIndexResponse response = client.indices().delete(d -> d.index(indexName));
         System.out.println("Index deleted: " + response.acknowledged());
@@ -112,22 +128,6 @@ public class OpenSearchService {
         }
     }
 
-    /**
-     * Example:
-     * Map<String, Property> newProperties = Map.of(
-     *     // NOTE: We now use Property.of() instead of TypeMapping.of()
-     *     "description", Property.of(m -> m.text(t -> t.analyzer("english"))),
-     *     "sku",         Property.of(m -> m.keyword(k -> k))
-     * );
-     */
-    public void updateMapping(String indexName, Map<String, Property> properties) throws IOException {
-        PutMappingResponse response = client.indices().putMapping(p -> p
-                .index(indexName)
-                .properties(properties)
-        );
-        System.out.println("Mapping updated? " + response.acknowledged());
-    }
-
     public void deleteDocument(String indexName, long id) throws IOException {
         DeleteResponse response = client.delete(d -> d
                 .index(indexName)
@@ -149,6 +149,15 @@ public class OpenSearchService {
                 .opType(OpType.Create)
         );
         System.out.println("Indexed with id: " + response.id());
+    }
+
+    public void addFieldsToDocument(String indexName, long id, Map<String, Object> fields) throws IOException {
+        UpdateResponse<Object> response = client.update(u -> u
+                .index(indexName)
+                .id(String.valueOf(id))
+                .doc(fields), Object.class
+        );
+        System.out.println("Document updated, result: " + response.result());
     }
 
     /**
