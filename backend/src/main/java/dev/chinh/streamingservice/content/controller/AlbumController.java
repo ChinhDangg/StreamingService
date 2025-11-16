@@ -22,12 +22,11 @@ public class AlbumController {
     }
 
     @PostMapping("/{id}/{resolution}/{offset}/check-resized")
-    public ResponseEntity<Void> checkResizedImage(@PathVariable Long id,
+    public ResponseEntity<Integer> checkResizedImage(@PathVariable Long id,
                                                   @PathVariable Resolution resolution,
                                                   @PathVariable Integer offset,
                                                   HttpServletRequest request) throws Exception {
-        albumService.processResizedAlbumImagesInBatch(id, resolution, offset, 5, request);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok().body(albumService.processResizedAlbumImagesInBatch(id, resolution, offset, 5, request));
     }
 
     @GetMapping("/{albumId}/{albumRes}/vid/{vidNum}/{vidRes}")
