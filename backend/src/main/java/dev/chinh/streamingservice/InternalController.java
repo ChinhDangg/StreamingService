@@ -24,7 +24,7 @@ public class InternalController {
     @PostMapping("/album/{albumId}/{resolution}")
     public void cacheAlbumImageLastAccess(@PathVariable long albumId, @PathVariable Resolution resolution) {
         System.out.println("cached last access for album: " + albumId);
-        albumService.addCacheAlbumLastAccess(albumService.getCacheMediaJobId(albumId, resolution), albumId);
+        albumService.addCacheAlbumLastAccess(albumId, albumService.getCacheMediaJobId(albumId, resolution));
     }
 
     @PostMapping("/album-vid/{albumId}/{albumRes}/{vidNum}/{vidRes}")
@@ -33,7 +33,6 @@ public class InternalController {
                                           @PathVariable int vidNum,
                                           @PathVariable Resolution vidRes) {
         System.out.println("cached last access for album video: " + albumId + ":" + vidNum);
-        albumService.addCacheAlbumVideoLastAccess(
-                albumService.getAlbumVidCacheJobIdString(albumId, vidNum, vidRes), albumId, albumRes);
+        albumService.addCacheAlbumVideoLastAccess(albumId, albumService.getAlbumVidCacheJobIdString(albumId, vidNum, vidRes), albumRes);
     }
 }
