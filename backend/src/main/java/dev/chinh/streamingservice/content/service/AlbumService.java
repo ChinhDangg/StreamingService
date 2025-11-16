@@ -225,23 +225,6 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         return new AlbumUrlInfo(albumUrls, new ArrayList<>(List.of(mediaDescription.getBucket())), mediaDescription.getSize(), null);
     }
 
-    public AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList, Resolution resolution) {
-        List<String> pathList = new ArrayList<>();
-        List<MediaUrl> albumUrlList = new ArrayList<>();
-        List<String> bucketList = new ArrayList<>();
-        for (MediaDescription mediaDescription : mediaDescriptionList) {
-            if (!mediaDescription.hasThumbnail())
-                continue;
-
-            bucketList.add(mediaDescription.getBucket());
-            pathList.add(mediaDescription.getThumbnail());
-
-            String pathString = MediaSearchService.getThumbnailPath(mediaDescription.getId(), resolution, mediaDescription.getThumbnail());
-            albumUrlList.add(new MediaUrl(MediaType.IMAGE, pathString));
-        }
-        return new AlbumUrlInfo(albumUrlList, bucketList, null, pathList);
-    }
-
     public void processResizedAlbumImagesInBatch(long albumId, Resolution resolution, int offset, int batch,
                                                  HttpServletRequest request) throws Exception {
         String albumCreationId = getCacheMediaJobId(albumId, resolution);
@@ -252,23 +235,12 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo, true);
         }
 
-        boolean processed = processResizedImagesInBatch(albumUrlInfo, resolution, offset, batch, true);
-        addCacheAlbumLastAccess(albumCreationId, albumId);
-
-        if (processed)
-            addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo, false);
-    }
-
-    /**
-     * Will modify the albumUrlInfo mediaUrlList in place to cache what image is already resized.
-     */
-    public boolean processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, int offset, int batch, boolean isAlbum) throws InterruptedException, IOException {
         int size = albumUrlInfo.mediaUrlList.size();
         if (offset >= size)
-            return false;
+            return;
 
         int stop = Math.min(size, offset + batch);
-        Map<Integer, String> notResized = new HashMap<>();
+        List<Integer> notResized = new ArrayList<>();
         for (int i = offset; i < stop; i++) {
             MediaUrl currentMediaUrl = albumUrlInfo.mediaUrlList.get(i);
             String output = currentMediaUrl.url;
@@ -280,12 +252,29 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             }
             output = "/chunks" + output;
             albumUrlInfo.mediaUrlList.set(i, new MediaUrl(currentMediaUrl.type, output));
-            notResized.put(i, output);
+            notResized.add(i);
         }
 
         if (notResized.isEmpty())
-            return false;
+            return;
 
+        AlbumUrlInfo notResizedAlbumUrlInfo = new AlbumUrlInfo(new ArrayList<>(), new ArrayList<>(), 1L, new ArrayList<>());
+        for (int i : notResized) {
+            notResizedAlbumUrlInfo.mediaUrlList.add(albumUrlInfo.mediaUrlList.get(i));
+            notResizedAlbumUrlInfo.buckets.add(albumUrlInfo.buckets.get(i));
+            notResizedAlbumUrlInfo.pathList.add(albumUrlInfo.pathList.get(i));
+        }
+
+        processResizedImagesInBatch(notResizedAlbumUrlInfo, resolution, true);
+        addCacheAlbumLastAccess(albumCreationId, albumId);
+
+        addCacheAlbumCreationInfo(albumId, albumCreationId, albumUrlInfo, false);
+    }
+
+    /**
+     * Will modify the albumUrlInfo mediaUrlList in place to cache what image is already resized.
+     */
+    public void processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, boolean isAlbum) throws InterruptedException, IOException {
         // Start one persistent bash session inside ffmpeg container
         ProcessBuilder pb = new ProcessBuilder("docker", "exec", "-i", "ffmpeg", "bash").redirectErrorStream(true);
         Process process = pb.start();
@@ -303,11 +292,8 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             OSUtil.createTempDir(path.substring(0, path.lastIndexOf("/")));
 
             String scale = getFfmpegScaleString(resolution, true);
-            for (int i = offset; i < stop; i++) {
-                String output = notResized.get(i);
-                if (output == null) {
-                    continue;
-                }
+            for (int i = 0; i < albumUrlInfo.size; i++) {
+                String output = albumUrlInfo.mediaUrlList.get(i).url;
 
                 String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(i);
                 String input = minIOService.getSignedUrlForContainerNginx(bucket, albumUrlInfo.pathList.get(i), expirySeconds);
@@ -338,7 +324,6 @@ public class AlbumService extends MediaService implements ResourceCleanable {
 
         int exit = process.waitFor();
         System.out.println("ffmpeg exited with code " + exit);
-        return true;
     }
 
     public String getAlbumVidCacheJobIdString(long albumId, int vidNum, Resolution resolution) {

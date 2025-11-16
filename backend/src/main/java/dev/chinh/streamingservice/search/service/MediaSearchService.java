@@ -169,14 +169,31 @@ public class MediaSearchService {
         }
         if (newThumbnails.isEmpty())
             return;
-        var albumUrlInfo = albumService.getMixThumbnailImagesAsAlbumUrls(newThumbnails, thumbnailResolution);
+        var albumUrlInfo = getMixThumbnailImagesAsAlbumUrls(newThumbnails, thumbnailResolution);
         try {
             if (albumUrlInfo.mediaUrlList().isEmpty())
                 return;
-            albumService.processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, 0, newThumbnails.size(), false);
+            albumService.processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, false);
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public AlbumService.AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList, Resolution resolution) {
+        List<String> pathList = new ArrayList<>();
+        List<AlbumService.MediaUrl> albumUrlList = new ArrayList<>();
+        List<String> bucketList = new ArrayList<>();
+        for (MediaDescription mediaDescription : mediaDescriptionList) {
+            if (!mediaDescription.hasThumbnail())
+                continue;
+
+            bucketList.add(mediaDescription.getBucket());
+            pathList.add(mediaDescription.getThumbnail());
+
+            String pathString = "/chunks" + getThumbnailPath(mediaDescription.getId(), resolution, mediaDescription.getThumbnail());
+            albumUrlList.add(new AlbumService.MediaUrl(MediaType.IMAGE, pathString));
+        }
+        return new AlbumService.AlbumUrlInfo(albumUrlList, bucketList, null, pathList);
     }
 
     private Boolean addCacheThumbnails(String thumbnailFileName, long expiry) {
