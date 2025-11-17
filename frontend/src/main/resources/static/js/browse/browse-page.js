@@ -184,22 +184,32 @@ async function displayItem(nameItems) {
 
     const browseContainer = document.getElementById('browse-item-container');
 
-    const loadImage = (url) => new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = (e) => reject(new Error(`Failed to load image: ${url}`, { cause: e }));
-        img.src = url;
-    });
+    const loadImage = (imgElement, src) => {
+        return new Promise((resolve, reject) => {
+            imgElement.onload = () => {
+                resolve(imgElement);
+            };
+            imgElement.onerror = (err) => {
+                reject(new Error(`Failed to load image: ${src}`));
+            };
+            // start fetching the image data
+            imgElement.src = src;
+        });
+    }
 
     for (const item of nameItems.content) {
         let itemNode;
         if (hasThumbnail) {
-            const loadedImage = await loadImage(item.thumbnail);
+            const loadedImage = document.createElement('img');
+            await loadImage(loadedImage, item.thumbnail);
+
             const horizontal = loadedImage.naturalWidth >= loadedImage.naturalHeight;
             const itemNodeTem = horizontal ? browseContainer.querySelector('.horizontal-item') : browseContainer.querySelector('.vertical-item');
             itemNode = helperCloneAndUnHideNode(itemNodeTem);
-            itemNode.querySelector('img').src = item.thumbnail;
-            loadedImage.remove();
+            const itemNodeImg = itemNode.querySelector('img');
+            loadedImage.className = itemNodeImg.className;
+            loadedImage.style.cssText = itemNodeImg.style.cssText;
+            itemNodeImg.replaceWith(loadedImage);
         } else {
             itemNode = helperCloneAndUnHideNode(browseContainer.querySelector('.text-item'));
         }
