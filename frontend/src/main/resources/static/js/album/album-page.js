@@ -340,7 +340,8 @@ let previousVideoWrapper = null;
 async function requestVideo(videoUrlRequest, videoWrapper) {
     if (!await getVideoPlayer())
         return;
-    const response = await fetch(videoUrlRequest);
+    const videoDefaultRes = 'p480';
+    const response = await fetch(videoUrlRequest + "/" + videoDefaultRes);
     if (!response.ok) {
         alert("Failed to fetch video");
         return;
@@ -354,9 +355,8 @@ async function requestVideo(videoUrlRequest, videoWrapper) {
     videoWrapper.querySelector('.temp-video-holder').classList.add('hidden');
     videoWrapper.querySelector('.video-holder').appendChild(videoPlayer);
 
-    const baseUrl = videoUrlRequest.split('/').slice(0, -1).join('/');
     setVideoUrl(videoPlayer, videoUrl);
-    setVideoResolution(videoPlayer, baseUrl, 1080, 'p480');
+    setVideoResolution(videoPlayer, videoUrlRequest, 1080, videoDefaultRes);
 }
 
 let videoPlayer = null;
