@@ -390,8 +390,14 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             return minIOService.getSignedUrlForHostNginx(bucket, videoPath, expirySeconds);
         }
 
-        final String videoDir = albumVidCacheJobId.replace(":", "/");
-        String streamUrl = getNginxVideoStreamUrl("album-vid/" + videoDir);
+        List<String> streamUrlPaths = List.of(
+                "album-vid",
+                String.valueOf(albumId),
+                albumRes.name(),
+                String.valueOf(vidNum),
+                res.name()
+        );
+        String streamUrl = getNginxVideoStreamUrl(String.join("/", streamUrlPaths));
 
         MediaJobStatus mediaJobStatus = videoService.getVideoJobStatus(albumVidCacheJobId);
         boolean prevJobStopped = false;
@@ -407,6 +413,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         if (!enoughSpace)
             return minIOService.getSignedUrlForHostNginx(bucket, videoPath, expirySeconds);
 
+        final String videoDir = albumVidCacheJobId.replace(":", "/");
         OSUtil.createTempDir(videoDir);
 
         String containerDir = "/chunks/" + videoDir;
