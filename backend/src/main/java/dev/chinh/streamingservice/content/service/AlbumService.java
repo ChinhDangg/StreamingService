@@ -100,42 +100,6 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         return albumId + ":album";
     }
 
-    private void addCacheAlbumCreationInfo(long albumId, AlbumUrlInfo albumUrlInfo, SizeAndDimensions sizeAndDimensions) throws JsonProcessingException {
-        String albumHashId = getAlbumCacheHashId(albumId);
-
-        redisTemplate.opsForHash().put(albumHashId, "bucket", albumUrlInfo.buckets.getFirst());
-
-        String pathListString = objectMapper.writeValueAsString(albumUrlInfo.pathList);
-        redisTemplate.opsForHash().put(albumHashId, albumId + ":pathList", pathListString);
-
-        String sizeAndDimensionsString = objectMapper.writeValueAsString(sizeAndDimensions);
-        redisTemplate.opsForHash().put(albumHashId, albumId + ":sizeAndDimensions", sizeAndDimensionsString);
-    }
-
-    public AlbumUrlInfo getCacheAlbumCreationInfo(long albumId) throws JsonProcessingException {
-        String albumHashId = getAlbumCacheHashId(albumId);
-        Object pathListValue = redisTemplate.opsForHash().get(albumHashId, albumId + ":pathList");
-        if (pathListValue == null)
-            return null;
-        List<String> pathList = objectMapper.readValue((String) pathListValue, new TypeReference<>() {});
-        List<String> buckets = new ArrayList<>();
-        buckets.add((String) redisTemplate.opsForHash().get(albumHashId, "bucket"));
-        return new AlbumUrlInfo(new ArrayList<>(), buckets, pathList);
-    }
-
-    public AlbumUrlInfoWithSizeAndDimensions getCacheAlbumCreationInfoWithSizeAndDimensions(long albumId) throws JsonProcessingException {
-        AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumId);
-        if (albumUrlInfo == null)
-            return null;
-
-        String albumHashId = getAlbumCacheHashId(albumId);
-        Object sizeAndDimensionsValue = redisTemplate.opsForHash().get(albumHashId, albumId + ":sizeAndDimensions");
-        if (sizeAndDimensionsValue == null)
-            return new AlbumUrlInfoWithSizeAndDimensions(albumUrlInfo, null);
-        SizeAndDimensions sizeAndDimensions = objectMapper.readValue((String) sizeAndDimensionsValue, new TypeReference<>() {});
-        return new AlbumUrlInfoWithSizeAndDimensions(albumUrlInfo, sizeAndDimensions);
-    }
-
     private void addCacheAlbumJobInfo(long albumId, String albumJobId, int offset) {
         String albumHashId = getAlbumCacheHashId(albumId);
         redisTemplate.opsForHash().put(albumHashId, albumJobId + ":offset", offset);
@@ -185,6 +149,44 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         if (sizeAndDimensionsValue == null)
             return null;
         return objectMapper.readValue((String) sizeAndDimensionsValue, new TypeReference<>() {});
+    }
+
+    private void addCacheAlbumCreationInfo(long albumId, AlbumUrlInfo albumUrlInfo, SizeAndDimensions sizeAndDimensions) throws JsonProcessingException {
+        String albumHashId = getAlbumCacheHashId(albumId);
+
+        redisTemplate.opsForHash().put(albumHashId, "bucket", albumUrlInfo.buckets.getFirst());
+
+        if (albumUrlInfo.pathList != null) {
+            String pathListString = objectMapper.writeValueAsString(albumUrlInfo.pathList);
+            redisTemplate.opsForHash().put(albumHashId, albumId + ":pathList", pathListString);
+        }
+
+        String sizeAndDimensionsString = objectMapper.writeValueAsString(sizeAndDimensions);
+        redisTemplate.opsForHash().put(albumHashId, albumId + ":sizeAndDimensions", sizeAndDimensionsString);
+    }
+
+    public AlbumUrlInfo getCacheAlbumCreationInfo(long albumId) throws JsonProcessingException {
+        String albumHashId = getAlbumCacheHashId(albumId);
+        Object pathListValue = redisTemplate.opsForHash().get(albumHashId, albumId + ":pathList");
+        if (pathListValue == null)
+            return null;
+        List<String> pathList = objectMapper.readValue((String) pathListValue, new TypeReference<>() {});
+        List<String> buckets = new ArrayList<>();
+        buckets.add((String) redisTemplate.opsForHash().get(albumHashId, "bucket"));
+        return new AlbumUrlInfo(new ArrayList<>(), buckets, pathList);
+    }
+
+    public AlbumUrlInfoWithSizeAndDimensions getCacheAlbumCreationInfoWithSizeAndDimensions(long albumId) throws JsonProcessingException {
+        AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumId);
+        if (albumUrlInfo == null)
+            return null;
+
+        String albumHashId = getAlbumCacheHashId(albumId);
+        Object sizeAndDimensionsValue = redisTemplate.opsForHash().get(albumHashId, albumId + ":sizeAndDimensions");
+        if (sizeAndDimensionsValue == null)
+            return new AlbumUrlInfoWithSizeAndDimensions(albumUrlInfo, null);
+        SizeAndDimensions sizeAndDimensions = objectMapper.readValue((String) sizeAndDimensionsValue, new TypeReference<>() {});
+        return new AlbumUrlInfoWithSizeAndDimensions(albumUrlInfo, sizeAndDimensions);
     }
 
     private AlbumUrlInfoWithSizeAndDimensions getAlbumInfoAndAddToCache(long albumId, Resolution resolution, HttpServletRequest request) throws Exception {
@@ -256,7 +258,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                     path, expirySeconds);
             albumUrls.add(new MediaUrl(mediaType, originalVideoUrl));
         }
-        return new AlbumUrlInfo(albumUrls, new ArrayList<>(List.of(mediaDescription.getBucket())), null);
+        return new AlbumUrlInfo(albumUrls, new ArrayList<>(List.of(mediaDescription.getBucket())), pathList);
     }
 
     public int processResizedAlbumImagesInBatch(long albumId, Resolution resolution, int offset, int batch,
@@ -265,10 +267,14 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             throw new BadRequestException("Cannot process original images in batch");
 
         String albumJobId = getCacheMediaJobId(albumId, resolution);
+        addCacheAlbumLastAccess(albumId, albumJobId);
+
         int previousProcessedOffset = getCacheAlbumJobInfo(albumId, albumJobId);
         if (previousProcessedOffset >= offset + batch) {
+            addCacheAlbumJobInfo(albumId, albumJobId, previousProcessedOffset);
             return previousProcessedOffset;
         }
+        addCacheAlbumJobInfo(albumId, albumJobId, offset + batch);
 
         List<MediaUrl> mediaUrlList = getCacheAlbumCreatedUrl(albumId, albumJobId);
 
@@ -317,8 +323,6 @@ public class AlbumService extends MediaService implements ResourceCleanable {
 
         processResizedImagesInBatch(notResizedAlbumUrlInfo, resolution, albumDir, true);
 
-        addCacheAlbumLastAccess(albumId, albumJobId);
-        addCacheAlbumJobInfo(albumId, albumJobId, offset + batch);
         return offset + batch;
     }
 
