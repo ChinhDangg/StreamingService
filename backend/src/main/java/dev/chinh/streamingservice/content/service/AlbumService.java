@@ -69,7 +69,8 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         }
 
         var albumInfo = getAlbumInfoAndAddToCache(albumId, resolution, request);
-        processResizedAlbumImagesInBatch(albumId, resolution, 0, 5, request);
+        if (resolution != Resolution.original)
+            processResizedAlbumImagesInBatch(albumId, resolution, 0, 5, request);
 
         return albumInfo.albumUrlInfo.mediaUrlList;
     }
