@@ -72,7 +72,6 @@ async function displayAlbumInfo(albumId, albumInfo = null) {
 
 const BATCH_SIZE = 5;
 let currentBatch = 0;
-let albumItems = [];
 
 const videoContainer = document.getElementById('album-video-container');
 const imageContainer = document.getElementById('album-image-container');
@@ -108,7 +107,7 @@ const addMediaItem = (start, end) => {
     const imageWrapperTem = imageContainer.querySelector('.image-container-wrapper');
     const videoWrapperTem = videoContainer.querySelector('.video-container-wrapper');
     for (let i = start; i < end; i++) {
-        const item = albumItems[i];
+        const item = albumResUrlMap.get(albumResolution)[i];
         if (item.type === 'IMAGE') {
             addImageItem(item, imageContainer, imageWrapperTem);
         } else if (item.type === 'VIDEO') {
@@ -119,8 +118,19 @@ const addMediaItem = (start, end) => {
     }
 }
 
+const RESOLUTION = Object.freeze({
+    original: 'Original',
+    p1080: '1080p',
+    p720: '720p',
+    p480: '480p',
+});
+
+const albumResUrlMap = new Map();
+let albumResolution = Object.keys(RESOLUTION)[1];
+
 const fetchCheckResized = async (albumId, start) => {
-    const response = await fetch(`/api/album/${albumId}/p1080/${start}/check-resized`, {
+    if (albumResolution === Object.keys(RESOLUTION)[0]) return true;
+    const response = await fetch(`/api/album/${albumId}/${albumResolution}/${start}/check-resized`, {
         method: 'POST',
     });
     if (!response.ok) {
@@ -130,14 +140,55 @@ const fetchCheckResized = async (albumId, start) => {
     return true;
 };
 
-async function displayAlbumItems(albumId) {
-    const response = await fetch(`/api/album/${albumId}/p1080`);
+function initializeResolutionSelector() {
+    const resolutionSelector = document.getElementById('resolution-select');
+    Object.keys(RESOLUTION).forEach(key => {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = RESOLUTION[key];
+        resolutionSelector.appendChild(option);
+    });
+    resolutionSelector.value = albumResolution;
+    resolutionSelector.addEventListener('change', async () => {
+        albumResolution = resolutionSelector.value;
+        if (!albumResUrlMap.has(albumResolution)) {
+            const albumItems = await fetchAlbumItemUrlsByResolution(albumId, albumResolution);
+            if (!albumItems) return;
+            albumResUrlMap.set(albumResolution, albumItems);
+        }
+        const imageItems = imageContainer.querySelectorAll('.image-container-wrapper');
+        let isImageCount = 0;
+        currentBatch = BATCH_SIZE;
+        for (let i = 1; i < imageItems.length; i++) {
+            if (i > currentBatch) {
+                imageItems[i].remove();
+                continue;
+            }
+            while (isImageCount < albumResUrlMap.get(albumResolution).length) {
+                if (albumResUrlMap.get(albumResolution)[isImageCount].type === 'IMAGE') {
+                    imageItems[i].querySelector('img').src = albumResUrlMap.get(albumResolution)[isImageCount].url;
+                    isImageCount++;
+                    break;
+                }
+                isImageCount++;
+            }
+        }
+    });
+}
+
+async function fetchAlbumItemUrlsByResolution(albumId, resolution) {
+    const response = await fetch(`/api/album/${albumId}/${resolution}`);
     if (!response.ok) {
         alert("Failed to fetch album items");
-        window.location.href = '/';
-        return;
+        return [];
     }
-    albumItems = await response.json();
+    return await response.json();
+}
+
+async function displayAlbumItems(albumId) {
+    const albumItems = await fetchAlbumItemUrlsByResolution(albumId, albumResolution);
+    if (!albumItems) return;
+    albumResUrlMap.set(albumResolution, albumItems);
 
     // albumItems = [
     //     {
@@ -153,6 +204,13 @@ async function displayAlbumItems(albumId) {
     //         "url": "https://placehold.co/1080x1920"
     //     }
     // ]
+
+    for (const item of albumItems) {
+        if (item.type === "IMAGE") {
+            initializeResolutionSelector();
+            break;
+        }
+    }
 
     const firstVideo = videoContainer.firstElementChild;
     if (firstVideo) videoContainer.replaceChildren(firstVideo);
@@ -271,11 +329,12 @@ function showNextFullScreen() {
     const dashIndex = currentFullScreen.lastIndexOf('-')+1;
     const idStr = currentFullScreen.slice(dashIndex, currentFullScreen.length);
     const id = parseInt(idStr);
-    if (id >= albumItems.length) return;
+    const albumLength = albumResUrlMap.get(albumResolution).length;
+    if (id >= albumLength) return;
     const nextId = currentFullScreen.slice(0, dashIndex) + (id + 1);
     showFullScreen(nextId);
 
-    if (currentBatch >= albumItems.length)
+    if (currentBatch >= albumLength)
         return;
     if (id < currentBatch-2)
         return;
@@ -284,7 +343,7 @@ function showNextFullScreen() {
             return;
         }
         const start = currentBatch;
-        const end = Math.min(currentBatch + BATCH_SIZE, albumItems.length);
+        const end = Math.min(currentBatch + BATCH_SIZE, albumLength);
         addMediaItem(start, end);
     });
 }
