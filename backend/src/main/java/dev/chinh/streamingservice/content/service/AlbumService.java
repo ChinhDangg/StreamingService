@@ -261,6 +261,9 @@ public class AlbumService extends MediaService implements ResourceCleanable {
 
     public int processResizedAlbumImagesInBatch(long albumId, Resolution resolution, int offset, int batch,
                                                  HttpServletRequest request) throws Exception {
+        if (resolution == Resolution.original)
+            throw new BadRequestException("Cannot process original images in batch");
+
         String albumJobId = getCacheMediaJobId(albumId, resolution);
         int previousProcessedOffset = getCacheAlbumJobInfo(albumId, albumJobId);
         if (previousProcessedOffset >= offset + batch) {
