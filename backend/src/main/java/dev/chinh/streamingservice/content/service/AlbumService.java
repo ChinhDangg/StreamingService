@@ -305,6 +305,13 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             notResizedAlbumUrlInfo.pathList.add(albumUrlInfo.pathList.get(i));
         }
 
+        SizeAndDimensions sizeAndDimensions = albumInfo.sizeAndDimensions;
+        long estimatedSize = notResized.size() * Resolution.getEstimatedSize(sizeAndDimensions.size, sizeAndDimensions.width, sizeAndDimensions.height, resolution) / size;
+        boolean enough = memoryManager.freeMemoryForSize(estimatedSize);
+        if (!enough) {
+            return -1;
+        }
+
         processResizedImagesInBatch(notResizedAlbumUrlInfo, resolution, albumDir, true);
 
         addCacheAlbumLastAccess(albumId, albumJobId);
