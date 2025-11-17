@@ -127,7 +127,7 @@ const RESOLUTION = Object.freeze({
 
 const albumResUrlMap = new Map();
 const albumCheckResizedMap = new Map();
-let albumResolution = Object.keys(RESOLUTION)[1];
+let albumResolution = Object.keys(RESOLUTION)[3];
 
 const fetchCheckResized = async (albumId, start) => {
     if (albumResolution === Object.keys(RESOLUTION)[0]) return true;
