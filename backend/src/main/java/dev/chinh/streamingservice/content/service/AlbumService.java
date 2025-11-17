@@ -293,7 +293,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
 
         int size = albumUrlInfo.pathList.size();
         if (offset >= size)
-            return 0;
+            return size;
 
         int stop = Math.min(size, offset + batch);
         List<Integer> notResized = new ArrayList<>();
@@ -304,7 +304,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         }
 
         if (notResized.isEmpty())
-            return 0;
+            return offset + batch;
 
         AlbumUrlInfo notResizedAlbumUrlInfo = new AlbumUrlInfo(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
         notResizedAlbumUrlInfo.buckets.add(albumUrlInfo.buckets.getFirst());

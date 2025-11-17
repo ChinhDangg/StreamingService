@@ -126,10 +126,15 @@ const RESOLUTION = Object.freeze({
 });
 
 const albumResUrlMap = new Map();
+const albumCheckResizedMap = new Map();
 let albumResolution = Object.keys(RESOLUTION)[1];
 
 const fetchCheckResized = async (albumId, start) => {
     if (albumResolution === Object.keys(RESOLUTION)[0]) return true;
+    if (albumCheckResizedMap.get(albumResolution) >= start + BATCH_SIZE
+        || albumCheckResizedMap.get(albumResolution) >= albumResUrlMap.get(albumResolution).length) {
+        return true;
+    }
     const response = await fetch(`/api/album/${albumId}/${albumResolution}/${start}/check-resized`, {
         method: 'POST',
     });
@@ -137,6 +142,8 @@ const fetchCheckResized = async (albumId, start) => {
         alert("Failed to fetch album items");
         return false;
     }
+    const resizedCount = await response.text();
+    albumCheckResizedMap.set(albumResolution, parseInt(resizedCount));
     return true;
 };
 
