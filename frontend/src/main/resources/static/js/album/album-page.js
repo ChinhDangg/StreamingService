@@ -160,7 +160,7 @@ function initializeResolutionSelector() {
         let isImageCount = 0;
         currentBatch = BATCH_SIZE;
         for (let i = 1; i < imageItems.length; i++) {
-            if (i > currentBatch) {
+            if (i >= currentBatch) {
                 imageItems[i].remove();
                 continue;
             }
