@@ -41,7 +41,7 @@ async function initialize() {
 
     removeRedirectBrowseOptions();
 
-    const fetched = await fetchNameItems(NameEntry[currentNameEntry], currentPage, currentSortBy, currentSortOrder);
+    const fetched = await fetchNameItems(NameEntry[currentNameEntry], currentPage, currentSortBy, currentSortOrder, false);
     if (!fetched) return;
 
     initializeSortByOptions();
@@ -119,7 +119,7 @@ function getSortOrderText(order) {
     }
 }
 
-async function fetchNameItems(nameEntry, p, by, order) {
+async function fetchNameItems(nameEntry, p, by, order, pushtoHistory = true) {
     const urlParams = new URLSearchParams({ p, by, order });
     const response = await fetch(`/api/media/${nameEntry}?${urlParams}`);
     if (!response.ok) {
@@ -128,10 +128,12 @@ async function fetchNameItems(nameEntry, p, by, order) {
     }
     const nameItems = await response.json();
 
-    const url = new URL(window.location.href);
-    const pageBrowseUrl = getBrowsePageUrl(currentPage);
-    const newUrl = url.origin + pageBrowseUrl;
-    window.history.pushState({ path: newUrl }, '', newUrl);
+    if (pushtoHistory) {
+        const url = new URL(window.location.href);
+        const pageBrowseUrl = getBrowsePageUrl(currentPage);
+        const newUrl = url.origin + pageBrowseUrl;
+        window.history.pushState({ path: newUrl }, '', newUrl);
+    }
     // const nameItems = {
     //     "content": [
     //         {
