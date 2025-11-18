@@ -33,9 +33,8 @@ public class ThumbnailService {
         for (MediaNameEntry item : items) {
             if (item.getThumbnail() == null)
                 continue;
-            Boolean addedCache = addCacheThumbnails(
-                    Paths.get(getThumbnailPath(item.getName(), item.getThumbnail())).getFileName().toString(), now);
-            if (addedCache) { // if new thumbnail (not in cache)
+            String thumbnailFileName = Paths.get(getThumbnailPath(item.getName(), item.getThumbnail())).getFileName().toString();
+            if (!hasCacheThumbnails(thumbnailFileName)) {
                 newThumbnails.add(item);
             }
         }
@@ -45,21 +44,25 @@ public class ThumbnailService {
         try {
             if (albumUrlInfo.mediaUrlList().isEmpty())
                 return;
-            albumService.processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), true);
+            int exitCode = albumService.processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), true);
+            if (exitCode != 0) {
+                throw new RuntimeException("Failed to resize thumbnails");
+            }
+            for (MediaNameEntry item : newThumbnails) {
+                addCacheThumbnails(Paths.get(getThumbnailPath(item.getName(), item.getThumbnail())).getFileName().toString(), now);
+            }
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
         }
     }
 
     public void processThumbnails(Collection<MediaSearchItem> items) {
-        long now = System.currentTimeMillis() + 60 * 60 * 1000;
         List<MediaDescription> newThumbnails = new ArrayList<>();
         for (MediaDescription item : items) {
             if (!item.hasThumbnail())
                 continue;
-            Boolean addedCache = addCacheThumbnails(
-                    Paths.get(getThumbnailPath(item.getId(), item.getThumbnail())).getFileName().toString(), now);
-            if (addedCache) { // if new thumbnail (not in cache)
+            String thumbnailFileName = Paths.get(getThumbnailPath(item.getId(), item.getThumbnail())).getFileName().toString();
+            if (!hasCacheThumbnails(thumbnailFileName)) {
                 newThumbnails.add(item);
             }
         }
@@ -69,7 +72,14 @@ public class ThumbnailService {
         try {
             if (albumUrlInfo.mediaUrlList().isEmpty())
                 return;
-            albumService.processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), false);
+            int exitCode = albumService.processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), false);
+            if (exitCode != 0) {
+                throw new RuntimeException("Failed to resize thumbnails");
+            }
+            long now = System.currentTimeMillis() + 60 * 60 * 1000;
+            for (MediaDescription item : newThumbnails) {
+                addCacheThumbnails(Paths.get(getThumbnailPath(item.getId(), item.getThumbnail())).getFileName().toString(), now);
+            }
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
         }
@@ -107,8 +117,12 @@ public class ThumbnailService {
         return new AlbumService.AlbumUrlInfo(albumUrlList, List.of("thumbnail"), pathList);
     }
 
-    private Boolean addCacheThumbnails(String thumbnailFileName, long expiry) {
-        return redisTemplate.opsForZSet().add("thumbnail-cache", thumbnailFileName, expiry);
+    private void addCacheThumbnails(String thumbnailFileName, long expiry) {
+        redisTemplate.opsForZSet().add("thumbnail-cache", thumbnailFileName, expiry);
+    }
+
+    private boolean hasCacheThumbnails(String thumbnailFileName) {
+        return redisTemplate.opsForZSet().score("thumbnail-cache", thumbnailFileName) != null;
     }
 
     public Set<ZSetOperations.TypedTuple<Object>> getAllThumbnailCacheLastAccess(long max) {
