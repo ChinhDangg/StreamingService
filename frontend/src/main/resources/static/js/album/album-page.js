@@ -180,6 +180,7 @@ function initializeResolutionSelector() {
                 isImageCount++;
             }
         }
+        observer.observe(sentinel);
     });
 }
 
@@ -191,6 +192,9 @@ async function fetchAlbumItemUrlsByResolution(albumId, resolution) {
     }
     return await response.json();
 }
+
+const sentinel = document.createElement("div");
+let observer;
 
 async function displayAlbumItems(albumId) {
     const albumItems = await fetchAlbumItemUrlsByResolution(albumId, albumResolution);
@@ -231,10 +235,9 @@ async function displayAlbumItems(albumId) {
         return;
     }
 
-    const sentinel = document.createElement("div");
     document.getElementById('main-album-container').appendChild(sentinel);
 
-    const observer = new IntersectionObserver(async (entries) => {
+    observer = new IntersectionObserver(async (entries) => {
         if (entries[0].isIntersecting) {
             //console.log('intersecting');
             if (currentBatch >= albumItems.length) {
@@ -310,49 +313,60 @@ function enterFullScreen() {
     });
 }
 
-const fullScreenClick = (e) => {
+const fullScreenClick = async (e) => {
     const rect = wrapperImageFullScreen.getBoundingClientRect();
     const clickY = e.clientY - rect.top;
     const half = rect.height / 2;
 
     if (clickY < half) { // top half
-        showNextFullScreen();
+        await showNextFullScreen();
     } else {
         showPreviousFullScreen();
     }
 }
 
-document.addEventListener("keydown", (e) => {
+document.addEventListener("keydown", async (e) => {
     if (!document.fullscreenElement) return;
 
     if (e.key === "ArrowRight") {
-        showNextFullScreen();
+        await showNextFullScreen();
     } else if (e.key === "ArrowLeft") {
         showPreviousFullScreen();
     }
 });
 
-function showNextFullScreen() {
+let isShowingNextFullScreen = false;
+async function showNextFullScreen() {
+    if (isShowingNextFullScreen) return;
+    isShowingNextFullScreen = true;
     const dashIndex = currentFullScreen.lastIndexOf('-')+1;
     const idStr = currentFullScreen.slice(dashIndex, currentFullScreen.length);
     const id = parseInt(idStr);
     const albumLength = albumResUrlMap.get(albumResolution).length;
-    if (id >= albumLength) return;
+    if (id >= albumLength) {
+        isShowingNextFullScreen = false;
+        return;
+    }
     const nextId = currentFullScreen.slice(0, dashIndex) + (id + 1);
     showFullScreen(nextId);
 
-    if (currentBatch >= albumLength)
+    if (currentBatch >= albumLength) {
+        isShowingNextFullScreen = false;
         return;
-    if (id < currentBatch-2)
+    }
+    if (id < currentBatch-2) {
+        isShowingNextFullScreen = false;
         return;
-    const resized = fetchCheckResized(albumId, currentBatch).then(() => {
-        if (!resized) {
-            return;
-        }
-        const start = currentBatch;
-        const end = Math.min(currentBatch + BATCH_SIZE, albumLength);
-        addMediaItem(start, end);
-    });
+    }
+    const resized = await fetchCheckResized(albumId, currentBatch);
+    if (!resized) {
+        isShowingNextFullScreen = false;
+        return;
+    }
+    const start = currentBatch;
+    const end = Math.min(currentBatch + BATCH_SIZE, albumLength);
+    addMediaItem(start, end);
+    isShowingNextFullScreen = false;
 }
 
 function showPreviousFullScreen() {
@@ -379,7 +393,7 @@ const fullScreenTouchStart = (e) => {
     touchStartY = t.screenY;
 };
 
-const fullScreenTouchEnd = (e) => {
+const fullScreenTouchEnd = async (e) => {
     if (!document.fullscreenElement) return;
     const t = e.changedTouches[0];
     touchEndX = t.screenX;
@@ -393,7 +407,7 @@ const fullScreenTouchEnd = (e) => {
 
     // Horizontal swipe left
     if (dx < -SWIPE_MIN_DISTANCE) {
-        showNextFullScreen();
+        await showNextFullScreen();
     }
 
     // Horizontal swipe right
