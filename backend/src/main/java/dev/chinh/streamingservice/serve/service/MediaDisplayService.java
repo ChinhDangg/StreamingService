@@ -8,8 +8,8 @@ import dev.chinh.streamingservice.content.service.AlbumService;
 import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.data.repository.MediaGroupMetaDataRepository;
+import dev.chinh.streamingservice.data.service.ThumbnailService;
 import dev.chinh.streamingservice.exception.ResourceNotFoundException;
-import dev.chinh.streamingservice.search.service.MediaSearchService;
 import dev.chinh.streamingservice.serve.data.MediaDisplayContent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
@@ -40,7 +40,7 @@ public class MediaDisplayService {
 
         MediaDisplayContent mediaDisplayContent = mediaMapper.map(mediaItem);
         if (mediaItem.hasThumbnail())
-            mediaDisplayContent.setThumbnail(MediaSearchService.getThumbnailPath(mediaId, MediaSearchService.thumbnailResolution, mediaItem.getThumbnail()));
+            mediaDisplayContent.setThumbnail(ThumbnailService.getThumbnailPath(mediaId, mediaItem.getThumbnail()));
 
         if (mediaItem.isGrouper()) {
             Slice<Long> mediaIds = getNextGroupOfMedia(mediaId, 0, Sort.Direction.DESC);

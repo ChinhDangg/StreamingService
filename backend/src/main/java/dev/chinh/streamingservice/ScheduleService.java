@@ -2,7 +2,7 @@ package dev.chinh.streamingservice;
 
 import dev.chinh.streamingservice.content.constant.MediaJobStatus;
 import dev.chinh.streamingservice.content.service.VideoService;
-import dev.chinh.streamingservice.search.service.MediaSearchService;
+import dev.chinh.streamingservice.data.service.ThumbnailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,7 +16,7 @@ import java.util.Set;
 public class ScheduleService {
 
     private final VideoService videoService;
-    private final MediaSearchService mediaSearchService;
+    private final ThumbnailService thumbnailService;
 
     @Scheduled(fixedRate = 60_000, initialDelay = 60_000)
     public void scheduled() throws Exception {
@@ -52,7 +52,7 @@ public class ScheduleService {
 
     private void cleanThumbnails() {
         long now = System.currentTimeMillis();
-        Set<ZSetOperations.TypedTuple<Object>> lastAccessThumbnails = mediaSearchService.getAllThumbnailCacheLastAccess(now);
+        Set<ZSetOperations.TypedTuple<Object>> lastAccessThumbnails = thumbnailService.getAllThumbnailCacheLastAccess(now);
         for (ZSetOperations.TypedTuple<Object> thumbnail : lastAccessThumbnails) {
             long millisPassed = (long) (System.currentTimeMillis() - thumbnail.getScore());
             if (millisPassed < 60_000) {
@@ -61,9 +61,9 @@ public class ScheduleService {
 
             String thumbnailFileName = (String) thumbnail.getValue();
 
-            String path = MediaSearchService.getThumbnailParentPath() + "/" + thumbnailFileName;
+            String path = ThumbnailService.getThumbnailParentPath() + "/" + thumbnailFileName;
             OSUtil.deleteForceMemoryDirectory(path);
-            mediaSearchService.removeThumbnailLastAccess(thumbnailFileName);
+            thumbnailService.removeThumbnailLastAccess(thumbnailFileName);
         }
     }
 }
