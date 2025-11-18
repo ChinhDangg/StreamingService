@@ -58,7 +58,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
     public record MediaUrl(MediaType type, String url) {}
     public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, List<String> buckets, List<String> pathList) {}
     public record AlbumUrlInfoWithSizeAndDimensions(AlbumUrlInfo albumUrlInfo, SizeAndDimensions sizeAndDimensions) {}
-    public record SizeAndDimensions(long size, int width, int height) {}
+    public record SizeAndDimensions(long size, int width, int height, int length) {}
 
     public List<MediaUrl> getAllMediaInAnAlbum(Long albumId, Resolution resolution, HttpServletRequest request) throws Exception {
         String albumCreationId = getCacheMediaJobId(albumId, resolution);
@@ -89,7 +89,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         addCacheLastAccess(albumLastAccessKey, getAlbumCacheHashId(albumId), now);
     }
 
-    private void removeAlbumCacheLastAccess(String albumMediaCreatedId) {
+    public void removeAlbumCacheLastAccess(String albumMediaCreatedId) {
         removeCacheLastAccess(albumLastAccessKey, albumMediaCreatedId);
     }
 
@@ -177,6 +177,10 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         return new AlbumUrlInfo(new ArrayList<>(), buckets, pathList);
     }
 
+    public void removeCacheAlbumCreationInfo(String albumHashId) {
+        redisTemplate.opsForHash().delete(albumHashId);
+    }
+
     public AlbumUrlInfoWithSizeAndDimensions getCacheAlbumCreationInfoWithSizeAndDimensions(long albumId) throws JsonProcessingException {
         AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumId);
         if (albumUrlInfo == null)
@@ -195,7 +199,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         AlbumUrlInfo albumUrlInfo = (resolution == Resolution.original) ?
                 getAlbumOriginalUrls(mediaDescription) :
                 getAlbumResizedUrls(mediaDescription, albumId, resolution, request);
-        SizeAndDimensions sizeAndDimensions = new SizeAndDimensions(mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight());
+        SizeAndDimensions sizeAndDimensions = new SizeAndDimensions(mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight(), mediaDescription.getLength());
         addCacheAlbumCreationInfo(albumId, albumUrlInfo, sizeAndDimensions);
         addCacheAlbumCreatedUrl(albumId, getCacheMediaJobId(albumId, resolution), albumUrlInfo.mediaUrlList);
         return new AlbumUrlInfoWithSizeAndDimensions(albumUrlInfo, sizeAndDimensions);
@@ -549,7 +553,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                 break;
             }
 
-            long millisPassed = (long) (System.currentTimeMillis() - mediaJob.getScore());
+            long millisPassed = (long) (now - mediaJob.getScore());
             if (millisPassed < 60_000) {
                 // zset is already sort, so if one found still being active - then the rest after is the same
                 if (removingSpace - headRoom > 0) {
@@ -561,23 +565,32 @@ public class AlbumService extends MediaService implements ResourceCleanable {
 
             String mediaJobId = Objects.requireNonNull(mediaJob.getValue()).toString();
             System.out.println("Removing: " + mediaJobId);
-            long albumId = Long.parseLong(mediaJobId.split(":")[0]);
 
-            Long estimatedSize = 1L;//getCacheAlbumCreationSize(albumId);
-            if (estimatedSize == null) {
-                System.out.println("Failed to get size for album creation info");
+            String[] mediaJobIdParts = mediaJobId.split(":");
+            long albumId = Long.parseLong(mediaJobIdParts[0]);
+            Resolution resolution = Resolution.valueOf(mediaJobIdParts[1]);
+
+            // avoid removing entire album info (pathList, bucket, size) in making space
+            // (only remove the album job which actually has memory data usage)
+            if (mediaJobId.endsWith(":album")) {
                 continue;
             }
-            removingSpace = removingSpace - estimatedSize;
 
-            if (mediaJobId.endsWith(":album")) {
-                redisTemplate.opsForHash().delete(albumLastAccessKey);
-            } else {
-                String mediaMemoryPath = mediaJobId.replace(":", "/");
-                OSUtil.deleteForceMemoryDirectory(mediaMemoryPath);
-                removeCacheAlbumJobInfo(albumId, mediaJobId);
+            try {
+                SizeAndDimensions sizeAndDimensions = getCacheAlbumSizeAndDimensions(albumId);
+                assert sizeAndDimensions != null;
+                long estimatedSize = Resolution.getEstimatedSize(
+                        sizeAndDimensions.size, sizeAndDimensions.width, sizeAndDimensions.height, resolution) / sizeAndDimensions.length;
+                removingSpace -= estimatedSize;
+                System.out.println("Estimated size: " + estimatedSize);
+            } catch (Exception e) {
+                System.out.println("Failed to get estimated size to estimate removing space");
             }
 
+            String mediaMemoryPath = mediaJobId.replace(":", "/");
+            OSUtil.deleteForceMemoryDirectory(mediaMemoryPath);
+            removeCacheAlbumJobInfo(albumId, mediaJobId);
+            removeCacheAlbumCreatedUrl(albumId, mediaJobId);
             removeAlbumCacheLastAccess(mediaJobId);
         }
         if (!enough && removingSpace - headRoom <= 0)
