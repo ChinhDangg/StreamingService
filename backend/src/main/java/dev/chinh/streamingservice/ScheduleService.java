@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice;
 
 import dev.chinh.streamingservice.content.constant.MediaJobStatus;
+import dev.chinh.streamingservice.content.service.AlbumService;
 import dev.chinh.streamingservice.content.service.VideoService;
 import dev.chinh.streamingservice.data.service.ThumbnailService;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +9,7 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -16,12 +18,14 @@ import java.util.Set;
 public class ScheduleService {
 
     private final VideoService videoService;
+    private final AlbumService albumService;
     private final ThumbnailService thumbnailService;
 
     @Scheduled(fixedRate = 60_000, initialDelay = 60_000)
     public void scheduled() throws Exception {
         stopNonViewingVideoRunningJob();
         cleanThumbnails();
+        removeAlbumCreationInfo();
         Thread.sleep(1_000);
         OSUtil.refreshUsableMemory();
     }
@@ -35,7 +39,7 @@ public class ScheduleService {
             double lastAccess = videoService.getCacheVideoLastAccess(videoJobId);
             long millisPassed = (long) (System.currentTimeMillis() - lastAccess);
             if (millisPassed < 60_000) {
-                continue;
+                break; // sorted so any after is the same
             }
 
             var cachedJobStatus = videoService.getVideoJobStatusInfo(videoJobId);
@@ -61,9 +65,27 @@ public class ScheduleService {
 
             String thumbnailFileName = (String) thumbnail.getValue();
 
+            System.out.println("Removing: " + thumbnailFileName);
             String path = ThumbnailService.getThumbnailParentPath() + "/" + thumbnailFileName;
             OSUtil.deleteForceMemoryDirectory(path);
             thumbnailService.removeThumbnailLastAccess(thumbnailFileName);
+        }
+    }
+
+    private void removeAlbumCreationInfo() {
+        long now = System.currentTimeMillis();
+        Set<ZSetOperations.TypedTuple<Object>> lastAccessMediaJob = albumService.getAllAlbumCacheLastAccess(now);
+        for (ZSetOperations.TypedTuple<Object> albumJob : lastAccessMediaJob) {
+            if (now - albumJob.getScore() < 60_000) {
+                break;
+            }
+
+            String albumJobId = Objects.requireNonNull(albumJob.getValue()).toString();
+            if (!albumJobId.endsWith(":album"))
+                continue;
+
+            albumService.removeAlbumCacheLastAccess(albumJobId);
+            albumService.removeCacheAlbumCreationInfo(albumJobId);
         }
     }
 }
