@@ -40,6 +40,8 @@ public class MediaNameEntityService {
 
     private Page<MediaNameEntry> mapInfo(Page<MediaNameEntry> entry) {
         List<MediaNameEntry> nameEntries = entry.getContent();
+        thumbnailService.processThumbnails(nameEntries); // process thumbnails first with the original thumbnail path
+        // set thumbnail path to the directory of the thumbnail location
         nameEntries.forEach(nameEntry -> {
             try {
                 nameEntry.setThumbnail(ThumbnailService.getThumbnailPath(nameEntry.getName(), nameEntry.getThumbnail()));
@@ -47,7 +49,6 @@ public class MediaNameEntityService {
                 throw new RuntimeException(e);
             }
         });
-        thumbnailService.processThumbnails(nameEntries);
         return new PageImpl<>(nameEntries, PageRequest.of(entry.getNumber(), entry.getSize()), entry.getTotalElements());
     }
 
