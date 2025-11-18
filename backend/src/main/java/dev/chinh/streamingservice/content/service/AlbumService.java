@@ -110,7 +110,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         String albumHashId = getAlbumCacheHashId(albumId);
         Object offset = redisTemplate.opsForHash().get(albumHashId, albumJobId + ":offset");
         if (offset == null)
-            return -1;
+            return 0;
         return (int) offset;
     }
 
@@ -275,11 +275,10 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         addCacheAlbumLastAccess(albumId, albumJobId);
 
         int previousProcessedOffset = getCacheAlbumJobInfo(albumId, albumJobId);
+        System.out.println("previousOffset: " + previousProcessedOffset);
         if (previousProcessedOffset >= offset + batch) {
-            addCacheAlbumJobInfo(albumId, albumJobId, previousProcessedOffset);
             return previousProcessedOffset;
         }
-        addCacheAlbumJobInfo(albumId, albumJobId, offset + batch);
 
         List<MediaUrl> mediaUrlList = getCacheAlbumCreatedUrl(albumId, albumJobId);
 
@@ -299,16 +298,18 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         if (offset >= size)
             return size;
 
-        int stop = Math.min(size, offset + batch);
+        int stop = Math.min(size-1, previousProcessedOffset + batch);
         List<Integer> notResized = new ArrayList<>();
-        for (int i = offset; i < stop; i++) {
+        for (int i = previousProcessedOffset; i <= stop; i++) {
             if (MediaType.detectMediaType(albumUrlInfo.pathList.get(i)) != MediaType.IMAGE)
                 continue;
             notResized.add(i);
         }
 
-        if (notResized.isEmpty())
-            return offset + batch;
+        if (notResized.isEmpty()) {
+            addCacheAlbumJobInfo(albumId, albumJobId, previousProcessedOffset + batch);
+            return previousProcessedOffset + batch;
+        }
 
         AlbumUrlInfo notResizedAlbumUrlInfo = new AlbumUrlInfo(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
         notResizedAlbumUrlInfo.buckets.add(albumUrlInfo.buckets.getFirst());
@@ -327,8 +328,10 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         }
 
         processResizedImagesInBatch(notResizedAlbumUrlInfo, resolution, albumDir, true);
+        addCacheAlbumJobInfo(albumId, albumJobId, previousProcessedOffset + notResized.size());
 
-        return offset + batch;
+        System.out.println("offset after: " + (previousProcessedOffset + notResized.size()));
+        return previousProcessedOffset + notResized.size();
     }
 
     public void processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String albumDir, boolean isAlbum) throws InterruptedException, IOException {
@@ -365,12 +368,12 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         }
 
         // Capture ffmpeg combined logs
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-            reader.lines().forEach(System.out::println);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+//        try (BufferedReader reader = new BufferedReader(
+//                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+//            reader.lines().forEach(System.out::println);
+//        } catch (IOException e) {
+//            throw new RuntimeException(e);
+//        }
 
         int exit = process.waitFor();
         System.out.println("ffmpeg exited with code " + exit);
