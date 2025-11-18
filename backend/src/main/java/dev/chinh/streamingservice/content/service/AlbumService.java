@@ -327,14 +327,17 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             return -1;
         }
 
-        processResizedImagesInBatch(notResizedAlbumUrlInfo, resolution, albumDir, true);
+        int exitCode = processResizedImagesInBatch(notResizedAlbumUrlInfo, resolution, albumDir, true);
+        if (exitCode != 0) {
+            throw new RuntimeException("Failed to resize images in batch for albumId " + albumId + " and resolution " + resolution + " with exit code " + exitCode);
+        }
         addCacheAlbumJobInfo(albumId, albumJobId, previousProcessedOffset + notResized.size());
 
         System.out.println("offset after: " + (previousProcessedOffset + notResized.size()));
         return previousProcessedOffset + notResized.size();
     }
 
-    public void processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String albumDir, boolean isAlbum) throws InterruptedException, IOException {
+    public int processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String albumDir, boolean isAlbum) throws InterruptedException, IOException {
         // Start one persistent bash session inside ffmpeg container
         ProcessBuilder pb = new ProcessBuilder("docker", "exec", "-i", "ffmpeg", "bash").redirectErrorStream(true);
         Process process = pb.start();
@@ -368,15 +371,16 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         }
 
         // Capture ffmpeg combined logs
-//        try (BufferedReader reader = new BufferedReader(
-//                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-//            reader.lines().forEach(System.out::println);
-//        } catch (IOException e) {
-//            throw new RuntimeException(e);
-//        }
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            reader.lines().forEach(System.out::println);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
         int exit = process.waitFor();
         System.out.println("ffmpeg exited with code " + exit);
+        return exit;
     }
 
     public String getAlbumVidCacheJobIdString(long albumId, int vidNum, Resolution resolution) {
