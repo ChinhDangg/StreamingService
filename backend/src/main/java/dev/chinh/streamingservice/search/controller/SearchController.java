@@ -101,21 +101,21 @@ public class SearchController {
 
     @GetMapping("/suggestion/authors")
     public List<String> getAuthorList(@RequestParam(name = "s") String authorSearchString) throws IOException {
-        return mediaSearchService.searchAuthorContaining(authorSearchString);
+        return mediaSearchService.searchContaining(ContentMetaData.AUTHORS, authorSearchString);
     }
 
     @GetMapping("/suggestion/characters")
     public List<String> getCharacterList(@RequestParam(name = "s") String characterSearchString) throws IOException {
-        return mediaSearchService.searchCharacterContaining(characterSearchString);
+        return mediaSearchService.searchContaining(ContentMetaData.CHARACTERS, characterSearchString);
     }
 
     @GetMapping("/suggestion/universes")
     public List<String> getUniverseList(@RequestParam(name = "s") String universeSearchString) throws IOException {
-        return mediaSearchService.searchUniverseContaining(universeSearchString);
+        return mediaSearchService.searchContaining(ContentMetaData.UNIVERSES, universeSearchString);
     }
 
     @GetMapping("/suggestion/tags")
     public List<String> getTagList(@RequestParam(name = "s") String tagSearchString) throws IOException {
-        return mediaSearchService.searchTagContaining(tagSearchString);
+        return mediaSearchService.searchContaining(ContentMetaData.TAGS, tagSearchString);
     }
 }

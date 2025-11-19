@@ -31,26 +31,10 @@ public class MediaSearchService {
 
     record NameEntry(String name) {}
 
-    public List<String> searchAuthorContaining(String text) throws IOException {
-        return searchContaining(ContentMetaData.AUTHORS, ContentMetaData.NAME, text);
-    }
-
-    public List<String> searchCharacterContaining(String text) throws IOException {
-        return searchContaining(ContentMetaData.CHARACTERS, ContentMetaData.NAME, text);
-    }
-
-    public List<String> searchUniverseContaining(String text) throws IOException {
-        return searchContaining(ContentMetaData.UNIVERSES, ContentMetaData.NAME, text);
-    }
-
-    public List<String> searchTagContaining(String text) throws IOException {
-        return searchContaining(ContentMetaData.TAGS, ContentMetaData.NAME, text);
-    }
-
-    private List<String> searchContaining(String index, String field, String text) throws IOException {
+    public List<String> searchContaining(String index, String text) throws IOException {
         ContentMetaData.validateNameText(text);
         SearchResponse<NameEntry> response = openSearchService.searchContaining(
-                index, field, text, NameEntry.class);
+                index, ContentMetaData.NAME, text, NameEntry.class);
         return mapSearchReponseNameEntryToList(response);
     }
 
