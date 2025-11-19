@@ -1,5 +1,7 @@
 package dev.chinh.streamingservice.data.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import dev.chinh.streamingservice.data.ContentMetaData;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -22,6 +24,9 @@ public class MediaUniverse extends MediaNameEntity {
             inverseJoinColumns = @JoinColumn(name = "characters_id")
     )
     private Set<MediaCharacter> characters = new HashSet<>();
+
+    @JsonProperty(ContentMetaData.THUMBNAIL)
+    private String thumbnail;
 
     public MediaUniverse(String name) {
         this.name = name;
