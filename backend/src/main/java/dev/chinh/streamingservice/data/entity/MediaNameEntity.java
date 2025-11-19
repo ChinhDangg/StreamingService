@@ -10,6 +10,7 @@ import lombok.Setter;
 import java.time.LocalDate;
 
 @Getter
+@Setter
 @MappedSuperclass
 public abstract class MediaNameEntity {
 
@@ -27,7 +28,4 @@ public abstract class MediaNameEntity {
     @Column(nullable = false)
     @JsonProperty(ContentMetaData.UPLOAD_DATE)
     protected LocalDate uploadDate;
-
-    @JsonProperty(ContentMetaData.THUMBNAIL)
-    protected String thumbnail;
 }
