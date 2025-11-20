@@ -25,6 +25,7 @@ public class ThumbnailService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final AlbumService albumService;
 
+    public static final String thumbnailBucket = "thumbnail";
     public static final Resolution thumbnailResolution = Resolution.p360;
 
     public void processThumbnails(List<MediaNameEntry> items) {
@@ -114,7 +115,7 @@ public class ThumbnailService {
             String pathString = "/chunks" + getThumbnailPath(mediaNameEntry.getName(), mediaNameEntry.getThumbnail());
             albumUrlList.add(new AlbumService.MediaUrl(MediaType.IMAGE, pathString));
         }
-        return new AlbumService.AlbumUrlInfo(albumUrlList, List.of("thumbnail"), pathList);
+        return new AlbumService.AlbumUrlInfo(albumUrlList, List.of(thumbnailBucket), pathList);
     }
 
     private void addCacheThumbnails(String thumbnailFileName, long expiry) {
