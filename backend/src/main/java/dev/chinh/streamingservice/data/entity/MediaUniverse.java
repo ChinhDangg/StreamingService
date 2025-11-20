@@ -1,12 +1,11 @@
 package dev.chinh.streamingservice.data.entity;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import dev.chinh.streamingservice.data.ContentMetaData;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -15,7 +14,7 @@ import java.util.Set;
 @NoArgsConstructor
 @Entity
 @Table(name = "universes")
-public class MediaUniverse extends MediaNameEntity {
+public class MediaUniverse extends MediaNameEntityWithThumbnail {
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
@@ -25,10 +24,8 @@ public class MediaUniverse extends MediaNameEntity {
     )
     private Set<MediaCharacter> characters = new HashSet<>();
 
-    @JsonProperty(ContentMetaData.THUMBNAIL)
-    private String thumbnail;
-
-    public MediaUniverse(String name) {
+    public MediaUniverse(String name, Instant uploadDate) {
         this.name = name;
+        this.uploadDate = uploadDate;
     }
 }
