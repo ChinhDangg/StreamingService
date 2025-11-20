@@ -16,7 +16,7 @@ public abstract class MediaNameEntity {
 
     @Setter(AccessLevel.NONE)
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    protected Integer id;
+    protected long id;
 
     @Column(unique = true, nullable = false)
     @JsonProperty(value = ContentMetaData.NAME)
