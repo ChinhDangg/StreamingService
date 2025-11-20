@@ -1,11 +1,12 @@
 package dev.chinh.streamingservice.content.service;
 
 import io.minio.*;
-import io.minio.errors.ErrorResponseException;
+import io.minio.errors.*;
 import io.minio.http.Method;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 
@@ -92,6 +93,39 @@ public class MinIOService {
         } catch (Exception e) {
             throw new RuntimeException("Error checking object existence", e);
         }
+    }
+
+
+    public void uploadFile(String bucket, String object, MultipartFile file) throws Exception {
+        try (InputStream inputStream = file.getInputStream()) {
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(bucket)
+                            .object(object)
+                            .stream(inputStream, file.getSize(), -1)
+                            .contentType(file.getContentType())
+                            .build()
+            );
+        }
+    }
+
+    public void removeFile(String bucket, String object) throws Exception {
+        minioClient.removeObject(
+                RemoveObjectArgs.builder()
+                        .bucket(bucket)
+                        .object(object)
+                        .build()
+        );
+    }
+
+    public void moveFileToObject(String bucket, String object, String filePath) throws Exception {
+        minioClient.uploadObject(
+                UploadObjectArgs.builder()
+                        .bucket(bucket)
+                        .object(object)
+                        .filename(filePath)
+                        .build()
+        );
     }
 
 }
