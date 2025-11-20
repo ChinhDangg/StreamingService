@@ -6,7 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDate;
+import java.time.Instant;
 
 @Getter
 @Setter
@@ -20,7 +20,7 @@ public class MediaNameEntry {
     private int length;
 
     @JsonProperty(ContentMetaData.UPLOAD_DATE)
-    private LocalDate uploadDate;
+    private Instant uploadDate;
 
     @JsonProperty(ContentMetaData.THUMBNAIL)
     private String thumbnail;
