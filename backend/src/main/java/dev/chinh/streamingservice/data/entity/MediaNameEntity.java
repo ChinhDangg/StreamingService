@@ -7,7 +7,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDate;
+import java.time.Instant;
 
 @Getter
 @Setter
@@ -27,5 +27,5 @@ public abstract class MediaNameEntity {
 
     @Column(nullable = false)
     @JsonProperty(ContentMetaData.UPLOAD_DATE)
-    protected LocalDate uploadDate;
+    protected Instant uploadDate;
 }

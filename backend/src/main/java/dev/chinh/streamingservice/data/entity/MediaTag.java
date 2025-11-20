@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.Instant;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -12,7 +14,8 @@ import lombok.Setter;
 @Table(name = "tags")
 public class MediaTag extends MediaNameEntity {
 
-    public MediaTag(String name) {
+    public MediaTag(String name, Instant uploadDate) {
         this.name = name;
+        this.uploadDate = uploadDate;
     }
 }
