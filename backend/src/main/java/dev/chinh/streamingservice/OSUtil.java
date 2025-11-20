@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice;
 
 import org.springframework.stereotype.Component;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
 import java.nio.file.*;
@@ -116,21 +117,18 @@ public class OSUtil {
         System.out.println("docker compose finished with exit code: " + exit);
     }
 
-    public static void createTempDir(String dir) throws Exception {
-        if (currentOS == OS.MAC ||  currentOS == OS.LINUX) {
-            createPathInRAMDisk(dir);
-        } else {
-            createDirectoryInContainer(dir);
-        }
+    public static long getUsableMemory() {
+        return MEMORY_USABLE.get();
     }
 
-    public static boolean checkTempFileExists(String fileName) throws IOException, InterruptedException {
-        if (currentOS == OS.MAC) {
-            File playlist = new File(normalizePath(RAMDISK, fileName));
-            return playlist.exists();
-        }
-        return containerFileExists(fileName);
+    public static void updateUsableMemory(long used) {
+        MEMORY_USABLE.addAndGet(used);
     }
+
+    public static void refreshUsableMemory() throws IOException, InterruptedException {
+        MEMORY_USABLE.set(getActualMemoryUsableSpace());
+    }
+
 
     public static boolean writeTextToTempFile(String relativePath, List<String> lines, boolean createDir) throws Exception {
         int dot = relativePath.lastIndexOf('.');
@@ -210,17 +208,6 @@ public class OSUtil {
         return true;
     }
 
-    public static long getUsableMemory() {
-        return MEMORY_USABLE.get();
-    }
-
-    public static void updateUsableMemory(long used) {
-        MEMORY_USABLE.addAndGet(used);
-    }
-
-    public static void refreshUsableMemory() throws IOException, InterruptedException {
-        MEMORY_USABLE.set(getActualMemoryUsableSpace());
-    }
 
     public static long getActualMemoryUsableSpace() throws IOException, InterruptedException {
         if (currentOS == OS.WINDOWS) {
@@ -250,6 +237,7 @@ public class OSUtil {
         }
         throw new RuntimeException("Unable to get RAM usable space from container");
     }
+
 
     public static void deleteForceMemoryDirectory(String dir) {
         if (currentOS == OS.WINDOWS) {
@@ -292,6 +280,7 @@ public class OSUtil {
         System.out.println("Deleted " + path + " in container");
     }
 
+
     private static long getMemoryTotalSpace() throws IOException, InterruptedException {
         if  (currentOS == OS.WINDOWS) {
             return getMemoryTotalFromContainer();
@@ -321,22 +310,6 @@ public class OSUtil {
         throw new RuntimeException("Unable to get RAM total from container");
     }
 
-    /**
-     * Create a path inside Mac RAMDISK located at Volumes/RAMDISK/ since Mac RAMDISK can be mounted
-     * as volume for docker. Making this write as simple as a normal file write.
-     * Does not copy the content of the file. Only create the path if it doesn't exist.
-     *
-     * @param path The path that to write to RAMDISK
-     * if the path is written, otherwise throw IOException
-     */
-    private static void createPathInRAMDisk(String path) throws IOException {
-        File dir = new File(normalizePath(RAMDISK, path));
-        if (!dir.exists()) {
-            if (!dir.mkdirs()) {
-                throw new IOException("Failed to create path: " + path);
-            }
-        }
-    }
 
     public static String readPlayListFromTempDir(String videoDir) throws IOException, InterruptedException {
         if  (currentOS == OS.WINDOWS) {
@@ -388,6 +361,15 @@ public class OSUtil {
         return String.join("\n", lastLines);
     }
 
+
+    public static boolean checkTempFileExists(String fileName) throws IOException, InterruptedException {
+        if (currentOS == OS.MAC) {
+            File playlist = new File(normalizePath(RAMDISK, fileName));
+            return playlist.exists();
+        }
+        return containerFileExists(fileName);
+    }
+
     private static boolean containerFileExists(String relativePath) {
         String targetPath = normalizePath(BASE_DIR, relativePath);
 
@@ -404,6 +386,32 @@ public class OSUtil {
         return true; // 0 = exists, else doesn't
     }
 
+
+    public static void createTempDir(String dir) throws Exception {
+        if (currentOS == OS.MAC ||  currentOS == OS.LINUX) {
+            createPathInRAMDisk(dir);
+        } else {
+            createDirectoryInContainer(dir);
+        }
+    }
+
+    /**
+     * Create a path inside Mac RAMDISK located at Volumes/RAMDISK/ since Mac RAMDISK can be mounted
+     * as volume for docker. Making this write as simple as a normal file write.
+     * Does not copy the content of the file. Only create the path if it doesn't exist.
+     *
+     * @param path The path that to write to RAMDISK
+     * if the path is written, otherwise throw IOException
+     */
+    private static void createPathInRAMDisk(String path) throws IOException {
+        File dir = new File(normalizePath(RAMDISK, path));
+        if (!dir.exists()) {
+            if (!dir.mkdirs()) {
+                throw new IOException("Failed to create path: " + path);
+            }
+        }
+    }
+
     /**
      * Create a directory directly inside the container under /chunks.
      */
@@ -416,6 +424,89 @@ public class OSUtil {
             throw new IOException("Failed to create directory: " + dirPath, e);
         }
     }
+
+
+    public static boolean saveMultipartFileToTempDir(String relativePath, MultipartFile file, boolean createDir) throws Exception {
+        if (currentOS == OS.WINDOWS) {
+            return streamMultipartFileToContainer(relativePath, file, createDir);
+        } else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
+            return saveMultipartFileToRAMDisk(relativePath, file, createDir);
+        }
+        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+    }
+
+    private static boolean saveMultipartFileToRAMDisk(String relativePath, MultipartFile file, boolean createDir) throws Exception {
+        String targetPath = normalizePath(RAMDISK, relativePath);
+        if (createDir) {
+            createTempDir(relativePath.substring(0, relativePath.lastIndexOf('/')));
+        }
+        if (!Files.exists(Paths.get(Paths.get(targetPath).getParent().toString())))
+            return false;
+        try {
+            file.transferTo(new File(targetPath));
+            return true;
+        } catch (Exception e) {
+            System.err.println("Failed to save file to RAMDISK: " + targetPath);
+            System.err.println(e.getMessage());
+            return false;
+        }
+    }
+
+    private static boolean streamMultipartFileToContainer(String relativePath, MultipartFile file, boolean createDir) throws Exception {
+        if (createDir) {
+            String parentDir = relativePath.substring(0, relativePath.lastIndexOf('/'));
+            createDirectoryInContainer(parentDir);
+        }
+
+        String targetPath = normalizePath(BASE_DIR, relativePath);
+
+        ProcessBuilder pb = new ProcessBuilder(
+                "docker", "exec", "-i", CONTAINER,
+                "sh", "-c", "cat > " + targetPath
+        );
+
+        Process process = pb.start();
+
+        // Use piped streams to stream MultipartFile without loading fully in memory
+        try (PipedOutputStream pipedOut = new PipedOutputStream();
+             PipedInputStream pipedIn = new PipedInputStream(pipedOut);
+             OutputStream dockerStdin = process.getOutputStream()) {
+
+            // Writer thread: read from MultipartFile and write into pipedOut
+            Thread writerThread = new Thread(() -> {
+                try (InputStream fileInput = file.getInputStream()) {
+                    byte[] buffer = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = fileInput.read(buffer)) != -1) {
+                        pipedOut.write(buffer, 0, bytesRead);
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                } finally {
+                    try {
+                        pipedOut.close();
+                    } catch (IOException ignored) {}
+                }
+            });
+            writerThread.start();
+
+            // Main thread: read from pipedIn and write directly to docker stdin
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = pipedIn.read(buffer)) != -1) {
+                dockerStdin.write(buffer, 0, bytesRead);
+            }
+        }
+
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            throw new IOException("Failed to stream file to container: " + targetPath + ", exit code: " + exitCode);
+        }
+
+        System.out.println("✅ Successfully streamed file to " + targetPath + " in " + CONTAINER);
+        return true;
+    }
+
 
     public static String normalizePath(String baseDir, String relativePath) {
         if (relativePath.startsWith("/")) {
