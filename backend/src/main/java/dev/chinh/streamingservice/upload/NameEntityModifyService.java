@@ -20,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -37,8 +38,11 @@ public class NameEntityModifyService {
         SearchResponse<NameEntityDTO> response = openSearchService.searchContaining(index, ContentMetaData.NAME, name, NameEntityDTO.class);
         return response.hits().hits().stream()
                 .map(h -> {
-                    assert h.source() != null;
-                    return h.source();
+                    NameEntityDTO dto = h.source();
+                    assert dto != null;
+                    assert h.id() != null;
+                    dto.setId(Long.parseLong(h.id()));
+                    return dto;
                 })
                 .toList();
     }
@@ -74,16 +78,31 @@ public class NameEntityModifyService {
     @Transactional
     protected <T extends MediaNameEntity> void addNameEntity(String name, String listName, T mediaNameEntity, MediaNameEntityRepository<T, Long> repository) {
         name = validateNameEntity(name);
+        Long id = null;
         try {
-            repository.save(mediaNameEntity);
+            T added = repository.save(mediaNameEntity);
+            id = added.getId();
+            openSearchService.indexDocument(listName, id, Map.of(ContentMetaData.NAME, name));
         } catch(DataIntegrityViolationException e) {
             if (e.getRootCause() != null && e.getRootCause().getMessage().contains("unique constraint")) {
                 throw new DuplicateEntryException(
                         "The name entry '" + name + "' already exists in the " + listName + " list."
                 );
             }
+            handleDeleteDocumentOnFailure(listName, id);
             // Handle other DataIntegrityViolationExceptions (e.g., foreign key)
             throw e;
+        } catch (Exception e) {
+            handleDeleteDocumentOnFailure(listName, id);
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void handleDeleteDocumentOnFailure(String indexName, Long id) {
+        try {
+            openSearchService.deleteDocument(indexName, id);
+        } catch (IOException ioe) {
+            throw new RuntimeException("Critical: Failed to delete document in OpenSearch to reroll", ioe);
         }
     }
 
@@ -145,6 +164,8 @@ public class NameEntityModifyService {
     @Transactional
     protected <T extends MediaNameEntityWithThumbnail> void updateNameEntity(long id, NameAndThumbnailPostRequest request, String listName, MediaNameEntityRepository<T, Long> repository) {
         T nameEntity = findById(id, listName, repository);
+        String oldName = nameEntity.getName();
+        String newName = request.name == null ? oldName : validateNameEntity(request.name);
 
         // The old thumbnail path to be deleted upon successful commit
         String oldThumbnailPath = nameEntity.getThumbnail();
@@ -166,14 +187,14 @@ public class NameEntityModifyService {
                 nameEntity.setThumbnail(newThumbnailPath);
             }
 
-            String newName = request.name == null ? nameEntity.getName() : validateNameEntity(request.name);
-
-            if (!nameEntity.getName().equals(newName)) {
+            if (!oldName.equals(newName)) {
                 nameEntity.setName(newName);
+                openSearchService.addFieldsToDocument(listName, id, Map.of(ContentMetaData.NAME, newName));
             }
-            if (newThumbnailPath != null || !nameEntity.getName().equals(newName)) {
+            if (newThumbnailPath != null || !oldName.equals(newName)) {
                 repository.save(nameEntity);
             }
+
             if (newThumbnailPath != null && oldThumbnailPath != null) {
                 // New file is saved and DB committed. Now delete the old file.
                 minIOService.removeFile(ThumbnailService.thumbnailBucket, oldThumbnailPath);
@@ -182,9 +203,11 @@ public class NameEntityModifyService {
         } catch (DataIntegrityViolationException e) {
             // Handle constraint violation (DB rolled back automatically)
             handleUploadRollback(newThumbnailPath);
+            handleSetOldNameBackOnFailure(listName, id, oldName, newName);
             throw new DuplicateEntryException("The name entry '" + request.name + "' already exists in the " + listName + " list.");
         } catch (Exception e) {
             // Handle other failures (e.g., MinIO upload failed, or other exceptions)
+            handleSetOldNameBackOnFailure(listName, id, oldName, newName);
             handleUploadRollback(newThumbnailPath);
             throw new RuntimeException("Update failed for entity ID " + id, e);
         }
@@ -200,6 +223,16 @@ public class NameEntityModifyService {
                 // Log the critical failure
                 System.err.println("CRITICAL: Failed to clean up temporary orphan file: " + uploadedPath);
             }
+        }
+    }
+
+    private void handleSetOldNameBackOnFailure(String indexName, Long id, String oldName, String newName) {
+        if (oldName.equals(newName))
+            return;
+        try {
+            openSearchService.addFieldsToDocument(indexName, id, Map.of(ContentMetaData.NAME, oldName));
+        } catch (IOException e) {
+            throw new RuntimeException("Critical: Failed to update OpenSearch index to revert name change", e);
         }
     }
 
