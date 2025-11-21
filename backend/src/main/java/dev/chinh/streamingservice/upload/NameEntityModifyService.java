@@ -11,6 +11,7 @@ import dev.chinh.streamingservice.search.service.OpenSearchService;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.apache.coyote.BadRequestException;
 import org.opensearch.client.opensearch.core.SearchResponse;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -138,12 +139,12 @@ public class NameEntityModifyService {
 
     @Transactional
     public void updateCharacter(long id, NameAndThumbnailPostRequest request) {
-        updateNameEntity(id, request.name, ContentMetaData.CHARACTERS, mediaCharacterRepository);
+        updateNameEntity(id, request, ContentMetaData.CHARACTERS, mediaCharacterRepository);
     }
 
     @Transactional
     public void updateUniverse(long id, NameAndThumbnailPostRequest request) {
-        updateNameEntity(id, request.name, ContentMetaData.UNIVERSES, mediaUniverseRepository);
+        updateNameEntity(id, request, ContentMetaData.UNIVERSES, mediaUniverseRepository);
     }
 
     @Transactional
@@ -163,6 +164,9 @@ public class NameEntityModifyService {
 
     @Transactional
     protected <T extends MediaNameEntityWithThumbnail> void updateNameEntity(long id, NameAndThumbnailPostRequest request, String listName, MediaNameEntityRepository<T, Long> repository) {
+        if (request.thumbnail == null && (request.name == null || request.name.isBlank()))
+            throw new IllegalArgumentException("No name or thumbnail provided");
+
         T nameEntity = findById(id, listName, repository);
         String oldName = nameEntity.getName();
         String newName = request.name == null ? oldName : validateNameEntity(request.name);
