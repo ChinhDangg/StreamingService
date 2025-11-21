@@ -17,26 +17,26 @@ public class NameEntityModifyController {
 
     private final NameEntityModifyService nameEntityModifyService;
 
-    @GetMapping("/authors/{name}")
-    public ResponseEntity<List<NameEntityDTO>> searchAuthors(@PathVariable String name) throws IOException {
+    @GetMapping("/authors")
+    public ResponseEntity<List<NameEntityDTO>> searchAuthors(@RequestParam String name) throws IOException {
         return ResponseEntity.ok().body(
                 nameEntityModifyService.searchNameContaining(ContentMetaData.AUTHORS, name));
     }
 
-    @GetMapping("/characters/{name}")
-    public ResponseEntity<List<NameEntityDTO>> searchCharacters(@PathVariable String name) throws IOException {
+    @GetMapping("/characters")
+    public ResponseEntity<List<NameEntityDTO>> searchCharacters(@RequestParam  String name) throws IOException {
         return ResponseEntity.ok().body(
                 nameEntityModifyService.searchNameContaining(ContentMetaData.CHARACTERS, name));
     }
 
-    @GetMapping("/universes/{name}")
-    public ResponseEntity<List<NameEntityDTO>> searchUniverses(@PathVariable String name) throws IOException {
+    @GetMapping("/universes")
+    public ResponseEntity<List<NameEntityDTO>> searchUniverses(@RequestParam String name) throws IOException {
         return ResponseEntity.ok().body(
                 nameEntityModifyService.searchNameContaining(ContentMetaData.UNIVERSES, name));
     }
 
-    @GetMapping("/tags/{name}")
-    public ResponseEntity<List<NameEntityDTO>> searchTags(@PathVariable String name) throws IOException {
+    @GetMapping("/tags")
+    public ResponseEntity<List<NameEntityDTO>> searchTags(@RequestParam String name) throws IOException {
         return ResponseEntity.ok().body(
                 nameEntityModifyService.searchNameContaining(ContentMetaData.TAGS, name));
     }
