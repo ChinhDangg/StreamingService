@@ -148,7 +148,7 @@ public class OpenSearchService {
                 .document(doc)
                 .opType(OpType.Create)
         );
-        System.out.println("Indexed with id: " + response.id());
+        System.out.println("Indexed doc with id: " + response.id());
     }
 
     public void addFieldsToDocument(String indexName, long id, Map<String, Object> fields) throws IOException {
