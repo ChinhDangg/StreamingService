@@ -74,6 +74,7 @@ public class NameEntityModifyService {
         name = validateNameEntity(name);
         Long id = null;
         try {
+            mediaNameEntity.setName(name);
             T added = repository.save(mediaNameEntity);
             id = added.getId();
             openSearchService.indexDocument(listName, id, Map.of(ContentMetaData.NAME, name));
