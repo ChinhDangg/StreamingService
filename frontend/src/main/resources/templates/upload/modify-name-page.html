@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Name Entities Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-900 min-h-screen p-6 text-gray-200">
+
+<div class="max-w-6xl mx-auto bg-gray-900 px-2">
+
+    <!-- Header -->
+    <h1 class="text-4xl font-extrabold tracking-tight text-white mb-6">
+        Name Entities Manager
+    </h1>
+
+    <div class="flex space-x-3 mb-6">
+        <button id="add-name-option-btn" class="px-4 py-2 rounded-lg text-white shadow border border-gray-700 bg-gray-800">
+            Add
+        </button>
+        <button id="update-name-option-btn" class="px-4 py-2 rounded-lg text-white shadow border border-gray-700 bg-gray-800">
+            Update
+        </button>
+    </div>
+
+    <!-- Tabs -->
+    <div id="entity-tab-container" class="flex mb-6">
+        <button class="entity-tab-btn hidden mr-3 px-4 py-2 rounded-lg text-white shadow border border-gray-700 bg-gray-800">
+            Name
+        </button>
+    </div>
+
+
+    <!-- Layout Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+        <!-- Existing Entries Panel -->
+        <div class="bg-gray-800 p-5 rounded-xl shadow-lg border border-gray-700">
+
+            <div class="flex flex-col gap-2 mb-4">
+                <h2 class="text-xl font-bold text-white">Existing Entries</h2>
+
+                <input id="searchNameInput" type="text"
+                       placeholder="Search..." autocomplete="off"
+                       class="px-3 py-2 w-full bg-gray-900 border border-gray-700 rounded-lg w-40 text-gray-200 placeholder-gray-500 focus:ring-2 focus:ring-blue-500" />
+            </div>
+
+            <div id="searchEntryList" class="h-[420px] overflow-y-auto border border-gray-700 rounded-lg p-3 space-y-2 bg-gray-900">
+                <div class="search-entry-item hidden p-2 border border-gray-300 rounded-lg bg-gray-900 hover:bg-gray-700 cursor-pointer transition text-gray-300">
+                    Jane Doe
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Add/Update Panel -->
+        <div class="bg-gray-800 p-5 rounded-xl shadow-lg border border-gray-700">
+
+            <h2 id="addUpdateTitle" class="text-xl font-bold text-white mb-4">Add / Update Entry</h2>
+
+            <div id="entityForm" class="space-y-4">
+
+                <!-- Type -->
+                <div>
+                    <label for="entityTypeInput" class="block font-medium text-gray-300 mb-1">
+                        Entity Type
+                    </label>
+                    <input id="entityTypeInput" type="text" readonly value="Authors"
+                           class="px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg w-full text-gray-300" />
+                </div>
+
+                <!-- ID -->
+                <div id="entityIdContainer">
+                    <label for="entityIdInput" class="block font-medium text-gray-300 mb-1">
+                        ID (for update)
+                    </label>
+                    <input id="entityIdInput" readonly type="number" value="Select one from Search to update" placeholder="Select one from Search to update"
+                           class="px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg w-full text-gray-300 placeholder-gray-500" />
+                </div>
+
+                <!-- Name -->
+                <div>
+                    <label for="entityNameInput" class="block font-medium text-gray-300 mb-1">
+                        Name
+                    </label>
+                    <input id="entityNameInput" autocomplete="off" type="text" placeholder="Name..." class="px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg w-full text-gray-200 placeholder-gray-500" />
+                </div>
+
+                <div id="imageUploadContainer">
+                    <!-- Upload Image -->
+                    <div>
+                        <label for="entityImageInput" class="block font-medium text-gray-300 mb-1">
+                            Upload Image (only one)
+                        </label>
+
+                        <!-- Hidden actual input -->
+                        <input id="entityImageInput" type="file" accept="image/*" class="hidden"/>
+
+                        <!-- Fancy button -->
+                        <button id="entityImageInputBtn" type="button"
+                                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow w-full text-left">
+                            Select Image…
+                        </button>
+                    </div>
+
+                    <!-- Preview Current Image -->
+                    <div>
+                        <div class="relative w-32 h-32 bg-gray-900 border border-gray-700 rounded-lg overflow-hidden flex items-center justify-center">
+                            <!-- Underneath (default text) -->
+                            <span id="noImageText" class="absolute text-gray-500 text-sm">
+                                No image uploaded
+                            </span>
+                            <!-- On top (image always rendered above text) -->
+                            <img id="currentImagePreview" src="" alt="No Image"
+                                 class="absolute inset-0 object-cover select-none w-full h-full hidden" />
+                        </div>
+                    </div>
+                </div>
+
+                <div id="warningMessage"
+                     class="hidden px-4 py-2 rounded-lg bg-yellow-600/20 border border-yellow-600 text-yellow-300 text-sm">
+                    Name is missing
+                </div>
+
+                <!-- Buttons -->
+                <div class="flex space-x-3">
+                    <button type="button" id="saveBtn" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg shadow">
+                        Save
+                    </button>
+
+                    <button type="reset" id="clearBtn" class="px-5 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg">
+                        Clear
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script type="module" th:src="@{/static/js/upload/modify-name-page.js}" src="/static/js/upload/modify-name-page.js"></script>
+
+</body>
+</html>
