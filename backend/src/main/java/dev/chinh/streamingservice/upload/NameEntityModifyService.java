@@ -49,13 +49,6 @@ public class NameEntityModifyService {
     }
 
 
-    public record NameAndThumbnailPostRequest(
-            @NotBlank
-            String name,
-            @NotNull
-            MultipartFile thumbnail
-    ) {}
-
     @Transactional
     public void addAuthor(String name) {
         addNameEntity(name, ContentMetaData.AUTHORS, new MediaAuthor(name, Instant.now()), mediaAuthorRepository);
@@ -63,12 +56,12 @@ public class NameEntityModifyService {
 
     @Transactional
     public void addCharacter(NameAndThumbnailPostRequest request) {
-        addNameEntity(request, ContentMetaData.CHARACTERS, new MediaCharacter(request.name, Instant.now()), mediaCharacterRepository);
+        addNameEntity(request, ContentMetaData.CHARACTERS, new MediaCharacter(request.getName(), Instant.now()), mediaCharacterRepository);
     }
 
     @Transactional
     public void addUniverse(NameAndThumbnailPostRequest request) {
-        addNameEntity(request, ContentMetaData.UNIVERSES, new MediaUniverse(request.name, Instant.now()), mediaUniverseRepository);
+        addNameEntity(request, ContentMetaData.UNIVERSES, new MediaUniverse(request.getName(), Instant.now()), mediaUniverseRepository);
     }
 
     @Transactional
@@ -100,6 +93,8 @@ public class NameEntityModifyService {
     }
 
     private void handleDeleteDocumentOnFailure(String indexName, Long id) {
+        if (id == null)
+            return;
         try {
             openSearchService.deleteDocument(indexName, id);
         } catch (IOException ioe) {
@@ -109,17 +104,17 @@ public class NameEntityModifyService {
 
     @Transactional
     protected <T extends MediaNameEntityWithThumbnail> void addNameEntity(NameAndThumbnailPostRequest request, String listName, T mediaNameEntity, MediaNameEntityRepository<T, Long> repository) {
-        String extension = request.thumbnail.getOriginalFilename() == null ? ".jpg"
-                : request.thumbnail.getOriginalFilename().substring(request.thumbnail.getOriginalFilename().lastIndexOf("."));
+        String extension = request.getThumbnail().getOriginalFilename() == null ? ".jpg"
+                : request.getThumbnail().getOriginalFilename().substring(request.getThumbnail().getOriginalFilename().lastIndexOf("."));
 
-        String path = listName + "/" + request.name + extension;
+        String path = listName + "/" + request.getName() + extension;
 
         try {
             // upload first to not start transaction first and hold the database connection
-            minIOService.uploadFile(ThumbnailService.thumbnailBucket, path, request.thumbnail);
+            minIOService.uploadFile(ThumbnailService.thumbnailBucket, path, request.getThumbnail());
 
             mediaNameEntity.setThumbnail(path);
-            addNameEntity(request.name, listName, mediaNameEntity, repository);
+            addNameEntity(request.getName(), listName, mediaNameEntity, repository);
         } catch (Exception e) {
             try {
                 minIOService.removeFile(ThumbnailService.thumbnailBucket, path);
@@ -164,12 +159,12 @@ public class NameEntityModifyService {
 
     @Transactional
     protected <T extends MediaNameEntityWithThumbnail> void updateNameEntity(long id, NameAndThumbnailPostRequest request, String listName, MediaNameEntityRepository<T, Long> repository) {
-        if (request.thumbnail == null && (request.name == null || request.name.isBlank()))
+        if (request.getThumbnail() == null && (request.getName() == null || request.getName().isBlank()))
             throw new IllegalArgumentException("No name or thumbnail provided");
 
         T nameEntity = findById(id, listName, repository);
         String oldName = nameEntity.getName();
-        String newName = request.name == null ? oldName : validateNameEntity(request.name);
+        String newName = request.getName() == null ? oldName : validateNameEntity(request.getName());
 
         // The old thumbnail path to be deleted upon successful commit
         String oldThumbnailPath = nameEntity.getThumbnail();
@@ -177,13 +172,13 @@ public class NameEntityModifyService {
 
         try {
             // --- 1. UPLOAD NEW FILE FIRST (OUTSIDE TRANSACTION) ---
-            if (request.thumbnail != null) {
-                String extension = request.thumbnail.getOriginalFilename() == null ? ".jpg" :
-                        request.thumbnail.getOriginalFilename().substring(request.thumbnail.getOriginalFilename().lastIndexOf("."));
+            if (request.getThumbnail() != null) {
+                String extension = request.getThumbnail().getOriginalFilename() == null ? ".jpg" :
+                        request.getThumbnail().getOriginalFilename().substring(request.getThumbnail().getOriginalFilename().lastIndexOf("."));
 
                 newThumbnailPath = listName + "/" + UUID.randomUUID() + extension;
                 
-                minIOService.uploadFile(ThumbnailService.thumbnailBucket, newThumbnailPath, request.thumbnail);
+                minIOService.uploadFile(ThumbnailService.thumbnailBucket, newThumbnailPath, request.getThumbnail());
             }
 
             // START/COMMIT TRANSACTION ---
@@ -208,7 +203,7 @@ public class NameEntityModifyService {
             // Handle constraint violation (DB rolled back automatically)
             handleUploadRollback(newThumbnailPath);
             handleSetOldNameBackOnFailure(listName, id, oldName, newName);
-            throw new DuplicateEntryException("The name entry '" + request.name + "' already exists in the " + listName + " list.");
+            throw new DuplicateEntryException("The name entry '" + request.getName() + "' already exists in the " + listName + " list.");
         } catch (Exception e) {
             // Handle other failures (e.g., MinIO upload failed, or other exceptions)
             handleSetOldNameBackOnFailure(listName, id, oldName, newName);
