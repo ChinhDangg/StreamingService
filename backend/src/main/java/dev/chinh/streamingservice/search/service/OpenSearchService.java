@@ -151,15 +151,6 @@ public class OpenSearchService {
         System.out.println("Indexed doc with id: " + response.id());
     }
 
-    public void addFieldsToDocument(String indexName, long id, Map<String, Object> fields) throws IOException {
-        UpdateResponse<Object> response = client.update(u -> u
-                .index(indexName)
-                .id(String.valueOf(id))
-                .doc(fields), Object.class
-        );
-        System.out.println("Document updated, result: " + response.result());
-    }
-
     /**
      * Will replace all existing fields with new values.
      * Will add new fields if doesn't exist previously.

@@ -189,7 +189,7 @@ public class NameEntityModifyService {
 
             if (!oldName.equals(newName)) {
                 nameEntity.setName(newName);
-                openSearchService.addFieldsToDocument(listName, id, Map.of(ContentMetaData.NAME, newName));
+                openSearchService.partialUpdateDocument(listName, id, Map.of(ContentMetaData.NAME, newName));
             }
             if (newThumbnailPath != null || !oldName.equals(newName)) {
                 repository.save(nameEntity);
@@ -230,7 +230,7 @@ public class NameEntityModifyService {
         if (oldName.equals(newName))
             return;
         try {
-            openSearchService.addFieldsToDocument(indexName, id, Map.of(ContentMetaData.NAME, oldName));
+            openSearchService.partialUpdateDocument(indexName, id, Map.of(ContentMetaData.NAME, oldName));
         } catch (IOException e) {
             throw new RuntimeException("Critical: Failed to update OpenSearch index to revert name change", e);
         }
