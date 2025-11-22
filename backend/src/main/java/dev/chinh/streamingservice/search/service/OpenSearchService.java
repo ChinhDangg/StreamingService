@@ -210,7 +210,6 @@ public class OpenSearchService {
                         )
                 , clazz
         );
-        response.hits().hits().forEach(hit -> System.out.println(hit.source()));
 
         return response;
     }
@@ -240,7 +239,7 @@ public class OpenSearchService {
 
                 BoolQuery.Builder groupBool = new BoolQuery.Builder();
 
-                if (group.isMustAll()) {
+                if (group.isMatchAll()) {
                     for (Object value : values) {
                         groupBool.must(buildTermOrMatch(field, value, group.isSearchTerm()));
                     }

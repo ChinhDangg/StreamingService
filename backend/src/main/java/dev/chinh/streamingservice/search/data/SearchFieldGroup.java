@@ -12,12 +12,12 @@ public class SearchFieldGroup {
     private String field;
     private Set<Object> values;
     private boolean searchTerm;
-    private boolean mustAll; // true = AND, false = OR
+    private boolean matchAll; // true = AND, false = OR
 
-    public SearchFieldGroup(String field, Set<Object> values, boolean mustAll,  boolean searchTerm) {
+    public SearchFieldGroup(String field, Set<Object> values, boolean matchAll, boolean searchTerm) {
         this.field = field;
         this.values = values;
-        this.mustAll = mustAll;
+        this.matchAll = matchAll;
         this.searchTerm = searchTerm;
     }
 }
