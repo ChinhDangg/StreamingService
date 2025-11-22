@@ -30,8 +30,8 @@ const SEARCH_INFO = Object.freeze({
     SORT_BY: 'sortBy',
     SORT_ORDER: 'sortOrder',
     SEARCH_STRING: 'searchString',
-    KEYWORD_FIELD: 'keywordField',
-    KEYWORD_VALUE_LIST: 'keywordValueList',
+    KEYWORD_FIELD: 'keyField',
+    KEYWORD_VALUE_LIST: 'keys',
     KEYWORD_MATCH_ALL: 'matchAll',
     ADVANCE_REQUEST_BODY: 'advanceRequestBody',
     SEARCH_TYPE: 'searchType'
@@ -42,6 +42,7 @@ const keywordSearchMap = new Map();
 let previousSortByButton = null;
 
 async function initialize() {
+    const url = new URL(window.location.href);
     const urlParams = new URLSearchParams(window.location.search);
     currentSearchInfo.set(SEARCH_INFO.PAGE, urlParams.get(SEARCH_INFO.PAGE) || 0);
     currentSearchInfo.set(SEARCH_INFO.SORT_BY, urlParams.get(SEARCH_INFO.SORT_BY) || SORT_BY.Upload);
@@ -49,16 +50,15 @@ async function initialize() {
     currentSearchInfo.set(SEARCH_INFO.SEARCH_STRING, urlParams.get(SEARCH_INFO.SEARCH_STRING));
 
     let field = null;
-    let values = null;
-    for (const key of Object.values(KEYWORDS)) {
-        if (urlParams.has(key)) {
-            field = key;
-            values = urlParams.getAll(key);
-            break; // stop at the first matching keyword
+    for (const value of Object.values(KEYWORDS)) {
+        if (url.pathname.endsWith(value)) {
+            field = value;
+            break;
         }
     }
     currentSearchInfo.set(SEARCH_INFO.KEYWORD_FIELD, field);
-    currentSearchInfo.set(SEARCH_INFO.KEYWORD_VALUE_LIST, values);
+    currentSearchInfo.set(SEARCH_INFO.KEYWORD_VALUE_LIST, urlParams.get(SEARCH_INFO.KEYWORD_VALUE_LIST));
+
     currentSearchInfo.set(SEARCH_INFO.KEYWORD_MATCH_ALL, urlParams.get(SEARCH_INFO.KEYWORD_MATCH_ALL) === 'true');
     currentSearchInfo.set(SEARCH_INFO.ADVANCE_REQUEST_BODY, null);
     if (currentSearchInfo.get(SEARCH_INFO.SEARCH_STRING))
@@ -69,6 +69,8 @@ async function initialize() {
         currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, SEARCH_TYPES.ADVANCE);
     else
         currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, urlParams.get(SEARCH_INFO.SEARCH_TYPE));
+
+    console.log(currentSearchInfo);
 
     initializeSearchPageTitle();
     initializeBasicSearchArea();
@@ -149,12 +151,12 @@ function initializeAdvanceSearchArea() {
         advanceSortByOptions.appendChild(sortByOption);
     });
 
-    const advanceSortOrderOptions = document.getElementById('advanceOrderByOptions');
-    const sortOrderOptionTem = advanceSortOrderOptions.querySelector('.order-by-option');
+    const advanceSortOrderOptions = document.getElementById('advanceSortOrderOptions');
+    const sortOrderOptionTem = advanceSortOrderOptions.querySelector('.sort-order-option');
     Object.entries(SORT_ORDERS).forEach(([key, value]) => {
         const sortOrderOption = helperCloneAndUnHideNode(sortOrderOptionTem);
         const input = sortOrderOption.querySelector('input');
-        input.name = 'orderBy';
+        input.name = 'sortOrder';
         input.value = value;
         sortOrderOption.querySelector('span').textContent = key;
         advanceSortOrderOptions.appendChild(sortOrderOption);
@@ -165,7 +167,7 @@ function initializeAdvanceSearchArea() {
         if (advanceIsSubmitting)
             return;
         const sortBy = advanceSearchForm.querySelector('input[name="sortBy"]:checked')?.value;
-        const orderBy = advanceSearchForm.querySelector('input[name="orderBy"]:checked')?.value;
+        const orderBy = advanceSearchForm.querySelector('input[name="sortOrder"]:checked')?.value;
         const yearFrom = advanceSearchForm.querySelector('.year-from-input').value;
         const yearTo = advanceSearchForm.querySelector('.year-to-input').value;
         const uploadFrom = advanceSearchForm.querySelector('.upload-from-input').value;
@@ -610,39 +612,39 @@ function getSearchUrl(searchType, page, sortBy, sortOrder,
 
 function getMatchAllSearchUrl(page, sortBy, sortOrder) {
     const queryParams = new URLSearchParams({
-        page: page,
-        sortBy: sortBy,
-        sortOrder: sortOrder
+        [SEARCH_INFO.PAGE]: page,
+        [SEARCH_INFO.SORT_BY]: sortBy,
+        [SEARCH_INFO.SORT_ORDER]: sortOrder
     });
     return `/api/search/match-all?${queryParams}`;
 }
 
 function getBasicSearchUrl(searchString, page, sortBy, sortOrder) {
     const queryParams = new URLSearchParams({
-        searchString: searchString,
-        page: page,
-        sortBy: sortBy,
-        sortOrder: sortOrder
+        [SEARCH_INFO.SEARCH_STRING]: searchString,
+        [SEARCH_INFO.PAGE]: page,
+        [SEARCH_INFO.SORT_BY]: sortBy,
+        [SEARCH_INFO.SORT_ORDER]: sortOrder
     });
     return `/api/search?${queryParams}`;
 }
 
 function getKeywordSearchUrl(keywordField, keywordValueList, keywordMatchAll, page, sortBy, sortOrder) {
     const queryParams = new URLSearchParams({
-        s: keywordValueList,
-        matchAll: keywordMatchAll,
-        page: page,
-        sortBy: sortBy,
-        sortOrder: sortOrder
+        [SEARCH_INFO.KEYWORD_VALUE_LIST]: keywordValueList,
+        [SEARCH_INFO.KEYWORD_MATCH_ALL]: keywordMatchAll,
+        [SEARCH_INFO.PAGE]: page,
+        [SEARCH_INFO.SORT_BY]: sortBy,
+        [SEARCH_INFO.SORT_ORDER]: sortOrder
     });
     return `/api/search/${keywordField}?${queryParams}`;
 }
 
 function getAdvanceSearchUrl(page, sortBy, sortOrder) {
     const queryParams = new URLSearchParams({
-        page: page,
-        sortBy: sortBy,
-        sortOrder: sortOrder
+        [SEARCH_INFO.PAGE]: page,
+        [SEARCH_INFO.SORT_BY]: sortBy,
+        [SEARCH_INFO.SORT_ORDER]: sortOrder
     });
     return `/api/search/advance?${queryParams}`;
 }
