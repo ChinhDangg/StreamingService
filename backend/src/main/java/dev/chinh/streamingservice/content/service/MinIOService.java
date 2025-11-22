@@ -107,6 +107,7 @@ public class MinIOService {
                             .build()
             );
         }
+        System.out.println("Uploaded object " + bucket + "/" + object);
     }
 
     public void removeFile(String bucket, String object) throws Exception {
@@ -116,6 +117,7 @@ public class MinIOService {
                         .object(object)
                         .build()
         );
+        System.out.println("Removed object " + bucket + "/" + object);
     }
 
     public void moveFileToObject(String bucket, String object, String filePath) throws Exception {
