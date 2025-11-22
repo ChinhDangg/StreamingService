@@ -2,15 +2,14 @@ package dev.chinh.streamingservice.data.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.data.ContentMetaData;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
+import org.simpleframework.xml.Default;
 
 import java.time.Instant;
 
 @Getter
 @Setter
-@AllArgsConstructor
 public class MediaNameEntry {
 
     @JsonProperty(ContentMetaData.NAME)
@@ -24,4 +23,18 @@ public class MediaNameEntry {
 
     @JsonProperty(ContentMetaData.THUMBNAIL)
     private String thumbnail;
+
+    @Default
+    public MediaNameEntry(String name, int length, Instant uploadDate, String thumbnail) {
+        this.name = name;
+        this.length = length;
+        this.uploadDate = uploadDate;
+        this.thumbnail = thumbnail;
+    }
+
+    public MediaNameEntry(String name, int length, Instant uploadDate) {
+        this.name = name;
+        this.length = length;
+        this.uploadDate = uploadDate;
+    }
 }
