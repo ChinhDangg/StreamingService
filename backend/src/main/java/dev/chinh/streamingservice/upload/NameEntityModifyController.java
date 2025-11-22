@@ -4,6 +4,7 @@ import dev.chinh.streamingservice.data.ContentMetaData;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.apache.hc.core5.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -48,14 +49,14 @@ public class NameEntityModifyController {
         return ResponseEntity.status(HttpStatus.SC_CREATED).build();
     }
 
-    @PostMapping("/characters")
-    public ResponseEntity<Void> addCharacter(@Valid @RequestBody NameEntityModifyService.NameAndThumbnailPostRequest request) {
+    @PostMapping(value = "/characters", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Void> addCharacter(@Valid @ModelAttribute NameAndThumbnailPostRequest request) {
         nameEntityModifyService.addCharacter(request);
         return ResponseEntity.status(HttpStatus.SC_CREATED).build();
     }
 
-    @PostMapping("/universes")
-    public ResponseEntity<Void> addUniverse(@Valid @RequestBody NameEntityModifyService.NameAndThumbnailPostRequest request) {
+    @PostMapping(value = "/universes", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Void> addUniverse(@Valid @ModelAttribute NameAndThumbnailPostRequest request) {
         nameEntityModifyService.addUniverse(request);
         return ResponseEntity.status(HttpStatus.SC_CREATED).build();
     }
@@ -73,16 +74,16 @@ public class NameEntityModifyController {
         return ResponseEntity.ok().build();
     }
 
-    @PutMapping("/characters/{id}")
+    @PutMapping(value = "/characters/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Void> updateCharacter(@PathVariable long id,
-                                                @RequestBody NameEntityModifyService.NameAndThumbnailPostRequest request) {
+                                                @ModelAttribute NameAndThumbnailPostRequest request) {
         nameEntityModifyService.updateCharacter(id, request);
         return ResponseEntity.ok().build();
     }
 
-    @PutMapping("/universes/{id}")
+    @PutMapping(value = "/universes/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Void> updateUniverse(@PathVariable long id,
-                                               @RequestBody NameEntityModifyService.NameAndThumbnailPostRequest request) {
+                                               @ModelAttribute NameAndThumbnailPostRequest request) {
         nameEntityModifyService.updateUniverse(id, request);
         return ResponseEntity.ok().build();
     }
