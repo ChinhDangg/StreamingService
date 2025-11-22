@@ -43,4 +43,9 @@ public class PageController {
     public String albumGrouperPage() {
         return "album-grouper/album-grouper-page";
     }
+
+    @GetMapping("/modify/name")
+    public String modifyNamePage() {
+        return "upload/modify-name-page";
+    }
 }
