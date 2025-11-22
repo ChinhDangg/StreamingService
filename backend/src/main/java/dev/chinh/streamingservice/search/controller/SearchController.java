@@ -24,13 +24,6 @@ public class SearchController {
     private final MediaSearchService mediaSearchService;
     private final int pageSize = 20;
 
-    public record MediaKeyWordSearchRequest(
-            @NotNull @NotBlank
-            String field,
-            @NotNull
-            List<Object> text
-    ) {}
-
     @PostMapping
     public ResponseEntity<MediaSearchResult> search(@RequestParam String searchString,
                                                     @RequestParam(required = false) int page,
@@ -47,49 +40,44 @@ public class SearchController {
         return ResponseEntity.ok().body(mediaSearchService.advanceSearch(mediaSearchRequest, page, pageSize, sortBy, sortOrder));
     }
 
-    @PostMapping("/keyword")
-    public ResponseEntity<MediaSearchResult> keywordSearch(@Valid @RequestBody MediaKeyWordSearchRequest searchRequest,
-                                                           @RequestParam(required = false) int page,
-                                                           @RequestParam(required = false) SortBy sortBy,
-                                                           @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
-        return ResponseEntity.ok().body(
-                mediaSearchService.searchByKeywords(searchRequest.field,  searchRequest.text, page, pageSize, sortBy, sortOrder));
-    }
-
     @PostMapping("/universes")
     public ResponseEntity<MediaSearchResult> universesSearch(@RequestParam(name = "s") List<Object> universes,
-                                                           @RequestParam(required = false) int page,
-                                                           @RequestParam(required = false) SortBy sortBy,
-                                                           @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
+                                                             @RequestParam(required = false, defaultValue = "true") boolean matchAll,
+                                                             @RequestParam(required = false) int page,
+                                                             @RequestParam(required = false) SortBy sortBy,
+                                                             @RequestParam(required = false) SortOrder sortOrder) throws IOException {
         return ResponseEntity.ok().body(
-                mediaSearchService.searchByKeywords(ContentMetaData.UNIVERSES, universes, page, pageSize, sortBy, sortOrder));
+                mediaSearchService.searchByKeywords(ContentMetaData.UNIVERSES, universes, matchAll, page, pageSize, sortBy, sortOrder));
     }
 
     @PostMapping("/characters")
     public ResponseEntity<MediaSearchResult> charactersSearch(@RequestParam(name = "s") List<Object> characters,
-                                                             @RequestParam(required = false) int page,
-                                                             @RequestParam(required = false) SortBy sortBy,
-                                                             @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
-        return ResponseEntity.ok().body(
-                mediaSearchService.searchByKeywords(ContentMetaData.CHARACTERS, characters, page, pageSize, sortBy, sortOrder));
-    }
-
-    @PostMapping("/authors")
-    public ResponseEntity<MediaSearchResult> authorsSearch(@RequestParam(name = "s") List<Object> authors,
-                                                           @RequestParam(required = false) int page,
-                                                           @RequestParam(required = false) SortBy sortBy,
-                                                           @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
-        return ResponseEntity.ok().body(
-                mediaSearchService.searchByKeywords(ContentMetaData.AUTHORS, authors, page, pageSize, sortBy, sortOrder));
-    }
-
-    @PostMapping("/tags")
-    public ResponseEntity<MediaSearchResult> tagsSearch(@RequestParam(name = "s") List<Object> tags,
+                                                              @RequestParam(required = false, defaultValue = "true") boolean matchAll,
                                                               @RequestParam(required = false) int page,
                                                               @RequestParam(required = false) SortBy sortBy,
                                                               @RequestParam(required = false) SortOrder sortOrder) throws IOException {
         return ResponseEntity.ok().body(
-                mediaSearchService.searchByKeywords(ContentMetaData.TAGS, tags, page, pageSize, sortBy, sortOrder));
+                mediaSearchService.searchByKeywords(ContentMetaData.CHARACTERS, characters, matchAll, page, pageSize, sortBy, sortOrder));
+    }
+
+    @PostMapping("/authors")
+    public ResponseEntity<MediaSearchResult> authorsSearch(@RequestParam(name = "s") List<Object> authors,
+                                                           @RequestParam(required = false, defaultValue = "true") boolean matchAll,
+                                                           @RequestParam(required = false) int page,
+                                                           @RequestParam(required = false) SortBy sortBy,
+                                                           @RequestParam(required = false) SortOrder sortOrder) throws IOException {
+        return ResponseEntity.ok().body(
+                mediaSearchService.searchByKeywords(ContentMetaData.AUTHORS, authors, matchAll, page, pageSize, sortBy, sortOrder));
+    }
+
+    @PostMapping("/tags")
+    public ResponseEntity<MediaSearchResult> tagsSearch(@RequestParam(name = "s") List<Object> tags,
+                                                        @RequestParam(required = false, defaultValue = "true") boolean matchAll,
+                                                        @RequestParam(required = false) int page,
+                                                        @RequestParam(required = false) SortBy sortBy,
+                                                        @RequestParam(required = false) SortOrder sortOrder) throws IOException {
+        return ResponseEntity.ok().body(
+                mediaSearchService.searchByKeywords(ContentMetaData.TAGS, tags, matchAll, page, pageSize, sortBy, sortOrder));
     }
 
     @PostMapping("/match-all")
