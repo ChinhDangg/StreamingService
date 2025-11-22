@@ -41,7 +41,7 @@ public class SearchController {
     }
 
     @PostMapping("/universes")
-    public ResponseEntity<MediaSearchResult> universesSearch(@RequestParam(name = "s") List<Object> universes,
+    public ResponseEntity<MediaSearchResult> universesSearch(@RequestParam(name = "keys") List<Object> universes,
                                                              @RequestParam(required = false, defaultValue = "true") boolean matchAll,
                                                              @RequestParam(required = false) int page,
                                                              @RequestParam(required = false) SortBy sortBy,
@@ -51,7 +51,7 @@ public class SearchController {
     }
 
     @PostMapping("/characters")
-    public ResponseEntity<MediaSearchResult> charactersSearch(@RequestParam(name = "s") List<Object> characters,
+    public ResponseEntity<MediaSearchResult> charactersSearch(@RequestParam(name = "keys") List<Object> characters,
                                                               @RequestParam(required = false, defaultValue = "true") boolean matchAll,
                                                               @RequestParam(required = false) int page,
                                                               @RequestParam(required = false) SortBy sortBy,
@@ -61,7 +61,7 @@ public class SearchController {
     }
 
     @PostMapping("/authors")
-    public ResponseEntity<MediaSearchResult> authorsSearch(@RequestParam(name = "s") List<Object> authors,
+    public ResponseEntity<MediaSearchResult> authorsSearch(@RequestParam(name = "keys") List<Object> authors,
                                                            @RequestParam(required = false, defaultValue = "true") boolean matchAll,
                                                            @RequestParam(required = false) int page,
                                                            @RequestParam(required = false) SortBy sortBy,
@@ -71,7 +71,7 @@ public class SearchController {
     }
 
     @PostMapping("/tags")
-    public ResponseEntity<MediaSearchResult> tagsSearch(@RequestParam(name = "s") List<Object> tags,
+    public ResponseEntity<MediaSearchResult> tagsSearch(@RequestParam(name = "keys") List<Object> tags,
                                                         @RequestParam(required = false, defaultValue = "true") boolean matchAll,
                                                         @RequestParam(required = false) int page,
                                                         @RequestParam(required = false) SortBy sortBy,
