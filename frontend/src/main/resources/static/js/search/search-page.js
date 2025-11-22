@@ -32,6 +32,7 @@ const SEARCH_INFO = Object.freeze({
     SEARCH_STRING: 'searchString',
     KEYWORD_FIELD: 'keywordField',
     KEYWORD_VALUE_LIST: 'keywordValueList',
+    KEYWORD_MATCH_ALL: 'matchAll',
     ADVANCE_REQUEST_BODY: 'advanceRequestBody',
     SEARCH_TYPE: 'searchType'
 });
@@ -58,6 +59,7 @@ async function initialize() {
     }
     currentSearchInfo.set(SEARCH_INFO.KEYWORD_FIELD, field);
     currentSearchInfo.set(SEARCH_INFO.KEYWORD_VALUE_LIST, values);
+    currentSearchInfo.set(SEARCH_INFO.KEYWORD_MATCH_ALL, urlParams.get(SEARCH_INFO.KEYWORD_MATCH_ALL) === 'true');
     currentSearchInfo.set(SEARCH_INFO.ADVANCE_REQUEST_BODY, null);
     if (currentSearchInfo.get(SEARCH_INFO.SEARCH_STRING))
         currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, SEARCH_TYPES.BASIC);
@@ -166,18 +168,19 @@ function initializeAdvanceSearchArea() {
         const includeFields = [];
         const excludeFields = [];
 
-        const getSearchField = (field, values, mustAll) => {
+        const getSearchField = (field, values, matchAll) => {
             return {
                 field: field,
                 values: values,
-                mustAll: mustAll
+                matchAll: matchAll
             }
         }
 
         let keywordCount = 0;
         Object.keys(KEYWORDS).forEach(key => {
             const value = KEYWORDS[key];
-            const keywordMap = keywordSearchMap.get(value);
+            const keywordMap = keywordSearchMap.get(value).keywordMap;
+            const matchAll = keywordSearchMap.get(value).matchAll;
             if (keywordMap.size !== 0) {
                 const include = [];
                 const exclude = [];
@@ -188,9 +191,9 @@ function initializeAdvanceSearchArea() {
                        exclude.push(key);
                 });
                 if (include.length)
-                    includeFields.push(getSearchField(value, include, true));
+                    includeFields.push(getSearchField(value, include, matchAll));
                 if (exclude.length)
-                    excludeFields.push(getSearchField(value, exclude, false));
+                    excludeFields.push(getSearchField(value, exclude, true)); // always exclude so match all is not needed
                 keywordCount++;
             }
         });
@@ -203,6 +206,7 @@ function initializeAdvanceSearchArea() {
             currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, orderBy);
             currentSearchInfo.set(SEARCH_INFO.KEYWORD_FIELD, includeFields[0].field);
             currentSearchInfo.set(SEARCH_INFO.KEYWORD_VALUE_LIST, includeFields[0].values);
+            currentSearchInfo.set(SEARCH_INFO.KEYWORD_MATCH_ALL, includeFields[0].matchAll);
             advanceIsSubmitting = true;
             sendSearchRequestOnCurrentInfo().then(() => {
                 advanceIsSubmitting = false;
@@ -247,30 +251,32 @@ function initializeKeywordSearchArea() {
     const keywordSearchContainer = document.getElementById('keywordSearchContainer');
     const keywordSearchTem = keywordSearchContainer.querySelector('.keyword-search');
 
-    const authorMap = new Map();
-    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.AUTHOR), authorMap, KEYWORDS.AUTHOR, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
-    const characterMap = new Map();
-    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.CHARACTER), characterMap, KEYWORDS.CHARACTER, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
-    const universeMap = new Map();
-    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.UNIVERSE), universeMap, KEYWORDS.UNIVERSE, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
-    const tagMap = new Map();
-    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.TAG), tagMap, KEYWORDS.TAG, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
-
-    keywordSearchMap.set(KEYWORDS.AUTHOR, authorMap);
-    keywordSearchMap.set(KEYWORDS.CHARACTER, characterMap);
-    keywordSearchMap.set(KEYWORDS.UNIVERSE, universeMap);
-    keywordSearchMap.set(KEYWORDS.TAG, tagMap);
+    keywordSearchMap.set(KEYWORDS.AUTHOR, { keywordMap: new Map(), matchAll: false });
+    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.AUTHOR), keywordSearchMap.get(KEYWORDS.AUTHOR),
+        KEYWORDS.AUTHOR, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
+    keywordSearchMap.set(KEYWORDS.CHARACTER, { keywordMap: new Map(), matchAll: false });
+    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.CHARACTER), keywordSearchMap.get(KEYWORDS.CHARACTER),
+        KEYWORDS.CHARACTER, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
+    keywordSearchMap.set(KEYWORDS.UNIVERSE, { keywordMap: new Map(), matchAll: false });
+    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.UNIVERSE), keywordSearchMap.get(KEYWORDS.UNIVERSE),
+        KEYWORDS.UNIVERSE, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
+    keywordSearchMap.set(KEYWORDS.TAG, { keywordMap: new Map(), matchAll: false });
+    addEventKeywordSearchArea(makeSearchFn(KEYWORDS.TAG), keywordSearchMap.get(KEYWORDS.TAG), KEYWORDS.TAG, keywordSearchContainer.appendChild(helperCloneAndUnHideNode(keywordSearchTem)));
 }
 
-function addEventKeywordSearchArea(fnKeywordSearch, addedMap, searchLabel, searchContainer) {
+function addEventKeywordSearchArea(fnKeywordSearch, keywordSearchMap, searchLabel, searchContainer) {
     searchLabel = searchLabel.charAt(0).toUpperCase() + searchLabel.slice(1);
     searchContainer.querySelector('.search-label-text').textContent = searchLabel;
+
+    const addedMap = keywordSearchMap.keywordMap;
 
     const searchInput = searchContainer.querySelector('.search-input');
     searchInput.placeholder = 'Search ' + searchLabel;
     const searchDropDownUl = searchContainer.querySelector('.search-dropdown-ul');
     const searchDropDownLiTem = searchDropDownUl.querySelector('li');
     const selectedCount = searchContainer.querySelector('.selected-count');
+
+    const checkboxMatchAll = searchContainer.querySelector('.checkbox-match-all');
 
     const selectedToggleBtn = searchContainer.querySelector('.selected-toggle-btn');
     const selectedDropDownUl = searchContainer.querySelector('.selected-dropdown-ul');
@@ -286,13 +292,17 @@ function addEventKeywordSearchArea(fnKeywordSearch, addedMap, searchLabel, searc
         }
 
         keywordSearchTimeOut = setTimeout(async () => {
-            const foundValue = await fnKeywordSearch(value);
-            if (!foundValue.length) {
-                searchDropDownUl.classList.add('hidden');
-                return;
-            }
             const first = searchDropDownUl.firstElementChild;
             if (first) searchDropDownUl.replaceChildren(first);
+
+            const foundValue = await fnKeywordSearch(value);
+            if (!foundValue.length) {
+                const searchDropDownLi = helperCloneAndUnHideNode(searchDropDownLiTem);
+                searchDropDownLi.textContent = 'No results found for ' + value;
+                searchDropDownUl.appendChild(searchDropDownLi);
+                searchDropDownUl.classList.remove('hidden');
+                return;
+            }
             foundValue.forEach(item => {
                 const searchDropDownLi = helperCloneAndUnHideNode(searchDropDownLiTem);
                 searchDropDownLi.textContent = item;
@@ -350,6 +360,12 @@ function addEventKeywordSearchArea(fnKeywordSearch, addedMap, searchLabel, searc
         }, 500);
 
     });
+    keywordSearchMap.matchAll = checkboxMatchAll.checked;
+    checkboxMatchAll.addEventListener('change', (e) => {
+        keywordSearchMap.matchAll = e.target.checked;
+        console.log(keywordSearchMap);
+    });
+
     searchInput.addEventListener('blur', () => {
         setTimeout(() => {
             if (document.activeElement !== searchDropDownUl)
@@ -446,6 +462,7 @@ async function sendSearchRequestOnCurrentInfo(updatePage = true) {
         currentSearchInfo.get(SEARCH_INFO.SEARCH_STRING),
         currentSearchInfo.get(SEARCH_INFO.KEYWORD_FIELD),
         currentSearchInfo.get(SEARCH_INFO.KEYWORD_VALUE_LIST),
+        currentSearchInfo.get(SEARCH_INFO.KEYWORD_MATCH_ALL),
         currentSearchInfo.get(SEARCH_INFO.ADVANCE_REQUEST_BODY),
         updatePage
     );
@@ -453,11 +470,11 @@ async function sendSearchRequestOnCurrentInfo(updatePage = true) {
 
 async function sendSearchRequest(searchType, page, sortBy, sortOrder,
                                  searchString = null,
-                                 keywordField = null, keywordValueList = null,
+                                 keywordField = null, keywordValueList = null, keywordMatchAll = null,
                                  advanceRequestBody = null,
                                  updatePage = true) {
     if (updatePage)
-        updatePageUrl(searchType, page, sortBy, sortOrder, searchString, keywordField, keywordValueList);
+        updatePageUrl(searchType, page, sortBy, sortOrder, searchString, keywordField, keywordValueList, keywordMatchAll);
     currentSearchInfo.clear();
     currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, searchType);
     currentSearchInfo.set(SEARCH_INFO.PAGE, page);
@@ -470,7 +487,8 @@ async function sendSearchRequest(searchType, page, sortBy, sortOrder,
         case SEARCH_TYPES.KEYWORD:
             currentSearchInfo.set(SEARCH_INFO.KEYWORD_FIELD, keywordField);
             currentSearchInfo.set(SEARCH_INFO.KEYWORD_VALUE_LIST, keywordValueList);
-            return requestKeywordSearch(keywordField, keywordValueList, page, sortBy, sortOrder);
+            currentSearchInfo.set(SEARCH_INFO.KEYWORD_MATCH_ALL, keywordMatchAll);
+            return requestKeywordSearch(keywordField, keywordValueList, keywordMatchAll, page, sortBy, sortOrder);
         case SEARCH_TYPES.ADVANCE:
             currentSearchInfo.set(SEARCH_INFO.ADVANCE_REQUEST_BODY, advanceRequestBody);
             return requestAdvanceSearch(advanceRequestBody, page, sortBy, sortOrder);
@@ -504,7 +522,7 @@ async function requestSearch(searchString, page, sortBy, sortOrder) {
     displaySearchResults(results, SEARCH_TYPES.BASIC, sortBy, sortOrder, searchString);
 }
 
-async function requestKeywordSearch(field, valueList, page, sortBy, sortOrder) {
+async function requestKeywordSearch(field, valueList, keywordMatchAll, page, sortBy, sortOrder) {
     const response = await fetch(getSearchUrl(SEARCH_TYPES.KEYWORD, page, sortBy, sortOrder, null, field, valueList), {
        method: 'POST'
     });
@@ -538,28 +556,28 @@ async function requestAdvanceSearch(advanceRequestBody, page, sortBy, sortOrder)
 
 function updatePageUrl(searchType, page, sortBy, sortOrder,
                        searchString = null,
-                       keywordField = null, keywordValueList = null) {
+                       keywordField = null, keywordValueList = null, keywordMatchAll = null) {
     const url = new URL(window.location.href);
-    const pageSearchUrl = getPageSearchUrl(page, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList);
+    const pageSearchUrl = getPageSearchUrl(page, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList, keywordMatchAll);
     const newUrl = url.origin + pageSearchUrl;
     window.history.pushState({ path: newUrl }, '', newUrl);
 }
 
 function getPageSearchUrl(page, searchType, sortBy, sortOrder,
                           searchString = null,
-                          keywordField = null, keywordValueList = null) {
-    const searchUrl = getSearchUrl(searchType, page, sortBy, sortOrder, searchString, keywordField, keywordValueList);
+                          keywordField = null, keywordValueList = null, keywordMatchAll = null) {
+    const searchUrl = getSearchUrl(searchType, page, sortBy, sortOrder, searchString, keywordField, keywordValueList, keywordMatchAll);
     return searchUrl.replace('api', 'page') + (searchType ? `&searchType=${searchType}` : '');
 }
 
 function getSearchUrl(searchType, page, sortBy, sortOrder,
                       searchString = null,
-                      keywordField = null, keywordValueList = null) {
+                      keywordField = null, keywordValueList = null, keywordMatchAll = null) {
     switch (searchType) {
         case SEARCH_TYPES.BASIC:
             return getBasicSearchUrl(searchString, page, sortBy, sortOrder);
         case SEARCH_TYPES.KEYWORD:
-            return getKeywordSearchUrl(keywordField, keywordValueList, page, sortBy, sortOrder);
+            return getKeywordSearchUrl(keywordField, keywordValueList, keywordMatchAll, page, sortBy, sortOrder);
         case SEARCH_TYPES.ADVANCE:
             return getAdvanceSearchUrl(page, sortBy, sortOrder);
         default:
@@ -587,9 +605,10 @@ function getBasicSearchUrl(searchString, page, sortBy, sortOrder) {
     return `/api/search?${queryParams}`;
 }
 
-function getKeywordSearchUrl(keywordField, valueList, page, sortBy, sortOrder) {
+function getKeywordSearchUrl(keywordField, keywordValueList, keywordMatchAll, page, sortBy, sortOrder) {
     const queryParams = new URLSearchParams({
-        s: valueList,
+        s: keywordValueList,
+        matchAll: keywordMatchAll,
         page: page,
         sortBy: sortBy,
         sortOrder: sortOrder
