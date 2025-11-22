@@ -4,14 +4,14 @@ import { initializeNameBrowseOptions, validateSearchString, setAlertStatus, help
 import { quickViewContentInOverlay } from "/static/js/overlay.js";
 
 const SORT_BY = Object.freeze({
-    UPLOAD: 'UPLOAD_DATE',
-    YEAR: 'YEAR',
-    LENGTH: 'LENGTH',
-    SIZE: 'SIZE'
+    Upload: 'UPLOAD_DATE',
+    Year: 'YEAR',
+    Length: 'LENGTH',
+    Size: 'SIZE'
 });
 const SORT_ORDERS = Object.freeze({
-   ASC: 'Asc',
-   DESC: 'Desc',
+   Ascending: 'Asc',
+   Descending: 'Desc',
 });
 const KEYWORDS = Object.freeze({
     UNIVERSE: 'universes',
@@ -44,8 +44,8 @@ let previousSortByButton = null;
 async function initialize() {
     const urlParams = new URLSearchParams(window.location.search);
     currentSearchInfo.set(SEARCH_INFO.PAGE, urlParams.get(SEARCH_INFO.PAGE) || 0);
-    currentSearchInfo.set(SEARCH_INFO.SORT_BY, urlParams.get(SEARCH_INFO.SORT_BY) || SORT_BY.UPLOAD);
-    currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, urlParams.get(SEARCH_INFO.SORT_ORDER) || SORT_ORDERS.DESC);
+    currentSearchInfo.set(SEARCH_INFO.SORT_BY, urlParams.get(SEARCH_INFO.SORT_BY) || SORT_BY.Upload);
+    currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, urlParams.get(SEARCH_INFO.SORT_ORDER) || SORT_ORDERS.Descending);
     currentSearchInfo.set(SEARCH_INFO.SEARCH_STRING, urlParams.get(SEARCH_INFO.SEARCH_STRING));
 
     let field = null;
@@ -91,8 +91,8 @@ function initializeSearchPageTitle() {
         e.preventDefault();
         currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, null);
         currentSearchInfo.set(SEARCH_INFO.PAGE, 0);
-        currentSearchInfo.set(SEARCH_INFO.SORT_BY, SORT_BY.UPLOAD);
-        currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, SORT_ORDERS.DESC);
+        currentSearchInfo.set(SEARCH_INFO.SORT_BY, SORT_BY.Upload);
+        currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, SORT_ORDERS.Descending);
         e.target.disabled = true;
         await sendSearchRequestOnCurrentInfo().then(() => {
             e.target.disabled = false;
@@ -138,6 +138,28 @@ function initializeAdvanceSearchArea() {
         initializeKeywordSearchArea();
     });
 
+    const advanceSortByOptions = document.getElementById('advanceSortByOptions');
+    const sortByOptionTem = advanceSortByOptions.querySelector('.sort-by-option');
+    Object.entries(SORT_BY).forEach(([key, value]) => {
+        const sortByOption = helperCloneAndUnHideNode(sortByOptionTem);
+        const input = sortByOption.querySelector('input');
+        input.name = 'sortBy';
+        input.value = value;
+        sortByOption.querySelector('span').textContent = key;
+        advanceSortByOptions.appendChild(sortByOption);
+    });
+
+    const advanceSortOrderOptions = document.getElementById('advanceOrderByOptions');
+    const sortOrderOptionTem = advanceSortOrderOptions.querySelector('.order-by-option');
+    Object.entries(SORT_ORDERS).forEach(([key, value]) => {
+        const sortOrderOption = helperCloneAndUnHideNode(sortOrderOptionTem);
+        const input = sortOrderOption.querySelector('input');
+        input.name = 'orderBy';
+        input.value = value;
+        sortOrderOption.querySelector('span').textContent = key;
+        advanceSortOrderOptions.appendChild(sortOrderOption);
+    });
+
     advanceSearchForm.addEventListener('submit', (e) => {
         e.preventDefault();
         if (advanceIsSubmitting)
@@ -159,10 +181,10 @@ function initializeAdvanceSearchArea() {
 
         const rangeFields = [];
         if (yearFrom || yearTo) {
-            rangeFields.push(getRangeField(SORT_BY.YEAR, yearFrom, yearTo));
+            rangeFields.push(getRangeField(SORT_BY.Year, yearFrom, yearTo));
         }
         if (uploadFrom || uploadTo) {
-            rangeFields.push(getRangeField(SORT_BY.UPLOAD, uploadFrom, uploadTo));
+            rangeFields.push(getRangeField(SORT_BY.Upload, uploadFrom, uploadTo));
         }
 
         const includeFields = [];
@@ -401,16 +423,16 @@ function initializeSortByOptions() {
     setSortByStyleToSelected(previousSortByButton);
 
     sortByOptions.querySelector('.upload-btn').addEventListener('click',async (e) => {
-        await sortByClick(e, SORT_BY.UPLOAD);
+        await sortByClick(e, SORT_BY.Upload);
     });
     sortByOptions.querySelector('.year-btn').addEventListener('click', async (e) => {
-        await sortByClick(e, SORT_BY.YEAR);
+        await sortByClick(e, SORT_BY.Year);
     });
     sortByOptions.querySelector('.length-btn').addEventListener('click', async (e) => {
-        await sortByClick(e, SORT_BY.LENGTH);
+        await sortByClick(e, SORT_BY.Length);
     });
     sortByOptions.querySelector('.size-btn').addEventListener('click', async (e) => {
-        await sortByClick(e, SORT_BY.SIZE);
+        await sortByClick(e, SORT_BY.Size);
     });
 }
 
@@ -436,15 +458,15 @@ function setSortByStyleToSelected(target) {
 
 function initializeSortOrderOptions() {
     const sortOrderButton = document.getElementById('sortOrderButton');
-    sortOrderButton.innerText = currentSearchInfo.get(SEARCH_INFO.SORT_ORDER) === SORT_ORDERS.DESC ? 'Descending' : 'Ascending';
+    sortOrderButton.innerText = currentSearchInfo.get(SEARCH_INFO.SORT_ORDER) === SORT_ORDERS.Descending ? 'Descending' : 'Ascending';
 
     sortOrderButton.addEventListener('click', (e) => {
-        if (currentSearchInfo.get(SEARCH_INFO.SORT_ORDER) === SORT_ORDERS.DESC) {
+        if (currentSearchInfo.get(SEARCH_INFO.SORT_ORDER) === SORT_ORDERS.Descending) {
             e.target.innerText = 'Ascending';
-            currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, SORT_ORDERS.ASC);
+            currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, SORT_ORDERS.Ascending);
         } else {
             e.target.innerText = 'Descending';
-            currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, SORT_ORDERS.DESC);
+            currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, SORT_ORDERS.Descending);
         }
         e.target.disabled = true;
         sendSearchRequestOnCurrentInfo().then(() => {
@@ -523,7 +545,7 @@ async function requestSearch(searchString, page, sortBy, sortOrder) {
 }
 
 async function requestKeywordSearch(field, valueList, keywordMatchAll, page, sortBy, sortOrder) {
-    const response = await fetch(getSearchUrl(SEARCH_TYPES.KEYWORD, page, sortBy, sortOrder, null, field, valueList), {
+    const response = await fetch(getSearchUrl(SEARCH_TYPES.KEYWORD, page, sortBy, sortOrder, null, field, valueList, keywordMatchAll), {
        method: 'POST'
     });
     if (!response.ok) {
