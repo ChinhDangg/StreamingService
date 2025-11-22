@@ -111,11 +111,11 @@ public class MediaSearchService {
         return mapSearchResult.searchResult;
     }
 
-    public MediaSearchResult searchByKeywords(String field, List<Object> keywords, int page, int size,
+    public MediaSearchResult searchByKeywords(String field, List<Object> keywords, boolean matchAll, int page, int size,
                                               SortBy sortBy, SortOrder sortOrder) throws IOException {
         ContentMetaData.validateSearchFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.searchTermByOneField(field, keywords, page, size, sortBy, sortOrder), page, size);
+                openSearchService.searchTermByOneField(field, keywords, matchAll, page, size, sortBy, sortOrder), page, size);
 
         thumbnailService.processThumbnails(mapSearchResult.searchItems);
         cacheMediaSearchItems(mapSearchResult.searchItems);

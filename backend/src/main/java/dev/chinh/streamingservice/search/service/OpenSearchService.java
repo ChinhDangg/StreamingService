@@ -321,17 +321,21 @@ public class OpenSearchService {
      * Search exactly with given search strings by field.
      * Does not work with fields that have text type. Use search match for that.
      */
-    public SearchResponse<Object> searchTermByOneField(String field, List<Object> text, int page, int size,
+    public SearchResponse<Object> searchTermByOneField(String field, List<Object> text, boolean matchAll, int page, int size,
                                                SortBy sortBy, SortOrder sortOrder) throws IOException {
-        Query termQuery = Query.of(q -> q
-                .terms(t -> t
-                        .field(field)
-                        .terms(terms -> terms
-                                .value(text.stream().map(o -> FieldValue.of(o.toString())).toList())
-                        )
-                )
-        );
-        return searchWithQuery(termQuery, page, size, sortBy, sortOrder);
+        BoolQuery.Builder termBoolBuilder = new BoolQuery.Builder();
+        if (matchAll) {
+            for (Object term : text) {
+                termBoolBuilder.must(buildTermOrMatch(field, term, true));
+            }
+        } else {
+            for (Object term : text) {
+                termBoolBuilder.should(buildTermOrMatch(field, term, true));
+            }
+            termBoolBuilder.minimumShouldMatch("1");
+        }
+        Query termBoolQuery = Query.of(q -> q.bool(termBoolBuilder.build()));
+        return searchWithQuery(termBoolQuery, page, size, sortBy, sortOrder);
     }
 
     private SearchResponse<Object> searchWithQuery(Query query, int page, int size, SortBy sortBy,
