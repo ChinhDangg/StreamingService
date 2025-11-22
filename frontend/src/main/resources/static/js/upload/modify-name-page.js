@@ -151,7 +151,7 @@ function initializeSearchName() {
     const searchName = async (nameString) => {
         const response = await fetch(`/api/media/modify/${currentNameEntity}?name=${nameString}`);
         if (!response.ok) {
-            alert('Failed to fetch name info');
+            alert('Failed to fetch name info: ' + await response.text());
             return;
         }
         const nameEntityInfo = await response.json();
@@ -226,8 +226,6 @@ function initializeModifyActionButtons() {
         if (entityImageInput.files.length > 0) {
             formData.append("thumbnail", entityImageInput.files[0]);
         }
-        formData.forEach((value, key) => console.log(`${key}: ${value}`));
-        console.log('saveBtn clicked');
 
         let url = `/api/media/modify/${currentNameEntity}`;
         let method = 'POST';
@@ -249,14 +247,14 @@ function initializeModifyActionButtons() {
             body: body
         });
         if (currentModifyOption === modifyOption.Add && response.status !== 201) {
-            alert('Failed to add new name entry');
+            alert('Failed to add new name entry: ' + await response.text());
             return;
         }
         if (currentModifyOption === modifyOption.Update && response.status !== 200) {
-            alert('Failed to update name entry');
+            alert('Failed to update name entry: ' + await response.text());
             return;
         }
-        console.log('Name entry is ' + currentModifyOption + ' successfully');
+        showSuccessMessage('Name entry is ' + currentModifyOption + ' successfully');
         clearBtn.click();
     });
 }
@@ -269,6 +267,17 @@ function showWarningMessage(message) {
     warningMessage.classList.remove('hidden');
     warningMessageTimeout = setTimeout(() => {
         warningMessage.classList.add('hidden');
+    }, 10000);
+}
+
+let successMessageTimeout = null;
+const successMessage = document.getElementById('successMessage');
+function showSuccessMessage(message) {
+    clearTimeout(successMessageTimeout);
+    successMessage.textContent = message;
+    successMessage.classList.remove('hidden');
+    successMessageTimeout = setTimeout(() => {
+        successMessage.classList.add('hidden');
     }, 10000);
 }
 
