@@ -237,6 +237,54 @@ public class NameEntityModifyService {
     }
 
 
+    @Transactional
+    public void deleteAuthor(long id) {
+        deleteNameEntity(id, ContentMetaData.AUTHORS, mediaAuthorRepository);
+    }
+
+    @Transactional
+    public void deleteCharacter(long id) {
+        deleteNameEntityWithThumbnail(id, ContentMetaData.CHARACTERS, mediaCharacterRepository);
+    }
+
+    @Transactional
+    public void deleteUniverse(long id) {
+        deleteNameEntityWithThumbnail(id, ContentMetaData.UNIVERSES, mediaUniverseRepository);
+    }
+
+    @Transactional
+    public void deleteTag(long id) {
+        deleteNameEntity(id, ContentMetaData.TAGS, mediaTagRepository);
+    }
+
+    // to be used locally for check
+    @Transactional
+    protected <T extends MediaNameEntity> void deleteNameEntity(long id, String listName, MediaNameEntityRepository<T, Long> repository) {
+        T nameEntity = findById(id, listName, repository);
+        try {
+            openSearchService.deleteDocument(listName, id);
+
+            repository.delete(nameEntity);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to delete " + listName + " entry with ID " + id, e);
+        }
+    }
+
+    @Transactional
+    protected <T extends MediaNameEntityWithThumbnail> void deleteNameEntityWithThumbnail(long id, String listName, MediaNameEntityRepository<T, Long> repository) {
+        T nameEntity = findById(id, listName, repository);
+        try {
+            openSearchService.deleteDocument(listName, id);
+            if (nameEntity.getThumbnail() != null)
+                minIOService.removeFile(ThumbnailService.thumbnailBucket, nameEntity.getThumbnail());
+
+            repository.delete(nameEntity);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to delete " + listName + " entry with ID " + id, e);
+        }
+    }
+
+
     private <T extends MediaNameEntity> T findById(long id, String listName, MediaNameEntityRepository<T, Long> repository) {
         return repository.findById(id).orElseThrow(() ->
                 new ResourceNotFoundException("No " + listName + " entry found with id: " + id));
