@@ -86,11 +86,11 @@ public class MediaSearchService {
             ContentMetaData.validateSearchFieldName(includeField.getField());
             if (includeField.getField().equals(ContentMetaData.TITLE)) {
                 searchFieldGroups.add(new SearchFieldGroup(
-                        includeField.getField(), includeField.getValues(), includeField.isMustAll(), false
+                        includeField.getField(), includeField.getValues(), includeField.isMatchAll(), false
                 ));
             } else {
                 searchFieldGroups.add(new SearchFieldGroup(
-                        includeField.getField(), includeField.getValues(), includeField.isMustAll(), true
+                        includeField.getField(), includeField.getValues(), includeField.isMatchAll(), true
                 ));
             }
         }
