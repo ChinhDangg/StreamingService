@@ -65,7 +65,9 @@ async function initialize() {
     currentSearchInfo.set(SEARCH_INFO.KEYWORD_VALUE_LIST, urlParams.get(SEARCH_INFO.KEYWORD_VALUE_LIST));
     currentSearchInfo.set(SEARCH_INFO.KEYWORD_MATCH_ALL, urlParams.get(SEARCH_INFO.KEYWORD_MATCH_ALL) === 'true');
 
-    currentSearchInfo.set(SEARCH_INFO.ADVANCE_REQUEST_BODY, null);
+    const savedAdvanceRequest = JSON.parse(sessionStorage.getItem(SEARCH_INFO.ADVANCE_REQUEST_BODY) || "null");
+    currentSearchInfo.set(SEARCH_INFO.ADVANCE_REQUEST_BODY, savedAdvanceRequest);
+
     if (currentSearchInfo.get(SEARCH_INFO.SEARCH_STRING))
         currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, SEARCH_TYPES.BASIC);
     else if (currentSearchInfo.get(SEARCH_INFO.KEYWORD_FIELD) && currentSearchInfo.get(SEARCH_INFO.KEYWORD_VALUE_LIST))
@@ -276,7 +278,7 @@ function initializeKeywordSearchArea() {
     const fnKeywordSearch = async (pathVariable, value) => {
         const response = await fetch(`/api/search/suggestion/${pathVariable}?s=${value}`);
         if (!response.ok) {
-            setAlertStatus('Search Suggestion Failed', response.statusText);
+            setAlertStatus('Search Suggestion Failed', await response.text());
             return [];
         }
         return await response.json();
@@ -541,6 +543,7 @@ async function sendSearchRequest(searchType, page, sortBy, sortOrder,
             return requestKeywordSearch(keywordField, keywordValueList, keywordMatchAll, page, sortBy, sortOrder);
         case SEARCH_TYPES.ADVANCE:
             currentSearchInfo.set(SEARCH_INFO.ADVANCE_REQUEST_BODY, advanceRequestBody);
+            sessionStorage.setItem(SEARCH_INFO.ADVANCE_REQUEST_BODY, JSON.stringify(advanceRequestBody));
             return requestAdvanceSearch(advanceRequestBody, page, sortBy, sortOrder);
         default:
             console.log('default to search match all');
@@ -553,7 +556,7 @@ async function requestMatchAllSearch(page, sortBy, sortOrder) {
         method: 'POST'
     });
     if (!response.ok) {
-        setAlertStatus('Search Match All Failed', response.statusText);
+        setAlertStatus('Search Match All Failed', await response.text());
         return;
     }
     const result = await response.json();
@@ -565,7 +568,7 @@ async function requestSearch(searchString, page, sortBy, sortOrder) {
         method: 'POST'
     });
     if (!response.ok) {
-        setAlertStatus('Search Failed', response.statusText);
+        setAlertStatus('Search Failed', await response.text());
         return;
     }
     const results = await response.json();
@@ -577,7 +580,7 @@ async function requestKeywordSearch(field, valueList, keywordMatchAll, page, sor
        method: 'POST'
     });
     if (!response.ok) {
-        setAlertStatus('Search Keyword Failed', response.statusText);
+        setAlertStatus('Search Keyword Failed', await response.text());
         return;
     }
     const results = await response.json();
@@ -866,7 +869,7 @@ async function requestVideoPreview(videoId, itemNode) {
         thumbnailContainer.appendChild(loader);
         const response = await fetch(`/api/videos/preview/${videoId}`);
         if (!response.ok) {
-            setAlertStatus('Preview Failed', response.statusText);
+            setAlertStatus('Preview Failed', await response.text());
             return;
         }
         playlistUrl = await response.text()
