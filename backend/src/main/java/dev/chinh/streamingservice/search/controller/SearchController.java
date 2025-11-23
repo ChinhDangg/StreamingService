@@ -36,7 +36,7 @@ public class SearchController {
     public ResponseEntity<MediaSearchResult> advanceSearch(@RequestBody MediaSearchRequest mediaSearchRequest,
                                                            @RequestParam(required = false) int page,
                                                            @RequestParam(required = false) SortBy sortBy,
-                                                           @RequestParam(required = false) SortOrder sortOrder) throws IOException, IllegalAccessException {
+                                                           @RequestParam(required = false) SortOrder sortOrder) throws IOException {
         return ResponseEntity.ok().body(mediaSearchService.advanceSearch(mediaSearchRequest, page, pageSize, sortBy, sortOrder));
     }
 
