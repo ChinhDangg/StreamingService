@@ -243,7 +243,9 @@ function initializeModifyActionButtons() {
 
         const response = await fetch(url, {
             method: method,
-            contentType: contentType,
+            headers: {
+                'Content-Type': contentType,
+            },
             body: body
         });
         if (currentModifyOption === modifyOption.Add && response.status !== 201) {
