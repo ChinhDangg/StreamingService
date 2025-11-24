@@ -139,16 +139,16 @@ function initializeBasicSearchArea() {
 }
 
 let advanceIsSubmitting = false;
+const advanceSearchForm = document.getElementById('advanceSearchForm');
 
 function initializeAdvanceSearchArea() {
-    const advanceSearchForm = document.getElementById('advanceSearchForm');
     const advanceSearchBtn = advanceSearchForm.querySelector('#advancedSearchBtn');
     advanceSearchBtn.addEventListener('click', () => {
         advanceSearchForm.querySelector('#advanceSearchSubmitBtn').classList.toggle('hidden');
         advanceSearchForm.querySelector('#advanceSearchContentContainer').classList.toggle('hidden');
         initializeKeywordSearchArea();
     });
-    if (currentSearchInfo.get(SEARCH_INFO.KEYWORD_VALUE_LIST)) {
+    if (currentSearchInfo.get(SEARCH_INFO.KEYWORD_VALUE_LIST) || currentSearchInfo.get(SEARCH_INFO.ADVANCE_REQUEST_BODY)) {
         advanceSearchBtn.click();
     }
 
@@ -180,12 +180,33 @@ function initializeAdvanceSearchArea() {
             return;
         const sortBy = advanceSearchForm.querySelector('input[name="sortBy"]:checked')?.value;
         const orderBy = advanceSearchForm.querySelector('input[name="sortOrder"]:checked')?.value;
-        const yearFrom = advanceSearchForm.querySelector('.year-from-input').value;
-        const yearTo = advanceSearchForm.querySelector('.year-to-input').value;
-        const uploadFrom = advanceSearchForm.querySelector('.upload-from-input').value;
-        const uploadTo = advanceSearchForm.querySelector('.upload-to-input').value;
+        const yearFrom = advanceSearchForm.querySelector('.year-from-input');
+        const yearTo = advanceSearchForm.querySelector('.year-to-input');
+        const uploadFrom = advanceSearchForm.querySelector('.upload-from-input');
+        const uploadTo = advanceSearchForm.querySelector('.upload-to-input');
+
+        const savedAdvanceRequestBody = currentSearchInfo.get(SEARCH_INFO.ADVANCE_REQUEST_BODY);
+        if (savedAdvanceRequestBody) {
+            const rangeFields = savedAdvanceRequestBody.rangeFields;
+            if (rangeFields.length) {
+                const yearRangeField = rangeFields.find(field => field.field === 'year');
+                const uploadRangeField = rangeFields.find(field => field.field === 'uploadDate');
+                if (yearRangeField) {
+                    yearFrom.value = yearRangeField.from;
+                    yearTo.values = yearRangeField.to;
+                }
+                if (uploadRangeField) {
+                    uploadFrom.value = uploadRangeField.from;
+                    uploadTo.values = uploadRangeField.to;
+                }
+            }
+        }
 
         const getRangeField = (field, from, to) => {
+            if (from > to) {
+                alert(`${field} from ${from} cannot be greater than to ${to}`);
+                return;
+            }
             return {
                 field: field,
                 from: from,
@@ -194,11 +215,11 @@ function initializeAdvanceSearchArea() {
         }
 
         const rangeFields = [];
-        if (yearFrom || yearTo) {
-            rangeFields.push(getRangeField(SORT_BY.Year, yearFrom, yearTo));
+        if (yearFrom.value || yearTo.values) {
+            rangeFields.push(getRangeField('year', yearFrom.value, yearTo.values));
         }
-        if (uploadFrom || uploadTo) {
-            rangeFields.push(getRangeField(SORT_BY.Upload, uploadFrom, uploadTo));
+        if (uploadFrom.value || uploadTo.value) {
+            rangeFields.push(getRangeField('uploadDate', uploadFrom.value, uploadTo.value));
         }
 
         const includeFields = [];
@@ -320,7 +341,7 @@ function addEventKeywordSearchArea(fnKeywordSearch, keywordSearchMap, searchLabe
     const selectedDropDownLiTem = selectedDropDownUl.querySelector('li');
     const unselectedCount = searchContainer.querySelector('.unselected-count');
 
-    const addSelectedItem = (item) => {
+    const addSelectedItem = (item, clickAtFirst = false) => {
         const selectedDropDownLi = helperCloneAndUnHideNode(selectedDropDownLiTem);
         selectedDropDownLi.querySelector('span').textContent = item;
         selectedDropDownLi.classList.remove('hover:bg-gray-700');
@@ -330,18 +351,28 @@ function addEventKeywordSearchArea(fnKeywordSearch, keywordSearchMap, searchLabe
         const inclusionBtn = selectedDropDownLi.querySelector('.inclusion-btn');
         inclusionBtn.addEventListener('click', (e) => {
             e.preventDefault();
+            addedMap.get(item).included = !addedMap.get(item).included;
             const included = addedMap.get(item).included;
-            inclusionBtn.textContent = included ? 'Excluded' : 'Included';
-            const styleList = ['bg-green-600', 'hover:bg-green-700', 'bg-red-600', 'hover:bg-red-700']
-            styleList.forEach(style => inclusionBtn.classList.toggle(style));
-            addedMap.get(item).included = !included;
+            inclusionBtn.textContent = included ? 'Included' : 'Excluded';
+            const includedClass = ['bg-green-600', 'hover:bg-green-700'];
+            const excludedClass = ['bg-red-600', 'hover:bg-red-700'];
+            if (included) {
+                inclusionBtn.classList.remove(...excludedClass);
+                inclusionBtn.classList.add(...includedClass);
+            } else {
+                inclusionBtn.classList.remove(...includedClass);
+                inclusionBtn.classList.add(...excludedClass);
+            }
             let falseCount = 0;
             for (const value of addedMap.values()) {
-                if (value === false)
+                if (value.included === false)
                     falseCount++;
             }
             unselectedCount.textContent = falseCount;
         });
+        if (clickAtFirst) {
+            inclusionBtn.click();
+        }
         selectedDropDownLi.querySelector('.remove-btn').addEventListener('click', (e) => {
             e.preventDefault();
             addedMap.get(item).selectedDropDownLi.remove();
@@ -418,6 +449,24 @@ function addEventKeywordSearchArea(fnKeywordSearch, keywordSearchMap, searchLabe
         selectedToggleBtn.classList.remove('hidden');
     }
 
+    const advanceBodyRequest = currentSearchInfo.get(SEARCH_INFO.ADVANCE_REQUEST_BODY);
+    if (advanceBodyRequest) {
+        const includeFields = advanceBodyRequest.includeFields;
+        for (const includeField of includeFields) {
+            if (includeField.field === searchLabel) {
+                includeField.values.forEach(item => addSelectedItem(item));
+                selectedCount.textContent = addedMap.size;
+                selectedToggleBtn.classList.remove('hidden');
+            }
+        }
+        const excludeFields = advanceBodyRequest.excludeFields;
+        for (const excludeField of excludeFields) {
+            if (excludeField.field === searchLabel) {
+                excludeField.values.forEach(item => addSelectedItem(item, true));
+            }
+        }
+    }
+
     searchInput.addEventListener('blur', () => {
         setTimeout(() => {
             if (document.activeElement !== searchDropDownUl)
@@ -435,8 +484,21 @@ function addEventKeywordSearchArea(fnKeywordSearch, keywordSearchMap, searchLabe
     selectedToggleBtn.addEventListener('click', () => {
         selectedDropDownUl.classList.toggle('hidden');
     });
+    selectedToggleBtn.addEventListener('blur', () => {
+        setTimeout(() => {
+            if (selectedDropDownUl.contains(document.activeElement)) {
+                selectedDropDownUl.focus();
+                return;
+            }
+            selectedDropDownUl.classList.add('hidden');
+        }, 150);
+    });
     selectedDropDownUl.addEventListener('blur', () => {
         setTimeout(() => {
+            if (selectedDropDownUl.contains(document.activeElement)) {
+                selectedDropDownUl.focus();
+                return;
+            }
             selectedDropDownUl.classList.add('hidden');
         }, 150);
     });
@@ -506,6 +568,17 @@ function initializeSortOrderOptions() {
 }
 
 async function sendSearchRequestOnCurrentInfo(updatePage = true) {
+    if (currentSearchInfo.get(SEARCH_INFO.SEARCH_TYPE) !== SEARCH_TYPES.ADVANCE) {
+        keywordSearchMap.forEach(map => {
+            map.keywordMap.forEach(value => {
+                value.selectedDropDownLi.querySelector('.remove-btn').click();
+            });
+            map.keywordMap.clear();
+        });
+        sessionStorage.removeItem(SEARCH_INFO.ADVANCE_REQUEST_BODY);
+        advanceSearchForm.querySelector('#advanceSearchSubmitBtn').classList.add('hidden');
+        advanceSearchForm.querySelector('#advanceSearchContentContainer').classList.add('hidden');
+    }
     await sendSearchRequest(
         currentSearchInfo.get(SEARCH_INFO.SEARCH_TYPE),
         currentSearchInfo.get(SEARCH_INFO.PAGE),
