@@ -24,20 +24,6 @@
 <header class="max-w-7xl mx-auto mb-6">
 
     <div th:insert="header :: header-html" th:remove="tag">
-        <h1 class="text-2xl font-semibold mb-4 w-full text-center">
-            <a id="header-page-title" href="#">Search Page</a>
-        </h1>
-        <form id="search-form">
-            <div class="flex gap-3">
-                <input id="search-input" type="text" placeholder="Search..."
-                       class="flex-1 px-4 py-2 rounded-lg bg-gray-800 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
-                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-medium">Search</button>
-            </div>
-        </form>
-
-        <div id="alert-status" role="status" class="hidden mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
-            <div class="text-sm"><span id="bold-status" class="font-semibold">Invalid</span><span>: </span><span id="normal-text">Search String</span></div>
-        </div>
     </div>
 
     <form id="advanceSearchForm">
@@ -258,89 +244,9 @@
 </div>
 
 <div th:insert="pagination :: pagination-html" th:remove="tag">
-    <!-- Pagination Node -->
-    <div id="pagination-node-bottom" class="hidden flex flex-col items-center justify-center mt-8 mb-8 select-none text-gray-300 space-y-3">
-        <div class="flex flex-col gap-2">
-            <!-- Control Buttons (Top Row) -->
-            <div class="flex items-center justify-between w-full max-w-xs mx-auto gap-4">
-
-                <!-- Left Controls -->
-                <div class="page-left-control flex items-center gap-2">
-                    <!-- Previous -->
-                    <a href="#" class="page-prev-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Previous Page">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                             stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </a>
-
-                    <!-- Next -->
-                    <a href="#" class="page-next-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Next Page">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                             stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                    </a>
-
-                    <!-- Go to First -->
-                    <a href="#" class="page-first-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="First Page">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                             stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
-                        </svg>
-                    </a>
-                </div>
-
-                <!-- Right Controls -->
-                <div class="page-right-control flex items-center gap-2">
-                    <!-- Go to Last -->
-                    <a href="#" class="page-last-control p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition" title="Last Page">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                             stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 19l7-7-7-7M13 19l7-7-7-7" />
-                        </svg>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Page Numbers (Bottom Row) -->
-            <div class="page-container flex items-center gap-1">
-                <a href="#" class="page-link-node hidden px-3 py-1 rounded-md bg-gray-800 hover:bg-gray-700 text-sm font-medium"></a>
-                <a href="#" class="page-selected-link-node hidden px-3 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-sm font-medium text-white ring-1 ring-indigo-500">
-                </a>
-                <span class="page-dots hidden px-2 text-gray-500">...</span>
-                <div class="page-num-container w-full flex justify-center items-center gap-1">
-                </div>
-            </div>
-        </div>
-    </div>
-</div> <!-- End of Pagination -->
+</div>
 
 <div th:insert="overlay :: overlay-html" th:remove="tag">
-    <!-- Full Page Overlay -->
-    <div id="quickViewOverlay"
-         class="fixed hidden inset-0 z-50 bg-gray-950/50 text-gray-100 border border-gray-800/50 flex flex-col transition-all duration-300">
-
-        <!-- Fixed Top Bar -->
-        <div class="fixed top-0 left-0 w-full z-20 bg-gray-900/90 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-6 py-4">
-            <h2 class="quick-view-title text-lg font-semibold tracking-wide">Quick View</h2>
-            <button id="closeOverlayBtn"
-                    class="text-gray-400 hover:text-gray-200 transition">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                     stroke-width="2" stroke="currentColor" class="w-6 h-6">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-
-        <!-- Scrollable Content Area -->
-        <div id="overlayContent" class="flex-1 overflow-y-auto pt-[72px] pb-10 flex justify-center">
-            <div class="overlayContent-inner-wrapper relative bg-gray-900/90 rounded-lg shadow-xl w-[90%] max-w-5xl mt-6 mb-16 animate-slideIn self-start"
-                 onclick="event.stopPropagation();">
-
-            </div>
-        </div>
-    </div>
 </div>
 
 <script type="module" th:src="@{/static/js/search/search-page.js}" src="/static/js/search/search-page.js"></script>
