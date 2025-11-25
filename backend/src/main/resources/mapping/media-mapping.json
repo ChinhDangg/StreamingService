@@ -41,6 +41,11 @@
     "key":        { "type": "text" },
     "thumbnail":  { "type": "text" },
     "length":     { "type": "integer" },
-    "size":       { "type": "long" }
+    "size":       { "type": "long" },
+    "groupInfo":  {
+      "properties": {
+        "grouperId": { "type": "long" }
+      }
+    }
   }
 }
