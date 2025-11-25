@@ -99,7 +99,7 @@ public class MediaDisplayService {
 
         String mediaPage;
         if (mediaItem.isGrouper()) {
-            mediaPage = "/page/album-grouper?mediaId=" + mediaId;
+            mediaPage = "/page/album-grouper?grouperId=" + mediaId;
         } else if (!mediaItem.hasKey()) {
             mediaPage = "/page/album?mediaId=" + mediaId;
         } else if (mediaItem.hasKey()) {
