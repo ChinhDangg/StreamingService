@@ -94,7 +94,6 @@ public class MediaDisplayService {
         if (mediaItem.isGrouper()) {
             mediaPage = "/page/album-grouper?mediaId=" + mediaId;
         } else if (!mediaItem.hasKey()) {
-            System.out.println("Album page");
             mediaPage = "/page/album?mediaId=" + mediaId;
         } else if (mediaItem.hasKey()) {
             mediaPage = "/page/video?mediaId=" + mediaId;
