@@ -21,7 +21,7 @@ public class MediaDisplayController {
 
     @GetMapping("/grouper-next/{id}")
     public ResponseEntity<MediaDisplayService.GroupSlice> getNextGrouper(@PathVariable long id,
-                                                                         @RequestParam(name = "o") int offset,
+                                                                         @RequestParam(name = "offset") int offset,
                                                                          @RequestParam(name = "order") Sort.Direction order) {
         return ResponseEntity.ok().body(mediaDisplayService.getNextGroupOfMedia(id, offset, order));
     }
