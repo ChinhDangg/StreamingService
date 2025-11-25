@@ -11,7 +11,10 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "media_groups")
+@Table(
+        name = "media_groups",
+        indexes = {@Index(columnList = "grouper_id")}
+)
 public class MediaGroupMetaData {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
