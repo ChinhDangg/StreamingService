@@ -1,6 +1,5 @@
 package dev.chinh.streamingservice.serve.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.MediaMapper;
 import dev.chinh.streamingservice.content.constant.MediaType;
@@ -35,6 +34,13 @@ public class MediaDisplayService {
 
     private final int maxBatchSize = 20;
 
+    public record GroupSlice(
+            List<Long> content,
+            int page,
+            int size,
+            boolean hasNext
+    ){}
+
     public MediaDisplayContent getMediaContentInfo(long mediaId) {
         MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(mediaId);
 
@@ -43,7 +49,7 @@ public class MediaDisplayService {
             mediaDisplayContent.setThumbnail(ThumbnailService.getThumbnailPath(mediaId, mediaItem.getThumbnail()));
 
         if (mediaItem.isGrouper()) {
-            Slice<Long> mediaIds = getNextGroupOfMedia(mediaId, 0, Sort.Direction.DESC);
+            GroupSlice mediaIds = getNextGroupOfMedia(mediaId, 0, Sort.Direction.DESC);
             mediaDisplayContent.setChildMediaIds(mediaIds);
             mediaDisplayContent.setMediaType(MediaType.GROUPER);
         } else {
@@ -52,26 +58,25 @@ public class MediaDisplayService {
         return mediaDisplayContent;
     }
 
-    private void cacheGroupOfMedia(long mediaId, int offset, Slice<Long> mediaIds) {
+    private void cacheGroupOfMedia(long mediaId, int offset, GroupSlice mediaIds) {
         redisTemplate.opsForValue().set("grouper::" + mediaId + ":" + offset, mediaIds, Duration.ofMinutes(15));
     }
 
-    public Slice<Long> getCacheGroupOfMedia(long mediaId, int offset) {
+    public GroupSlice getCacheGroupOfMedia(long mediaId, int offset) {
         String key = "grouper::" + mediaId + ":" + offset;
         Object json = redisTemplate.opsForValue().get(key);
 
         if (json == null)
             return null;
         try {
-            List<Long> list = objectMapper.readValue(json.toString(), new TypeReference<>() {});
-            return new SliceImpl<>(list);
+            return objectMapper.convertValue(json, GroupSlice.class);
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse cached Slice<Long>", e);
         }
     }
 
-    public Slice<Long> getNextGroupOfMedia(long mediaId, int offset, Sort.Direction sortOrder) {
-        Slice<Long> cachedGroupOfMedia = getCacheGroupOfMedia(mediaId, offset);
+    public GroupSlice getNextGroupOfMedia(long mediaId, int offset, Sort.Direction sortOrder) {
+        GroupSlice cachedGroupOfMedia = getCacheGroupOfMedia(mediaId, offset);
         if (cachedGroupOfMedia != null) {
             return cachedGroupOfMedia;
         }
@@ -83,8 +88,10 @@ public class MediaDisplayService {
 
         Pageable pageable = PageRequest.of(offset, maxBatchSize, Sort.by(sortOrder, ContentMetaData.NUM_INFO));
         Slice<Long> groupOfMedia = mediaGroupMetaDataRepository.findMediaMetadataIdsByGrouperMetaDataId(mediaId, pageable);
-        cacheGroupOfMedia(mediaId, offset, groupOfMedia);
-        return groupOfMedia;
+        GroupSlice groupSlice = new GroupSlice(groupOfMedia.getContent(), offset, maxBatchSize, groupOfMedia.hasNext());
+
+        cacheGroupOfMedia(mediaId, offset, groupSlice);
+        return groupSlice;
     }
 
     public ResponseEntity<Void> getServePageTypeFromMedia(long mediaId) {

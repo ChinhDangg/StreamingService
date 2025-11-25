@@ -3,11 +3,11 @@ package dev.chinh.streamingservice.serve.data;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.data.ContentMetaData;
+import dev.chinh.streamingservice.serve.service.MediaDisplayService;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.data.domain.Slice;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -60,5 +60,5 @@ public class MediaDisplayContent {
     private MediaType mediaType;
 
     // optional inner child media ids if the current media is just a grouper (not individual video item or album)
-    Slice<Long> childMediaIds;
+    MediaDisplayService.GroupSlice childMediaIds;
 }
