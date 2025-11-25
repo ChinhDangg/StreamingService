@@ -17,6 +17,6 @@ public interface MediaNameEntityRepository<T extends MediaNameEntity, ID> extend
     @Query("SELECT e.name FROM #{#entityName} e WHERE LOWER(e.name) LIKE LOWER(CONCAT('%', :name, '%'))")
     List<String> findNamesContaining(@Param("name") String name);
 
-    @Query("SELECT e.name, e.length, e.uploadDate FROM #{#entityName} e")
+    @Query("SELECT new dev.chinh.streamingservice.data.dto.MediaNameEntry(e.name, e.length, e.uploadDate) FROM #{#entityName} e")
     Page<MediaNameEntry> findAllNames(Pageable pageable);
 }
