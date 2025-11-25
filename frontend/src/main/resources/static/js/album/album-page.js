@@ -3,6 +3,27 @@ import { setVideoUrl, setVideoResolution } from "/static/js/set-video-url.js";
 import { displayContentInfo, helperCloneAndUnHideNode } from "/static/js/metadata-display.js";
 
 let albumId = null;
+const BATCH_SIZE = 5;
+let currentBatch = 0;
+
+const RESOLUTION = Object.freeze({
+    original: 'Original',
+    p1080: '1080p',
+    p720: '720p',
+    p480: '480p',
+});
+
+const albumResUrlMap = new Map();
+const albumCheckResizedMap = new Map();
+let albumResolution = Object.keys(RESOLUTION)[3];
+
+const sentinel = document.createElement("div");
+let observer;
+
+let currentFullScreen = null;
+let isShowingNextFullScreen = false;
+
+let previousVideoWrapper = null;
 
 export async function initialize(id = null, albumInfo = null) {
     if (id) albumId = id;
@@ -16,6 +37,19 @@ export async function initialize(id = null, albumInfo = null) {
         alert("No albumId provided");
         return;
     }
+
+    if (observer) {
+        observer.unobserve(sentinel);
+    }
+
+    currentBatch = 0;
+
+    albumResUrlMap.clear();
+    albumCheckResizedMap.clear();
+    albumResolution = Object.keys(RESOLUTION)[3];
+
+    currentFullScreen = null;
+    isShowingNextFullScreen = false;
 
     await Promise.all([
         displayAlbumInfo(albumId, albumInfo),
@@ -70,9 +104,6 @@ async function displayAlbumInfo(albumId, albumInfo = null) {
     displayContentInfo(albumInfo, albumMainContainer);
 }
 
-const BATCH_SIZE = 5;
-let currentBatch = 0;
-
 const videoContainer = document.getElementById('album-video-container');
 const imageContainer = document.getElementById('album-image-container');
 
@@ -118,17 +149,6 @@ const addMediaItem = (start, end) => {
     }
 }
 
-const RESOLUTION = Object.freeze({
-    original: 'Original',
-    p1080: '1080p',
-    p720: '720p',
-    p480: '480p',
-});
-
-const albumResUrlMap = new Map();
-const albumCheckResizedMap = new Map();
-let albumResolution = Object.keys(RESOLUTION)[3];
-
 const fetchCheckResized = async (albumId, start) => {
     if (albumResolution === Object.keys(RESOLUTION)[0]) return true;
     if (albumCheckResizedMap.get(albumResolution) >= start + BATCH_SIZE
@@ -149,6 +169,7 @@ const fetchCheckResized = async (albumId, start) => {
 
 function initializeResolutionSelector() {
     const resolutionSelector = document.getElementById('resolution-select');
+    resolutionSelector.innerHTML = '';
     Object.keys(RESOLUTION).forEach(key => {
         const option = document.createElement('option');
         option.value = key;
@@ -193,9 +214,6 @@ async function fetchAlbumItemUrlsByResolution(albumId, resolution) {
     return await response.json();
 }
 
-const sentinel = document.createElement("div");
-let observer;
-
 async function displayAlbumItems(albumId) {
     const albumItems = await fetchAlbumItemUrlsByResolution(albumId, albumResolution);
     if (!albumItems) return;
@@ -239,7 +257,7 @@ async function displayAlbumItems(albumId) {
 
     observer = new IntersectionObserver(async (entries) => {
         if (entries[0].isIntersecting) {
-            //console.log('intersecting');
+            console.log('intersecting');
             if (currentBatch >= albumItems.length) {
                 //console.log('no more items');
                 observer.unobserve(sentinel);
@@ -262,7 +280,6 @@ async function displayAlbumItems(albumId) {
     observer.observe(sentinel);
 }
 
-let currentFullScreen = null;
 const wrapperImageFullScreen = document.getElementById('image-wrapper-fullscreen');
 
 function showFullScreen(imageWrapperId) {
@@ -335,7 +352,6 @@ document.addEventListener("keydown", async (e) => {
     }
 });
 
-let isShowingNextFullScreen = false;
 async function showNextFullScreen() {
     if (isShowingNextFullScreen) return;
     isShowingNextFullScreen = true;
@@ -416,7 +432,6 @@ const fullScreenTouchEnd = async (e) => {
     }
 }
 
-let previousVideoWrapper = null;
 async function requestVideo(videoUrlRequest, videoWrapper) {
     if (!await getVideoPlayer())
         return;
