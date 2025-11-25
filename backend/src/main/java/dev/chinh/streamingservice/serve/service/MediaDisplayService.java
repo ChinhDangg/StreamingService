@@ -58,8 +58,8 @@ public class MediaDisplayService {
         return mediaDisplayContent;
     }
 
-    private void cacheGroupOfMedia(long mediaId, int offset, GroupSlice mediaIds) {
-        redisTemplate.opsForValue().set("grouper::" + mediaId + ":" + offset, mediaIds, Duration.ofMinutes(15));
+    private void cacheGroupOfMedia(long mediaId, int offset, Sort.Direction sortOrder, GroupSlice mediaIds) {
+        redisTemplate.opsForValue().set("grouper::" + mediaId + ":" + offset + ":" + sortOrder, mediaIds, Duration.ofMinutes(15));
     }
 
     public GroupSlice getCacheGroupOfMedia(long mediaId, int offset) {
@@ -90,7 +90,7 @@ public class MediaDisplayService {
         Slice<Long> groupOfMedia = mediaGroupMetaDataRepository.findMediaMetadataIdsByGrouperMetaDataId(mediaId, pageable);
         GroupSlice groupSlice = new GroupSlice(groupOfMedia.getContent(), offset, maxBatchSize, groupOfMedia.hasNext());
 
-        cacheGroupOfMedia(mediaId, offset, groupSlice);
+        cacheGroupOfMedia(mediaId, offset, sortOrder, groupSlice);
         return groupSlice;
     }
 
