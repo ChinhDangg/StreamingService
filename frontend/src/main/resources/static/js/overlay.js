@@ -60,10 +60,14 @@ async function displayContentPageForOverlay(mediaType, mediaId, mediaInfo = null
         if (previousQuickViewMediaId !== null && previousQuickViewMediaId !== mediaId) {
             mod.initialize(mediaId, mediaInfo);
             previousQuickViewMediaId = mediaId;
+            openOverlay(true);
+        } else {
+            openOverlay();
         }
-        openOverlay();
         return;
     }
+
+    previousQuickViewMediaId = mediaId;
 
     const pageDoc = (mediaType === 'VIDEO') ? await getVideoPageContent() : await getAlbumPageContent();
 
@@ -110,10 +114,12 @@ async function displayContentPageForOverlay(mediaType, mediaId, mediaInfo = null
 }
 
 const overlay = document.getElementById('quickViewOverlay');
-function openOverlay() {
+function openOverlay(scrollToTop = false) {
     overlay.classList.remove('hidden');
     overlay.classList.add('flex');
     document.body.style.overflow = 'hidden'; // disable background scroll
+    if (scrollToTop)
+        document.getElementById('overlayContent').scrollTop = 0;
 }
 
 function closeOverlay() {
