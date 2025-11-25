@@ -104,6 +104,11 @@
     <section id="listSection" class="mt-10">
         <h2 class="list-title text-2xl font-bold mb-4 text-gray-200">List (0)</h2>
 
+        <button id="sortOrderButton"
+                class="select-none mb-2 px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
+            Descending
+        </button>
+
         <!-- Scrollable list -->
         <div class="list-scroll-container max-h-96 overflow-y-auto pr-2 space-y-3">
             <a href="#" class="list-item-node hidden bg-gray-800 hover:bg-gray-700 border border-gray-700 px-4 py-3 rounded-lg transition flex justify-between items-center font-semibold text-gray-100">Chapter 1: Awakening</a>
@@ -123,7 +128,7 @@
 <!-- Full Page Overlay -->
 <div id="quickViewOverlay" class="hidden fixed inset-0 z-50 bg-gray-950/50 text-gray-100 border border-gray-800/50 flex flex-col transition-all duration-300">
     <!-- Fixed Top Bar -->
-    <div class="fixed top-0 left-0 w-full z-20 bg-gray-900/90 backdrop-blur-md border-b border-gray-800 px-4 py-4">
+    <div class="fixed top-0 left-0 w-full z-20 bg-gray-900/90 backdrop-blur-md border-b border-gray-800 px-4 py-2">
         <div class="flex items-center justify-between w-full">
             <h2 class="quick-view-title text-lg font-semibold tracking-wide">Quick View</h2>
             <button id="closeOverlayBtn"
@@ -135,7 +140,7 @@
             </button>
         </div>
         <div class="border-t border-gray-700 mt-2"></div>
-        <div class="w-full bg-gray-900 text-white mt-4 flex items-center justify-between">
+        <div class="w-full bg-gray-900 text-white mt-2 flex items-center justify-between">
             <!-- Left buttons -->
             <div class="left-buttons flex gap-3">
                 <!-- Prev -->
