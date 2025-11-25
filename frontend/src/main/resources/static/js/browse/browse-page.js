@@ -172,11 +172,13 @@ async function displayItem(nameItems) {
     browseTitle.querySelector('.title').textContent = currentNameEntry;
     browseTitle.querySelector('.total').textContent = nameItems.total;
 
-    const hasThumbnail = true; //NameEntry[currentNameEntry] === nameEntry.Characters || NameEntry[currentNameEntry] === nameEntry.Universes;
-    const nameContainer = hasThumbnail ? document.getElementById('main-item-container')
-        : document.getElementById('main-text-item-container');
+    const hasThumbnail = NameEntry[currentNameEntry] === NameEntry.Characters || NameEntry[currentNameEntry] === NameEntry.Universes;
+    const mainItemContainer = document.getElementById('main-item-container');
+    const mainTextItemContainer = document.getElementById('main-text-item-container');
+    const nameContainer = hasThumbnail ? mainItemContainer : mainTextItemContainer;
 
-    nameContainer.innerHTML = '';
+    mainItemContainer.innerHTML = '';
+    mainTextItemContainer.innerHTML = '';
     nameContainer.classList.remove('hidden');
 
     if (nameItems.total === 0) {
