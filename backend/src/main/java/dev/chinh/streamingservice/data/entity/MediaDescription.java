@@ -68,7 +68,7 @@ public abstract class MediaDescription implements MetaDataProvider {
     protected MediaGroupMetaData groupInfo;
 
     public boolean isGrouper() {
-        return groupInfo != null && groupInfo.getGrouperMetaDataId() == null;
+        return groupInfo != null && (groupInfo.getGrouperMetaDataId() == null || groupInfo.getGrouperMetaDataId() == -1);
     }
 
     public String getPath() {
