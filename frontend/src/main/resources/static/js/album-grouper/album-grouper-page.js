@@ -4,10 +4,10 @@ import { quickViewContentInOverlay } from "/static/js/overlay.js";
 async function initialize() {
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
-    const albumGrouperId= urlParams.get('mediaId');
+    const albumGrouperId= urlParams.get('grouperId');
 
     if (!albumGrouperId) {
-        alert('Media Id not found');
+        alert('grouper Id not found');
         return;
     }
 
@@ -87,11 +87,17 @@ function displayThumbnailSectionInfo(albumGrouperInfo) {
     thumbnailItem.querySelector('img').src = albumGrouperInfo.thumbnail;
 }
 
+let offset = 0;
 let albumGrouperCountLength = 0;
 let currentViewAlbumId = null;
 let albumGrouperChildAlbumIds = [];
 const albumInfoContentMap = new Map();
-let sortOrder = 'DESC';
+
+const SORT_ORDER = Object.freeze({
+    Ascending: 'ASC',
+    Descending: 'DESC'
+});
+let sortOrder = SORT_ORDER.Descending;
 
 function displayListSectionInfo(albumGrouperInfo) {
     const listSection = document.getElementById('listSection');
@@ -105,9 +111,12 @@ function displayListSectionInfo(albumGrouperInfo) {
         return;
     }
 
-    albumGrouperCountLength = childMediaIdsSlice.content.length;
+    if (sortOrder === SORT_ORDER.Descending)
+        albumGrouperCountLength = albumGrouperInfo.length;
+    else
+        albumGrouperCountLength = 0;
 
-    if (albumGrouperCountLength === 0) {
+    if (albumGrouperInfo.length === 0) {
         showMoreBtn.classList.add('hidden');
         return;
     }
@@ -116,6 +125,7 @@ function displayListSectionInfo(albumGrouperInfo) {
     const listItemTem = scrollContainer.querySelector('.list-item-node');
 
     const quickViewOverlay = document.getElementById('quickViewOverlay');
+    const quickViewTitle = quickViewOverlay.querySelector('.quick-view-title');
     const leftButtons = quickViewOverlay.querySelector('.left-buttons');
     const rightButtons = quickViewOverlay.querySelector('.right-buttons');
     const leftNextBtn = leftButtons.querySelector('.next-btn');
@@ -125,21 +135,21 @@ function displayListSectionInfo(albumGrouperInfo) {
 
     const showStepControls = (itemId) => {
         const albumIndex = albumGrouperChildAlbumIds.indexOf(itemId);
-        if ((sortOrder === 'ASC' && albumIndex >= albumGrouperInfo.length - 1)
-            || (sortOrder === 'DESC' && albumIndex === 0)) {
-            leftNextBtn.classList.add('hidden');
-            rightNextBtn.classList.add('hidden');
+        if ((sortOrder === SORT_ORDER.Ascending && albumIndex >= albumGrouperInfo.length - 1)
+            || (sortOrder === SORT_ORDER.Descending && albumIndex === 0)) {
+            leftNextBtn.classList.add('invisible');
+            rightNextBtn.classList.add('invisible');
         } else {
-            leftNextBtn.classList.remove('hidden');
-            rightNextBtn.classList.remove('hidden');
+            leftNextBtn.classList.remove('invisible');
+            rightNextBtn.classList.remove('invisible');
         }
-        if ((sortOrder === 'ASC' && albumIndex === 0)
-            || (sortOrder === 'DESC' && albumIndex >= albumGrouperInfo.length - 1)) {
-            leftPrevBtn.classList.add('hidden');
-            rightPrevBtn.classList.add('hidden');
+        if ((sortOrder === SORT_ORDER.Ascending && albumIndex === 0)
+            || (sortOrder === SORT_ORDER.Descending && albumIndex >= albumGrouperInfo.length - 1)) {
+            leftPrevBtn.classList.add('invisible');
+            rightPrevBtn.classList.add('invisible');
         } else {
-            leftPrevBtn.classList.remove('hidden');
-            rightPrevBtn.classList.remove('hidden');
+            leftPrevBtn.classList.remove('invisible');
+            rightPrevBtn.classList.remove('invisible');
         }
     };
 
@@ -153,17 +163,32 @@ function displayListSectionInfo(albumGrouperInfo) {
         }
         if (!mediaInfo) return;
         currentViewAlbumId = itemId;
+        let itemNum = albumGrouperChildAlbumIds.indexOf(itemId);
+        if (sortOrder === SORT_ORDER.Descending)
+            itemNum = albumGrouperInfo.length - itemNum;
+        else
+            itemNum = itemNum + 1;
+        quickViewTitle.querySelector('span').textContent = 'Item ' + itemNum;
         showStepControls(itemId);
         await quickViewContentInOverlay(itemId, mediaInfo.mediaType, mediaInfo);
     };
 
-    const addItem = (id) => {
+    const addItem = (id, updateList = true) => {
         const listItem = helperCloneAndUnHideNode(listItemTem);
-        listItem.innerText = `Item: ${albumGrouperCountLength}`
         listItem.href = `/api/media/content-page/${id}`;
-        albumGrouperCountLength--;
+        let title;
+        if (sortOrder === SORT_ORDER.Descending) {
+            title = `Item: ${albumGrouperCountLength}`;
+            albumGrouperCountLength--;
+        }
+        else {
+            albumGrouperCountLength++;
+            title = `Item: ${albumGrouperCountLength}`;
+        }
+        listItem.innerText = title;
         scrollContainer.appendChild(listItem);
-        albumGrouperChildAlbumIds.push(id);
+        if (updateList)
+            albumGrouperChildAlbumIds.push(id);
         listItem.addEventListener('click', async (e) => {
             e.preventDefault();
             e.target.disabled = true;
@@ -175,7 +200,7 @@ function displayListSectionInfo(albumGrouperInfo) {
 
     const getNextGrouperInfo = async (grouperId) => {
         const grouperInfo = await fetchGrouperNext(grouperId);
-        if (!grouperInfo) return;
+        if (!grouperInfo.content.length) return;
         grouperInfo.content.forEach(id => {
             addItem(id);
         });
@@ -183,23 +208,50 @@ function displayListSectionInfo(albumGrouperInfo) {
             top: scrollContainer.scrollHeight,
             behavior: 'smooth'
         });
-        if (!grouperInfo.hasNext) {
-            this.remove();
-        }
     }
+
+    const sortOrderButton = document.getElementById('sortOrderButton');
+    sortOrderButton.addEventListener('click', async () => {
+        sortOrder = sortOrder === SORT_ORDER.Descending ? SORT_ORDER.Ascending : SORT_ORDER.Descending;
+        sortOrderButton.textContent = sortOrder === SORT_ORDER.Descending ? 'Descending' : 'Ascending';
+        if (sortOrder === SORT_ORDER.Descending) {
+            albumGrouperCountLength = albumGrouperInfo.length;
+        } else {
+            albumGrouperCountLength = 0;
+        }
+        const first = scrollContainer.firstElementChild;
+        if (first) scrollContainer.replaceChildren(first);
+        if (albumGrouperChildAlbumIds.length === albumGrouperInfo.length) {
+            if (sortOrder === SORT_ORDER.Descending)
+                albumGrouperChildAlbumIds.sort((a, b) => b - a);
+            else
+                albumGrouperChildAlbumIds.sort((a, b) => a - b);
+            albumGrouperChildAlbumIds.forEach(id => {
+                addItem(id, false);
+            });
+            scrollContainer.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+            return;
+        }
+        offset = 0;
+        albumGrouperChildAlbumIds = [];
+        await getNextGrouperInfo(albumGrouperInfo.id);
+    });
 
     const viewNextAlbum = async () => {
         const currentAlbumIdIndex = albumGrouperChildAlbumIds.indexOf(currentViewAlbumId);
         if (currentAlbumIdIndex === -1) return;
-        const dif = sortOrder === 'ASC' ? 1 : -1;
+        const dif = sortOrder === SORT_ORDER.Ascending ? 1 : -1;
         const nextAlbumIdIndex = currentAlbumIdIndex + dif;
-        if (sortOrder === 'ASC') {
+        if (sortOrder === SORT_ORDER.Ascending) {
             if (nextAlbumIdIndex >= albumGrouperChildAlbumIds.length) {
                 await getNextGrouperInfo(albumGrouperInfo.id);
             }
             if (nextAlbumIdIndex >= albumGrouperChildAlbumIds.length) return;
         }
-        else if (sortOrder === 'DESC') {
+        else if (sortOrder === SORT_ORDER.Descending) {
             if (nextAlbumIdIndex < 0) {
                 await getNextGrouperInfo(albumGrouperInfo.id);
             }
@@ -208,32 +260,32 @@ function displayListSectionInfo(albumGrouperInfo) {
         const nextAlbumId = albumGrouperChildAlbumIds[nextAlbumIdIndex];
         await getMediaContentAndShowInOverlay(nextAlbumId);
         const nextTwoAlbumIdIndex = nextAlbumIdIndex + dif;
-        if ((sortOrder === 'ASC' && nextTwoAlbumIdIndex >= albumGrouperInfo.length)
-            || (sortOrder === 'DESC' && nextTwoAlbumIdIndex < 0)) {
-            leftNextBtn.classList.add('hidden');
-            rightNextBtn.classList.add('hidden');
+        if ((sortOrder === SORT_ORDER.Ascending && nextTwoAlbumIdIndex >= albumGrouperInfo.length)
+            || (sortOrder === SORT_ORDER.Descending && nextTwoAlbumIdIndex < 0)) {
+            leftNextBtn.classList.add('invisible');
+            rightNextBtn.classList.add('invisible');
         }
-        leftPrevBtn.classList.remove('hidden');
-        rightPrevBtn.classList.remove('hidden');
+        leftPrevBtn.classList.remove('invisible');
+        rightPrevBtn.classList.remove('invisible');
     };
 
     const viewPrevAlbum = async () => {
         const currentAlbumIdIndex = albumGrouperChildAlbumIds.indexOf(currentViewAlbumId);
         if (currentAlbumIdIndex === -1) return;
-        const dif = (sortOrder === 'ASC' ? 1 : -1);
+        const dif = (sortOrder === SORT_ORDER.Ascending ? 1 : -1);
         const prevAlbumIdIndex = currentAlbumIdIndex - dif;
-        if (sortOrder === 'ASC' && prevAlbumIdIndex < 0) return;
-        else if (sortOrder === 'DESC' && prevAlbumIdIndex >= albumGrouperChildAlbumIds.length) return;
+        if (sortOrder === SORT_ORDER.Ascending && prevAlbumIdIndex < 0) return;
+        else if (sortOrder === SORT_ORDER.Descending && prevAlbumIdIndex >= albumGrouperChildAlbumIds.length) return;
         const prevAlbumId = albumGrouperChildAlbumIds[prevAlbumIdIndex];
         await getMediaContentAndShowInOverlay(prevAlbumId);
         const prevTwoAlbumIdIndex = prevAlbumIdIndex - dif;
-        if ((sortOrder === 'ASC' && prevTwoAlbumIdIndex < 0)
-            || (sortOrder === 'DESC' && prevTwoAlbumIdIndex >= albumGrouperInfo.length)) {
-            leftPrevBtn.classList.add('hidden');
-            rightPrevBtn.classList.add('hidden');
+        if ((sortOrder === SORT_ORDER.Ascending && prevTwoAlbumIdIndex < 0)
+            || (sortOrder === SORT_ORDER.Descending && prevTwoAlbumIdIndex >= albumGrouperInfo.length)) {
+            leftPrevBtn.classList.add('invisible');
+            rightPrevBtn.classList.add('invisible');
         }
-        leftNextBtn.classList.remove('hidden');
-        rightNextBtn.classList.remove('hidden');
+        leftNextBtn.classList.remove('invisible');
+        rightNextBtn.classList.remove('invisible');
     };
 
     leftNextBtn.addEventListener('click', viewNextAlbum);
@@ -245,7 +297,7 @@ function displayListSectionInfo(albumGrouperInfo) {
         addItem(id);
     });
 
-    if (albumGrouperCountLength === 0) {
+    if (albumGrouperCountLength === 0 || albumGrouperCountLength === albumGrouperInfo.length) {
         listSection.querySelector('.show-more-btn').classList.add('hidden');
         return;
     }
@@ -297,7 +349,7 @@ async function fetchMediaContent(mediaId) {
 }
 
 async function fetchGrouperNext(albumGrouperId) {
-    const response = await fetch(`/api/media/grouper-next/${albumGrouperId}?o=${albumGrouperCountLength}`);
+    const response = await fetch(`/api/media/grouper-next/${albumGrouperId}?offset=${offset}&order=${sortOrder}`);
     if (!response.ok) {
         alert("Failed to grouper next list");
         return null;
