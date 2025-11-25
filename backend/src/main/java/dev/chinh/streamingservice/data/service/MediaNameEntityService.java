@@ -23,32 +23,34 @@ public class MediaNameEntityService {
     private final ThumbnailService thumbnailService;
 
     public Page<MediaNameEntry> findAllAuthors(int offset, SortBy sortBy, Sort.Direction sortOrder) {
-        return mapInfo(mediaAuthorRepository.findAllNames(getPageable(offset, sortBy, sortOrder)));
+        return mapInfo(mediaAuthorRepository.findAllNames(getPageable(offset, sortBy, sortOrder)), false);
     }
 
     public Page<MediaNameEntry> findAllCharacters(int offset, SortBy sortBy, Sort.Direction sortOrder) {
-        return mapInfo(mediaCharacterRepository.findAllNames(getPageable(offset, sortBy, sortOrder)));
+        return mapInfo(mediaCharacterRepository.findAllNames(getPageable(offset, sortBy, sortOrder)), true);
     }
 
     public Page<MediaNameEntry> findAllUniverses(int offset, SortBy sortBy, Sort.Direction sortOrder) {
-        return mapInfo(mediaUniverseRepository.findAllNames(getPageable(offset, sortBy, sortOrder)));
+        return mapInfo(mediaUniverseRepository.findAllNames(getPageable(offset, sortBy, sortOrder)), true);
     }
 
     public Page<MediaNameEntry> findAllTags(int offset, SortBy sortBy, Sort.Direction sortOrder) {
-        return mapInfo(mediaTagRepository.findAllNames(getPageable(offset, sortBy, sortOrder)));
+        return mapInfo(mediaTagRepository.findAllNames(getPageable(offset, sortBy, sortOrder)), false);
     }
 
-    private Page<MediaNameEntry> mapInfo(Page<MediaNameEntry> entry) {
+    private Page<MediaNameEntry> mapInfo(Page<MediaNameEntry> entry, boolean hasThumbnail) {
         List<MediaNameEntry> nameEntries = entry.getContent();
-        thumbnailService.processThumbnails(nameEntries); // process thumbnails first with the original thumbnail path
-        // set thumbnail path to the directory of the thumbnail location
-        nameEntries.forEach(nameEntry -> {
-            try {
-                nameEntry.setThumbnail(ThumbnailService.getThumbnailPath(nameEntry.getName(), nameEntry.getThumbnail()));
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
+        if (hasThumbnail) {
+            thumbnailService.processThumbnails(nameEntries); // process thumbnails first with the original thumbnail path
+            // set thumbnail path to the directory of the thumbnail location
+            nameEntries.forEach(nameEntry -> {
+                try {
+                    nameEntry.setThumbnail(ThumbnailService.getThumbnailPath(nameEntry.getName(), nameEntry.getThumbnail()));
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
         return new PageImpl<>(nameEntries, PageRequest.of(entry.getNumber(), entry.getSize()), entry.getTotalElements());
     }
 
