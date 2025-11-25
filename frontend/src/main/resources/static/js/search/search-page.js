@@ -835,10 +835,12 @@ function displaySearchItems(searchItems) {
         itemContainer.querySelector('.name-note').textContent = (item.authors && item.authors.length) ? item.authors.join(", ") : 'Unknown';
         const itemLink = itemContainer.querySelector('.item-link');
         itemLink.href = `/api/media/content-page/${item.id}`;
-        itemLink.addEventListener('click', async (e) => {
-            e.preventDefault();
-            await quickViewContentInOverlay(item.id, item.mediaType);
-        });
+        if (item.mediaType !== 'GROUPER') {
+            itemLink.addEventListener('click', async (e) => {
+                e.preventDefault();
+                await quickViewContentInOverlay(item.id, item.mediaType);
+            });
+        }
         if (item.mediaType === 'VIDEO') {
             itemContainer.querySelector('.time-note').textContent = formatTime(item.length);
             const thumbnailContainer = itemContainer.querySelector('.thumbnail-container');
