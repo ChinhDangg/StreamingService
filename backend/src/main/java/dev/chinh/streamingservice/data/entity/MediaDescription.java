@@ -62,15 +62,6 @@ public abstract class MediaDescription implements MetaDataProvider {
     @Column(nullable = false)
     protected Integer year;
 
-    // Grouping (optional)
-    @JsonProperty(ContentMetaData.GROUP_INFO)
-    @OneToOne(fetch = FetchType.LAZY)
-    protected MediaGroupMetaData groupInfo;
-
-    public boolean isGrouper() {
-        return groupInfo != null && (groupInfo.getGrouperMetaDataId() == null || groupInfo.getGrouperMetaDataId() == -1);
-    }
-
     public String getPath() {
         if (parentPath != null && !parentPath.isBlank() && hasKey())
             return parentPath + "/" + key;

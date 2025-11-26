@@ -54,6 +54,15 @@ public class MediaMetaData extends MediaDescription {
     )
     private Set<MediaAuthor> authors;
 
+    // Grouping (optional)
+    @JsonProperty(ContentMetaData.GROUP_INFO)
+    @OneToOne(fetch = FetchType.LAZY)
+    private MediaGroupMetaData groupInfo;
+
+    public boolean isGrouper() {
+        return groupInfo != null && (groupInfo.getGrouperMetaDataId() == null || groupInfo.getGrouperMetaDataId() == -1);
+    }
+
     // Technical
     @Column(nullable = false)
     private short frameRate;

@@ -11,4 +11,6 @@ public interface MetaDataProvider {
     List<String> getUniverses();
 
     List<String> getAuthors();
+
+    boolean isGrouper();
 }
