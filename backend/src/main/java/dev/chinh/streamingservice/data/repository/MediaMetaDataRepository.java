@@ -17,6 +17,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
         LEFT JOIN FETCH m.characters
         LEFT JOIN FETCH m.universes
         LEFT JOIN FETCH m.authors
+        LEFT JOIN FETCH m.groupInfo
         WHERE m.id = :id
     """)
     Optional<MediaMetaData> findByIdWithAllInfo(@Param("id") Long id);
