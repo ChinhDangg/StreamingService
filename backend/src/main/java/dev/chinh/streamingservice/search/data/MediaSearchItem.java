@@ -25,4 +25,11 @@ public class MediaSearchItem extends MediaDescription {
     @JsonProperty(ContentMetaData.AUTHORS)
     private List<String> authors;
 
+    private MediaGroupInfo mediaGroupInfo;
+
+    @Override
+    public boolean isGrouper() {
+        return mediaGroupInfo != null && (mediaGroupInfo.getGrouperId() == null || mediaGroupInfo.getGrouperId() == -1);
+    }
+
 }
