@@ -25,6 +25,7 @@ let currentSortBy = SortBy.Name;
 let currentSortOrder = SortOrder.Ascending;
 
 let previousSortByButton = null;
+const currentBrowseTabMap = new Map();
 
 function getCurrentNameEntry(url = window.location.href) {
     const pathName = new URL(url).pathname;
@@ -60,7 +61,7 @@ function initializeCurrentOptions() {
     currentSortOrder = urlParams.get('order') || SortOrder.Ascending;
 }
 
-function removeRedirectBrowseOptions () {
+function removeRedirectBrowseOptions() {
     const browseOptionContainer = document.getElementById('browse-option-container');
     browseOptionContainer.querySelectorAll('a').forEach(browseOption => {
         if (browseOption.href) {
@@ -69,7 +70,8 @@ function removeRedirectBrowseOptions () {
                 e.preventDefault();
                 if (currentNameEntry === nameEntry) return;
                 currentNameEntry = nameEntry;
-                await fetchNameItems(NameEntry[currentNameEntry], currentPage, currentSortBy, currentSortOrder);
+                const nameItems = currentBrowseTabMap.get(currentNameEntry);
+                await fetchNameItems(NameEntry[currentNameEntry], currentPage, currentSortBy, currentSortOrder, true, nameItems);
             });
         }
     });
@@ -119,14 +121,16 @@ function getSortOrderText(order) {
     }
 }
 
-async function fetchNameItems(nameEntry, p, by, order, pushtoHistory = true) {
-    const urlParams = new URLSearchParams({ p, by, order });
-    const response = await fetch(`/api/media/${nameEntry}?${urlParams}`);
-    if (!response.ok) {
-        alert("Failed to fetch name items");
-        return false;
+async function fetchNameItems(nameEntry, p, by, order, pushtoHistory = true, nameItems = null) {
+    if (!nameItems) {
+        const urlParams = new URLSearchParams({p, by, order});
+        const response = await fetch(`/api/media/${nameEntry}?${urlParams}`);
+        if (!response.ok) {
+            alert("Failed to fetch name items");
+            return false;
+        }
+        nameItems = await response.json();
     }
-    const nameItems = await response.json();
 
     if (pushtoHistory) {
         const url = new URL(window.location.href);
@@ -193,7 +197,7 @@ async function displayItem(nameItems) {
             imgElement.onload = () => {
                 resolve(imgElement);
             };
-            imgElement.onerror = (err) => {
+            imgElement.onerror = () => {
                 reject(new Error(`Failed to load image: ${src}`));
             };
             // start fetching the image data
@@ -223,6 +227,7 @@ async function displayItem(nameItems) {
         itemNode.querySelector('.item-link').href = `/page/search?${NameEntry[currentNameEntry]}=${item.name}`;
         nameContainer.appendChild(itemNode);
     }
+    currentBrowseTabMap.set(currentNameEntry, nameItems);
 }
 
 function getBrowsePageUrl(page) {
