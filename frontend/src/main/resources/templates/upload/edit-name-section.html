@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Editing Media Name Entity Info</title>
+</head>
+<body>
+
+
+<button th:fragment="editButton(btnId)"
+        th:id="${btnId}"
+        class="flex items-center gap-2 ml-2 px-1 py-1 rounded-lg border border-gray-300 hover:bg-gray-500 text-sm font-medium transition">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24"
+         stroke-width="1.5" stroke="white" class="w-5 h-5">
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="M16.862 4.487l1.687 1.688a2.25 2.25 0 010 3.182L9.27 18.737a2.25 2.25 0 01-.795.502l-3.395 1.132a.75.75 0 01-.948-.948l1.133-3.395a2.25 2.25 0 01.501-.795l9.279-9.28a2.25 2.25 0 013.182 0z"/>
+    </svg>
+</button>
+
+
+<div th:fragment="edit-name-area-html" th:remove="tag">
+    <div id="editAreaContainer" class="hidden mt-10 p-4 bg-gray-900 rounded-xl border border-gray-700 shadow-lg space-y-2">
+        <li class="temp-edit-node-li hidden cursor-pointer flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-md shadow-lg px-2 py-1 flex justify-between items-center hover:bg-gray-700 text-gray-200">
+            <span class="text-name">Nothing</span>
+            <span class="remove-btn text-gray-400 hover:text-white text-lg">&times;</span>
+        </li>
+
+        <!-- Title -->
+        <h3 class="font-semibold text-xl text-gray-200">
+            Editing <span class="current-edit-name-title text-indigo-400">character</span>
+        </h3>
+        <!-- CURRENT -->
+        <div class="flex gap-4">
+            <span class="w-20 font-semibold text-gray-300">Current:</span>
+            <ul id="currentArea" tabindex="0" class="flex flex-wrap gap-2 select-none">
+                <!-- dynamically filled -->
+            </ul>
+        </div>
+        <!-- ADDING -->
+        <div class="flex gap-4">
+            <span class="w-20 font-semibold text-gray-300">Adding:</span>
+            <div class="relative">
+                <input type="text" placeholder="Search..." autocomplete="off" class="adding-search-input px-4 py-2 w-64 bg-gray-800 text-gray-100 rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+                <!-- Dropdown -->
+                <ul tabindex="0" class="search-dropdown-ul hidden absolute top-full w-full mt-1 bg-gray-800 border border-gray-700 rounded-md shadow-lg max-h-60 overflow-y-auto text-gray-200 text-sm">
+                    <li class="select-none hidden px-4 py-2 hover:bg-gray-700 cursor-pointer">Author 1</li>
+                </ul>
+            </div>
+            <ul id="addingArea" tabindex="0" class="flex flex-wrap gap-2 select-none">
+                <!-- dynamically filled -->
+            </ul>
+        </div>
+
+        <!-- REMOVING -->
+        <div id="removingAreaContainer" class="hidden flex gap-4">
+            <span class="w-20 font-semibold text-gray-300">Removing:</span>
+            <ul id="removingArea" tabindex="0" class="flex flex-wrap gap-2 select-none"></ul>
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="flex gap-3 pt-2">
+            <button class="save-edit-name-btn px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-medium transition duration-150">
+                Save
+            </button>
+            <button class="close-edit-name-btn px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md font-medium transition duration-150">
+                Close
+            </button>
+        </div>
+    </div> <!-- End of edit area container -->
+</div>
+
+
+</body>
+</html>
