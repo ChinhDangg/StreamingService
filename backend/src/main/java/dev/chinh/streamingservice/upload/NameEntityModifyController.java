@@ -13,7 +13,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/media/modify")
+@RequestMapping("/api/modify/name")
 public class NameEntityModifyController {
 
     private final NameEntityModifyService nameEntityModifyService;
