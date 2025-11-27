@@ -28,4 +28,8 @@ public class MediaMetadataService {
     public MediaSearchItem getCachedMediaSearchItem(String id) {
         return objectMapper.convertValue(redisTemplate.opsForValue().get("media::" + id), MediaSearchItem.class);
     }
+
+    public void removeCachedMediaSearchItem(String id) {
+        redisTemplate.delete("media::" + id);
+    }
 }

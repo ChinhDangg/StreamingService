@@ -2,6 +2,8 @@ package dev.chinh.streamingservice.upload;
 
 import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
+import dev.chinh.streamingservice.data.service.MediaMetadataService;
+import dev.chinh.streamingservice.search.service.OpenSearchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +15,8 @@ import java.util.List;
 public class MediaMetadataModifyService {
 
     private final MediaMetaDataRepository mediaMetaDataRepository;
+    private final MediaMetadataService mediaMetadataService;
+    private final OpenSearchService openSearchService;
 
     public List<NameEntityDTO> getMediaAuthorInfo(long mediaId) {
         return mediaMetaDataRepository.findAuthorsByMediaId(mediaId);
@@ -36,12 +40,14 @@ public class MediaMetadataModifyService {
 
     @Transactional
     public void updateNameEntityInMedia(UpdateList updateList, long mediaId) {
+        if (updateList.adding.isEmpty() && updateList.removing.isEmpty()) return;
         for (NameEntityDTO nameEntityDTO : updateList.removing) {
             removeNameEntityInMedia(mediaId, nameEntityDTO.getId(), updateList.nameEntity);
         }
         for (NameEntityDTO nameEntityDTO : updateList.adding) {
             addNameEntityInMedia(mediaId, nameEntityDTO.getId(), updateList.nameEntity);
         }
+        mediaMetadataService.removeCachedMediaSearchItem(String.valueOf(mediaId));
     }
 
     private void removeNameEntityInMedia(long mediaId, long nameEntityId, String nameEntity) {
