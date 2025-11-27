@@ -130,7 +130,6 @@ function initializeUploadImageInput() {
 }
 
 let searchTimeOut = null;
-let currentSelectedNameEntity = null;
 const searchEntryList = document.getElementById('searchEntryList');
 
 function initializeSearchName() {
@@ -141,7 +140,6 @@ function initializeSearchName() {
         const searchEntry = helperCloneAndUnHideNode(searchEntryTem);
         searchEntry.textContent = nameEntity.name;
         searchEntry.addEventListener('click', () => {
-            currentSelectedNameEntity = nameEntity;
             entityIdInput.value = nameEntity.id;
             entityNameInput.value = nameEntity.name;
         });
@@ -149,7 +147,7 @@ function initializeSearchName() {
     }
 
     const searchName = async (nameString) => {
-        const response = await fetch(`/api/media/modify/${currentNameEntity}?name=${nameString}`);
+        const response = await fetch(`/api/modify/name/${currentNameEntity}?name=${nameString}`);
         if (!response.ok) {
             alert('Failed to fetch name info: ' + await response.text());
             return;
@@ -227,9 +225,8 @@ function initializeModifyActionButtons() {
             formData.append("thumbnail", entityImageInput.files[0]);
         }
 
-        let url = `/api/media/modify/${currentNameEntity}`;
+        let url = `/api/modify/name/${currentNameEntity}`;
         let method = 'POST';
-        let contentType = 'multipart/form-data';
         let body = formData;
         if (currentModifyOption === modifyOption.Update) {
             url += `/${entityIdInput.value}`;
@@ -237,15 +234,11 @@ function initializeModifyActionButtons() {
         }
 
         if (currentNameEntity === nameEntity.Authors || currentNameEntity === nameEntity.Tags) {
-            contentType = 'text/plain';
             body = entityNameInput.value;
         }
 
         const response = await fetch(url, {
             method: method,
-            headers: {
-                'Content-Type': contentType,
-            },
             body: body
         });
         if (currentModifyOption === modifyOption.Add && response.status !== 201) {
