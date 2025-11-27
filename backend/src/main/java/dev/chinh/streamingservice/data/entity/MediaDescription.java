@@ -35,7 +35,6 @@ public abstract class MediaDescription implements MetaDataProvider {
     protected String key;  // if key exist then is an individual content item, otherwise use parentPath for grouping
 
     @JsonProperty(ContentMetaData.THUMBNAIL)
-    @Column(nullable = false)
     protected String thumbnail;
 
     @JsonProperty(ContentMetaData.LENGTH)
