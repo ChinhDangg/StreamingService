@@ -31,15 +31,15 @@ public class MediaMetadataModifyService {
     }
 
     public record UpdateList(
-            List<NameEntityDTO> added, List<NameEntityDTO> removed, String nameEntity
+            List<NameEntityDTO> adding, List<NameEntityDTO> removing, String nameEntity
     ) {}
 
     @Transactional
     public void updateNameEntityInMedia(UpdateList updateList, long mediaId) {
-        for (NameEntityDTO nameEntityDTO : updateList.removed) {
+        for (NameEntityDTO nameEntityDTO : updateList.removing) {
             removeNameEntityInMedia(mediaId, nameEntityDTO.getId(), updateList.nameEntity);
         }
-        for (NameEntityDTO nameEntityDTO : updateList.added) {
+        for (NameEntityDTO nameEntityDTO : updateList.adding) {
             addNameEntityInMedia(mediaId, nameEntityDTO.getId(), updateList.nameEntity);
         }
     }
