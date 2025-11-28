@@ -10,7 +10,7 @@ export function displayContentInfo(mediaInfo, mainContainer) {
         const authorNodeTem = authorContainer.querySelector('.author-info');
         mediaInfo.authors.forEach(author => {
             const authorNode = helperCloneAndUnHideNode(authorNodeTem);
-            authorNode.href = `/page/search?authors=${author}`;
+            authorNode.href = `/page/search/keyword?field=authors&keys=${author}`;
             authorNode.textContent = author;
             authorContainer.appendChild(authorNode);
         });
@@ -24,7 +24,7 @@ export function displayContentInfo(mediaInfo, mainContainer) {
         const universeNodeTem = universeContainer.querySelector('.universe-info');
         mediaInfo.universes.forEach(universe => {
             const universeNode = helperCloneAndUnHideNode(universeNodeTem);
-            universeNode.href = `/page/search?universes=${universe}`;
+            universeNode.href = `/page/search/keyword?field=universes&keys=${universe}`;
             universeNode.textContent = universe;
             universeContainer.appendChild(universeNode);
         });
@@ -38,7 +38,7 @@ export function displayContentInfo(mediaInfo, mainContainer) {
         const characterNodeTem = characterContainer.querySelector('.character-info');
         mediaInfo.characters.forEach(character => {
             const characterNode = helperCloneAndUnHideNode(characterNodeTem);
-            characterNode.href = `/page/search?characters=${character}`;
+            characterNode.href = `/page/search/keyword?field=characters&keys=${character}`;
             characterNode.textContent = character;
             characterContainer.appendChild(characterNode);
         });
@@ -52,7 +52,7 @@ export function displayContentInfo(mediaInfo, mainContainer) {
         const tagNodeTem = tagContainer.querySelector('.tag-info');
         mediaInfo.tags.forEach(tag => {
             const tagNode = helperCloneAndUnHideNode(tagNodeTem);
-            tagNode.href = `/page/search?tags=${tag}`;
+            tagNode.href = `/page/search/keyword?field=tags&keys=${tag}`;
             tagNode.textContent = tag;
             tagContainer.appendChild(tagNode);
         });
