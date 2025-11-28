@@ -5,9 +5,7 @@ import dev.chinh.streamingservice.search.constant.SortBy;
 import dev.chinh.streamingservice.search.data.MediaSearchRequest;
 import dev.chinh.streamingservice.search.data.MediaSearchResult;
 import dev.chinh.streamingservice.search.service.MediaSearchService;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import dev.chinh.streamingservice.upload.MediaNameEntityConstant;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.client.opensearch._types.SortOrder;
 import org.springframework.http.ResponseEntity;
@@ -40,44 +38,15 @@ public class SearchController {
         return ResponseEntity.ok().body(mediaSearchService.advanceSearch(mediaSearchRequest, page, pageSize, sortBy, sortOrder));
     }
 
-    @PostMapping("/universes")
-    public ResponseEntity<MediaSearchResult> universesSearch(@RequestParam(name = "keys") List<Object> universes,
-                                                             @RequestParam(required = false, defaultValue = "true") boolean matchAll,
-                                                             @RequestParam(required = false) int page,
-                                                             @RequestParam(required = false) SortBy sortBy,
-                                                             @RequestParam(required = false) SortOrder sortOrder) throws IOException {
-        return ResponseEntity.ok().body(
-                mediaSearchService.searchByKeywords(ContentMetaData.UNIVERSES, universes, matchAll, page, pageSize, sortBy, sortOrder));
-    }
-
-    @PostMapping("/characters")
-    public ResponseEntity<MediaSearchResult> charactersSearch(@RequestParam(name = "keys") List<Object> characters,
-                                                              @RequestParam(required = false, defaultValue = "true") boolean matchAll,
-                                                              @RequestParam(required = false) int page,
-                                                              @RequestParam(required = false) SortBy sortBy,
-                                                              @RequestParam(required = false) SortOrder sortOrder) throws IOException {
-        return ResponseEntity.ok().body(
-                mediaSearchService.searchByKeywords(ContentMetaData.CHARACTERS, characters, matchAll, page, pageSize, sortBy, sortOrder));
-    }
-
-    @PostMapping("/authors")
-    public ResponseEntity<MediaSearchResult> authorsSearch(@RequestParam(name = "keys") List<Object> authors,
+    @PostMapping("/keyword")
+    public ResponseEntity<MediaSearchResult> keywordSearch(@RequestParam(name = "field") MediaNameEntityConstant nameEntity,
+                                                           @RequestParam(name = "keys") List<Object> keywordList,
                                                            @RequestParam(required = false, defaultValue = "true") boolean matchAll,
                                                            @RequestParam(required = false) int page,
                                                            @RequestParam(required = false) SortBy sortBy,
                                                            @RequestParam(required = false) SortOrder sortOrder) throws IOException {
         return ResponseEntity.ok().body(
-                mediaSearchService.searchByKeywords(ContentMetaData.AUTHORS, authors, matchAll, page, pageSize, sortBy, sortOrder));
-    }
-
-    @PostMapping("/tags")
-    public ResponseEntity<MediaSearchResult> tagsSearch(@RequestParam(name = "keys") List<Object> tags,
-                                                        @RequestParam(required = false, defaultValue = "true") boolean matchAll,
-                                                        @RequestParam(required = false) int page,
-                                                        @RequestParam(required = false) SortBy sortBy,
-                                                        @RequestParam(required = false) SortOrder sortOrder) throws IOException {
-        return ResponseEntity.ok().body(
-                mediaSearchService.searchByKeywords(ContentMetaData.TAGS, tags, matchAll, page, pageSize, sortBy, sortOrder));
+                mediaSearchService.searchByKeywords(nameEntity.getName(), keywordList, matchAll, page, pageSize, sortBy, sortOrder));
     }
 
     @PostMapping("/match-all")
