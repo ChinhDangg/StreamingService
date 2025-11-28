@@ -15,29 +15,28 @@ public class MediaMetadataModifyController {
 
     @GetMapping("/authors/{id}")
     public ResponseEntity<List<NameEntityDTO>> getMediaAuthorInfo(@PathVariable long id) {
-        return ResponseEntity.ok().body(mediaMetadataModifyService.getMediaAuthorInfo(id));
+        return ResponseEntity.ok().body(mediaMetadataModifyService.getMediaNameEntityInfo(id, MediaNameEntity.AUTHORS));
     }
 
     @GetMapping("/characters/{id}")
     public ResponseEntity<List<NameEntityDTO>> getMediaCharacterInfo(@PathVariable long id) {
-        return ResponseEntity.ok().body(mediaMetadataModifyService.getMediaCharacterInfo(id));
+        return ResponseEntity.ok().body(mediaMetadataModifyService.getMediaNameEntityInfo(id, MediaNameEntity.CHARACTERS));
     }
 
     @GetMapping("/universes/{id}")
     public ResponseEntity<List<NameEntityDTO>> getMediaUniverseInfo(@PathVariable long id) {
-        return ResponseEntity.ok().body(mediaMetadataModifyService.getMediaUniverseInfo(id));
+        return ResponseEntity.ok().body(mediaMetadataModifyService.getMediaNameEntityInfo(id, MediaNameEntity.UNIVERSES));
     }
 
     @GetMapping("/tags/{id}")
     public ResponseEntity<List<NameEntityDTO>> getMediaTagInfo(@PathVariable long id) {
-        return ResponseEntity.ok().body(mediaMetadataModifyService.getMediaTagInfo(id));
+        return ResponseEntity.ok().body(mediaMetadataModifyService.getMediaNameEntityInfo(id, MediaNameEntity.TAGS));
     }
 
     @PutMapping("/update/{id}")
-    public ResponseEntity<Void> updateMediaAuthorInfo(@PathVariable long id,
+    public ResponseEntity<List<String>> updateMediaAuthorInfo(@PathVariable long id,
                                                       @RequestBody MediaMetadataModifyService.UpdateList updateList) {
-        mediaMetadataModifyService.updateNameEntityInMedia(updateList, id);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok().body(mediaMetadataModifyService.updateNameEntityInMedia(updateList, id));
     }
 
 }
