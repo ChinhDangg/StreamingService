@@ -35,7 +35,7 @@ const SEARCH_INFO = Object.freeze({
     SORT_BY: 'sortBy',
     SORT_ORDER: 'sortOrder',
     SEARCH_STRING: 'searchString',
-    KEYWORD_FIELD: 'keyField',
+    KEYWORD_FIELD: 'field',
     KEYWORD_VALUE_LIST: 'keys',
     KEYWORD_MATCH_ALL: 'matchAll',
     ADVANCE_REQUEST_BODY: 'advanceRequestBody',
@@ -47,21 +47,13 @@ const keywordSearchMap = new Map();
 let previousSortByButton = null;
 
 async function initialize() {
-    const url = new URL(window.location.href);
     const urlParams = new URLSearchParams(window.location.search);
     currentSearchInfo.set(SEARCH_INFO.PAGE, urlParams.get(SEARCH_INFO.PAGE) || 0);
     currentSearchInfo.set(SEARCH_INFO.SORT_BY, urlParams.get(SEARCH_INFO.SORT_BY) || SORT_BY.Upload);
     currentSearchInfo.set(SEARCH_INFO.SORT_ORDER, urlParams.get(SEARCH_INFO.SORT_ORDER) || SORT_ORDERS.Descending);
     currentSearchInfo.set(SEARCH_INFO.SEARCH_STRING, urlParams.get(SEARCH_INFO.SEARCH_STRING));
 
-    let field = null;
-    for (const value of Object.values(KEYWORDS)) {
-        if (url.pathname.endsWith(value)) {
-            field = value;
-            break;
-        }
-    }
-    currentSearchInfo.set(SEARCH_INFO.KEYWORD_FIELD, field);
+    currentSearchInfo.set(SEARCH_INFO.KEYWORD_FIELD, urlParams.get(SEARCH_INFO.KEYWORD_FIELD));
     currentSearchInfo.set(SEARCH_INFO.KEYWORD_VALUE_LIST, urlParams.get(SEARCH_INFO.KEYWORD_VALUE_LIST));
     currentSearchInfo.set(SEARCH_INFO.KEYWORD_MATCH_ALL, urlParams.get(SEARCH_INFO.KEYWORD_MATCH_ALL) === 'true');
 
@@ -75,7 +67,7 @@ async function initialize() {
     else if (currentSearchInfo.get(SEARCH_INFO.ADVANCE_REQUEST_BODY))
         currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, SEARCH_TYPES.ADVANCE);
     else
-        currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, urlParams.get(SEARCH_INFO.SEARCH_TYPE));
+        currentSearchInfo.set(SEARCH_INFO.SEARCH_TYPE, null);
 
     console.log(currentSearchInfo);
 
@@ -735,13 +727,14 @@ function getBasicSearchUrl(searchString, page, sortBy, sortOrder) {
 
 function getKeywordSearchUrl(keywordField, keywordValueList, keywordMatchAll, page, sortBy, sortOrder) {
     const queryParams = new URLSearchParams({
+        [SEARCH_INFO.KEYWORD_FIELD]: keywordField,
         [SEARCH_INFO.KEYWORD_VALUE_LIST]: keywordValueList,
         [SEARCH_INFO.KEYWORD_MATCH_ALL]: keywordMatchAll,
         [SEARCH_INFO.PAGE]: page,
         [SEARCH_INFO.SORT_BY]: sortBy,
         [SEARCH_INFO.SORT_ORDER]: sortOrder
     });
-    return `/api/search/${keywordField}?${queryParams}`;
+    return `/api/search/keyword?${queryParams}`;
 }
 
 function getAdvanceSearchUrl(page, sortBy, sortOrder) {
