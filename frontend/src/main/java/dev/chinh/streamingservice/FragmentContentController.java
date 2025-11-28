@@ -17,7 +17,7 @@ public class FragmentContentController {
     private final TemplateEngine templateEngine;
 
     @GetMapping("/video-player")
-    public Map<String, Object> getCombinedContent() {
+    public Map<String, Object> getVideoPlayerContent() {
         Context context = new Context();
 
         String templateName = "video-player/video-player";
@@ -25,23 +25,32 @@ public class FragmentContentController {
         Map<String, String> fragmentMap = new HashMap<>();
         fragmentMap.put("style", "video-player-style");
         fragmentMap.put("html", "video-player-html");
-        fragmentMap.put("script", "video-player-script");
 
-        return getCombinedFragmentAsResponse(context, templateName, fragmentMap);
+        var content = getCombinedFragmentAsResponse(context, templateName, fragmentMap);
+        content.put("script", new String[] {
+                "/static/js/video-player/video-player.js"
+        });
+        return content;
     }
 
     @GetMapping("/video")
     public Map<String, Object> getVideoContent() {
         Context context = new Context();
+        context.setVariable("mainVideoContainerId", GlobalModelAttributes.mainVideoContainerId());
 
         String templateName = "video/video-page";
 
         Map<String, String> fragmentMap = new HashMap<>();
-        fragmentMap.put("style", "video-page-style");
         fragmentMap.put("html", "video-page-html");
-        fragmentMap.put("script", "video-page-script");
 
-        return getCombinedFragmentAsResponse(context, templateName, fragmentMap);
+        var content = getCombinedFragmentAsResponse(context, templateName, fragmentMap);
+        content.put("script", new String[] {
+                "/static/js/video-player/video-player.js",
+                "/static/js/video/video-page.js"
+        });
+        var videoPlayerContent = getVideoPlayerContent();
+        content.put("style", videoPlayerContent.get("style"));
+        return content;
     }
 
     @GetMapping("/album")
@@ -53,9 +62,12 @@ public class FragmentContentController {
         Map<String, String> fragmentMap = new HashMap<>();
         fragmentMap.put("style", "album-style");
         fragmentMap.put("html", "album-html");
-        fragmentMap.put("script", "album-script");
 
-        return getCombinedFragmentAsResponse(context, templateName, fragmentMap);
+        var content = getCombinedFragmentAsResponse(context, templateName, fragmentMap);
+        content.put("script", new String[] {
+                "/static/js/album/album-page.js"
+        });
+        return content;
     }
 
     private Map<String, Object> getCombinedFragmentAsResponse(Context context, String templateName,
@@ -73,16 +85,6 @@ public class FragmentContentController {
             if (styles.startsWith("<style>")) styles = styles.substring(7);
             if (styles.endsWith("</style>")) styles = styles.substring(0, styles.length() - 8);
             response.put("style", styles);
-        }
-
-        if (response.get("script") != null) {
-            String scripts = response.get("script").toString();
-            String[] parts = scripts.split("\n");
-            String[] scriptOnly = Arrays.stream(parts)
-                    .map(String::trim)
-                    .filter(s -> !s.isBlank() && !s.startsWith("<"))
-                    .toArray(String[]::new);
-            response.put("script", scriptOnly);
         }
 
         return response;
