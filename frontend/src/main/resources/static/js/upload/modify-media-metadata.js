@@ -1,3 +1,4 @@
+import { displayContentInfo } from "/static/js/metadata-display.js";
 
 let mediaId = null;
 
@@ -15,10 +16,10 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 const NameEntity = Object.freeze({
-    Characters: 'characters',
-    Universes: 'universes',
-    Authors: 'authors',
-    Tags: 'tags',
+    CHARACTERS: 'characters',
+    UNIVERSES: 'universes',
+    AUTHORS: 'authors',
+    TAGS: 'tags',
 });
 
 let currentNameEntity = null;
@@ -137,20 +138,20 @@ async function initializeEdit() {
     }
 
     document.getElementById('editUniverseBtn').addEventListener('click', async () => {
-        await startEdit(NameEntity.Universes);
+        await startEdit(NameEntity.UNIVERSES);
     });
 
     document.getElementById('editCharacterBtn').addEventListener('click', async () => {
-        await startEdit(NameEntity.Characters);
+        await startEdit(NameEntity.CHARACTERS);
         console.log(allNameEntityMap);
     });
 
     document.getElementById('editAuthorBtn').addEventListener('click', async () => {
-        await startEdit(NameEntity.Authors);
+        await startEdit(NameEntity.AUTHORS);
     });
 
     document.getElementById('editTagBtn').addEventListener('click', async () => {
-        await startEdit(NameEntity.Tags);
+        await startEdit(NameEntity.TAGS);
     });
 
     editAreaContainer.querySelector('.close-edit-name-btn').addEventListener('click', () => {
@@ -173,7 +174,7 @@ async function initializeEdit() {
         const body = {
             adding: adding,
             removing: removing,
-            nameEntity: currentNameEntity,
+            nameEntity: currentNameEntity.toUpperCase(),
         }
         const response = await fetch(`/api/modify/media/update/${mediaId}`, {
             method: 'PUT',
@@ -188,6 +189,12 @@ async function initializeEdit() {
         }
         allNameEntityMap.get(currentNameEntity).clear();
         editAreaContainer.classList.add('hidden');
+        const updatedNameEntities = await response.json();
+        const mediaInfoTemp = {
+            [currentNameEntity]: updatedNameEntities,
+        };
+        const mainContainer = document.getElementById(document.body.dataset.mainContainerId);
+        displayContentInfo(mediaInfoTemp, mainContainer);
     });
 
     await initializeEditAddingArea();
