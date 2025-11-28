@@ -56,23 +56,9 @@ public class SearchController {
         return ResponseEntity.ok().body(mediaSearchService.searchMatchAll(page, pageSize, sortBy, sortOrder));
     }
 
-    @GetMapping("/suggestion/authors")
-    public List<String> getAuthorList(@RequestParam(name = "s") String authorSearchString) throws IOException {
-        return mediaSearchService.searchContaining(ContentMetaData.AUTHORS, authorSearchString);
-    }
-
-    @GetMapping("/suggestion/characters")
-    public List<String> getCharacterList(@RequestParam(name = "s") String characterSearchString) throws IOException {
-        return mediaSearchService.searchContaining(ContentMetaData.CHARACTERS, characterSearchString);
-    }
-
-    @GetMapping("/suggestion/universes")
-    public List<String> getUniverseList(@RequestParam(name = "s") String universeSearchString) throws IOException {
-        return mediaSearchService.searchContaining(ContentMetaData.UNIVERSES, universeSearchString);
-    }
-
-    @GetMapping("/suggestion/tags")
-    public List<String> getTagList(@RequestParam(name = "s") String tagSearchString) throws IOException {
-        return mediaSearchService.searchContaining(ContentMetaData.TAGS, tagSearchString);
+    @GetMapping("/suggestion/{nameEntity}")
+    public List<String> searchNameEntity(@PathVariable MediaNameEntityConstant nameEntity,
+                                         @RequestParam(name = "s") String authorSearchString) throws IOException {
+        return mediaSearchService.searchContaining(nameEntity.getName(), authorSearchString);
     }
 }
