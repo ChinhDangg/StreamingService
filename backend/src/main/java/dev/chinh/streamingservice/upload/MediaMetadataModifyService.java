@@ -21,7 +21,7 @@ public class MediaMetadataModifyService {
     private final MediaMetadataService mediaMetadataService;
     private final OpenSearchService openSearchService;
 
-    public List<NameEntityDTO> getMediaNameEntityInfo(long mediaId, MediaNameEntity nameEntity) {
+    public List<NameEntityDTO> getMediaNameEntityInfo(long mediaId, MediaNameEntityConstant nameEntity) {
         return switch (nameEntity.getName()) {
             case ContentMetaData.AUTHORS -> mediaMetaDataRepository.findAuthorsByMediaId(mediaId);
             case ContentMetaData.CHARACTERS -> mediaMetaDataRepository.findCharactersByMediaId(mediaId);
@@ -32,7 +32,7 @@ public class MediaMetadataModifyService {
     }
 
     public record UpdateList(
-            List<NameEntityDTO> adding, List<NameEntityDTO> removing, MediaNameEntity nameEntity
+            List<NameEntityDTO> adding, List<NameEntityDTO> removing, MediaNameEntityConstant nameEntity
     ) {}
 
     @Transactional
@@ -47,7 +47,7 @@ public class MediaMetadataModifyService {
         List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(mediaId, updateList.nameEntity);
         List<String> nameEntityList = updatedMediaNameEntityList.stream().map(NameEntityDTO::getName).toList();
         try {
-            openSearchService.partialUpdateDocument(OpenSearchService.INDEX_NAME, mediaId, Map.of(ContentMetaData.NAME, nameEntityList));
+            openSearchService.partialUpdateDocument(OpenSearchService.INDEX_NAME, mediaId, Map.of(updateList.nameEntity.getName(), nameEntityList));
         } catch (IOException e) {
             throw new RuntimeException("Failed to update OpenSearch index field for media " + mediaId, e);
         }
@@ -55,7 +55,7 @@ public class MediaMetadataModifyService {
         return nameEntityList;
     }
 
-    private void removeNameEntityInMedia(long mediaId, long nameEntityId, MediaNameEntity nameEntity) {
+    private void removeNameEntityInMedia(long mediaId, long nameEntityId, MediaNameEntityConstant nameEntity) {
         switch (nameEntity.getName()) {
             case ContentMetaData.AUTHORS -> mediaMetaDataRepository.deleteAuthorFromMedia(mediaId, nameEntityId);
             case ContentMetaData.CHARACTERS -> mediaMetaDataRepository.deleteCharacterFromMedia(mediaId, nameEntityId);
@@ -65,7 +65,7 @@ public class MediaMetadataModifyService {
         }
     }
 
-    private void addNameEntityInMedia(long mediaId, long nameEntityId, MediaNameEntity nameEntity) {
+    private void addNameEntityInMedia(long mediaId, long nameEntityId, MediaNameEntityConstant nameEntity) {
         switch (nameEntity.getName()) {
             case ContentMetaData.AUTHORS -> mediaMetaDataRepository.addAuthorToMedia(mediaId, nameEntityId);
             case ContentMetaData.CHARACTERS -> mediaMetaDataRepository.addCharacterToMedia(mediaId, nameEntityId);
