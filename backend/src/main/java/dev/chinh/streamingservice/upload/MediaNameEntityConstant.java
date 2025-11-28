@@ -6,10 +6,10 @@ import lombok.Getter;
 @Getter
 public enum MediaNameEntityConstant {
 
-    AUTHORS(ContentMetaData.AUTHORS),
-    CHARACTERS(ContentMetaData.CHARACTERS),
-    UNIVERSES(ContentMetaData.UNIVERSES),
-    TAGS(ContentMetaData.TAGS);
+    authors(ContentMetaData.AUTHORS),
+    characters(ContentMetaData.CHARACTERS),
+    universes(ContentMetaData.UNIVERSES),
+    tags(ContentMetaData.TAGS);
 
     private final String name;
 
