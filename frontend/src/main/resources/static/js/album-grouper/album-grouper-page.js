@@ -1,3 +1,4 @@
+import { initializeHeader } from "/static/js/header.js";
 import { displayContentInfo, helperCloneAndUnHideNode} from "/static/js/metadata-display.js";
 import { quickViewContentInOverlay } from "/static/js/overlay.js";
 
@@ -16,7 +17,10 @@ async function initialize() {
     ]);
 }
 
-window.addEventListener('DOMContentLoaded', initialize);
+window.addEventListener('DOMContentLoaded', () => {
+    initializeHeader();
+    initialize();
+});
 
 async function displayAlbumGrouperInfo(albumGrouperId) {
     const response = await fetch(`/api/media/content/${albumGrouperId}`);
