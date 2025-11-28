@@ -12,7 +12,7 @@
 <!-- Header -->
 <header class="max-w-7xl mx-auto mb-6">
 
-    <div th:insert="header :: header-html" th:remove="tag">
+    <div th:replace="header :: header-html">
         <div id="browse-option-container" class="flex items-center space-x-2 mt-3">
             <a class="hidden select-none cursor-pointer px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
                 <span>Characters</span>
