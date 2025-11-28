@@ -4,7 +4,7 @@ import dev.chinh.streamingservice.data.ContentMetaData;
 import lombok.Getter;
 
 @Getter
-public enum MediaNameEntity {
+public enum MediaNameEntityConstant {
 
     AUTHORS(ContentMetaData.AUTHORS),
     CHARACTERS(ContentMetaData.CHARACTERS),
@@ -13,7 +13,7 @@ public enum MediaNameEntity {
 
     private final String name;
 
-    MediaNameEntity(String name) {
+    MediaNameEntityConstant(String name) {
         this.name = name;
     }
 }
