@@ -8,15 +8,11 @@ import dev.chinh.streamingservice.data.service.ThumbnailService;
 import dev.chinh.streamingservice.exception.DuplicateEntryException;
 import dev.chinh.streamingservice.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.search.service.OpenSearchService;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
-import org.apache.coyote.BadRequestException;
 import org.opensearch.client.opensearch.core.SearchResponse;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
