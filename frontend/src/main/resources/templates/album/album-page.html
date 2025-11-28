@@ -32,7 +32,7 @@
 </head>
 <body class="bg-gray-900 min-h-screen pt-6 p-4">
 
-<header th:insert="header :: header-html" th:remove="tag"></header>
+<header th:replace="header :: header-html"></header>
 
 <main th:fragment="album-html" id="main-album-container" class="max-w-7xl mx-auto px-4 py-8">
 
@@ -148,9 +148,6 @@
     </div>
 </main>
 
-<div th:fragment="album-script" class="hidden">
-    /static/js/album/album-page.js
-</div>
 
 <script type="module" th:src="@{/static/js/album/album-page.js}" src="/static/js/album/album-page.js"></script>
 
