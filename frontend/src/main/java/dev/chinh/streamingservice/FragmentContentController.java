@@ -56,6 +56,7 @@ public class FragmentContentController {
     @GetMapping("/album")
     public Map<String, Object> getAlbumContent() {
         Context context = new Context();
+        context.setVariable("mainAlbumContainerId", GlobalModelAttributes.mainAlbumContainerId());
 
         String templateName = "album/album-page";
 

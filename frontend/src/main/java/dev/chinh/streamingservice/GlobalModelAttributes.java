@@ -13,6 +13,11 @@ public class GlobalModelAttributes {
         return "main-video-container";
     }
 
+    @ModelAttribute("mainAlbumContainerId")
+    public static String mainAlbumContainerId() {
+        return "main-album-container";
+    }
+
     @ModelAttribute("modifyAllow")
     public boolean modifyAllow(Principal principal) {
         return true;
