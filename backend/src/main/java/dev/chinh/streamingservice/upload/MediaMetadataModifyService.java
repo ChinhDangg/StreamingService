@@ -31,6 +31,29 @@ public class MediaMetadataModifyService {
         };
     }
 
+    @Transactional
+    public String updateMediaTitle(long mediaId, String newTitle) {
+        if (newTitle == null) {
+            throw new IllegalArgumentException("Title must not be null");
+        }
+        newTitle = newTitle.trim();
+        if (newTitle.isEmpty())
+            throw new IllegalArgumentException("Name must not be empty");
+        if (newTitle.length() < 5)
+            throw new IllegalArgumentException("Name must be at least 5 chars: " + newTitle);
+        if (newTitle.length() > 300)
+            throw new IllegalArgumentException("Name must be at most 300 chars");
+
+        mediaMetaDataRepository.updateMediaTitle(mediaId, newTitle);
+        try {
+            openSearchService.partialUpdateDocument(OpenSearchService.INDEX_NAME, mediaId, Map.of(ContentMetaData.TITLE, newTitle));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to update OpenSearch index title field for media " + mediaId, e);
+        }
+        mediaMetadataService.removeCachedMediaSearchItem(String.valueOf(mediaId));
+        return newTitle;
+    }
+
     public record UpdateList(
             List<NameEntityDTO> adding, List<NameEntityDTO> removing, MediaNameEntityConstant nameEntity
     ) {}

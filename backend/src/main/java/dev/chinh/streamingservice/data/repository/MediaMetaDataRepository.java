@@ -27,6 +27,12 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     Optional<MediaMetaData> findByIdWithAllInfo(@Param("id") Long id);
 
 
+    @Modifying
+    @Transactional
+    @Query("UPDATE MediaMetaData m SET m.title = :title WHERE m.id = :id")
+    int updateMediaTitle(Long id, String title);
+
+
     @Query("""
         SELECT new dev.chinh.streamingservice.upload.NameEntityDTO(a.id, a.name)
         FROM MediaMetaData m
