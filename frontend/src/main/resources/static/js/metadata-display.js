@@ -11,7 +11,7 @@ export function displayContentInfo(mediaInfo, mainContainer) {
         mediaInfo.authors.forEach(author => {
             const authorNode = helperCloneAndUnHideNode(authorNodeTem);
             authorNode.href = `/page/search/keyword?field=authors&keys=${author}`;
-            authorNode.textContent = author;
+            authorNode.textContent = capitalizeWords(author);
             authorContainer.appendChild(authorNode);
         });
     }
@@ -25,7 +25,7 @@ export function displayContentInfo(mediaInfo, mainContainer) {
         mediaInfo.universes.forEach(universe => {
             const universeNode = helperCloneAndUnHideNode(universeNodeTem);
             universeNode.href = `/page/search/keyword?field=universes&keys=${universe}`;
-            universeNode.textContent = universe;
+            universeNode.textContent = capitalizeWords(universe);
             universeContainer.appendChild(universeNode);
         });
     }
@@ -39,7 +39,7 @@ export function displayContentInfo(mediaInfo, mainContainer) {
         mediaInfo.characters.forEach(character => {
             const characterNode = helperCloneAndUnHideNode(characterNodeTem);
             characterNode.href = `/page/search/keyword?field=characters&keys=${character}`;
-            characterNode.textContent = character;
+            characterNode.textContent = capitalizeWords(character);
             characterContainer.appendChild(characterNode);
         });
     }
@@ -63,4 +63,12 @@ export function helperCloneAndUnHideNode(node) {
     const clone = node.cloneNode(true);
     clone.classList.remove('hidden');
     return clone;
+}
+
+function capitalizeWords(sentence) {
+    return sentence
+        .trim()
+        .split(/\s+/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
 }
