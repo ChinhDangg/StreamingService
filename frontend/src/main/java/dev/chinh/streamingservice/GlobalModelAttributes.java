@@ -18,6 +18,11 @@ public class GlobalModelAttributes {
         return "main-album-container";
     }
 
+    @ModelAttribute("mainGrouperContainerId")
+    public static String mainGrouperContainerId() {
+        return "main-grouper-container";
+    }
+
     @ModelAttribute("modifyAllow")
     public boolean modifyAllow(Principal principal) {
         return true;
