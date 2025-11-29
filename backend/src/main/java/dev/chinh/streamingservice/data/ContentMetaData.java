@@ -70,7 +70,7 @@ public class ContentMetaData {
         }
     }
 
-    public static void validateNameText(String text) {
+    public static void validateSearchText(String text) {
         text = text.trim();
         if (text.length() < 2) {
             throw new IllegalArgumentException("Text must be at least 2 chars: " + text);

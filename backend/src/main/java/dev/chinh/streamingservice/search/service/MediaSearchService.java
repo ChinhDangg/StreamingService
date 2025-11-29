@@ -32,7 +32,7 @@ public class MediaSearchService {
     record NameEntry(String name) {}
 
     public List<String> searchContaining(String index, String text) throws IOException {
-        ContentMetaData.validateNameText(text);
+        ContentMetaData.validateSearchText(text);
         SearchResponse<NameEntry> response = openSearchService.searchContaining(
                 index, ContentMetaData.NAME, text, NameEntry.class);
         return mapSearchReponseNameEntryToList(response);
