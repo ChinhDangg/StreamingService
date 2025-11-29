@@ -19,6 +19,11 @@ public class MediaMetadataModifyController {
         return ResponseEntity.ok().body(mediaMetadataModifyService.getMediaNameEntityInfo(id, nameEntity));
     }
 
+    @PutMapping("/title/{id}")
+    public ResponseEntity<String> updateMediaTitle(@PathVariable long id, @RequestBody String title) {
+        return ResponseEntity.ok().body(mediaMetadataModifyService.updateMediaTitle(id, title));
+    }
+
     @PutMapping("/update/{id}")
     public ResponseEntity<List<String>> updateMediaAuthorInfo(@PathVariable long id,
                                                       @RequestBody MediaMetadataModifyService.UpdateList updateList) {
