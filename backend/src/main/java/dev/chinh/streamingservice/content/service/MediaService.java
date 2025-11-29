@@ -7,6 +7,8 @@ import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
 import dev.chinh.streamingservice.data.service.MediaMetadataService;
+import dev.chinh.streamingservice.search.data.MediaGroupInfo;
+import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
@@ -68,7 +70,12 @@ public abstract class MediaService {
     protected MediaMetaData findMediaMetaDataAllInfo(long id) {
         MediaMetaData mediaMetaData = mediaRepository.findByIdWithAllInfo(id).orElseThrow(() ->
                 new IllegalArgumentException("Media not found with id " + id));
-        mediaMetadataService.cacheMediaSearchItem(mediaMapper.map(mediaMetaData));
+        MediaSearchItem mediaSearchItem = mediaMapper.map(mediaMetaData);
+        if (mediaMetaData.getGrouperId() != null) {
+            mediaSearchItem.setMediaGroupInfo(
+                    new MediaGroupInfo(mediaMetaData.getGrouperId(), mediaMetaData.getGroupInfo().getNumInfo()));
+        }
+        mediaMetadataService.cacheMediaSearchItem(mediaSearchItem);
         return mediaMetaData;
     }
 
