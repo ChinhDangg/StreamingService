@@ -59,8 +59,14 @@ public class MediaMetaData extends MediaDescription {
     @OneToOne(fetch = FetchType.LAZY)
     private MediaGroupMetaData groupInfo;
 
+    @Override
     public boolean isGrouper() {
         return groupInfo != null && (groupInfo.getGrouperMetaDataId() == null || groupInfo.getGrouperMetaDataId() == -1);
+    }
+
+    @Override
+    public Long getGrouperId() {
+        return groupInfo == null ? null : groupInfo.getGrouperMetaDataId();
     }
 
     // Technical

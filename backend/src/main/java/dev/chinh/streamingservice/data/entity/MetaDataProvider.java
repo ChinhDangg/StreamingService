@@ -13,4 +13,6 @@ public interface MetaDataProvider {
     List<String> getAuthors();
 
     boolean isGrouper();
+
+    Long getGrouperId();
 }
