@@ -35,7 +35,6 @@
 <header th:replace="header :: header-html"></header>
 
 <main th:fragment="album-html" th:id="${mainAlbumContainerId}" class="max-w-7xl mx-auto px-4 py-8">
-
     <div class="px-4 py-4 sm:px-0">
 
         <div th:replace="metadata-content :: metadata-title-html('font-extrabold text-4xl tracking-tight text-white')"></div>
@@ -55,7 +54,6 @@
 
         <div class="mt-4"></div>
         <div th:replace="metadata-content :: metadata-tag-html"></div>
-
 
         <div th:replace="upload/edit-name-section :: edit-name-area-html"></div>
     </div>
