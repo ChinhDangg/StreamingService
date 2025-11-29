@@ -10,17 +10,29 @@
 
 <th:block th:fragment="editButton(btnId)">
     <th:block th:if="${modifyAllow}">
-        <button th:id="${btnId}"
-                class="flex items-center gap-2 ml-2 px-1 py-1 rounded-lg border border-gray-300 hover:bg-gray-500 text-sm font-medium transition">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24"
-                 stroke-width="1.5" stroke="white" class="w-5 h-5">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                      d="M16.862 4.487l1.687 1.688a2.25 2.25 0 010 3.182L9.27 18.737a2.25 2.25 0 01-.795.502l-3.395 1.132a.75.75 0 01-.948-.948l1.133-3.395a2.25 2.25 0 01.501-.795l9.279-9.28a2.25 2.25 0 013.182 0z"/>
-            </svg>
+            <button th:id="${btnId}" class="ml-2">
+            <div class="flex items-center justify-center gap-2 px-1 py-1 rounded-lg border border-gray-300 hover:bg-gray-500 text-sm font-medium transition">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24"
+                     stroke-width="1.5" stroke="white" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M16.862 4.487l1.687 1.688a2.25 2.25 0 010 3.182L9.27 18.737a2.25 2.25 0 01-.795.502l-3.395 1.132a.75.75 0 01-.948-.948l1.133-3.395a2.25 2.25 0 01.501-.795l9.279-9.28a2.25 2.25 0 013.182 0z"/>
+                </svg>
+            </div>
         </button>
     </th:block>
 </th:block>
 
+<th:block th:fragment="edit-title-area-html">
+    <th:block th:if="${modifyAllow}">
+        <div id="edit-title-area" class="hidden flex flex-col items-start gap-1">
+            <input type="text" value="Test Video 2" placeholder="New Title" autocomplete="off"
+                   class="edit-title-input px-4 py-2 w-64 bg-gray-800 text-gray-100 rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+            <button class="save-edit-title-btn px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-medium transition duration-150">
+                Save
+            </button>
+        </div>
+    </th:block>
+</th:block>
 
 <th:block th:fragment="edit-name-area-html">
     <th:block th:if="${modifyAllow}">
