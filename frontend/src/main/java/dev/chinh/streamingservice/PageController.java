@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice;
 
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -40,7 +41,8 @@ public class PageController {
     }
 
     @GetMapping("/album-grouper")
-    public String albumGrouperPage() {
+    public String albumGrouperPage(Model model) {
+        model.addAttribute("mainGrouperContainerId", GlobalModelAttributes.mainGrouperContainerId());
         return "album-grouper/album-grouper-page";
     }
 

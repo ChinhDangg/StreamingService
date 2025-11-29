@@ -4,7 +4,7 @@ let mediaId = null;
 
 async function initialize() {
     const urlParams = new URLSearchParams(window.location.search);
-    mediaId = urlParams.get('mediaId');
+    mediaId = urlParams.get('mediaId') || urlParams.get('grouperId');
     if (!mediaId) {
         alert("No mediaId found-bad request");
     }
