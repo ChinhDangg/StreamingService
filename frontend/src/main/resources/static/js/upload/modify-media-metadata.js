@@ -8,12 +8,48 @@ async function initialize() {
     if (!mediaId) {
         alert("No mediaId found-bad request");
     }
+    initializeEditTitle();
     await initializeEdit();
 }
 
 window.addEventListener('DOMContentLoaded', () => {
     initialize();
 });
+
+
+function initializeEditTitle() {
+    const editTitleBtn = document.getElementById('editTitleBtn');
+
+    const editTitleArea = document.getElementById('edit-title-area');
+    const editTitleInput = editTitleArea.querySelector('.edit-title-input');
+    const mainContainer = document.getElementById(document.body.dataset.mainContainerId);
+    const mainTitle = mainContainer.querySelector('.main-title');
+
+    editTitleBtn.addEventListener('click', () => {
+        editTitleArea.classList.toggle('hidden');
+        editTitleInput.value = mainTitle.textContent.trim();
+    });
+
+    const saveEditTitleBtn = editTitleArea.querySelector('.save-edit-title-btn');
+    saveEditTitleBtn.addEventListener('click', async () => {
+        const newTitle = editTitleInput.value.trim();
+        if (newTitle.length === 0) {
+            alert('Title cannot be empty');
+            return;
+        }
+        const response = await fetch(`/api/modify/media/title/${mediaId}`, {
+            method: 'PUT',
+            body: newTitle
+        });
+        if (!response.ok) {
+            alert(`Failed to save title: ${await response.text()}`);
+            return;
+        }
+        mainTitle.textContent = await response.text();
+        editTitleArea.classList.add('hidden');
+    });
+}
+
 
 const NameEntity = Object.freeze({
     CHARACTERS: 'characters',
