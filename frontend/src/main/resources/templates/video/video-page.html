@@ -15,17 +15,18 @@
 <div class="max-w-7xl mx-auto flex flex-col md:flex-row gap-4">
 
     <main th:fragment="video-page-html" th:id="${mainVideoContainerId}" class="w-full order-1 flex-1 p-4 rounded-lg">
-        <div th:replace="metadata-content :: metadata-title-html"></div>
+
+        <div th:replace="metadata-content :: metadata-title-html('text-xl font-semibold tracking-tight text-white')"></div>
 
         <div th:replace="video-player/video-player :: video-player-html">
         </div> <!-- End of video player insert div -->
 
-        <div th:replace="metadata-content :: metadata-universe-html"></div>
+        <div th:replace="metadata-content :: metadata-universe-html('mt-5 pb-3 border-b border-gray-700')"></div>
 
-        <div th:replace="metadata-content :: metadata-author-html"></div>
+        <div th:replace="metadata-content :: metadata-author-html('mt-3 mb-5 pb-3 border-b border-gray-700')"></div>
 
         <div class="mt-1">
-            <div class="flex flex-col">
+            <div class="flex flex-col mb-3">
                 <div th:replace="metadata-content :: metadata-character-html"></div>
             </div>
 
