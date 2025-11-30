@@ -16,9 +16,6 @@ import java.util.Set;
 @Table(name = "characters")
 public class MediaCharacter extends MediaNameEntityWithThumbnail {
 
-    @ManyToMany(mappedBy = "characters", fetch = FetchType.LAZY)
-    private Set<MediaUniverse> universe = new HashSet<>();
-
     public MediaCharacter(String name, Instant uploadDate) {
         this.name = name;
         this.uploadDate = uploadDate;

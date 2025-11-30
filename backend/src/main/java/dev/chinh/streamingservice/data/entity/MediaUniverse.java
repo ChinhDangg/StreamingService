@@ -16,14 +16,6 @@ import java.util.Set;
 @Table(name = "universes")
 public class MediaUniverse extends MediaNameEntityWithThumbnail {
 
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "characters_universes",
-            joinColumns = @JoinColumn(name = "universes_id"),
-            inverseJoinColumns = @JoinColumn(name = "characters_id")
-    )
-    private Set<MediaCharacter> characters = new HashSet<>();
-
     public MediaUniverse(String name, Instant uploadDate) {
         this.name = name;
         this.uploadDate = uploadDate;
