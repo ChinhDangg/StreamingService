@@ -221,7 +221,7 @@ async function displayItem(nameItems) {
         } else {
             itemNode = helperCloneAndUnHideNode(browseContainer.querySelector('.text-item'));
         }
-        itemNode.querySelector('.name-title').textContent = item.name;
+        itemNode.querySelector('.name-title').textContent = capitalizeWords(item.name);
         itemNode.querySelector('.date-note').textContent = item.uploadDate;
         itemNode.querySelector('.total-note').textContent = item.length;
         itemNode.querySelector('.item-link').href = `/page/search?${NameEntry[currentNameEntry]}=${item.name}`;
@@ -242,4 +242,12 @@ async function pageClickHandler(e, page) {
     fetchNameItems(NameEntry[currentNameEntry], page, currentSortBy, currentSortOrder).then(() => {
         e.target.disabled = false;
     });
+}
+
+function capitalizeWords(sentence) {
+    return sentence
+        .trim()
+        .split(/\s+/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
 }
