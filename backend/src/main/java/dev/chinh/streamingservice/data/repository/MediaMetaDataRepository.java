@@ -1,7 +1,7 @@
 package dev.chinh.streamingservice.data.repository;
 
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
-import dev.chinh.streamingservice.upload.NameEntityDTO;
+import dev.chinh.streamingservice.upload.modify.NameEntityDTO;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -34,7 +34,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
 
 
     @Query("""
-        SELECT new dev.chinh.streamingservice.upload.NameEntityDTO(a.id, a.name)
+        SELECT new dev.chinh.streamingservice.upload.modify.NameEntityDTO(a.id, a.name)
         FROM MediaMetaData m
         JOIN m.authors a
         WHERE m.id = :mediaId
@@ -42,7 +42,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     List<NameEntityDTO> findAuthorsByMediaId(long mediaId);
 
     @Query("""
-        SELECT new dev.chinh.streamingservice.upload.NameEntityDTO(c.id, c.name)
+        SELECT new dev.chinh.streamingservice.upload.modify.NameEntityDTO(c.id, c.name)
         FROM MediaMetaData m
         JOIN m.characters c
         WHERE m.id = :mediaId
@@ -50,7 +50,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     List<NameEntityDTO> findCharactersByMediaId(long mediaId);
 
     @Query("""
-        SELECT new dev.chinh.streamingservice.upload.NameEntityDTO(u.id, u.name)
+        SELECT new dev.chinh.streamingservice.upload.modify.NameEntityDTO(u.id, u.name)
         FROM MediaMetaData m
         JOIN m.universes u
         WHERE m.id = :mediaId
@@ -58,7 +58,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     List<NameEntityDTO> findUniversesByMediaId(long mediaId);
 
     @Query("""
-        SELECT new dev.chinh.streamingservice.upload.NameEntityDTO(t.id, t.name)
+        SELECT new dev.chinh.streamingservice.upload.modify.NameEntityDTO(t.id, t.name)
         FROM MediaMetaData m
         JOIN m.tags t
         WHERE m.id = :mediaId
