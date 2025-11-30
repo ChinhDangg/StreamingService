@@ -1,11 +1,10 @@
 package dev.chinh.streamingservice.search.controller;
 
-import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.search.constant.SortBy;
 import dev.chinh.streamingservice.search.data.MediaSearchRequest;
 import dev.chinh.streamingservice.search.data.MediaSearchResult;
 import dev.chinh.streamingservice.search.service.MediaSearchService;
-import dev.chinh.streamingservice.upload.MediaNameEntityConstant;
+import dev.chinh.streamingservice.upload.modify.MediaNameEntityConstant;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.client.opensearch._types.SortOrder;
 import org.springframework.http.ResponseEntity;
