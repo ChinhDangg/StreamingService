@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.upload;
+package dev.chinh.streamingservice.upload.modify;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.upload;
+package dev.chinh.streamingservice.upload.modify;
 
 import dev.chinh.streamingservice.data.ContentMetaData;
 import jakarta.validation.Valid;

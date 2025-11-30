@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.upload;
+package dev.chinh.streamingservice.upload.modify;
 
 import dev.chinh.streamingservice.content.service.MinIOService;
 import dev.chinh.streamingservice.data.ContentMetaData;

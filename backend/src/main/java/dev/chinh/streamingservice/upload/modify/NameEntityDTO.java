@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.upload;
+package dev.chinh.streamingservice.upload.modify;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.data.ContentMetaData;
