@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>SS Media Upload</title>
+</head>
+<body>
+
+<div>
+    <label for="single-file-input">Video Upload:</label>
+    <input id="single-file-input" type="file" accept=".mp4, .mp3, .mov, video/mp4, audio/mpeg"/>
+</div>
+
+<div>
+    <label for="folder-input">Album Upload:</label>
+    <input id="folder-input" type="file" webkitdirectory directory />
+</div>
+
+<div>
+    <label for="saving-path-input">Saving Path:</label>
+    <input id="saving-path-input" type="text">
+</div>
+
+<button id="submit-btn" type="submit">Submit</button>
+
+
+<script type="module" src="/static/js/upload/media-upload.js"></script>
+
+</body>
+</html>
