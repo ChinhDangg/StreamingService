@@ -100,7 +100,8 @@ submitBtn.addEventListener('click',async () => {
         await uploadFile(sessionId, currentFiles, savingPath, MediaTypes.VIDEO);
     } else if (currentMediaType === MediaTypes.ALBUM) {
         for (const f of currentFiles) {
-            await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM);
+            const result = await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM);
+            if (!result) return;
         }
     }
 });
@@ -122,7 +123,7 @@ async function uploadFile(sessionId, file, fileName, mediaType) {
     });
     if (!response.ok) {
         alert('Failed to init ' + await response.text());
-        return;
+        return false;
     }
 
     const uploadId = await response.text();
@@ -148,7 +149,7 @@ async function uploadFile(sessionId, file, fileName, mediaType) {
         });
         if (!urlResponse.ok) {
             alert('Failed to get presign url for chunks ' + await urlResponse.text());
-            return;
+            return false;
         }
         const urlRes = await urlResponse.text();
         console.log('Presigned url: ' + urlRes);
@@ -178,7 +179,9 @@ async function uploadFile(sessionId, file, fileName, mediaType) {
     });
     if (!completeResponse.ok) {
         alert('Failed to complete ' + await completeResponse.text());
+        return false;
     }
+    return true;
 }
 
 function chunkFile(file) {
