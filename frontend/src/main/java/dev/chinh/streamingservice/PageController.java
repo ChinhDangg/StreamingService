@@ -50,4 +50,10 @@ public class PageController {
     public String modifyNamePage() {
         return "upload/modify-name-page";
     }
+
+
+    @GetMapping("/upload/media")
+    public String uploadMediaPage() {
+        return "upload/media-upload-page";
+    }
 }
