@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.upload;
 
 import dev.chinh.streamingservice.content.constant.MediaType;
+import dev.chinh.streamingservice.content.service.MinIOService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ public class MediaUploadService {
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final MinIOService minIOService;
 
     private final String mediaBucket = "media";
 
@@ -47,6 +49,10 @@ public class MediaUploadService {
         validateObjectWithMediaType(validatedObject, mediaType);
 
         validateMediaSessionInfoWithRequest(uploadRequest, validatedObject, mediaType);
+
+        if (minIOService.objectExists(mediaBucket, validatedObject)) {
+            throw new IllegalArgumentException("Object already exists: " + validatedObject);
+        }
 
         CreateMultipartUploadRequest multipartUploadRequest = CreateMultipartUploadRequest.builder()
                 .bucket(mediaBucket)
