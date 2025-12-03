@@ -325,7 +325,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
     protected MediaDescription getMediaDescription(long videoId) {
         MediaDescription mediaDescription = super.getMediaDescription(videoId);
         if (!mediaDescription.hasKey())
-            throw new IllegalStateException("Requested video media does not has key with id: " + videoId);
+            throw new IllegalArgumentException("Requested video media does not has key with id: " + videoId);
         return mediaDescription;
     }
 
