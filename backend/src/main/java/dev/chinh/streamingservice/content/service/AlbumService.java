@@ -510,7 +510,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
     protected MediaDescription getMediaDescription(long albumId) {
         MediaDescription mediaDescription = super.getMediaDescription(albumId);
         if (mediaDescription.hasKey())
-            throw new IllegalStateException("Not an album, individual media found: " + albumId);
+            throw new IllegalArgumentException("Not an album, individual media found: " + albumId);
         return mediaDescription;
     }
 

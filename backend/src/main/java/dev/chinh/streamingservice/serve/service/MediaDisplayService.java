@@ -105,7 +105,7 @@ public class MediaDisplayService {
         } else if (mediaItem.hasKey()) {
             mediaPage = "/page/video?mediaId=" + mediaId;
         } else {
-            throw new IllegalStateException("Unknown page type with mediaId: " + mediaId);
+            throw new IllegalArgumentException("Unknown page type with mediaId: " + mediaId);
         }
 
         HttpHeaders headers = new HttpHeaders();
