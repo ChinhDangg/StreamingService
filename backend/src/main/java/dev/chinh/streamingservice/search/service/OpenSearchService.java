@@ -2,6 +2,7 @@ package dev.chinh.streamingservice.search.service;
 
 import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.search.constant.SortBy;
+import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import dev.chinh.streamingservice.search.data.MediaSearchRangeField;
 import dev.chinh.streamingservice.search.data.SearchFieldGroup;
 import lombok.RequiredArgsConstructor;
@@ -149,6 +150,16 @@ public class OpenSearchService {
                 .opType(OpType.Create)
         );
         System.out.println("Indexed doc with id: " + response.id());
+    }
+
+    public void indexDocument(String indexName, long id, MediaSearchItem searchItem) throws IOException {
+        IndexRequest<MediaSearchItem> request = IndexRequest.of(i -> i
+                .index(indexName)
+                .id(String.valueOf(id))
+                .document(searchItem)
+        );
+        IndexResponse response = client.index(request);
+        System.out.println("Indexed class doc with id: " + response.id());
     }
 
     /**
