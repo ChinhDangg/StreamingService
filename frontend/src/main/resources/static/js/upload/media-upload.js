@@ -4,6 +4,9 @@ const singleFileInput = document.getElementById('single-file-input');
 const folderInput = document.getElementById('folder-input');
 const savingPathInput = document.getElementById('saving-path-input');
 
+const titleInput = document.getElementById('title-input');
+const yearInput = document.getElementById('year-input');
+
 const submitBtn = document.getElementById('submit-btn');
 
 let currentFiles = null;
@@ -23,7 +26,10 @@ singleFileInput.addEventListener('change', () => {
     }
     const file = singleFileInput.files[0];
     currentFiles = file;
+    folderInput.value = '';
+
     updateSavingPath(file.name);
+    updateTitle(file.name);
     currentMediaType = MediaTypes.VIDEO;
 });
 
@@ -48,16 +54,22 @@ folderInput.addEventListener('change', () => {
         return;
     }
     currentFiles = validFiles;
+    singleFileInput.value = '';
 
     const relativePath = validFiles[0].webkitRelativePath;
     const folderPath = relativePath.substring(0, relativePath.lastIndexOf('/'));
 
     updateSavingPath(folderPath);
+    updateTitle(folderPath.substring(folderPath.lastIndexOf('/') + 1));
     currentMediaType = MediaTypes.ALBUM;
 });
 
 function updateSavingPath(path) {
     savingPathInput.value = path;
+}
+
+function updateTitle(title) {
+    titleInput.value = title.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 submitBtn.addEventListener('click',async () => {
@@ -80,6 +92,17 @@ submitBtn.addEventListener('click',async () => {
     } else if (currentMediaType === MediaTypes.ALBUM) {
         if (!validateDirectory(savingPath)) return;
     }
+    const title = titleInput.value.trim();
+    if (title.length === 0) {
+        alert('No title entered');
+        return;
+    }
+    const year = yearInput.value;
+    if (!year || year.length === 0) {
+        alert('No year entered');
+        return;
+    }
+
     const sessionResponse = await fetch('/api/upload/media/create-session', {
         method: 'POST',
         headers: {
@@ -91,19 +114,42 @@ submitBtn.addEventListener('click',async () => {
         })
     });
     if (!sessionResponse.ok) {
-        alert('Failed to create session: ' + await sessionResponse.text());
+        alert('Failed to start upload: ' + await sessionResponse.text());
         return;
     }
     const sessionId = await sessionResponse.text();
     console.log('sessionId: ' + sessionId);
+    let fileUploaded = false;
     if (currentMediaType === MediaTypes.VIDEO) {
-        await uploadFile(sessionId, currentFiles, savingPath, MediaTypes.VIDEO);
+        fileUploaded = await uploadFile(sessionId, currentFiles, savingPath, MediaTypes.VIDEO);
     } else if (currentMediaType === MediaTypes.ALBUM) {
         for (const f of currentFiles) {
-            const result = await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM);
-            if (!result) return;
+            fileUploaded = await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM);
+            if (!fileUploaded) return;
         }
     }
+
+    if (!fileUploaded)
+        return;
+
+    const endResponse = await fetch('/api/upload/media/end-session', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            sessionId: sessionId,
+            basicInfo: {
+                title: title,
+                year: year
+            }
+        })
+    });
+    if (!endResponse.ok) {
+        alert('Failed to finalize upload: ' + await endResponse.text());
+        return;
+    }
+    alert('Upload successful! ' + await endResponse.text());
 });
 
 async function uploadFile(sessionId, file, fileName, mediaType) {
