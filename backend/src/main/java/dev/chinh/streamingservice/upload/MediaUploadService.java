@@ -1,20 +1,35 @@
 package dev.chinh.streamingservice.upload;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.chinh.streamingservice.MediaMapper;
+import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.content.service.MinIOService;
+import dev.chinh.streamingservice.data.entity.MediaMetaData;
+import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
+import dev.chinh.streamingservice.search.data.MediaSearchItem;
+import dev.chinh.streamingservice.search.service.OpenSearchService;
+import io.minio.Result;
+import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedUploadPartRequest;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @RequiredArgsConstructor
 @Service
@@ -23,12 +38,18 @@ public class MediaUploadService {
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
     private final RedisTemplate<String, Object> redisTemplate;
+
+    private final ObjectMapper mapper;
     private final MinIOService minIOService;
+    private final MediaMapper mediaMapper;
+
+    private final MediaMetaDataRepository mediaRepository;
 
     private final String mediaBucket = "media";
+    private final OpenSearchService openSearchService;
 
     public String initiateMediaUploadRequest(String objectName, MediaType mediaType) {
-        String validatedObject = validateObject(objectName);
+        String validatedObject = validateObject(objectName, mediaType);
         if (mediaType == MediaType.VIDEO && MediaType.detectMediaType(validatedObject) != MediaType.VIDEO) {
             throw new IllegalArgumentException("Invalid video type: " + validatedObject);
         }
@@ -45,12 +66,13 @@ public class MediaUploadService {
             throw new IllegalArgumentException("Invalid session ID: " + sessionId);
         }
 
-        String validatedObject = validateObject(object);
+        String validatedObject = validateObject(object, mediaType);
         validateObjectWithMediaType(validatedObject, mediaType);
 
         validateMediaSessionInfoWithRequest(uploadRequest, validatedObject, mediaType);
 
         if (minIOService.objectExists(mediaBucket, validatedObject)) {
+            removeCacheMediaUploadRequest(sessionId);
             throw new IllegalArgumentException("Object already exists: " + validatedObject);
         }
 
@@ -70,7 +92,7 @@ public class MediaUploadService {
         if (mediaType == null) {
             throw new IllegalArgumentException("Upload ID not found: " + uploadId);
         }
-        String validatedObject = validateObject(object);
+        String validatedObject = validateObject(object, mediaType);
         validateObjectWithMediaType(validatedObject, mediaType);
 
         UploadPartRequest uploadPartRequest = UploadPartRequest.builder()
@@ -94,7 +116,7 @@ public class MediaUploadService {
         if (mediaType == null) {
             throw new IllegalArgumentException("Upload ID not found: " + uploadId);
         }
-        String validatedObject = validateObject(object);
+        String validatedObject = validateObject(object, mediaType);
         validateObjectWithMediaType(validatedObject, mediaType);
 
         List<CompletedPart> completedParts = uploadedParts.stream()
@@ -120,6 +142,206 @@ public class MediaUploadService {
         removeCacheFileUploadRequest(uploadId);
     }
 
+    public record MediaBasicInfo(String title, int year) {}
+
+    @Transactional
+    public long saveMedia(String sessionId, MediaBasicInfo titleAndYear) throws Exception {
+        MediaUploadRequest upload = getCachedMediaUploadRequest(sessionId);
+        if (upload == null) {
+            throw new IllegalArgumentException("Invalid session ID: " + sessionId);
+        }
+
+        MediaMetaData mediaMetaData = new MediaMetaData();
+        mediaMetaData.setTitle(titleAndYear.title);
+        mediaMetaData.setYear(titleAndYear.year);
+        mediaMetaData.setUploadDate(LocalDateTime.ofInstant(Instant.now(), ZoneId.of("UTC")));
+        mediaMetaData.setBucket(mediaBucket);
+        mediaMetaData.setAbsoluteFilePath(mediaBucket + "/" + upload.objectName);
+
+        if (upload.mediaType == MediaType.VIDEO) {
+            int index = upload.objectName.lastIndexOf("/");
+            mediaMetaData.setParentPath(upload.objectName.substring(0, index));
+            mediaMetaData.setKey(upload.objectName.substring(index + 1));
+            VideoMetadata videoMetadata = parseMediaMetadata(probeMediaInfo(mediaBucket, mediaMetaData.getPath()), VideoMetadata.class);
+            mediaMetaData.setFrameRate(videoMetadata.frameRate);
+            mediaMetaData.setFormat(videoMetadata.format);
+            mediaMetaData.setSize(videoMetadata.size);
+            mediaMetaData.setWidth(videoMetadata.width);
+            mediaMetaData.setHeight(videoMetadata.height);
+            mediaMetaData.setLength((int) videoMetadata.durationSeconds);
+        } else if (upload.mediaType == MediaType.ALBUM) {
+            mediaMetaData.setParentPath(upload.objectName);
+            var results = minIOService.getAllItemsInBucketWithPrefix(mediaBucket, upload.objectName);
+            int count = 0;
+            long totalSize = 0;
+            String firstImage = null;
+            for (Result<Item> result : results) {
+                count++;
+                Item item = result.get();
+                if (MediaType.detectMediaType(result.get().objectName()) == MediaType.IMAGE) {
+                    if (firstImage == null)
+                        firstImage = item.objectName();
+                    totalSize += item.size();
+                }
+            }
+            mediaMetaData.setSize(totalSize);
+            mediaMetaData.setLength(count);
+            mediaMetaData.setThumbnail(firstImage);
+            ImageMetadata imageMetadata = parseMediaMetadata(probeMediaInfo(mediaBucket, firstImage), ImageMetadata.class);
+            mediaMetaData.setWidth(imageMetadata.width);
+            mediaMetaData.setHeight(imageMetadata.height);
+            mediaMetaData.setFormat(imageMetadata.format);
+        }
+
+        Long savedId = null;
+        try {
+            MediaMetaData saved = mediaRepository.save(mediaMetaData);
+            savedId = saved.getId();
+            MediaSearchItem searchItem = mediaMapper.map(saved);
+            openSearchService.indexDocument(OpenSearchService.INDEX_NAME, savedId, searchItem);
+            removeCacheMediaUploadRequest(sessionId);
+            return savedId;
+        } catch (Exception e) {
+            try {
+                if (savedId != null)
+                    openSearchService.deleteDocument(OpenSearchService.INDEX_NAME, savedId);
+            } catch (IOException ie) {
+                throw new RuntimeException("Critical: Failed to delete media from OpenSearch to rollback", ie);
+            }
+            throw new RuntimeException("Failed to save media metadata", e);
+        }
+    }
+
+    public JsonNode probeMediaInfo(String bucket, String object) throws Exception {
+        String containerSignUrl = minIOService.getSignedUrlForContainerNginx(bucket, object, (int) Duration.ofMinutes(15).toSeconds());
+        ProcessBuilder pb = new ProcessBuilder(
+                "docker", "exec", "ffmpeg",
+                "ffprobe",
+                "-v", "quiet",
+                "-print_format", "json",
+                "-show_format",
+                "-show_streams",
+                containerSignUrl
+        );
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
+
+        boolean finished = process.waitFor(15, TimeUnit.SECONDS);
+        if (!finished) {
+            process.destroyForcibly();
+            throw new RuntimeException("ffprobe timeout");
+        }
+
+        String output = new String(process.getInputStream().readAllBytes());
+
+        int exitCode = process.exitValue();
+        if (exitCode != 0) {
+            throw new RuntimeException("ffprobe failed — exit=" + exitCode + " output: " + output);
+        }
+
+        JsonNode jsonNode = mapper.readTree(output);
+        JsonNode streams = jsonNode.get("streams");
+        if (streams == null || !streams.isArray()) {
+            throw new RuntimeException("No stream data found in video");
+        }
+
+        return jsonNode;
+    }
+
+    public record VideoMetadata(
+            short frameRate,
+            String format,
+            long size,
+            int width,
+            int height,
+            double durationSeconds
+    ) {}
+
+    public record ImageMetadata(
+            int width,
+            int height,
+            long size,
+            String format
+    ) {}
+
+    public <T> T parseMediaMetadata(JsonNode jsonNode, Class<T> targetClass) {
+        JsonNode streams = jsonNode.get("streams");
+        JsonNode format = jsonNode.get("format");
+
+        if (streams == null || streams.isEmpty() || format == null) {
+            throw new IllegalArgumentException("Invalid ffprobe metadata");
+        }
+
+        // find any video stream (images are single-frame "video")
+        JsonNode videoStream = null;
+        for (JsonNode stream : streams) {
+            if ("video".equals(stream.get("codec_type").asText())) {
+                videoStream = stream;
+                break;
+            }
+        }
+
+        if (videoStream == null) {
+            throw new IllegalArgumentException("No visual stream found.");
+        }
+
+        int width = videoStream.get("width").asInt();
+        int height = videoStream.get("height").asInt();
+        long size = format.get("size").asLong();
+        String fmt = format.get("format_name").asText();
+
+        // ---------- Returning Image ----------
+        if (targetClass.equals(ImageMetadata.class)) {
+            return targetClass.cast(
+                    new ImageMetadata(width, height, size, fmt)
+            );
+        }
+
+        // ---------- Returning Video ----------
+        if (targetClass.equals(VideoMetadata.class)) {
+            String frameRateStr = videoStream.get("avg_frame_rate").asText();
+            short frameRate = parseRate(frameRateStr);
+            double duration = format.get("duration").asDouble();
+
+            return targetClass.cast(
+                    new VideoMetadata(
+                            frameRate,
+                            fmt,
+                            size,
+                            width,
+                            height,
+                            duration
+                    )
+            );
+        }
+
+        throw new IllegalArgumentException("Unsupported metadata type: " + targetClass.getName());
+    }
+
+    private short parseRate(String rate) {
+        if (rate == null || rate.isBlank() || "0/0".equals(rate)) return 0;
+
+        String[] parts = rate.split("/");
+        try {
+            if (parts.length == 2) {
+                double num = Double.parseDouble(parts[0]);
+                double den = Double.parseDouble(parts[1]);
+                if (den == 0) return 0;
+
+                int fps = (int) Math.round(num / den);
+                return (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, fps));
+            }
+
+            // fallback for plain numeric values
+            int fps = (int) Math.round(Double.parseDouble(rate));
+            return (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, fps));
+
+        } catch (NumberFormatException e) {
+            return 0; // or throw exception if you prefer strict behavior
+        }
+    }
+
+
     private void validateMediaSessionInfoWithRequest(MediaUploadRequest request, String object, MediaType mediaType) {
         if (request.mediaType != mediaType) {
             throw new IllegalArgumentException("Mismatched media type: " + object);
@@ -129,7 +351,7 @@ public class MediaUploadService {
         }
     }
 
-    private String validateObject(String object) {
+    private String validateObject(String object, MediaType mediaType) {
         if (object == null) {
             throw new IllegalArgumentException("Object name must not be null");
         }
@@ -165,6 +387,13 @@ public class MediaUploadService {
 
         if (object.isBlank()) {
             throw new IllegalArgumentException("Object name is blank after sanitization");
+        }
+
+        if (mediaType == MediaType.VIDEO) {
+            int pathIndex = object.lastIndexOf("/");
+            if (pathIndex == -1) { // no base dir for vid, seem to vid folder - later save to user path or whatever
+                object = OSUtil.normalizePath("vid", object);
+            }
         }
 
         return object;
@@ -217,6 +446,11 @@ public class MediaUploadService {
                 (String) cached.get("objectName"),
                 MediaType.valueOf((String) cached.get("mediaType"))
         );
+    }
+
+    private void removeCacheMediaUploadRequest(String mediaUploadId) {
+        String key = "upload::" + mediaUploadId;
+        redisTemplate.delete(key);
     }
 
     public boolean isValidDirectoryPath(String path) {
