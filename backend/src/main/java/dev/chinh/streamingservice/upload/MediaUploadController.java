@@ -2,6 +2,7 @@ package dev.chinh.streamingservice.upload;
 
 import dev.chinh.streamingservice.content.constant.MediaType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -44,29 +45,12 @@ public class MediaUploadController {
     public void completeUpload(@RequestBody CompleteMultipartUploadRequest request) {
         mediaUploadService.completeMultipartUpload(request.objectKey, request.uploadId, request.uploadedParts);
     }
+
+    public record EndSessionRequest(String sessionId, MediaUploadService.MediaBasicInfo basicInfo) {}
+
+    @PostMapping("/end-session")
+    public ResponseEntity<Long> endSession(@RequestBody EndSessionRequest request) throws Exception {
+        return ResponseEntity.ok().body(mediaUploadService.saveMedia(request.sessionId, request.basicInfo));
+    }
+
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
