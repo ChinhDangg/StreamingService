@@ -7,7 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -55,7 +55,7 @@ public abstract class MediaDescription implements MetaDataProvider {
 
     @JsonProperty(ContentMetaData.UPLOAD_DATE)
     @Column(nullable = false)
-    protected LocalDate uploadDate;
+    protected LocalDateTime uploadDate;
 
     @JsonProperty(ContentMetaData.YEAR)
     @Column(nullable = false)
