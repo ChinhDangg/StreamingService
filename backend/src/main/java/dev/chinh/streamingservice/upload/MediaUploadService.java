@@ -8,6 +8,7 @@ import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.content.service.MinIOService;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
+import dev.chinh.streamingservice.data.service.ThumbnailService;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import dev.chinh.streamingservice.search.service.OpenSearchService;
 import io.minio.Result;
@@ -44,11 +45,13 @@ public class MediaUploadService {
     private final ObjectMapper mapper;
     private final MinIOService minIOService;
     private final MediaMapper mediaMapper;
+    private final OpenSearchService openSearchService;
+    private final ThumbnailService thumbnailService;
 
     private final MediaMetaDataRepository mediaRepository;
 
     private final String mediaBucket = "media";
-    private final OpenSearchService openSearchService;
+    public static final String defaultVidPath = "vid";
 
     public String initiateMediaUploadRequest(String objectName, MediaType mediaType) {
         String validatedObject = validateObject(objectName, mediaType);
@@ -173,6 +176,9 @@ public class MediaUploadService {
             mediaMetaData.setWidth(videoMetadata.width);
             mediaMetaData.setHeight(videoMetadata.height);
             mediaMetaData.setLength((int) videoMetadata.durationSeconds);
+
+            mediaMetaData.setThumbnail(thumbnailService.generateThumbnailFromVideo(mediaBucket, upload.objectName));
+
         } else if (upload.mediaType == MediaType.ALBUM) {
             mediaMetaData.setParentPath(upload.objectName);
             var results = minIOService.getAllItemsInBucketWithPrefix(mediaBucket, upload.objectName);
@@ -401,7 +407,7 @@ public class MediaUploadService {
         if (mediaType == MediaType.VIDEO) {
             int pathIndex = object.lastIndexOf("/");
             if (pathIndex == -1) { // no base dir for vid, seem to vid folder - later save to user path or whatever
-                object = OSUtil.normalizePath("vid", object);
+                object = OSUtil.normalizePath(defaultVidPath, object);
             }
         }
 
