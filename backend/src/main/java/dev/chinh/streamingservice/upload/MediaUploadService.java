@@ -14,6 +14,7 @@ import io.minio.Result;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -28,6 +29,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -57,7 +59,7 @@ public class MediaUploadService {
             throw new IllegalArgumentException("Album must be a valid directory path");
         }
 
-        return cacheMediaUploadRequest(mediaType, validatedObject);
+        return addCacheMediaUploadRequest(mediaType, validatedObject);
     }
 
     public String initiateMultipartUploadRequest(String sessionId, String object, MediaType mediaType) {
@@ -72,7 +74,9 @@ public class MediaUploadService {
         validateMediaSessionInfoWithRequest(uploadRequest, validatedObject, mediaType);
 
         if (minIOService.objectExists(mediaBucket, validatedObject)) {
-            removeCacheMediaUploadRequest(sessionId);
+            // Personal system - so only check for name to ensure uniqueness (not content itself).
+            // For wide usage - generate unique names for every object and keep all content
+            // or check etag but multipart upload must ensure same part number and size.
             throw new IllegalArgumentException("Object already exists: " + validatedObject);
         }
 
@@ -83,12 +87,12 @@ public class MediaUploadService {
 
         CreateMultipartUploadResponse response = s3Client.createMultipartUpload(multipartUploadRequest);
         String uploadId = response.uploadId();
-        cacheFileUploadRequest(uploadId, mediaType);
+        cacheFileUploadRequest(sessionId, uploadId, object);
         return uploadId;
     }
 
-    public String generatePresignedPartUrl(String object, String uploadId, int partNumber) {
-        MediaType mediaType = getCachedFileUploadRequest(uploadId);
+    public String generatePresignedPartUrl(String sessionId, String uploadId, String object, int partNumber) {
+        MediaType mediaType = getCachedFileUploadRequest(sessionId, uploadId);
         if (mediaType == null) {
             throw new IllegalArgumentException("Upload ID not found: " + uploadId);
         }
@@ -111,8 +115,8 @@ public class MediaUploadService {
 
     public record UploadedPart(int partNumber, String etag) {}
 
-    public void completeMultipartUpload(String object, String uploadId, List<UploadedPart> uploadedParts) {
-        MediaType mediaType = getCachedFileUploadRequest(uploadId);
+    public void completeMultipartUpload(String sessionId, String uploadId, String object, List<UploadedPart> uploadedParts) {
+        MediaType mediaType = getCachedFileUploadRequest(sessionId, uploadId);
         if (mediaType == null) {
             throw new IllegalArgumentException("Upload ID not found: " + uploadId);
         }
@@ -139,7 +143,7 @@ public class MediaUploadService {
                 .build();
 
         s3Client.completeMultipartUpload(completeRequest);
-        removeCacheFileUploadRequest(uploadId);
+        removeCacheFileUploadRequest(sessionId, uploadId);
     }
 
     public record MediaBasicInfo(String title, int year) {}
@@ -199,7 +203,7 @@ public class MediaUploadService {
             savedId = saved.getId();
             MediaSearchItem searchItem = mediaMapper.map(saved);
             openSearchService.indexDocument(OpenSearchService.INDEX_NAME, savedId, searchItem);
-            removeCacheMediaUploadRequest(sessionId);
+            removeCacheMediaSessionRequest(sessionId);
             return savedId;
         } catch (Exception e) {
             try {
@@ -210,6 +214,10 @@ public class MediaUploadService {
             }
             throw new RuntimeException("Failed to save media metadata", e);
         }
+    }
+
+    public void removeUploadObject(String object) throws Exception {
+        minIOService.removeFile(mediaBucket, object);
     }
 
     public JsonNode probeMediaInfo(String bucket, String object) throws Exception {
@@ -409,48 +417,71 @@ public class MediaUploadService {
         }
     }
 
-    private void cacheFileUploadRequest(String uploadId, MediaType mediaType) {
-        String id = "file::" + uploadId;
-        redisTemplate.opsForValue().set(id, mediaType.name(), Duration.ofHours(1));
+    private void cacheFileUploadRequest(String sessionId, String uploadId, String object) {
+        redisTemplate.opsForHash().put("upload::" + sessionId, uploadId, object);
     }
 
-    private MediaType getCachedFileUploadRequest(String uploadId) {
-        String id = "file::" + uploadId;
-        Object value = redisTemplate.opsForValue().get(id);
-        return value == null ? null : MediaType.valueOf((String) value);
+    private MediaType getCachedFileUploadRequest(String sessionId, String uploadId) {
+        String key = "upload::" + sessionId;
+        Object cached = redisTemplate.opsForHash().get(key, uploadId);
+
+        if (cached == null) return null;
+
+        return MediaType.valueOf((String) redisTemplate.opsForHash().get(key, "mediaType"));
     }
 
-    private void removeCacheFileUploadRequest(String uploadId) {
-        String id = "file::" + uploadId;
-        redisTemplate.delete(id);
+    private void removeCacheFileUploadRequest(String sessionId, String uploadId) {
+        String key = "upload::" + sessionId;
+        redisTemplate.opsForHash().delete(key, uploadId);
+    }
+
+    public Map<Object, Object> getUploadSessionObjects(String sessionId) {
+        var map = redisTemplate.opsForHash().entries("upload::" + sessionId);
+        if (map.isEmpty()) return Map.of();
+        map.remove("objectName");
+        map.remove("mediaType");
+        return map;
     }
 
     public record MediaUploadRequest(String objectName, MediaType mediaType) {}
 
-    private String cacheMediaUploadRequest(MediaType mediaType, String objectName) {
+    private String addCacheMediaUploadRequest(MediaType mediaType, String objectName) {
         String id = Instant.now().toEpochMilli() + "-" + UUID.randomUUID();
         String redisKey = "upload::" + id;
 
         redisTemplate.opsForHash().put(redisKey, "objectName", objectName);
         redisTemplate.opsForHash().put(redisKey, "mediaType", mediaType.name());
+        addUploadSessionCacheLastAccess(id);
         return id;
     }
 
-    private MediaUploadRequest getCachedMediaUploadRequest(String mediaUploadId) {
+    public MediaUploadRequest getCachedMediaUploadRequest(String mediaUploadId) {
         String key = "upload::" + mediaUploadId;
-        Map<Object, Object> cached = redisTemplate.opsForHash().entries(key);
+        Object cached = redisTemplate.opsForHash().get(key, "objectName");
 
-        if (cached.isEmpty()) return null;
+        if (cached == null) return null;
 
         return new MediaUploadRequest(
-                (String) cached.get("objectName"),
-                MediaType.valueOf((String) cached.get("mediaType"))
+                (String) cached,
+                MediaType.valueOf((String) redisTemplate.opsForHash().get(key, "mediaType"))
         );
     }
 
-    private void removeCacheMediaUploadRequest(String mediaUploadId) {
-        String key = "upload::" + mediaUploadId;
+    public void removeCacheMediaSessionRequest(String sessionId) {
+        String key = "upload::" + sessionId;
         redisTemplate.delete(key);
+    }
+
+    private void addUploadSessionCacheLastAccess(String sessionId) {
+        redisTemplate.opsForZSet().add("upload::lastAccess", sessionId, Instant.now().toEpochMilli());
+    }
+
+    public Set<ZSetOperations.TypedTuple<Object>> getAllUploadSessionCacheLastAccess(long max) {
+        return redisTemplate.opsForZSet().rangeByScoreWithScores("upload::lastAccess", 0, max, 0, 50);
+    }
+
+    public void removeUploadSessionCacheLastAccess(String sessionId) {
+        redisTemplate.opsForZSet().remove("upload::lastAccess", sessionId);
     }
 
     public boolean isValidDirectoryPath(String path) {
