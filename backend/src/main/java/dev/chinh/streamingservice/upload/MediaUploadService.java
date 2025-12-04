@@ -204,6 +204,7 @@ public class MediaUploadService {
             MediaSearchItem searchItem = mediaMapper.map(saved);
             openSearchService.indexDocument(OpenSearchService.INDEX_NAME, savedId, searchItem);
             removeCacheMediaSessionRequest(sessionId);
+            removeUploadSessionCacheLastAccess(sessionId);
             return savedId;
         } catch (Exception e) {
             try {
