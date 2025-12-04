@@ -27,23 +27,25 @@ public class MediaUploadController {
     }
 
     public record PresignUploadRequest(
-            String objectKey,
+            String sessionId,
             String uploadId,
+            String objectKey,
             int partNumber) {}
 
     @PostMapping("/presign-part-url")
     public String getPresignPartUrl(@RequestBody PresignUploadRequest request) {
-        return mediaUploadService.generatePresignedPartUrl(request.objectKey, request.uploadId, request.partNumber);
+        return mediaUploadService.generatePresignedPartUrl(request.sessionId, request.uploadId, request.objectKey, request.partNumber);
     }
 
     public record CompleteMultipartUploadRequest(
-            String objectKey,
+            String sessionId,
             String uploadId,
+            String objectKey,
             List<MediaUploadService.UploadedPart> uploadedParts) {}
 
     @PostMapping("/complete")
     public void completeUpload(@RequestBody CompleteMultipartUploadRequest request) {
-        mediaUploadService.completeMultipartUpload(request.objectKey, request.uploadId, request.uploadedParts);
+        mediaUploadService.completeMultipartUpload(request.sessionId, request.uploadId, request.objectKey, request.uploadedParts);
     }
 
     public record EndSessionRequest(String sessionId, MediaUploadService.MediaBasicInfo basicInfo) {}
