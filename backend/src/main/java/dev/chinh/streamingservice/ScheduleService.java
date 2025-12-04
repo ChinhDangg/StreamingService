@@ -4,7 +4,7 @@ import dev.chinh.streamingservice.content.constant.MediaJobStatus;
 import dev.chinh.streamingservice.content.service.AlbumService;
 import dev.chinh.streamingservice.content.service.VideoService;
 import dev.chinh.streamingservice.data.service.ThumbnailService;
-import dev.chinh.streamingservice.upload.MediaUploadService;
+import dev.chinh.streamingservice.upload.service.MediaUploadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.scheduling.annotation.Scheduled;
