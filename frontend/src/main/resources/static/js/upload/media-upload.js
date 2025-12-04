@@ -9,7 +9,11 @@ const yearInput = document.getElementById('year-input');
 
 const submitBtn = document.getElementById('submit-btn');
 
+let currentSavingPath = null;
 let currentFiles = null;
+const uploadingFiles = new Map();
+let currentSessionId = null;
+let currentFailTexts = [];
 
 const MediaTypes = Object.freeze({
     VIDEO: 'VIDEO',
@@ -20,6 +24,7 @@ const MediaTypes = Object.freeze({
 let currentMediaType = null;
 
 singleFileInput.addEventListener('change', () => {
+    clearUploadedFile();
     if (!singleFileInput.files.length) {
         updateSavingPath('');
         return;
@@ -36,6 +41,7 @@ singleFileInput.addEventListener('change', () => {
 const ALLOWED = ["video/", "image/png", "image/jpeg", "image/gif"];
 
 folderInput.addEventListener('change', () => {
+    clearUploadedFile();
     if (!folderInput.files.length) {
         updateSavingPath('');
         return;
@@ -72,89 +78,156 @@ function updateTitle(title) {
     titleInput.value = title.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function clearUploadedFile() {
+    uploadingFiles.clear();
+    currentSessionId = null;
+}
+
+const errorMessageContainer = document.getElementById('error-message-container');
+function displayFailTexts() {
+    errorMessageContainer.innerHTML = '';
+    currentFailTexts.forEach(t => {
+        const span = document.createElement('span');
+        span.textContent = t;
+        errorMessageContainer.appendChild(span);
+    });
+    currentFailTexts = [];
+    errorMessageContainer.classList.remove('hidden');
+}
+
 submitBtn.addEventListener('click',async () => {
-    console.log('submitting');
-    if (currentMediaType === null) {
-        alert('No file selected');
-        return;
-    }
-    if (currentFiles === null) {
-        alert('No file selected');
-        return;
-    }
-    const savingPath = savingPathInput.value.trim();
-    if (savingPath.length === 0) {
-        alert('No saving path entered');
-        return;
-    }
-    if (currentMediaType === MediaTypes.VIDEO) {
-        if (!validateVideo(savingPath)) return;
-    } else if (currentMediaType === MediaTypes.ALBUM) {
-        if (!validateDirectory(savingPath)) return;
-    }
-    const title = titleInput.value.trim();
-    if (title.length === 0) {
-        alert('No title entered');
-        return;
-    }
-    const year = yearInput.value;
-    if (!year || year.length === 0) {
-        alert('No year entered');
-        return;
-    }
-
-    const sessionResponse = await fetch('/api/upload/media/create-session', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            objectKey: savingPath,
-            mediaType: currentMediaType
-        })
-    });
-    if (!sessionResponse.ok) {
-        alert('Failed to start upload: ' + await sessionResponse.text());
-        return;
-    }
-    const sessionId = await sessionResponse.text();
-    console.log('sessionId: ' + sessionId);
-    let fileUploaded = false;
-    if (currentMediaType === MediaTypes.VIDEO) {
-        fileUploaded = await uploadFile(sessionId, currentFiles, savingPath, MediaTypes.VIDEO);
-    } else if (currentMediaType === MediaTypes.ALBUM) {
-        for (const f of currentFiles) {
-            fileUploaded = await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM);
-            if (!fileUploaded) return;
+    submitBtn.textContent = 'Submit';
+    const submitFileUpload = async () => {
+        console.log('submitting');
+        if (currentMediaType === null) {
+            alert('No file selected');
+            return;
         }
-    }
+        if (currentFiles === null) {
+            alert('No file selected');
+            return;
+        }
+        const savingPath = savingPathInput.value.trim();
+        if (savingPath.length === 0) {
+            alert('No saving path entered');
+            return;
+        }
+        if (currentMediaType === MediaTypes.VIDEO) {
+            if (!validateVideo(savingPath)) return;
+        } else if (currentMediaType === MediaTypes.ALBUM) {
+            if (!validateDirectory(savingPath)) return;
+        }
+        const title = titleInput.value.trim();
+        if (title.length === 0) {
+            alert('No title entered');
+            return;
+        }
+        const year = yearInput.value;
+        if (!year || year.length === 0) {
+            alert('No year entered');
+            return;
+        }
 
-    if (!fileUploaded)
-        return;
+        if (currentSavingPath !== savingPath) {
+            // if the current saving path is different when resubmitting, start a new session
+            currentSessionId = null;
+        }
+        currentSavingPath = savingPath;
 
-    const endResponse = await fetch('/api/upload/media/end-session', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            sessionId: sessionId,
-            basicInfo: {
-                title: title,
-                year: year
+        let sessionId = currentSessionId;
+        if (!sessionId) {
+            const sessionResponse = await fetch('/api/upload/media/create-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    objectKey: savingPath,
+                    mediaType: currentMediaType
+                })
+            });
+            if (!sessionResponse.ok) {
+                alert('Failed to start upload: ' + await sessionResponse.text());
+                return;
             }
-        })
-    });
-    if (!endResponse.ok) {
-        alert('Failed to finalize upload: ' + await endResponse.text());
-        return;
+            sessionId = await sessionResponse.text();
+        }
+        console.log('sessionId: ' + sessionId);
+
+        let fileNotUploaded = 0;
+        if (currentMediaType === MediaTypes.VIDEO) {
+            if (uploadingFiles.has(currentFiles)) {
+                uploadingFiles.get(currentFiles).chunks.partNumber = uploadingFiles.get(currentFiles).partNumber;
+                const passed = await uploadFile(sessionId, currentFiles, savingPath, MediaTypes.VIDEO, uploadingFiles.get(currentFiles).chunks, uploadingFiles.get(currentFiles).eTags);
+                if (!passed) fileNotUploaded++;
+            } else {
+                const passed = await uploadFile(sessionId, currentFiles, savingPath, MediaTypes.VIDEO);
+                if (!passed) fileNotUploaded++;
+            }
+        } else if (currentMediaType === MediaTypes.ALBUM) {
+            if (uploadingFiles.size > 0) {
+                for (const f of uploadingFiles.keys()) {
+                    uploadingFiles.get(f).chunks.partNumber = uploadingFiles.get(f).partNumber;
+                    const passed = await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM, uploadingFiles.get(f).chunks, uploadingFiles.get(f).eTags);
+                    if (!passed) fileNotUploaded++;
+                }
+            } else {
+                for (const f of currentFiles) {
+                    const passed = await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM);
+                    if (!passed) fileNotUploaded++;
+                }
+            }
+        }
+
+        if (fileNotUploaded) {
+            submitBtn.textContent = 'Resubmit';
+            console.log(uploadingFiles);
+            displayFailTexts();
+            return;
+        }
+
+        const endResponse = await fetch('/api/upload/media/end-session', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                sessionId: sessionId,
+                basicInfo: {
+                    title: title,
+                    year: year
+                }
+            })
+        });
+        if (!endResponse.ok) {
+            alert('Failed to finalize upload: ' + await endResponse.text());
+            return;
+        }
+        singleFileInput.value = '';
+        folderInput.value = '';
+        uploadingFiles.clear();
+        updateTitle('');
+        updateSavingPath('');
+        alert('Upload successful! ' + await endResponse.text());
     }
-    alert('Upload successful! ' + await endResponse.text());
+
+    submitBtn.disabled = true;
+    submitFileUpload().then(() => {
+        submitBtn.disabled = false
+    });
 });
 
-async function uploadFile(sessionId, file, fileName, mediaType) {
+async function uploadFile(sessionId, file, fileName, mediaType, chunks = null, eTags = null) {
 
     console.log('fileName: ' + fileName);
+
+    chunks = chunks == null ? chunkFile(file) : chunks;
+    eTags = eTags == null ? [] : eTags;
+
+    console.log('chunks:');
+    console.log(chunks);
+
+    uploadingFiles.set(file, { chunks: chunks, eTags: eTags, partNumber: chunks[0].partNumber });
 
     const response = await fetch('/api/upload/media/initiate', {
         method: 'POST',
@@ -168,18 +241,12 @@ async function uploadFile(sessionId, file, fileName, mediaType) {
         })
     });
     if (!response.ok) {
-        alert('Failed to init ' + await response.text());
+        currentFailTexts.push('Init: ' + await response.text());
         return false;
     }
 
     const uploadId = await response.text();
     console.log('uploadId: ' + uploadId);
-
-    const chunks = chunkFile(file);
-    const etags = [];
-
-    console.log('chunks:');
-    console.log(chunks);
 
     for (const c of chunks) {
         const urlResponse = await fetch('/api/upload/media/presign-part-url', {
@@ -188,13 +255,14 @@ async function uploadFile(sessionId, file, fileName, mediaType) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
+                sessionId: sessionId,
                 uploadId: uploadId,
                 objectKey: fileName,
                 partNumber: c.partNumber
             })
         });
         if (!urlResponse.ok) {
-            alert('Failed to get presign url for chunks ' + await urlResponse.text());
+            currentFailTexts.push('Presign: ' + await urlResponse.text());
             return false;
         }
         const urlRes = await urlResponse.text();
@@ -206,10 +274,12 @@ async function uploadFile(sessionId, file, fileName, mediaType) {
         });
         console.log('blob upload result: ' + res);
 
-        etags.push({
+        eTags.push({
             partNumber: c.partNumber,
             etag: res.headers.get('ETag').replace(/"/g, '')
         });
+
+        uploadingFiles.get(file).partNumber++;
     }
 
     const completeResponse = await fetch('/api/upload/media/complete', {
@@ -218,15 +288,19 @@ async function uploadFile(sessionId, file, fileName, mediaType) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
+            sessionId: sessionId,
             uploadId: uploadId,
             objectKey: fileName,
-            uploadedParts: etags
+            uploadedParts: eTags
         })
     });
     if (!completeResponse.ok) {
-        alert('Failed to complete ' + await completeResponse.text());
+        currentFailTexts.push('Complete: ' + await completeResponse.text());
         return false;
     }
+
+    uploadingFiles.delete(file);
+
     return true;
 }
 
