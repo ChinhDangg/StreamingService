@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.upload.modify;
+package dev.chinh.streamingservice.modify;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

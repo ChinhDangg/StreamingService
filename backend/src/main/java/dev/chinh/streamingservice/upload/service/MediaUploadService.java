@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.upload;
+package dev.chinh.streamingservice.upload.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

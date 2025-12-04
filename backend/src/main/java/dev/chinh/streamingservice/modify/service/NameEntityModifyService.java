@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.upload.modify;
+package dev.chinh.streamingservice.modify.service;
 
 import dev.chinh.streamingservice.content.service.MinIOService;
 import dev.chinh.streamingservice.data.ContentMetaData;
@@ -8,6 +8,8 @@ import dev.chinh.streamingservice.data.service.ThumbnailService;
 import dev.chinh.streamingservice.exception.DuplicateEntryException;
 import dev.chinh.streamingservice.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.search.service.OpenSearchService;
+import dev.chinh.streamingservice.modify.NameAndThumbnailPostRequest;
+import dev.chinh.streamingservice.modify.NameEntityDTO;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.client.opensearch.core.SearchResponse;
 import org.springframework.dao.DataIntegrityViolationException;

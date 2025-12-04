@@ -1,5 +1,8 @@
-package dev.chinh.streamingservice.upload.modify;
+package dev.chinh.streamingservice.modify.controller;
 
+import dev.chinh.streamingservice.modify.service.MediaMetadataModifyService;
+import dev.chinh.streamingservice.modify.MediaNameEntityConstant;
+import dev.chinh.streamingservice.modify.NameEntityDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

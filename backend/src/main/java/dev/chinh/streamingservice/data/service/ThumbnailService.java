@@ -8,15 +8,13 @@ import dev.chinh.streamingservice.content.service.MinIOService;
 import dev.chinh.streamingservice.data.dto.MediaNameEntry;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
-import dev.chinh.streamingservice.upload.MediaUploadService;
+import dev.chinh.streamingservice.upload.service.MediaUploadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;

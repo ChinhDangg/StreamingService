@@ -4,7 +4,7 @@ import dev.chinh.streamingservice.search.constant.SortBy;
 import dev.chinh.streamingservice.search.data.MediaSearchRequest;
 import dev.chinh.streamingservice.search.data.MediaSearchResult;
 import dev.chinh.streamingservice.search.service.MediaSearchService;
-import dev.chinh.streamingservice.upload.modify.MediaNameEntityConstant;
+import dev.chinh.streamingservice.modify.MediaNameEntityConstant;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.client.opensearch._types.SortOrder;
 import org.springframework.http.ResponseEntity;

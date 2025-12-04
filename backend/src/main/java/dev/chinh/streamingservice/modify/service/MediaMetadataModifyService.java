@@ -1,9 +1,11 @@
-package dev.chinh.streamingservice.upload.modify;
+package dev.chinh.streamingservice.modify.service;
 
 import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.service.MediaMetadataService;
 import dev.chinh.streamingservice.search.service.OpenSearchService;
+import dev.chinh.streamingservice.modify.MediaNameEntityConstant;
+import dev.chinh.streamingservice.modify.NameEntityDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

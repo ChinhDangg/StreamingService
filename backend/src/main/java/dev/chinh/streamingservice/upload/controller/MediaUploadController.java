@@ -1,6 +1,7 @@
-package dev.chinh.streamingservice.upload;
+package dev.chinh.streamingservice.upload.controller;
 
 import dev.chinh.streamingservice.content.constant.MediaType;
+import dev.chinh.streamingservice.upload.service.MediaUploadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
