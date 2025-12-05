@@ -6,11 +6,14 @@ import dev.chinh.streamingservice.MediaMapper;
 import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.content.service.MinIOService;
+import dev.chinh.streamingservice.data.entity.MediaGroupMetaData;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.service.ThumbnailService;
+import dev.chinh.streamingservice.search.data.MediaGroupInfo;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import dev.chinh.streamingservice.search.service.OpenSearchService;
+import dev.chinh.streamingservice.upload.MediaBasicInfo;
 import io.minio.Result;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
@@ -149,18 +152,71 @@ public class MediaUploadService {
         removeCacheFileUploadRequest(sessionId, uploadId);
     }
 
-    public record MediaBasicInfo(String title, int year) {}
 
     @Transactional
-    public long saveMedia(String sessionId, MediaBasicInfo titleAndYear) throws Exception {
+    public long saveGrouperMedia(MediaBasicInfo basicInfo) throws Exception {
+        MediaMetaData mediaMetaData = new MediaMetaData();
+        mediaMetaData.setTitle(basicInfo.getTitle());
+        mediaMetaData.setYear(basicInfo.getYear());
+        mediaMetaData.setUploadDate(LocalDateTime.ofInstant(Instant.now(), ZoneId.of("UTC")));
+        mediaMetaData.setBucket(mediaBucket);
+        mediaMetaData.setAbsoluteFilePath(mediaBucket + "/grouper-not-media");
+        mediaMetaData.setParentPath("grouper-not-media");
+        mediaMetaData.setKey("grouper-not-media");
+        mediaMetaData.setLength(0);
+
+        MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
+        mediaGroupInfo.setGrouperMetaDataId(-1L);
+        mediaGroupInfo.setNumInfo(0);
+        mediaMetaData.setGroupInfo(mediaGroupInfo);
+
+        String extension = basicInfo.getThumbnail().getOriginalFilename() == null ? ".jpg"
+                : basicInfo.getThumbnail().getOriginalFilename().substring(basicInfo.getThumbnail().getOriginalFilename().lastIndexOf("."));
+        String path = "grouper/" + mediaMetaData.getUploadDate() + "_" + validateObject(basicInfo.getTitle(), MediaType.ALBUM) + extension;
+
+        Long savedId = null;
+        try {
+            minIOService.uploadFile(ThumbnailService.thumbnailBucket, path, basicInfo.getThumbnail());
+            ImageMetadata imageMetadata = parseMediaMetadata(probeMediaInfo(ThumbnailService.thumbnailBucket, path), ImageMetadata.class);
+            mediaMetaData.setThumbnail(path);
+            mediaMetaData.setSize(imageMetadata.size);
+            mediaMetaData.setWidth(imageMetadata.width);
+            mediaMetaData.setHeight(imageMetadata.height);
+            mediaMetaData.setFormat(imageMetadata.format);
+
+            MediaMetaData saved = mediaRepository.save(mediaMetaData);
+            savedId = saved.getId();
+            MediaSearchItem searchItem = mediaMapper.map(mediaMetaData);
+            searchItem.setMediaGroupInfo(new MediaGroupInfo(saved.getGrouperId()));
+            openSearchService.indexDocument(OpenSearchService.INDEX_NAME, savedId, searchItem);
+            return savedId;
+        } catch (Exception e) {
+            try {
+                minIOService.removeFile(ThumbnailService.thumbnailBucket, path);
+            } catch (Exception ex) {
+                throw new RuntimeException("Critical: Failed to delete thumbnail from MinIO to rollback", ex);
+            }
+            try {
+                if (savedId != null) {
+                    openSearchService.deleteDocument(OpenSearchService.INDEX_NAME, savedId);
+                }
+            } catch (IOException ie) {
+                throw new RuntimeException("Critical: Failed to delete media from OpenSearch to rollback", ie);
+            }
+            throw new RuntimeException("Failed to save media grouper metadata", e);
+        }
+    }
+
+    @Transactional
+    public long saveMedia(String sessionId, MediaBasicInfo basicInfo) throws Exception {
         MediaUploadRequest upload = getCachedMediaUploadRequest(sessionId);
         if (upload == null) {
             throw new IllegalArgumentException("Invalid session ID: " + sessionId);
         }
 
         MediaMetaData mediaMetaData = new MediaMetaData();
-        mediaMetaData.setTitle(titleAndYear.title);
-        mediaMetaData.setYear(titleAndYear.year);
+        mediaMetaData.setTitle(basicInfo.getTitle());
+        mediaMetaData.setYear(basicInfo.getYear());
         mediaMetaData.setUploadDate(LocalDateTime.ofInstant(Instant.now(), ZoneId.of("UTC")));
         mediaMetaData.setBucket(mediaBucket);
         mediaMetaData.setAbsoluteFilePath(mediaBucket + "/" + upload.objectName);
@@ -357,72 +413,6 @@ public class MediaUploadService {
     }
 
 
-    private void validateMediaSessionInfoWithRequest(MediaUploadRequest request, String object, MediaType mediaType) {
-        if (request.mediaType != mediaType) {
-            throw new IllegalArgumentException("Mismatched media type: " + object);
-        }
-        if (!object.startsWith(request.objectName)) {
-            throw new IllegalArgumentException("Mismatched object name: " + object);
-        }
-    }
-
-    private String validateObject(String object, MediaType mediaType) {
-        if (object == null) {
-            throw new IllegalArgumentException("Object name must not be null");
-        }
-
-        object = object.trim();
-
-        // Normalize separators
-        object = object.replace("\\", "/");
-
-        // Collapse multiple slashes
-        object = object.replaceAll("/+", "/");
-
-        // Remove trailing slash unless root
-        if (object.endsWith("/") && object.length() > 1) {
-            object = object.substring(0, object.length() - 1);
-        }
-
-        if (object.isBlank()) {
-            throw new IllegalArgumentException("Object name must not be empty");
-        }
-
-        // Block directory traversal
-        if (object.contains("..")) {
-            throw new IllegalArgumentException("Parent directory reference '..' is not allowed");
-        }
-
-        // KEEP:
-        // - Unicode letters
-        // - Numbers
-        // - underscore, hyphen, dot, slash
-        // REMOVE everything else
-        object = object.replaceAll("[^\\p{L}0-9._/-]", "");
-
-        if (object.isBlank()) {
-            throw new IllegalArgumentException("Object name is blank after sanitization");
-        }
-
-        if (mediaType == MediaType.VIDEO) {
-            int pathIndex = object.lastIndexOf("/");
-            if (pathIndex == -1) { // no base dir for vid, seem to vid folder - later save to user path or whatever
-                object = OSUtil.normalizePath(defaultVidPath, object);
-            }
-        }
-
-        return object;
-    }
-
-    private void validateObjectWithMediaType(String object, MediaType mediaType) {
-        MediaType detectedType = MediaType.detectMediaType(object);
-        if (detectedType == MediaType.OTHER) {
-            throw new IllegalArgumentException("Invalid file type: " + object);
-        }
-        if (mediaType == MediaType.VIDEO && detectedType != MediaType.VIDEO) {
-            throw new IllegalArgumentException("Invalid video type: " + object);
-        }
-    }
 
     private void cacheFileUploadRequest(String sessionId, String uploadId, String object) {
         redisTemplate.opsForHash().put("upload::" + sessionId, uploadId, object);
@@ -491,6 +481,74 @@ public class MediaUploadService {
         redisTemplate.opsForZSet().remove("upload::lastAccess", sessionId);
     }
 
+
+    private void validateMediaSessionInfoWithRequest(MediaUploadRequest request, String object, MediaType mediaType) {
+        if (request.mediaType != mediaType) {
+            throw new IllegalArgumentException("Mismatched media type: " + object);
+        }
+        if (!object.startsWith(request.objectName)) {
+            throw new IllegalArgumentException("Mismatched object name: " + object);
+        }
+    }
+
+    private String validateObject(String object, MediaType mediaType) {
+        if (object == null) {
+            throw new IllegalArgumentException("Object name must not be null");
+        }
+
+        object = object.trim();
+
+        // Normalize separators
+        object = object.replace("\\", "/");
+
+        // Collapse multiple slashes
+        object = object.replaceAll("/+", "/");
+
+        // Remove trailing slash unless root
+        if (object.endsWith("/") && object.length() > 1) {
+            object = object.substring(0, object.length() - 1);
+        }
+
+        if (object.isBlank()) {
+            throw new IllegalArgumentException("Object name must not be empty");
+        }
+
+        // Block directory traversal
+        if (object.contains("..")) {
+            throw new IllegalArgumentException("Parent directory reference '..' is not allowed");
+        }
+
+        // KEEP:
+        // - Unicode letters
+        // - Numbers
+        // - underscore, hyphen, dot, slash
+        // REMOVE everything else
+        object = object.replaceAll("[^\\p{L}0-9._/-]", "");
+
+        if (object.isBlank()) {
+            throw new IllegalArgumentException("Object name is blank after sanitization");
+        }
+
+        if (mediaType == MediaType.VIDEO) {
+            int pathIndex = object.lastIndexOf("/");
+            if (pathIndex == -1) { // no base dir for vid, seem to vid folder - later save to user path or whatever
+                object = OSUtil.normalizePath(defaultVidPath, object);
+            }
+        }
+
+        return object;
+    }
+
+    private void validateObjectWithMediaType(String object, MediaType mediaType) {
+        MediaType detectedType = MediaType.detectMediaType(object);
+        if (detectedType == MediaType.OTHER) {
+            throw new IllegalArgumentException("Invalid file type: " + object);
+        }
+        if (mediaType == MediaType.VIDEO && detectedType != MediaType.VIDEO) {
+            throw new IllegalArgumentException("Invalid video type: " + object);
+        }
+    }
+
     public boolean isValidDirectoryPath(String path) {
         if (path == null) return false;
 
@@ -526,6 +584,4 @@ public class MediaUploadService {
 
         return true;
     }
-
-
 }
