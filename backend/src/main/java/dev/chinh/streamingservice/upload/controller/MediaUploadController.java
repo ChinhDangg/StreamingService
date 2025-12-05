@@ -1,7 +1,9 @@
 package dev.chinh.streamingservice.upload.controller;
 
 import dev.chinh.streamingservice.content.constant.MediaType;
+import dev.chinh.streamingservice.upload.MediaBasicInfo;
 import dev.chinh.streamingservice.upload.service.MediaUploadService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -49,11 +51,16 @@ public class MediaUploadController {
         mediaUploadService.completeMultipartUpload(request.sessionId, request.uploadId, request.objectKey, request.uploadedParts);
     }
 
-    public record EndSessionRequest(String sessionId, MediaUploadService.MediaBasicInfo basicInfo) {}
+    public record EndSessionRequest(String sessionId, MediaBasicInfo basicInfo) {}
 
     @PostMapping("/end-session")
     public ResponseEntity<Long> endSession(@RequestBody EndSessionRequest request) throws Exception {
         return ResponseEntity.ok().body(mediaUploadService.saveMedia(request.sessionId, request.basicInfo));
+    }
+
+    @PostMapping(value = "/create-grouper", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Long> createGrouperMedia(@Valid @ModelAttribute MediaBasicInfo basicInfo) throws Exception {
+        return ResponseEntity.ok().body(mediaUploadService.saveGrouperMedia(basicInfo));
     }
 
 }
