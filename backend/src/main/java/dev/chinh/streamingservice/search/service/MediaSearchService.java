@@ -145,7 +145,7 @@ public class MediaSearchService {
             MediaSearchItemResponse itemResponse = mediaMapper.map(searchItem);
             itemResponse.setThumbnail(searchItem.hasThumbnail() ? ThumbnailService.getThumbnailPath(
                     searchItem.getId(), searchItem.getThumbnail()) : null);
-            itemResponse.setMediaType(searchItem.hasKey() ? MediaType.VIDEO : searchItem.isGrouper() ? MediaType.GROUPER : MediaType.IMAGE);
+            itemResponse.setMediaType(searchItem.isGrouper() ? MediaType.GROUPER : searchItem.hasKey() ? MediaType.VIDEO : MediaType.IMAGE);
             itemResponses.add(itemResponse);
         }
 
