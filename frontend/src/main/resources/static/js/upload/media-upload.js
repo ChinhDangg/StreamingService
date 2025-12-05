@@ -3,6 +3,7 @@
 const singleFileInput = document.getElementById('single-file-input');
 const folderInput = document.getElementById('folder-input');
 const savingPathInput = document.getElementById('saving-path-input');
+const grouperInput = document.getElementById('grouper-input');
 
 const titleInput = document.getElementById('title-input');
 const yearInput = document.getElementById('year-input');
@@ -22,6 +23,37 @@ const MediaTypes = Object.freeze({
 });
 
 let currentMediaType = null;
+
+const uploadTypeSelect = document.getElementById('upload-type-select');
+const singleFileContainer = document.getElementById('single-file-container');
+const folderContainer = document.getElementById('folder-container');
+const grouperContainer = document.getElementById('grouper-container');
+const savingPathContainer = document.getElementById('saving-path-container');
+
+uploadTypeSelect.addEventListener('change', () => {
+    const selected = uploadTypeSelect.value;
+    if (selected === MediaTypes.VIDEO) {
+        currentMediaType = MediaTypes.VIDEO;
+        singleFileContainer.classList.remove('hidden');
+        savingPathContainer.classList.remove('hidden');
+        folderContainer.classList.add('hidden');
+        grouperContainer.classList.add('hidden');
+
+    } else if (selected === MediaTypes.ALBUM) {
+        currentMediaType = MediaTypes.ALBUM;
+        folderContainer.classList.remove('hidden');
+        savingPathContainer.classList.remove('hidden');
+        singleFileContainer.classList.add('hidden');
+        grouperContainer.classList.add('hidden');
+
+    } else if (selected === MediaTypes.GROUPER) {
+        currentMediaType = MediaTypes.GROUPER;
+        grouperContainer.classList.remove('hidden');
+        singleFileContainer.classList.add('hidden');
+        folderContainer.classList.add('hidden');
+        savingPathContainer.classList.add('hidden');
+    }
+})
 
 singleFileInput.addEventListener('change', () => {
     clearUploadedFile();
@@ -70,6 +102,16 @@ folderInput.addEventListener('change', () => {
     currentMediaType = MediaTypes.ALBUM;
 });
 
+grouperInput.addEventListener('change', () => {
+    clearUploadedFile();
+    if (!grouperInput.files.length) {
+        return;
+    }
+    currentFiles = grouperInput.files[0];
+    updateTitle(grouperInput.files[0].name);
+    currentMediaType = MediaTypes.GROUPER;
+})
+
 function updateSavingPath(path) {
     savingPathInput.value = path;
 }
@@ -107,16 +149,6 @@ submitBtn.addEventListener('click',async () => {
             alert('No file selected');
             return;
         }
-        const savingPath = savingPathInput.value.trim();
-        if (savingPath.length === 0) {
-            alert('No saving path entered');
-            return;
-        }
-        if (currentMediaType === MediaTypes.VIDEO) {
-            if (!validateVideo(savingPath)) return;
-        } else if (currentMediaType === MediaTypes.ALBUM) {
-            if (!validateDirectory(savingPath)) return;
-        }
         const title = titleInput.value.trim();
         if (title.length === 0) {
             alert('No title entered');
@@ -126,6 +158,35 @@ submitBtn.addEventListener('click',async () => {
         if (!year || year.length === 0) {
             alert('No year entered');
             return;
+        }
+
+        if (currentMediaType === MediaTypes.GROUPER) {
+            const formData = new FormData();
+            formData.append('thumbnail', currentFiles);
+            formData.append('title', title);
+            formData.append('year', year);
+
+            const response = await fetch('/api/upload/media/create-grouper', {
+                method: 'POST',
+                body: formData
+            });
+            if (!response.ok) {
+                alert('Failed to create grouper: ' + await response.text());
+                return;
+            }
+            alert('Grouper created successfully! ' + await response.text());
+            return;
+        }
+
+        const savingPath = savingPathInput.value.trim();
+        if (savingPath.length === 0) {
+            alert('No saving path entered');
+            return;
+        }
+        if (currentMediaType === MediaTypes.VIDEO) {
+            if (!validateVideo(savingPath)) return;
+        } else if (currentMediaType === MediaTypes.ALBUM) {
+            if (!validateDirectory(savingPath)) return;
         }
 
         if (currentSavingPath !== savingPath) {

@@ -9,16 +9,30 @@
 <body>
 
 <div>
+    <label for="upload-type-select">Select Upload Type:</label>
+    <select id="upload-type-select" class="">
+        <option value="VIDEO">Video</option>
+        <option value="ALBUM">Album</option>
+        <option value="GROUPER">Grouper</option>
+    </select>
+</div>
+
+<div id="single-file-container">
     <label for="single-file-input">Video Upload:</label>
     <input id="single-file-input" type="file" accept=".mp4, .mp3, .mov, video/mp4, audio/mpeg"/>
 </div>
 
-<div>
+<div id="folder-container" class="hidden">
     <label for="folder-input">Album Upload:</label>
     <input id="folder-input" type="file" webkitdirectory directory />
 </div>
 
-<div>
+<div id="grouper-container" class="hidden">
+    <label for="grouper-input">Grouper Thumbnail Upload:</label>
+    <input id="grouper-input" type="file" multiple accept=".jpeg, .jpg, .png, .webp, image/jpeg, image/png, image/webp" />
+</div>
+
+<div id="saving-path-container">
     <label for="saving-path-input">Saving Path:</label>
     <input id="saving-path-input" type="text">
 </div>
@@ -34,6 +48,10 @@
 </div>
 
 <button id="submit-btn" type="submit">Submit</button>
+
+<div id="error-message-container" class="hidden flex flex-col">
+    <span>Error something</span>
+</div>
 
 
 <script type="module" src="/static/js/upload/media-upload.js"></script>
