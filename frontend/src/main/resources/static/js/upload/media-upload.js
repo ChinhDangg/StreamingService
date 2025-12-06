@@ -1,4 +1,4 @@
-
+import {uploadFile, startUploadSession, endUploadSession, validateDirectory} from "/static/js/upload/upload-file.js";
 
 const singleFileInput = document.getElementById('single-file-input');
 const folderInput = document.getElementById('folder-input');
@@ -197,21 +197,10 @@ submitBtn.addEventListener('click',async () => {
 
         let sessionId = currentSessionId;
         if (!sessionId) {
-            const sessionResponse = await fetch('/api/upload/media/create-session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    objectKey: savingPath,
-                    mediaType: currentMediaType
-                })
-            });
-            if (!sessionResponse.ok) {
-                alert('Failed to start upload: ' + await sessionResponse.text());
+            sessionId = await startUploadSession(savingPath, currentMediaType);
+            if (!sessionId) {
                 return;
             }
-            sessionId = await sessionResponse.text();
         }
         console.log('sessionId: ' + sessionId);
 
@@ -219,22 +208,24 @@ submitBtn.addEventListener('click',async () => {
         if (currentMediaType === MediaTypes.VIDEO) {
             if (uploadingFiles.has(currentFiles)) {
                 uploadingFiles.get(currentFiles).chunks.partNumber = uploadingFiles.get(currentFiles).partNumber;
-                const passed = await uploadFile(sessionId, currentFiles, savingPath, MediaTypes.VIDEO, uploadingFiles.get(currentFiles).chunks, uploadingFiles.get(currentFiles).eTags);
+                const passed = await uploadFile(sessionId, currentFiles, savingPath, MediaTypes.VIDEO, uploadingFiles, currentFailTexts,
+                    uploadingFiles.get(currentFiles).chunks, uploadingFiles.get(currentFiles).eTags);
                 if (!passed) fileNotUploaded++;
             } else {
-                const passed = await uploadFile(sessionId, currentFiles, savingPath, MediaTypes.VIDEO);
+                const passed = await uploadFile(sessionId, currentFiles, savingPath, MediaTypes.VIDEO, uploadingFiles, currentFailTexts);
                 if (!passed) fileNotUploaded++;
             }
         } else if (currentMediaType === MediaTypes.ALBUM) {
             if (uploadingFiles.size > 0) {
                 for (const f of uploadingFiles.keys()) {
                     uploadingFiles.get(f).chunks.partNumber = uploadingFiles.get(f).partNumber;
-                    const passed = await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM, uploadingFiles.get(f).chunks, uploadingFiles.get(f).eTags);
+                    const passed = await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM, uploadingFiles, currentFailTexts,
+                        uploadingFiles.get(f).chunks, uploadingFiles.get(f).eTags);
                     if (!passed) fileNotUploaded++;
                 }
             } else {
                 for (const f of currentFiles) {
-                    const passed = await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM);
+                    const passed = await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM, uploadingFiles, currentFailTexts);
                     if (!passed) fileNotUploaded++;
                 }
             }
@@ -247,29 +238,23 @@ submitBtn.addEventListener('click',async () => {
             return;
         }
 
-        const endResponse = await fetch('/api/upload/media/end-session', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                sessionId: sessionId,
-                basicInfo: {
-                    title: title,
-                    year: year
-                }
-            })
+        const basicInfo = {
+            sessionId: sessionId,
+            basicInfo: {
+                title: title,
+                year: year
+            }
+        };
+        endUploadSession(basicInfo).then(responseText => {
+            if (responseText) {
+                singleFileInput.value = '';
+                folderInput.value = '';
+                uploadingFiles.clear();
+                updateTitle('');
+                updateSavingPath('');
+                alert('Upload successful! ' + responseText);
+            }
         });
-        if (!endResponse.ok) {
-            alert('Failed to finalize upload: ' + await endResponse.text());
-            return;
-        }
-        singleFileInput.value = '';
-        folderInput.value = '';
-        uploadingFiles.clear();
-        updateTitle('');
-        updateSavingPath('');
-        alert('Upload successful! ' + await endResponse.text());
     }
 
     submitBtn.disabled = true;
@@ -277,128 +262,6 @@ submitBtn.addEventListener('click',async () => {
         submitBtn.disabled = false
     });
 });
-
-async function uploadFile(sessionId, file, fileName, mediaType, chunks = null, eTags = null) {
-
-    console.log('fileName: ' + fileName);
-
-    chunks = chunks == null ? chunkFile(file) : chunks;
-    eTags = eTags == null ? [] : eTags;
-
-    console.log('chunks:');
-    console.log(chunks);
-
-    uploadingFiles.set(file, { chunks: chunks, eTags: eTags, partNumber: chunks[0].partNumber });
-
-    const response = await fetch('/api/upload/media/initiate', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            sessionId: sessionId,
-            objectKey: fileName,
-            mediaType: mediaType
-        })
-    });
-    if (!response.ok) {
-        currentFailTexts.push('Init: ' + await response.text());
-        return false;
-    }
-
-    const uploadId = await response.text();
-    console.log('uploadId: ' + uploadId);
-
-    for (const c of chunks) {
-        const urlResponse = await fetch('/api/upload/media/presign-part-url', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                sessionId: sessionId,
-                uploadId: uploadId,
-                objectKey: fileName,
-                partNumber: c.partNumber
-            })
-        });
-        if (!urlResponse.ok) {
-            currentFailTexts.push('Presign: ' + await urlResponse.text());
-            return false;
-        }
-        const urlRes = await urlResponse.text();
-        console.log('Presigned url: ' + urlRes);
-
-        const res = await fetch(urlRes, {
-            method: 'PUT',
-            body: c.blob
-        });
-        console.log('blob upload result: ' + res);
-
-        eTags.push({
-            partNumber: c.partNumber,
-            etag: res.headers.get('ETag').replace(/"/g, '')
-        });
-
-        uploadingFiles.get(file).partNumber++;
-    }
-
-    const completeResponse = await fetch('/api/upload/media/complete', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            sessionId: sessionId,
-            uploadId: uploadId,
-            objectKey: fileName,
-            uploadedParts: eTags
-        })
-    });
-    if (!completeResponse.ok) {
-        currentFailTexts.push('Complete: ' + await completeResponse.text());
-        return false;
-    }
-
-    uploadingFiles.delete(file);
-
-    return true;
-}
-
-function chunkFile(file) {
-    const MAX_PARTS = 1000;
-    const MIN_CHUNK = 5 * 1024 * 1024;       // 5 MB
-    const DEFAULT_CHUNK = 8 * 1024 * 1024;   // 8 MB
-    const MAX_CHUNK = 64 * 1024 * 1024;      // 64 MB
-
-    let chunkSize = DEFAULT_CHUNK;
-
-    // Dynamically resize chunk to avoid more than 1000 parts
-    const estimatedParts = Math.ceil(file.size / chunkSize);
-    if (estimatedParts > MAX_PARTS) {
-        chunkSize = Math.ceil(file.size / MAX_PARTS);
-    }
-
-    // Hard clamp between safe range
-    chunkSize = Math.max(chunkSize, MIN_CHUNK);
-    chunkSize = Math.min(chunkSize, MAX_CHUNK);
-
-    const chunks = [];
-    let start = 0;
-    let partNumber = 1;
-
-    while (start < file.size) {
-        const end = Math.min(start + chunkSize, file.size);
-        chunks.push({
-            partNumber,
-            blob: file.slice(start, end),
-        });
-        partNumber++;
-        start = end;
-    }
-
-    return chunks;
-}
 
 function validateVideo(path) {
     const INVALID = /[<>:"|?*\x00-\x1F]/;
@@ -434,40 +297,4 @@ function validateVideo(path) {
     }
     return true;
 }
-
-
-function validateDirectory(path) {
-    const INVALID = /[<>:"|?*\x00-\x1F]/; // Windows + control chars
-    const trimmed = path.trim();
-    let errors = [];
-
-    // Empty
-    if (!trimmed.length) {
-        errors.push("Path cannot be empty.");
-    }
-
-    // Contains invalid characters
-    if (INVALID.test(trimmed)) {
-        errors.push(`Path contains invalid characters: "${path}"`);
-    }
-
-    // Cannot end with slash or backslash
-    if (/[/\\]$/.test(trimmed)) {
-        errors.push("Directory path must not end with a slash.");
-    }
-
-    // Cannot look like a file (should have no extension)
-    const parts = trimmed.split(/[/\\]/).filter(Boolean);
-    const last = parts.at(-1);
-    if (/\.[^./\\]+$/i.test(last)) {
-        errors.push("This looks like a file, not a directory.");
-    }
-
-    if (errors.length) {
-        alert("Invalid directory:\n\n" + errors.join("\n"));
-        return false;
-    }
-    return true;
-}
-
 
