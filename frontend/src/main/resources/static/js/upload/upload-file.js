@@ -202,8 +202,8 @@ export function validateDirectory(path) {
 
     if (errors.length) {
         alert("Invalid directory:\n\n" + errors.join("\n"));
-        return false;
+        return null;
     }
 
-    return true;
+    return trimmed;
 }
