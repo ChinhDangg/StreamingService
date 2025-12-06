@@ -10,6 +10,7 @@ import dev.chinh.streamingservice.data.entity.MediaGroupMetaData;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
 import dev.chinh.streamingservice.data.repository.MediaGroupMetaDataRepository;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
+import dev.chinh.streamingservice.data.service.MediaMetadataService;
 import dev.chinh.streamingservice.data.service.ThumbnailService;
 import dev.chinh.streamingservice.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.search.data.MediaGroupInfo;
@@ -54,6 +55,7 @@ public class MediaUploadService {
     private final OpenSearchService openSearchService;
     private final ThumbnailService thumbnailService;
     private final MediaDisplayService mediaDisplayService;
+    private final MediaMetadataService mediaMetadataService;
 
     private final MediaMetaDataRepository mediaRepository;
     private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
@@ -267,6 +269,7 @@ public class MediaUploadService {
         grouperMedia.setLength(grouperMedia.getLength() + 1);
         mediaRepository.save(grouperMedia);
 
+        mediaMetadataService.removeCachedMediaSearchItem(grouperMediaId);
         mediaDisplayService.removeCacheGroupOfMedia(grouperMediaId);
 
         removeCacheMediaSessionRequest(sessionId);
