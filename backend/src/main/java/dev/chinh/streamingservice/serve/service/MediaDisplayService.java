@@ -29,6 +29,7 @@ import java.util.List;
 public class MediaDisplayService {
 
     private final AlbumService albumService;
+    private final ThumbnailService thumbnailService;
     private final ObjectMapper objectMapper;
     private final MediaMapper mediaMapper;
     private final RedisTemplate<String, Object> redisTemplate;
@@ -47,8 +48,10 @@ public class MediaDisplayService {
         MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(mediaId);
 
         MediaDisplayContent mediaDisplayContent = mediaMapper.map(mediaItem);
-        if (mediaItem.hasThumbnail())
+        if (mediaItem.hasThumbnail()) {
             mediaDisplayContent.setThumbnail(ThumbnailService.getThumbnailPath(mediaId, mediaItem.getThumbnail()));
+            thumbnailService.processThumbnails(List.of(mediaItem));
+        }
 
         if (mediaItem.isGrouper()) {
             GroupSlice mediaIds = getNextGroupOfMedia(mediaId, 0, Sort.Direction.DESC);
