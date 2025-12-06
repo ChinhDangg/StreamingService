@@ -59,8 +59,15 @@ public class MediaUploadController {
     }
 
     @PostMapping(value = "/create-grouper", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<Long> createGrouperMedia(@Valid @ModelAttribute MediaBasicInfo basicInfo) throws Exception {
+    public ResponseEntity<Long> createGrouperMedia(@Valid @ModelAttribute MediaBasicInfo basicInfo) {
         return ResponseEntity.ok().body(mediaUploadService.saveGrouperMedia(basicInfo));
+    }
+
+    public record EndSessionGrouperRequest(String sessionId, long grouperMediaId, String title) {}
+
+    @PostMapping("/end-session-grouper")
+    public ResponseEntity<Long> endSessionGrouper(@RequestBody EndSessionGrouperRequest request) throws Exception {
+        return ResponseEntity.ok().body(mediaUploadService.saveMediaInGrouper(request.sessionId, request.grouperMediaId, request.title));
     }
 
 }
