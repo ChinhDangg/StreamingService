@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.serve.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.MediaMapper;
 import dev.chinh.streamingservice.content.constant.MediaType;
@@ -12,7 +13,7 @@ import dev.chinh.streamingservice.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.serve.data.MediaDisplayContent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.*;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -41,7 +43,7 @@ public class MediaDisplayService {
             boolean hasNext
     ){}
 
-    public MediaDisplayContent getMediaContentInfo(long mediaId) {
+    public MediaDisplayContent getMediaContentInfo(long mediaId) throws JsonProcessingException {
         MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(mediaId);
 
         MediaDisplayContent mediaDisplayContent = mediaMapper.map(mediaItem);
@@ -58,25 +60,55 @@ public class MediaDisplayService {
         return mediaDisplayContent;
     }
 
-    private void cacheGroupOfMedia(long mediaId, int offset, Sort.Direction sortOrder, GroupSlice mediaIds) {
-        redisTemplate.opsForValue().set("grouper::" + mediaId + ":" + offset + ":" + sortOrder, mediaIds, Duration.ofMinutes(15));
+    private void addCacheGroupOfMedia(long mediaId, int offset, Sort.Direction sortOrder, GroupSlice mediaIds) throws JsonProcessingException {
+        String id = "grouper::" + mediaId;
+        redisTemplate.opsForHash().put(id, offset + ":" + sortOrder, objectMapper.writeValueAsString(mediaIds));
+        redisTemplate.expire(id, Duration.ofMinutes(15));
     }
 
-    public GroupSlice getCacheGroupOfMedia(long mediaId, int offset) {
-        String key = "grouper::" + mediaId + ":" + offset;
-        Object json = redisTemplate.opsForValue().get(key);
+    public GroupSlice getCacheGroupOfMedia(long mediaId, int offset, Sort.Direction sortOrder) {
+        String id = "grouper::" + mediaId;
+        Object json = redisTemplate.opsForHash().get(id, offset + ":" + sortOrder);
 
         if (json == null)
             return null;
         try {
-            return objectMapper.convertValue(json, GroupSlice.class);
+            return objectMapper.readValue((String) json, GroupSlice.class);
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse cached Slice<Long>", e);
         }
     }
 
-    public GroupSlice getNextGroupOfMedia(long mediaId, int offset, Sort.Direction sortOrder) {
-        GroupSlice cachedGroupOfMedia = getCacheGroupOfMedia(mediaId, offset);
+    public void removeCacheGroupOfMedia(long mediaId) {
+        String id = "grouper::" + mediaId;
+        redisTemplate.delete(id);
+    }
+
+    public void deleteAllCacheForMedia(long mediaId) {
+        String pattern = "grouper::" + mediaId + ":*";
+
+        // 1. Use the non-deprecated redisTemplate.scan() method
+        //    It respects the configured KeySerializer (StringRedisSerializer) and returns String keys.
+        try (Cursor<String> cursor = redisTemplate.scan(ScanOptions.scanOptions()
+                .match(pattern)
+                .count(1000)
+                .build())) {
+
+            // 2. Collect all keys returned by the cursor into a list
+            List<String> keysToDelete = new ArrayList<>();
+            cursor.forEachRemaining(keysToDelete::add);
+
+            // 3. Delete the keys in a single operation
+            if (!keysToDelete.isEmpty()) {
+                // redisTemplate.delete(Collection<K> keys) is safe and respects serialization
+                redisTemplate.delete(keysToDelete);
+            }
+        }
+        // The try-with-resources block ensures the cursor is closed automatically.
+    }
+
+    public GroupSlice getNextGroupOfMedia(long mediaId, int offset, Sort.Direction sortOrder) throws JsonProcessingException {
+        GroupSlice cachedGroupOfMedia = getCacheGroupOfMedia(mediaId, offset, sortOrder);
         if (cachedGroupOfMedia != null) {
             return cachedGroupOfMedia;
         }
@@ -90,7 +122,7 @@ public class MediaDisplayService {
         Slice<Long> groupOfMedia = mediaGroupMetaDataRepository.findMediaMetadataIdsByGrouperMetaDataId(mediaId, pageable);
         GroupSlice groupSlice = new GroupSlice(groupOfMedia.getContent(), offset, maxBatchSize, groupOfMedia.hasNext());
 
-        cacheGroupOfMedia(mediaId, offset, sortOrder, groupSlice);
+        addCacheGroupOfMedia(mediaId, offset, sortOrder, groupSlice);
         return groupSlice;
     }
 
