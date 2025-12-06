@@ -71,7 +71,7 @@ public abstract class MediaService {
         MediaMetaData mediaMetaData = mediaRepository.findByIdWithAllInfo(id).orElseThrow(() ->
                 new IllegalArgumentException("Media not found with id " + id));
         MediaSearchItem mediaSearchItem = mediaMapper.map(mediaMetaData);
-        if (mediaMetaData.getGrouperId() != null) {
+        if (mediaMetaData.getGrouperId() != null || mediaMetaData.isGrouper()) {
             mediaSearchItem.setMediaGroupInfo(
                     new MediaGroupInfo(mediaMetaData.getGrouperId(), mediaMetaData.getGroupInfo().getNumInfo()));
         }
