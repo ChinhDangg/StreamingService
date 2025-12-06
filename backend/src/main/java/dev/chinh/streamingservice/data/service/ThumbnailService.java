@@ -62,7 +62,7 @@ public class ThumbnailService {
         }
     }
 
-    public void processThumbnails(Collection<MediaSearchItem> items) {
+    public void processThumbnails(Collection<? extends MediaDescription> items) {
         List<MediaDescription> newThumbnails = new ArrayList<>();
         for (MediaDescription item : items) {
             if (!item.hasThumbnail())
