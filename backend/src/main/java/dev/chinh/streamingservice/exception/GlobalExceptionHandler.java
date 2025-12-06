@@ -9,11 +9,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DuplicateEntryException.class)
     public ResponseEntity<String> handleDuplicateEntryException(DuplicateEntryException e) {
+        e.printStackTrace();
         return ResponseEntity.badRequest().body(e.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException e) {
+        e.printStackTrace();
         return ResponseEntity.badRequest().body(e.getMessage());
     }
 }
