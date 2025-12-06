@@ -8,15 +8,19 @@ import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.content.service.MinIOService;
 import dev.chinh.streamingservice.data.entity.MediaGroupMetaData;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
+import dev.chinh.streamingservice.data.repository.MediaGroupMetaDataRepository;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.service.ThumbnailService;
+import dev.chinh.streamingservice.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.search.data.MediaGroupInfo;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import dev.chinh.streamingservice.search.service.OpenSearchService;
+import dev.chinh.streamingservice.serve.service.MediaDisplayService;
 import dev.chinh.streamingservice.upload.MediaBasicInfo;
 import io.minio.Result;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -50,8 +54,10 @@ public class MediaUploadService {
     private final MediaMapper mediaMapper;
     private final OpenSearchService openSearchService;
     private final ThumbnailService thumbnailService;
+    private final MediaDisplayService mediaDisplayService;
 
     private final MediaMetaDataRepository mediaRepository;
+    private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
 
     private final String mediaBucket = "media";
     public static final String defaultVidPath = "vid";
@@ -154,7 +160,7 @@ public class MediaUploadService {
 
 
     @Transactional
-    public long saveGrouperMedia(MediaBasicInfo basicInfo) throws Exception {
+    public long saveGrouperMedia(MediaBasicInfo basicInfo) {
         MediaMetaData mediaMetaData = new MediaMetaData();
         mediaMetaData.setTitle(basicInfo.getTitle());
         mediaMetaData.setYear(basicInfo.getYear());
@@ -205,6 +211,69 @@ public class MediaUploadService {
             }
             throw new RuntimeException("Failed to save media grouper metadata", e);
         }
+    }
+
+    @Transactional
+    public long saveMediaInGrouper(String sessionId, long grouperMediaId, String title) throws Exception {
+        MediaUploadRequest upload = getCachedMediaUploadRequest(sessionId);
+        if (upload == null) {
+            throw new IllegalArgumentException("Invalid session ID: " + sessionId);
+        }
+
+        MediaMetaData grouperMedia = mediaRepository.findById(grouperMediaId).orElseThrow(
+                () -> new ResourceNotFoundException("Media not found: " + grouperMediaId)
+        );
+        if (!grouperMedia.isGrouper()) {
+            throw new IllegalArgumentException("Media is not a grouper media: " + grouperMediaId);
+        }
+        MediaGroupMetaData grouperGroupInfo = grouperMedia.getGroupInfo();
+
+        MediaMetaData mediaMetaData = new MediaMetaData();
+        mediaMetaData.setTitle(title);
+        mediaMetaData.setYear(grouperMedia.getYear());
+        mediaMetaData.setUploadDate(LocalDateTime.ofInstant(Instant.now(), ZoneId.of("UTC")));
+        mediaMetaData.setBucket(mediaBucket);
+        mediaMetaData.setAbsoluteFilePath(mediaBucket + "/" + upload.objectName);
+        mediaMetaData.setParentPath(upload.objectName);
+
+        MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
+        mediaGroupInfo.setGrouperMetaDataId(grouperGroupInfo.getId());
+        mediaGroupInfo.setMediaMetaData(mediaMetaData);
+        mediaGroupInfo.setNumInfo(grouperGroupInfo.getNumInfo() + 1);
+        mediaMetaData.setGroupInfo(mediaGroupInfo);
+        var results = minIOService.getAllItemsInBucketWithPrefix(mediaBucket, upload.objectName);
+        int count = 0;
+        long totalSize = 0;
+        String firstImage = null;
+        for (Result<Item> result : results) {
+            count++;
+            Item item = result.get();
+            if (MediaType.detectMediaType(result.get().objectName()) == MediaType.IMAGE) {
+                if (firstImage == null)
+                    firstImage = item.objectName();
+                totalSize += item.size();
+            }
+        }
+        mediaMetaData.setSize(totalSize);
+        mediaMetaData.setLength(count);
+        mediaMetaData.setThumbnail(firstImage);
+        ImageMetadata imageMetadata = parseMediaMetadata(probeMediaInfo(mediaBucket, firstImage), ImageMetadata.class);
+        mediaMetaData.setWidth(imageMetadata.width);
+        mediaMetaData.setHeight(imageMetadata.height);
+        mediaMetaData.setFormat(imageMetadata.format);
+        Long savedId = mediaRepository.save(mediaMetaData).getId();
+
+        grouperGroupInfo.setNumInfo(grouperGroupInfo.getNumInfo() + 1);
+        mediaGroupMetaDataRepository.save(grouperGroupInfo);
+
+        grouperMedia.setLength(grouperMedia.getLength() + 1);
+        mediaRepository.save(grouperMedia);
+
+        mediaDisplayService.removeCacheGroupOfMedia(grouperMediaId);
+
+        removeCacheMediaSessionRequest(sessionId);
+        removeUploadSessionCacheLastAccess(sessionId);
+        return savedId;
     }
 
     @Transactional
