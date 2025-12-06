@@ -160,7 +160,8 @@ const getMediaContentAndShowInOverlay = async (itemId) => {
     await quickViewContentInOverlay(itemId, mediaInfo.mediaType, mediaInfo);
 };
 
-const addItem = (id, updateList = true) => {
+const addItem = (id) => {
+    if (albumGrouperChildAlbumIds.includes(id)) return;
     const listItem = helperCloneAndUnHideNode(listItemTem);
     listItem.href = `/api/media/content-page/${id}`;
     let title;
@@ -172,10 +173,10 @@ const addItem = (id, updateList = true) => {
         albumGrouperCountLength++;
         title = `Item: ${albumGrouperCountLength}`;
     }
+    offset++;
     listItem.innerText = title;
     scrollContainer.appendChild(listItem);
-    if (updateList)
-        albumGrouperChildAlbumIds.push(id);
+    albumGrouperChildAlbumIds.push(id);
     listItem.addEventListener('click', async (e) => {
         e.preventDefault();
         e.target.disabled = true;
@@ -213,17 +214,19 @@ sortOrderButton.addEventListener('click', async () => {
             albumGrouperChildAlbumIds.sort((a, b) => b - a);
         else
             albumGrouperChildAlbumIds.sort((a, b) => a - b);
-        albumGrouperChildAlbumIds.forEach(id => {
-            addItem(id, false);
+        const copy = [...albumGrouperChildAlbumIds];
+        albumGrouperChildAlbumIds.length = 0;
+        copy.forEach(id => {
+            addItem(id);
         });
+        albumGrouperChildAlbumIds = copy;
         scrollContainer.scrollTo({
             top: 0,
             behavior: 'smooth'
         });
         return;
     }
-    offset = 0;
-    albumGrouperChildAlbumIds = [];
+    offset = albumGrouperChildAlbumIds.length;
     await getNextGrouperInfo(albumGrouperInfo.id);
 });
 
