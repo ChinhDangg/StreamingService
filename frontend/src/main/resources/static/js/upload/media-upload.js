@@ -70,7 +70,7 @@ singleFileInput.addEventListener('change', () => {
     currentMediaType = MediaTypes.VIDEO;
 });
 
-const ALLOWED = ["video/", "image/png", "image/jpeg", "image/gif"];
+const ALLOWED = ["video/", "image/png", "image/jpeg", "image/gif", "image/webp"];
 
 folderInput.addEventListener('change', () => {
     clearUploadedFile();
