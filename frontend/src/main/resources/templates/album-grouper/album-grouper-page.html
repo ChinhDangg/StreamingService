@@ -126,10 +126,13 @@
             </div>
         </div>
 
-        <button id="sortOrderButton"
-                class="select-none mb-2 px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
-            Descending
-        </button>
+        <div class="flex gap-2">
+            <span>Sorted: </span>
+            <button id="sortOrderButton"
+                    class="select-none mb-2 px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
+                Descending
+            </button>
+        </div>
 
         <!-- Scrollable list -->
         <div class="list-scroll-container max-h-96 overflow-y-auto pr-2 space-y-3">
