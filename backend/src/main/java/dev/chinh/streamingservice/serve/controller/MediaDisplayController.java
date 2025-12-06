@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.serve.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import dev.chinh.streamingservice.serve.data.MediaDisplayContent;
 import dev.chinh.streamingservice.serve.service.MediaDisplayService;
 import lombok.RequiredArgsConstructor;
@@ -15,14 +16,14 @@ public class MediaDisplayController {
     private final MediaDisplayService mediaDisplayService;
 
     @GetMapping("/content/{id}")
-    public ResponseEntity<MediaDisplayContent> getMediaDisplayContent(@PathVariable long id){
+    public ResponseEntity<MediaDisplayContent> getMediaDisplayContent(@PathVariable long id) throws JsonProcessingException {
         return ResponseEntity.ok().body(mediaDisplayService.getMediaContentInfo(id));
     }
 
     @GetMapping("/grouper-next/{id}")
     public ResponseEntity<MediaDisplayService.GroupSlice> getNextGrouper(@PathVariable long id,
                                                                          @RequestParam(name = "offset") int offset,
-                                                                         @RequestParam(name = "order") Sort.Direction order) {
+                                                                         @RequestParam(name = "order") Sort.Direction order) throws JsonProcessingException {
         return ResponseEntity.ok().body(mediaDisplayService.getNextGroupOfMedia(id, offset, order));
     }
 
