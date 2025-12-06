@@ -6,53 +6,94 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <title>SS Media Upload</title>
 </head>
-<body>
+<body class="bg-gray-900 min-h-screen flex items-center justify-center p-6 text-gray-200">
 
-<div>
-    <label for="upload-type-select">Select Upload Type:</label>
-    <select id="upload-type-select" class="">
-        <option value="VIDEO">Video</option>
-        <option value="ALBUM">Album</option>
-        <option value="GROUPER">Grouper</option>
-    </select>
+<div class="w-full max-w-xl bg-gray-800 shadow-xl rounded-xl p-6 space-y-6">
+
+    <!-- Upload Type Selector -->
+    <div class="flex flex-col space-y-2">
+        <label for="upload-type-select" class="font-medium text-gray-300">Select Upload Type:</label>
+        <select id="upload-type-select"
+                class="bg-gray-900 text-gray-200 border border-gray-700 rounded-lg p-2 text-sm focus:outline-none focus:border-blue-500">
+            <option value="VIDEO">Video</option>
+            <option value="ALBUM">Album</option>
+            <option value="GROUPER">Grouper</option>
+        </select>
+    </div>
+
+    <!-- Video Upload -->
+    <div id="single-file-container" class="flex flex-col space-y-2">
+        <label for="single-file-input" class="font-medium text-gray-300">Video Upload:</label>
+        <input id="single-file-input"
+               type="file"
+               accept=".mp4, .mp3, .mov, video/mp4, audio/mpeg"
+               class="block w-full border border-gray-700 rounded-lg p-2 text-sm bg-gray-900 text-gray-200 focus:outline-none focus:border-blue-500">
+    </div>
+
+    <!-- Album Upload -->
+    <div id="folder-container" class="hidden flex flex-col space-y-2">
+        <label for="folder-input" class="font-medium text-gray-300">Album Upload:</label>
+        <input id="folder-input"
+               type="file"
+               webkitdirectory
+               directory
+               class="block w-full border border-gray-700 rounded-lg p-2 text-sm bg-gray-900 text-gray-200 focus:outline-none focus:border-blue-500">
+    </div>
+
+    <!-- Grouper Thumbnail Upload -->
+    <div id="grouper-container" class="hidden flex flex-col space-y-2">
+        <label for="grouper-input" class="font-medium text-gray-300">Grouper Thumbnail Upload:</label>
+        <input id="grouper-input"
+               type="file"
+               multiple
+               accept=".jpeg, .jpg, .png, .webp, image/jpeg, image/png, image/webp"
+               class="block w-full border border-gray-700 rounded-lg p-2 text-sm bg-gray-900 text-gray-200 focus:outline-none focus:border-blue-500">
+    </div>
+
+    <!-- Saving Path -->
+    <div id="saving-path-container" class="flex flex-col space-y-2">
+        <label for="saving-path-input" class="font-medium text-gray-300">Saving Path:</label>
+        <input id="saving-path-input"
+               type="text"
+               class="block w-full border border-gray-700 rounded-lg p-2 text-sm bg-gray-900 text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+               placeholder="/storage/path/">
+    </div>
+
+    <!-- Title -->
+    <div class="flex flex-col space-y-2">
+        <label for="title-input" class="font-medium text-gray-300">Title:</label>
+        <input id="title-input"
+               type="text"
+               placeholder="Title..."
+               class="block w-full border border-gray-700 rounded-lg p-2 text-sm bg-gray-900 text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500">
+    </div>
+
+    <!-- Year -->
+    <div class="flex flex-col space-y-2">
+        <label for="year-input" class="font-medium text-gray-300">Year:</label>
+        <input id="year-input"
+               type="number"
+               value="2025"
+               min="1900"
+               max="2025"
+               placeholder="Year..."
+               class="block w-full border border-gray-700 rounded-lg p-2 text-sm bg-gray-900 text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500">
+    </div>
+
+    <!-- Submit Button -->
+    <button id="submit-btn"
+            type="submit"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg shadow">
+        Submit
+    </button>
+
+    <!-- Error Message -->
+    <div id="error-message-container"
+         class="hidden flex flex-col bg-red-900 border border-red-700 text-red-300 p-3 rounded-lg">
+        <span>Error something</span>
+    </div>
+
 </div>
-
-<div id="single-file-container">
-    <label for="single-file-input">Video Upload:</label>
-    <input id="single-file-input" type="file" accept=".mp4, .mp3, .mov, video/mp4, audio/mpeg"/>
-</div>
-
-<div id="folder-container" class="hidden">
-    <label for="folder-input">Album Upload:</label>
-    <input id="folder-input" type="file" webkitdirectory directory />
-</div>
-
-<div id="grouper-container" class="hidden">
-    <label for="grouper-input">Grouper Thumbnail Upload:</label>
-    <input id="grouper-input" type="file" multiple accept=".jpeg, .jpg, .png, .webp, image/jpeg, image/png, image/webp" />
-</div>
-
-<div id="saving-path-container">
-    <label for="saving-path-input">Saving Path:</label>
-    <input id="saving-path-input" type="text">
-</div>
-
-<div>
-    <label for="title-input">Title:</label>
-    <input id="title-input" type="text" placeholder="Title..." />
-</div>
-
-<div>
-    <label for="year-input">Year:</label>
-    <input id="year-input" type="number" value="2025" min="1900" max="2025" placeholder="Year..." />
-</div>
-
-<button id="submit-btn" type="submit">Submit</button>
-
-<div id="error-message-container" class="hidden flex flex-col">
-    <span>Error something</span>
-</div>
-
 
 <script type="module" src="/static/js/upload/media-upload.js"></script>
 
