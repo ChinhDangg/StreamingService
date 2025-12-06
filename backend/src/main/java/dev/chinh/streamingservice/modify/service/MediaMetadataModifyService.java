@@ -52,7 +52,7 @@ public class MediaMetadataModifyService {
         } catch (IOException e) {
             throw new RuntimeException("Failed to update OpenSearch index title field for media " + mediaId, e);
         }
-        mediaMetadataService.removeCachedMediaSearchItem(String.valueOf(mediaId));
+        mediaMetadataService.removeCachedMediaSearchItem(mediaId);
         return newTitle;
     }
 
@@ -76,7 +76,7 @@ public class MediaMetadataModifyService {
         } catch (IOException e) {
             throw new RuntimeException("Failed to update OpenSearch index field for media " + mediaId, e);
         }
-        mediaMetadataService.removeCachedMediaSearchItem(String.valueOf(mediaId));
+        mediaMetadataService.removeCachedMediaSearchItem(mediaId);
         return nameEntityList;
     }
 

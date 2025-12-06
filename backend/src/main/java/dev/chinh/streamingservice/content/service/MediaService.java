@@ -61,7 +61,7 @@ public abstract class MediaService {
     }
 
     protected MediaDescription getMediaDescription(long mediaId) {
-        MediaDescription mediaDescription = mediaMetadataService.getCachedMediaSearchItem(String.valueOf(mediaId));
+        MediaDescription mediaDescription = mediaMetadataService.getCachedMediaSearchItem(mediaId);
         if (mediaDescription == null)
             mediaDescription = findMediaMetaDataAllInfo(mediaId);
         return mediaDescription;

@@ -25,11 +25,11 @@ public class MediaMetadataService {
         redisTemplate.opsForValue().set(id, item, duration);
     }
 
-    public MediaSearchItem getCachedMediaSearchItem(String id) {
+    public MediaSearchItem getCachedMediaSearchItem(long id) {
         return objectMapper.convertValue(redisTemplate.opsForValue().get("media::" + id), MediaSearchItem.class);
     }
 
-    public void removeCachedMediaSearchItem(String id) {
+    public void removeCachedMediaSearchItem(long id) {
         redisTemplate.delete("media::" + id);
     }
 }
