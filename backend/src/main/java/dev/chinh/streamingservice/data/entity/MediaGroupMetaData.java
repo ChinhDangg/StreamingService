@@ -3,6 +3,7 @@ package dev.chinh.streamingservice.data.entity;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.data.ContentMetaData;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -24,6 +25,7 @@ public class MediaGroupMetaData {
     @JoinColumn(name = "media_id")
     private MediaMetaData mediaMetaData;
 
+    @Setter(AccessLevel.NONE)
     // Read-only access to foreign key column
     @Column(name = "media_id", insertable = false, updatable = false)
     private Long mediaMetaDataId;
@@ -36,6 +38,7 @@ public class MediaGroupMetaData {
     @JoinColumn(name = "grouper_id")
     private MediaGroupMetaData grouperMetaData;
 
+    @Setter(AccessLevel.NONE)
     @JsonProperty(ContentMetaData.GROUPER_ID)
     @Column(name = "grouper_id", insertable = false, updatable = false)
     private Long grouperMetaDataId;

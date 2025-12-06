@@ -20,7 +20,6 @@ import dev.chinh.streamingservice.upload.MediaBasicInfo;
 import io.minio.Result;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -172,7 +171,6 @@ public class MediaUploadService {
         mediaMetaData.setLength(0);
 
         MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
-        mediaGroupInfo.setGrouperMetaDataId(-1L);
         mediaGroupInfo.setNumInfo(0);
         mediaMetaData.setGroupInfo(mediaGroupInfo);
 
@@ -237,7 +235,7 @@ public class MediaUploadService {
         mediaMetaData.setParentPath(upload.objectName);
 
         MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
-        mediaGroupInfo.setGrouperMetaDataId(grouperGroupInfo.getId());
+        mediaGroupInfo.setGrouperMetaData(grouperGroupInfo);
         mediaGroupInfo.setMediaMetaData(mediaMetaData);
         mediaGroupInfo.setNumInfo(grouperGroupInfo.getNumInfo() + 1);
         mediaMetaData.setGroupInfo(mediaGroupInfo);
