@@ -196,7 +196,7 @@ public class MediaUploadService {
             savedId = saved.getId();
             MediaSearchItem searchItem = mediaMapper.map(mediaMetaData);
             searchItem.setMediaGroupInfo(new MediaGroupInfo(-1L));
-            openSearchService.indexDocument(OpenSearchService.INDEX_NAME, savedId, searchItem);
+            openSearchService.indexDocument(OpenSearchService.MEDIA_INDEX_NAME, savedId, searchItem);
             return savedId;
         } catch (Exception e) {
             try {
@@ -206,7 +206,7 @@ public class MediaUploadService {
             }
             try {
                 if (savedId != null) {
-                    openSearchService.deleteDocument(OpenSearchService.INDEX_NAME, savedId);
+                    openSearchService.deleteDocument(OpenSearchService.MEDIA_INDEX_NAME, savedId);
                 }
             } catch (IOException ie) {
                 throw new RuntimeException("Critical: Failed to delete media from OpenSearch to rollback", ie);
@@ -268,7 +268,7 @@ public class MediaUploadService {
         try {
             previousLength = grouperMedia.getLength();
             grouperMedia.setLength(previousLength + 1);
-            openSearchService.partialUpdateDocument(OpenSearchService.INDEX_NAME, grouperMediaId, Map.of(ContentMetaData.LENGTH, grouperMedia.getLength()));
+            openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, grouperMediaId, Map.of(ContentMetaData.LENGTH, grouperMedia.getLength()));
 
             grouperGroupInfo.setNumInfo(grouperGroupInfo.getNumInfo() + 1);
 
@@ -286,7 +286,7 @@ public class MediaUploadService {
         } catch (Exception e) {
             try {
                 if (previousLength != null) {
-                    openSearchService.partialUpdateDocument(OpenSearchService.INDEX_NAME, grouperMediaId, Map.of(ContentMetaData.LENGTH, previousLength));
+                    openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, grouperMediaId, Map.of(ContentMetaData.LENGTH, previousLength));
                 }
             } catch (IOException ex) {
                 throw new RuntimeException("Critical: Failed to rollback media length update to OpenSearch to rollback", ex);
@@ -352,14 +352,14 @@ public class MediaUploadService {
             MediaMetaData saved = mediaRepository.save(mediaMetaData);
             savedId = saved.getId();
             MediaSearchItem searchItem = mediaMapper.map(saved);
-            openSearchService.indexDocument(OpenSearchService.INDEX_NAME, savedId, searchItem);
+            openSearchService.indexDocument(OpenSearchService.MEDIA_INDEX_NAME, savedId, searchItem);
             removeCacheMediaSessionRequest(sessionId);
             removeUploadSessionCacheLastAccess(sessionId);
             return savedId;
         } catch (Exception e) {
             try {
                 if (savedId != null)
-                    openSearchService.deleteDocument(OpenSearchService.INDEX_NAME, savedId);
+                    openSearchService.deleteDocument(OpenSearchService.MEDIA_INDEX_NAME, savedId);
             } catch (IOException ie) {
                 throw new RuntimeException("Critical: Failed to delete media from OpenSearch to rollback", ie);
             }

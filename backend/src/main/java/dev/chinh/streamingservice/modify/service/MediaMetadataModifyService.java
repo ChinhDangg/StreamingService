@@ -48,7 +48,7 @@ public class MediaMetadataModifyService {
 
         mediaMetaDataRepository.updateMediaTitle(mediaId, newTitle);
         try {
-            openSearchService.partialUpdateDocument(OpenSearchService.INDEX_NAME, mediaId, Map.of(ContentMetaData.TITLE, newTitle));
+            openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, mediaId, Map.of(ContentMetaData.TITLE, newTitle));
         } catch (IOException e) {
             throw new RuntimeException("Failed to update OpenSearch index title field for media " + mediaId, e);
         }
@@ -72,7 +72,7 @@ public class MediaMetadataModifyService {
         List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(mediaId, updateList.nameEntity);
         List<String> nameEntityList = updatedMediaNameEntityList.stream().map(NameEntityDTO::getName).toList();
         try {
-            openSearchService.partialUpdateDocument(OpenSearchService.INDEX_NAME, mediaId, Map.of(updateList.nameEntity.getName(), nameEntityList));
+            openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, mediaId, Map.of(updateList.nameEntity.getName(), nameEntityList));
         } catch (IOException e) {
             throw new RuntimeException("Failed to update OpenSearch index field for media " + mediaId, e);
         }
