@@ -173,7 +173,6 @@ const addItem = (id) => {
         albumGrouperCountLength++;
         title = `Item: ${albumGrouperCountLength}`;
     }
-    offset++;
     listItem.innerText = title;
     scrollContainer.appendChild(listItem);
     albumGrouperChildAlbumIds.push(id);
@@ -186,7 +185,7 @@ const addItem = (id) => {
     });
 }
 
-export async function getNextGrouperInfo(grouperId) {
+async function getNextGrouperInfo(grouperId) {
     const grouperInfo = await fetchGrouperNext(grouperId);
     if (!grouperInfo.content.length) return;
     grouperInfo.content.forEach(id => {
@@ -226,7 +225,9 @@ sortOrderButton.addEventListener('click', async () => {
         });
         return;
     }
-    offset = albumGrouperChildAlbumIds.length;
+    const batchSize = 20;
+    offset = Math.floor((albumGrouperChildAlbumIds.length - 1) / batchSize);
+    if (offset < 0) return;
     await getNextGrouperInfo(albumGrouperInfo.id);
 });
 
@@ -283,7 +284,6 @@ rightNextBtn.addEventListener('click', viewNextAlbum);
 leftPrevBtn.addEventListener('click', viewPrevAlbum);
 rightPrevBtn.addEventListener('click', viewPrevAlbum);
 
-showMoreBtn.classList.remove('hidden');
 showMoreBtn.addEventListener('click', async () => {
     await getNextGrouperInfo(albumGrouperInfo.id);
     // const grouperInfo = {
@@ -323,11 +323,15 @@ function displayListSectionInfo(grouperInfo) {
     albumGrouperInfo = grouperInfo;
     listSection.querySelector('.list-title').textContent = `List (${albumGrouperInfo.length})`;
 
-    const childMediaIdsSlice = albumGrouperInfo.childMediaIds;
-    if (!childMediaIdsSlice) {
+    const childMediaIdsSlice = albumGrouperInfo.childMediaIds.content;
+    if (!childMediaIdsSlice.length) {
         showMoreBtn.classList.add('hidden');
+        sortOrderButton.classList.add('hidden');
         return;
     }
+
+    sortOrderButton.classList.remove('hidden');
+    showMoreBtn.classList.remove('hidden');
 
     if (sortOrder === SORT_ORDER.Descending)
         albumGrouperCountLength = albumGrouperInfo.length;
@@ -339,7 +343,7 @@ function displayListSectionInfo(grouperInfo) {
         return;
     }
 
-    childMediaIdsSlice.content.forEach(id => {
+    childMediaIdsSlice.forEach(id => {
         addItem(id);
     });
 
@@ -348,6 +352,24 @@ function displayListSectionInfo(grouperInfo) {
     }
 }
 
+export function addNewAlbumItem(newId) {
+    albumGrouperInfo.length = albumGrouperInfo.length + 1;
+    albumGrouperCountLength = albumGrouperInfo.length;
+    listSection.querySelector('.list-title').textContent = `List (${albumGrouperInfo.length})`;
+    if (sortOrder === SORT_ORDER.Descending) {
+        albumGrouperChildAlbumIds.unshift(newId);
+    } else {
+        albumGrouperChildAlbumIds.push(newId);
+    }
+    const first = scrollContainer.firstElementChild;
+    if (first) scrollContainer.replaceChildren(first);
+    const copy = [...albumGrouperChildAlbumIds];
+    albumGrouperChildAlbumIds.length = 0;
+    copy.forEach(id => {
+        addItem(id);
+    });
+    albumGrouperChildAlbumIds = copy;
+}
 
 async function fetchMediaContent(mediaId) {
     const response = await fetch(`/api/media/content/${mediaId}`);
