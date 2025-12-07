@@ -202,18 +202,16 @@ public class OpenSearchService {
     }
 
     public <T> SearchResponse<T> searchContaining(String index, String field, String text, Class<T> clazz) throws IOException {
-        SearchResponse<T> response = client.search(s -> s
+        return client.search(s -> s
                         .index(index)
                         .query(q -> q
-                                .wildcard(w -> w
+                                .match(m -> m
                                         .field(field)
-                                        .value("*" + text.toLowerCase() + "*")
+                                        .query(FieldValue.of(text))
                                 )
-                        )
-                , clazz
+                        ),
+                clazz
         );
-
-        return response;
     }
 
     public SearchResponse<Object> advanceSearch(List<SearchFieldGroup> includeGroups, List<SearchFieldGroup> excludeGroups,
