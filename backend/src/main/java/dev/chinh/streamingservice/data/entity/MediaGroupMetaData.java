@@ -18,11 +18,12 @@ import lombok.Setter;
 )
 public class MediaGroupMetaData {
 
+    @Setter(AccessLevel.NONE)
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "media_id")
+    @JoinColumn(name = "media_id", nullable = false)
     private MediaMetaData mediaMetaData;
 
     @Setter(AccessLevel.NONE)
