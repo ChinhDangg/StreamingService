@@ -77,9 +77,9 @@ public class VideoService extends MediaService implements ResourceCleanable {
         double clipLength = previewLength / segments;
         double interval = duration / segments;
 
-        long estimatedSize = Resolution.getEstimatedSize(
-                mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight(), resolution)
-                / 10;
+        long estimatedSize = (long) (Resolution.getEstimatedSize(
+                        mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight(), resolution)
+                        / (duration / previewLength));
         memoryManager.freeMemoryForSize(estimatedSize);
 
         // Build trim chains
