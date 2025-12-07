@@ -1,5 +1,5 @@
 import {uploadFile, startUploadSession, validateDirectory} from "/static/js/upload/upload-file.js";
-import {getNextGrouperInfo} from "/static/js/album-grouper/album-grouper-page.js";
+import {addNewAlbumItem} from "/static/js/album-grouper/album-grouper-page.js";
 
 let grouperId = null;
 
@@ -27,6 +27,10 @@ const fileListContainer = grouperUploadContainer.querySelector('#file-list-conta
 const submitBtn = grouperUploadContainer.querySelector('#submit-btn');
 
 const parentPathMap = new Map();
+const uploadingAlbumFiles = new Map();
+
+let currentFailTexts = [];
+const errorMessageContainer = document.getElementById('error-message-container');
 
 const ALLOWED = ["video/", "image/png", "image/jpeg", "image/gif", "image/webp"];
 
@@ -34,17 +38,21 @@ folderInput.addEventListener('change', () => {
     const first = fileListContainer.firstElementChild;
     if (first) fileListContainer.replaceChildren(first);
     parentPathMap.clear();
+    uploadingAlbumFiles.clear();
+    currentFailTexts = [];
+    errorMessageContainer.innerHTML = '';
+    errorMessageContainer.classList.add('hidden');
 
     if (!folderInput.files.length) return;
     for (const f of folderInput.files) {
         if (ALLOWED.some(a => f.type.startsWith(a))) {
             const parentPath = f.webkitRelativePath.substring(0, f.webkitRelativePath.lastIndexOf('/'));
             if (parentPathMap.has(parentPath)) {
-                parentPathMap.get(parentPath).push(f);
+                parentPathMap.get(parentPath).fileList.push(f);
             } else {
                 const fileList = [];
                 fileList.push(f);
-                parentPathMap.set(parentPath, fileList);
+                parentPathMap.set(parentPath, { fileList: fileList });
             }
         }
     }
@@ -57,16 +65,14 @@ folderInput.addEventListener('change', () => {
         fileListItem.querySelector('.file-path').textContent = dir;
         fileListItem.querySelector('.remove-btn').addEventListener('click', () => {
             parentPathMap.delete(dir);
+            uploadingAlbumFiles.delete(dir);
             fileListItem.remove();
         });
+        parentPathMap.get(dir).fileListItem = fileListItem;
         fileListContainer.appendChild(fileListItem);
     });
 });
 
-const uploadingAlbumFiles = new Map();
-let currentFailTexts = [];
-
-const errorMessageContainer = document.getElementById('error-message-container');
 function displayFailTexts() {
     errorMessageContainer.innerHTML = '';
     currentFailTexts.forEach(t => {
@@ -84,7 +90,7 @@ async function uploadAlbum(files, savingPath, parentPath, sessionId = null, uplo
         sessionId = await startUploadSession(objectName, 'ALBUM');
     }
     if (!sessionId)
-        return false;
+        return null;
 
     if (uploadingFiles.size) {
         for (const f of uploadingFiles.keys()) {
@@ -102,7 +108,9 @@ async function uploadAlbum(files, savingPath, parentPath, sessionId = null, uplo
     if (uploadingFiles.size) {
         uploadingAlbumFiles.set(parentPath, { sessionId: sessionId, uploadingFiles: uploadingFiles });
         displayFailTexts();
-        return false;
+        return null;
+    } else {
+        uploadingAlbumFiles.delete(parentPath);
     }
     const basicInfo = {
         sessionId: sessionId,
@@ -118,12 +126,13 @@ async function uploadAlbum(files, savingPath, parentPath, sessionId = null, uplo
     });
     if (!response.ok) {
         alert('Failed to create album: ' + await response.text());
-        return false;
+        return null;
     }
-    return true;
+    return await response.text();
 }
 
 submitBtn.addEventListener('click', async () => {
+    errorMessageContainer.innerHTML = '';
     if (!parentPathMap.size) {
         alert('No files selected');
         return;
@@ -134,16 +143,17 @@ submitBtn.addEventListener('click', async () => {
     }
     const savingPath = validateDirectory(savingPathInput.value);
     if (!savingPath) return;
-    for (const [parentPath, files] of parentPathMap) {
+    for (const [parentPath, object] of parentPathMap) {
         if (uploadingAlbumFiles.has(parentPath)) {
             const uploadingFiles = uploadingAlbumFiles.get(parentPath).uploadingFiles;
             const sessionId = uploadingAlbumFiles.get(parentPath).sessionId;
-            await uploadAlbum(files, savingPath, parentPath, sessionId, uploadingFiles);
+            await uploadAlbum(object.fileList, savingPath, parentPath, sessionId, uploadingFiles);
         } else {
-            const passed = await uploadAlbum(files, savingPath, parentPath);
+            const passed = await uploadAlbum(object.fileList, savingPath, parentPath);
             if (!passed) return;
+            parentPathMap.get(parentPath).fileListItem.remove();
             parentPathMap.delete(parentPath);
-            await getNextGrouperInfo(grouperId);
+            addNewAlbumItem(passed);
         }
     }
 });
