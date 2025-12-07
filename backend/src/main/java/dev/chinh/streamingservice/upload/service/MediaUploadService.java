@@ -6,6 +6,7 @@ import dev.chinh.streamingservice.MediaMapper;
 import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.content.service.MinIOService;
+import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.data.entity.MediaGroupMetaData;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
 import dev.chinh.streamingservice.data.repository.MediaGroupMetaDataRepository;
@@ -262,20 +263,36 @@ public class MediaUploadService {
         mediaMetaData.setWidth(imageMetadata.width);
         mediaMetaData.setHeight(imageMetadata.height);
         mediaMetaData.setFormat(imageMetadata.format);
-        Long savedId = mediaRepository.save(mediaMetaData).getId();
 
-        grouperGroupInfo.setNumInfo(grouperGroupInfo.getNumInfo() + 1);
-        mediaGroupMetaDataRepository.save(grouperGroupInfo);
+        Integer previousLength = null;
+        try {
+            previousLength = grouperMedia.getLength();
+            grouperMedia.setLength(previousLength + 1);
+            openSearchService.partialUpdateDocument(OpenSearchService.INDEX_NAME, grouperMediaId, Map.of(ContentMetaData.LENGTH, grouperMedia.getLength()));
 
-        grouperMedia.setLength(grouperMedia.getLength() + 1);
-        mediaRepository.save(grouperMedia);
+            grouperGroupInfo.setNumInfo(grouperGroupInfo.getNumInfo() + 1);
 
-        mediaMetadataService.removeCachedMediaSearchItem(grouperMediaId);
-        mediaDisplayService.removeCacheGroupOfMedia(grouperMediaId);
+            Long savedId = mediaRepository.save(mediaMetaData).getId();
 
-        removeCacheMediaSessionRequest(sessionId);
-        removeUploadSessionCacheLastAccess(sessionId);
-        return savedId;
+            mediaRepository.save(grouperMedia);
+            mediaGroupMetaDataRepository.save(grouperGroupInfo);
+
+            mediaMetadataService.removeCachedMediaSearchItem(grouperMediaId);
+            mediaDisplayService.removeCacheGroupOfMedia(grouperMediaId);
+
+            removeCacheMediaSessionRequest(sessionId);
+            removeUploadSessionCacheLastAccess(sessionId);
+            return savedId;
+        } catch (Exception e) {
+            try {
+                if (previousLength != null) {
+                    openSearchService.partialUpdateDocument(OpenSearchService.INDEX_NAME, grouperMediaId, Map.of(ContentMetaData.LENGTH, previousLength));
+                }
+            } catch (IOException ex) {
+                throw new RuntimeException("Critical: Failed to rollback media length update to OpenSearch to rollback", ex);
+            }
+            throw new RuntimeException("Failed to save media metadata", e);
+        }
     }
 
     @Transactional
