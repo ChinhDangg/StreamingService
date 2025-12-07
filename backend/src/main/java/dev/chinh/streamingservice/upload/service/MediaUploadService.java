@@ -174,6 +174,7 @@ public class MediaUploadService {
 
         MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
         mediaGroupInfo.setNumInfo(0);
+        mediaGroupInfo.setMediaMetaData(mediaMetaData);
         mediaMetaData.setGroupInfo(mediaGroupInfo);
 
         String extension = basicInfo.getThumbnail().getOriginalFilename() == null ? ".jpg"
@@ -193,7 +194,7 @@ public class MediaUploadService {
             MediaMetaData saved = mediaRepository.save(mediaMetaData);
             savedId = saved.getId();
             MediaSearchItem searchItem = mediaMapper.map(mediaMetaData);
-            searchItem.setMediaGroupInfo(new MediaGroupInfo(saved.getGrouperId()));
+            searchItem.setMediaGroupInfo(new MediaGroupInfo(-1L));
             openSearchService.indexDocument(OpenSearchService.INDEX_NAME, savedId, searchItem);
             return savedId;
         } catch (Exception e) {
