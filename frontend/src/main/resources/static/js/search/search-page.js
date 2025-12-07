@@ -834,7 +834,10 @@ function displaySearchItems(searchItems) {
                 await quickViewContentInOverlay(item.id, item.mediaType);
             });
         }
-        if (item.mediaType === 'VIDEO') {
+        if (item.mediaType === 'GROUPER') {
+            itemContainer.querySelector('.time-note').textContent = item.length;
+        }
+        else if (item.mediaType === 'VIDEO') {
             itemContainer.querySelector('.time-note').textContent = formatTime(item.length);
             const thumbnailContainer = itemContainer.querySelector('.thumbnail-container');
             const imageContainer = thumbnailContainer.querySelector('.image-container');
