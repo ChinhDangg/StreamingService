@@ -107,7 +107,6 @@ async function uploadAlbum(files, savingPath, parentPath, sessionId = null, uplo
     }
     if (uploadingFiles.size) {
         uploadingAlbumFiles.set(parentPath, { sessionId: sessionId, uploadingFiles: uploadingFiles });
-        displayFailTexts();
         return null;
     } else {
         uploadingAlbumFiles.delete(parentPath);
@@ -150,12 +149,15 @@ submitBtn.addEventListener('click', async () => {
             await uploadAlbum(object.fileList, savingPath, parentPath, sessionId, uploadingFiles);
         } else {
             const passed = await uploadAlbum(object.fileList, savingPath, parentPath);
-            if (!passed) return;
-            parentPathMap.get(parentPath).fileListItem.remove();
-            parentPathMap.delete(parentPath);
-            addNewAlbumItem(passed);
+            if (passed) {
+                parentPathMap.get(parentPath).fileListItem.remove();
+                parentPathMap.delete(parentPath);
+                addNewAlbumItem(passed);
+            }
         }
     }
+    if (currentFailTexts.length)
+        displayFailTexts();
 });
 
 function helperCloneAndUnHideNode(node) {
