@@ -56,7 +56,7 @@ public class MediaMetaData extends MediaDescription {
 
     // Grouping (optional)
     @JsonProperty(ContentMetaData.GROUP_INFO)
-    @OneToOne(fetch = FetchType.LAZY,
+    @OneToOne(mappedBy = "mediaMetaData",
             cascade = CascadeType.ALL,
             orphanRemoval = true)
     private MediaGroupMetaData groupInfo;
