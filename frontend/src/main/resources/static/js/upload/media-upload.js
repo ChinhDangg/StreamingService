@@ -175,6 +175,7 @@ submitBtn.addEventListener('click',async () => {
                 return;
             }
             alert('Grouper created successfully! ' + await response.text());
+            grouperInput.value = '';
             return;
         }
 
@@ -249,6 +250,7 @@ submitBtn.addEventListener('click',async () => {
             if (responseText) {
                 singleFileInput.value = '';
                 folderInput.value = '';
+                grouperInput.value = '';
                 uploadingFiles.clear();
                 updateTitle('');
                 updateSavingPath('');
