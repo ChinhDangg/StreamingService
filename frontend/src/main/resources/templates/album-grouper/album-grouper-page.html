@@ -7,9 +7,11 @@
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen p-6" th:data-main-container-id="${mainGrouperContainerId}">
+<body class="bg-gray-900 text-gray-100 min-h-screen pt-6" th:data-main-container-id="${mainGrouperContainerId}">
 
-<header th:replace="header :: header-html"></header>
+<div class="px-4">
+    <header th:replace="header :: header-html"></header>
+</div>
 
 <main th:id="${mainGrouperContainerId}" class="max-w-4xl mx-auto px-4 py-8">
     <div class="px-4 py-4 sm:px-0">
@@ -74,66 +76,62 @@
     <section id="listSection" class="mt-10 min-h-[700px]">
         <div class="mb-4 flex">
             <h2 class="list-title text-2xl font-bold text-gray-200">List (0)</h2>
-            <button id="edit-album-grouper-btn" class="ml-2">
-                <div class="flex items-center justify-center gap-2 px-1 py-1 rounded-lg border border-gray-300 hover:bg-gray-500 text-sm font-medium transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24"
-                         stroke-width="1.5" stroke="white" class="w-5 h-5">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                              d="M16.862 4.487l1.687 1.688a2.25 2.25 0 010 3.182L9.27 18.737a2.25 2.25 0 01-.795.502l-3.395 1.132a.75.75 0 01-.948-.948l1.133-3.395a2.25 2.25 0 01.501-.795l9.279-9.28a2.25 2.25 0 013.182 0z"/>
-                    </svg>
-                </div>
-            </button>
+            <th:block th:if="${modifyAllow}">
+                <button th:replace="upload/edit-name-section :: editButton('edit-album-grouper-btn')"></button>
+            </th:block>
         </div>
 
-        <div id="grouper-upload-container" class="mb-4 space-y-2">
-            <div class="flex flex-col space-y-2">
-                <label for="folder-input" class="font-medium text-gray-300">Album Upload:</label>
-                <input id="folder-input"
-                       type="file"
-                       webkitdirectory
-                       directory
-                       class="block w-full border border-gray-700 rounded-lg p-2 text-sm bg-gray-900 text-gray-200 focus:outline-none focus:border-blue-500">
-            </div>
-            <!-- Saving Path -->
-            <div class="flex flex-col space-y-2">
-                <label for="saving-path-input" class="font-medium text-gray-300">Saving Path:</label>
-                <input id="saving-path-input"
-                       type="text"
-                       autocomplete="off"
-                       class="block w-full border border-gray-700 rounded-lg p-2 text-sm bg-gray-900 text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                       placeholder="/storage/path/">
-            </div>
-            <button id="submit-btn"
-                    type="submit"
-                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg shadow">
-                Submit
-            </button>
+        <th:block th:if="${modifyAllow}">
+            <div id="grouper-upload-container" class="hidden mb-4 space-y-2">
+                <div class="flex flex-col space-y-2">
+                    <label for="folder-input" class="font-medium text-gray-300">Album Upload:</label>
+                    <input id="folder-input"
+                           type="file"
+                           webkitdirectory
+                           directory
+                           class="block w-full border border-gray-700 rounded-lg p-2 text-sm bg-gray-900 text-gray-200 focus:outline-none focus:border-blue-500">
+                </div>
+                <!-- Saving Path -->
+                <div class="flex flex-col space-y-2">
+                    <label for="saving-path-input" class="font-medium text-gray-300">Saving Path:</label>
+                    <input id="saving-path-input"
+                           type="text"
+                           autocomplete="off"
+                           class="block w-full border border-gray-700 rounded-lg p-2 text-sm bg-gray-900 text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                           placeholder="/storage/path/">
+                </div>
+                <button id="submit-btn"
+                        type="submit"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg shadow">
+                    Submit
+                </button>
 
-            <div>
-                <h3 class="mb-2">Files will be added as album:</h3>
-                <div id="file-list-container"
-                     class="flex flex-col gap-2 bg-gray-800 p-3 rounded-lg border border-gray-700 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
-                    <div class="file-item hidden flex items-center justify-between bg-gray-700/40 px-2 py-1 rounded">
-                        <span class="file-path text-gray-300">File 2</span>
-                        <button class="remove-btn text-red-400 hover:text-red-300">❌</button>
+                <div>
+                    <h3 class="mb-2">Files will be added as album:</h3>
+                    <div id="file-list-container"
+                         class="flex flex-col gap-2 bg-gray-800 p-3 rounded-lg border border-gray-700 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+                        <div class="file-item hidden flex items-center justify-between bg-gray-700/40 px-2 py-1 rounded">
+                            <span class="file-path text-gray-300">File 2</span>
+                            <button class="remove-btn text-red-400 hover:text-red-300">❌</button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Error Message -->
-            <div id="error-message-container"
-                 class="hidden max-h-200 overflow-y-auto scrollbar-thin scrollbar-thumb-red-600 flex flex-col bg-red-900 border border-red-700 text-red-300 p-3 rounded-lg">
-                <span>Error something</span>
-            </div>
-        </div>
+                <!-- Error Message -->
+                <div id="error-message-container"
+                     class="hidden max-h-200 overflow-y-auto scrollbar-thin scrollbar-thumb-red-600 flex flex-col bg-red-900 border border-red-700 text-red-300 p-3 rounded-lg">
+                    <span>Error something</span>
+                </div>
+            </div> <!-- End of Grouper Upload Container -->
 
-        <div class="flex gap-2">
-            <span>Sorted: </span>
-            <button id="sortOrderButton"
-                    class="hidden select-none mb-2 px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
-                Descending
-            </button>
-        </div>
+            <div class="flex gap-2">
+                <span>Sorted: </span>
+                <button id="sortOrderButton"
+                        class="hidden select-none mb-2 px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
+                    Descending
+                </button>
+            </div>
+        </th:block>
 
         <!-- Scrollable list -->
         <div class="list-scroll-container max-h-96 overflow-y-auto pr-2 space-y-3">
