@@ -99,6 +99,7 @@
                 <label for="saving-path-input" class="font-medium text-gray-300">Saving Path:</label>
                 <input id="saving-path-input"
                        type="text"
+                       autocomplete="off"
                        class="block w-full border border-gray-700 rounded-lg p-2 text-sm bg-gray-900 text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500"
                        placeholder="/storage/path/">
             </div>
@@ -121,7 +122,7 @@
 
             <!-- Error Message -->
             <div id="error-message-container"
-                 class="hidden flex flex-col bg-red-900 border border-red-700 text-red-300 p-3 rounded-lg">
+                 class="hidden max-h-200 overflow-y-auto scrollbar-thin scrollbar-thumb-red-600 flex flex-col bg-red-900 border border-red-700 text-red-300 p-3 rounded-lg">
                 <span>Error something</span>
             </div>
         </div>
@@ -129,7 +130,7 @@
         <div class="flex gap-2">
             <span>Sorted: </span>
             <button id="sortOrderButton"
-                    class="select-none mb-2 px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
+                    class="hidden select-none mb-2 px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
                 Descending
             </button>
         </div>
