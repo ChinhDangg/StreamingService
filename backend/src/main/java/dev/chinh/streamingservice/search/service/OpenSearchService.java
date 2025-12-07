@@ -1,5 +1,7 @@
 package dev.chinh.streamingservice.search.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.search.constant.SortBy;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
@@ -7,18 +9,18 @@ import dev.chinh.streamingservice.search.data.MediaSearchRangeField;
 import dev.chinh.streamingservice.search.data.SearchFieldGroup;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.client.json.JsonData;
+import org.opensearch.client.json.JsonpMapper;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.opensearch._types.*;
+import org.opensearch.client.opensearch._types.analysis.*;
 import org.opensearch.client.opensearch._types.mapping.Property;
+import org.opensearch.client.opensearch._types.mapping.TypeMapping;
 import org.opensearch.client.opensearch._types.query_dsl.BoolQuery;
 import org.opensearch.client.opensearch._types.query_dsl.Query;
 import org.opensearch.client.opensearch._types.query_dsl.RangeQuery;
 import org.opensearch.client.opensearch._types.query_dsl.TextQueryType;
 import org.opensearch.client.opensearch.core.*;
-import org.opensearch.client.opensearch.indices.CreateIndexResponse;
-import org.opensearch.client.opensearch.indices.DeleteIndexResponse;
-import org.opensearch.client.opensearch.indices.PutMappingResponse;
-import org.opensearch.client.opensearch.indices.UpdateAliasesResponse;
+import org.opensearch.client.opensearch.indices.*;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
@@ -34,8 +36,94 @@ import java.util.stream.Collectors;
 public class OpenSearchService {
 
     private final OpenSearchClient client;
+    private final ObjectMapper objectMapper;
 
-    public static final String INDEX_NAME = "media";
+    public static final String MEDIA_INDEX_NAME = "media";
+
+    public void createIndexWithSettingAndMapping(String indexName, String mappingPath) throws IOException {
+        Map<String, Object> map;
+
+        ClassPathResource resource = new ClassPathResource(mappingPath);
+        try (InputStream is = resource.getInputStream()) {
+            map = objectMapper.readValue(is.readAllBytes(), new TypeReference<>() {});
+        }
+
+        JsonpMapper jsonpMapper = client._transport().jsonpMapper();
+
+        Object settings = map.get("settings");
+        IndexSettings indexSettings = JsonData.of(settings).to(IndexSettings.class, jsonpMapper);
+
+        Object mappings = map.get("mappings");
+        TypeMapping typeMapping = JsonData.of(mappings).to(TypeMapping.class, jsonpMapper);
+
+        CreateIndexRequest req = new CreateIndexRequest.Builder()
+                .index(indexName)
+                .settings(indexSettings)
+                .mappings(typeMapping)
+                .build();
+
+        CreateIndexResponse resp = client.indices().create(req);
+
+        System.out.println("Index created: " + resp.index());
+    }
+
+    // check setting: http://localhost:9200/{name-entity}/_settings
+    public void createIndexForNameEntity(String indexName) throws IOException {
+
+        String autocomplete_tokenizer = "autocomplete_tokenizer";
+        String autocomplete_analyzer = "autocomplete_analyzer";
+        String autocomplete_search_analyzer = "autocomplete_search_analyzer";
+
+        EdgeNGramTokenizer edgeNGramTokenizer = EdgeNGramTokenizer.builder()
+                .minGram(2)
+                .maxGram(20)
+                .tokenChars(List.of(TokenChar.Letter, TokenChar.Digit))
+                .build();
+
+        CustomAnalyzer customAutoCompleteAnalyzer = CustomAnalyzer.builder()
+                .tokenizer(autocomplete_tokenizer)
+                .filter(List.of("lowercase"))
+                .build();
+
+        CustomAnalyzer customAutoCompleteSearchAnalyzer = CustomAnalyzer.builder()
+                .tokenizer("lowercase")
+                .build();
+
+        IndexSettingsAnalysis analysis = IndexSettingsAnalysis.builder()
+                .tokenizer(autocomplete_tokenizer, Tokenizer.builder()
+                        .definition(edgeNGramTokenizer.toTokenizerDefinition())
+                        .build())
+                .analyzer(Map.of(
+                        autocomplete_analyzer, Analyzer.builder()
+                                .custom(customAutoCompleteAnalyzer)
+                                .build(),
+                        autocomplete_search_analyzer, Analyzer.builder()
+                                .custom(customAutoCompleteSearchAnalyzer)
+                                .build()
+                ))
+                .build();
+
+        IndexSettings settings = IndexSettings.builder()
+                .analysis(analysis)
+                .build();
+
+        TypeMapping mapping = TypeMapping.builder()
+                .properties(Map.of(
+                        "name", Property.of(m -> m.text(t -> t.analyzer("english")))
+                ))
+                .build();
+
+        // 5. Construct the final CreateIndexRequest
+        CreateIndexRequest req = new CreateIndexRequest.Builder()
+                .index(indexName)
+                .settings(settings)
+                .mappings(mapping)
+                .build();
+
+        CreateIndexResponse resp = client.indices().create(req);
+
+        System.out.println("Index created: " + resp.index());
+    }
 
     // http://localhost:9200/media
     public void createIndexWithMapping(String indexName, String mappingPath) throws IOException {
@@ -356,7 +444,7 @@ public class OpenSearchService {
                 : SortOptions.of(o -> o.field(f -> f.field(sortByField).order(sortOrder)));
 
         SearchResponse<Object> response = client.search(s -> s
-                .index(INDEX_NAME)
+                .index(MEDIA_INDEX_NAME)
                 .from(page * size)
                 .size(size)
                 .query(query)
