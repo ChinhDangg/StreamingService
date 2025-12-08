@@ -203,6 +203,10 @@ public class MediaUploadService {
         }
     }
 
+//    You always see your own writes in a transaction.
+//    READ_COMMITTED still allows this.
+//    REPEATABLE_READ also allows this.
+//    SERIALIZABLE of course does.
     @Transactional
     public long saveMediaInGrouper(String sessionId, long grouperMediaId, String title) throws Exception {
         MediaUploadRequest upload = getCachedMediaUploadRequest(sessionId);
@@ -247,11 +251,11 @@ public class MediaUploadService {
         mediaMetaData.setHeight(imageMetadata.height);
         mediaMetaData.setFormat(imageMetadata.format);
 
-        mediaRepository.incrementLength(grouperMedia.getId());
-        mediaGroupMetaDataRepository.incrementNumInfo(grouperGroupInfo.getId());
+//        mediaRepository.incrementLength(grouperMedia.getId());
+//        mediaGroupMetaDataRepository.incrementNumInfo(grouperGroupInfo.getId());
 
-        Integer updatedNumInfo = mediaGroupMetaDataRepository.getNumInfo(grouperGroupInfo.getId());
-        Integer updatedLength = mediaRepository.getMediaLength(grouperMedia.getId());
+        Integer updatedNumInfo = mediaGroupMetaDataRepository.incrementNumInfoReturning(grouperGroupInfo.getId());
+        Integer updatedLength = mediaRepository.incrementLengthReturning(grouperMedia.getId());
 
         MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
         mediaGroupInfo.setGrouperMetaData(grouperGroupInfo);
@@ -263,8 +267,8 @@ public class MediaUploadService {
 
         eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMedia.getId(), updatedLength));
 
-        mediaMetadataService.removeCachedMediaSearchItem(grouperMediaId);
-        mediaDisplayService.removeCacheGroupOfMedia(grouperMediaId);
+        mediaMetadataService.removeCachedMediaSearchItem(grouperMedia.getId());
+        mediaDisplayService.removeCacheGroupOfMedia(grouperMedia.getId());
 
         removeCacheMediaSessionRequest(sessionId);
         removeUploadSessionCacheLastAccess(sessionId);
