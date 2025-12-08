@@ -5,16 +5,17 @@ import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.data.entity.*;
 import dev.chinh.streamingservice.data.repository.*;
 import dev.chinh.streamingservice.data.service.ThumbnailService;
-import dev.chinh.streamingservice.exception.DuplicateEntryException;
 import dev.chinh.streamingservice.exception.ResourceNotFoundException;
+import dev.chinh.streamingservice.modify.MediaNameEntityConstant;
 import dev.chinh.streamingservice.search.service.OpenSearchService;
 import dev.chinh.streamingservice.modify.NameAndThumbnailPostRequest;
 import dev.chinh.streamingservice.modify.NameEntityDTO;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.client.opensearch.core.SearchResponse;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -49,71 +50,65 @@ public class NameEntityModifyService {
 
     @Transactional
     public void addAuthor(String name) {
-        addNameEntity(name, ContentMetaData.AUTHORS, new MediaAuthor(name, Instant.now()), mediaAuthorRepository);
+        addNameEntity(name, MediaNameEntityConstant.AUTHORS, new MediaAuthor(name, Instant.now()), mediaAuthorRepository);
     }
 
     @Transactional
     public void addCharacter(NameAndThumbnailPostRequest request) {
-        addNameEntity(request, ContentMetaData.CHARACTERS, new MediaCharacter(request.getName(), Instant.now()), mediaCharacterRepository);
+        addNameEntity(request, MediaNameEntityConstant.CHARACTERS, new MediaCharacter(request.getName(), Instant.now()), mediaCharacterRepository);
     }
 
     @Transactional
     public void addUniverse(NameAndThumbnailPostRequest request) {
-        addNameEntity(request, ContentMetaData.UNIVERSES, new MediaUniverse(request.getName(), Instant.now()), mediaUniverseRepository);
+        addNameEntity(request, MediaNameEntityConstant.UNIVERSES, new MediaUniverse(request.getName(), Instant.now()), mediaUniverseRepository);
     }
 
     @Transactional
     public void addTag(String name) {
-        addNameEntity(name, ContentMetaData.TAGS, new MediaTag(name, Instant.now()), mediaTagRepository);
+        addNameEntity(name, MediaNameEntityConstant.TAGS, new MediaTag(name, Instant.now()), mediaTagRepository);
     }
 
     @Transactional
-    protected <T extends MediaNameEntity> void addNameEntity(String name, String listName, T mediaNameEntity, MediaNameEntityRepository<T, Long> repository) {
+    protected <T extends MediaNameEntity> void addNameEntity(String name, MediaNameEntityConstant mediaNameEntityConstant, T mediaNameEntity, MediaNameEntityRepository<T, Long> repository) {
         name = validateNameEntity(name);
-        Long id = null;
-        try {
-            mediaNameEntity.setName(name);
-            T added = repository.save(mediaNameEntity);
-            id = added.getId();
-            openSearchService.indexDocument(listName, id, Map.of(ContentMetaData.NAME, name));
-        } catch(DataIntegrityViolationException e) {
-            if (e.getRootCause() != null && e.getRootCause().getMessage().contains("unique constraint")) {
-                throw new DuplicateEntryException(
-                        "The name entry '" + name + "' already exists in the " + listName + " list."
-                );
-            }
-            handleDeleteDocumentOnFailure(listName, id);
-            // Handle other DataIntegrityViolationExceptions (e.g., foreign key)
-            throw e;
-        } catch (Exception e) {
-            handleDeleteDocumentOnFailure(listName, id);
-            throw new RuntimeException(e);
-        }
-    }
 
-    private void handleDeleteDocumentOnFailure(String indexName, Long id) {
-        if (id == null)
-            return;
-        try {
-            openSearchService.deleteDocument(indexName, id);
-        } catch (IOException ioe) {
-            throw new RuntimeException("Critical: Failed to delete document in OpenSearch to reroll", ioe);
-        }
+        mediaNameEntity.setName(name);
+
+        T added = repository.save(mediaNameEntity);
+        long id = added.getId();
+
+        String finalName = name;
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            openSearchService.indexDocument(mediaNameEntityConstant.getName(), id,
+                                    Map.of(ContentMetaData.NAME, finalName));
+                        } catch (IOException e) {
+                            throw new RuntimeException("Failed to index " + mediaNameEntityConstant.getName() + " " + id + " to OpenSearch");
+                        }
+                    }
+                }
+        );
     }
 
     @Transactional
-    protected <T extends MediaNameEntityWithThumbnail> void addNameEntity(NameAndThumbnailPostRequest request, String listName, T mediaNameEntity, MediaNameEntityRepository<T, Long> repository) {
+    protected <T extends MediaNameEntityWithThumbnail> void addNameEntity(NameAndThumbnailPostRequest request,
+                                                                          MediaNameEntityConstant mediaNameEntityConstant,
+                                                                          T mediaNameEntity,
+                                                                          MediaNameEntityRepository<T, Long> repository) {
         String extension = request.getThumbnail().getOriginalFilename() == null ? ".jpg"
                 : request.getThumbnail().getOriginalFilename().substring(request.getThumbnail().getOriginalFilename().lastIndexOf("."));
 
-        String path = listName + "/" + request.getName() + extension;
+        String path = mediaNameEntityConstant.getName() + "/" + request.getName() + extension;
 
         try {
             // upload first to not start transaction first and hold the database connection
             minIOService.uploadFile(ThumbnailService.thumbnailBucket, path, request.getThumbnail());
 
             mediaNameEntity.setThumbnail(path);
-            addNameEntity(request.getName(), listName, mediaNameEntity, repository);
+            addNameEntity(request.getName(), mediaNameEntityConstant, mediaNameEntity, repository);
         } catch (Exception e) {
             try {
                 minIOService.removeFile(ThumbnailService.thumbnailBucket, path);
@@ -128,40 +123,44 @@ public class NameEntityModifyService {
 
     @Transactional
     public void updateAuthor(long id, String name) {
-        updateNameEntity(id, name, ContentMetaData.AUTHORS, mediaAuthorRepository);
+        updateNameEntity(id, name, MediaNameEntityConstant.AUTHORS, mediaAuthorRepository);
     }
 
     @Transactional
     public void updateCharacter(long id, NameAndThumbnailPostRequest request) {
-        updateNameEntity(id, request, ContentMetaData.CHARACTERS, mediaCharacterRepository);
+        updateNameEntity(id, request, MediaNameEntityConstant.CHARACTERS, mediaCharacterRepository);
     }
 
     @Transactional
     public void updateUniverse(long id, NameAndThumbnailPostRequest request) {
-        updateNameEntity(id, request, ContentMetaData.UNIVERSES, mediaUniverseRepository);
+        updateNameEntity(id, request, MediaNameEntityConstant.UNIVERSES, mediaUniverseRepository);
     }
 
     @Transactional
     public void updateTag(long id, String name) {
-        updateNameEntity(id, name, ContentMetaData.TAGS, mediaTagRepository);
+        updateNameEntity(id, name, MediaNameEntityConstant.TAGS, mediaTagRepository);
     }
 
     @Transactional
-    protected <T extends MediaNameEntity> void updateNameEntity(long id, String name, String listName, MediaNameEntityRepository<T, Long> repository) {
-        T nameEntity = findById(id, listName, repository);
+    protected <T extends MediaNameEntity> void updateNameEntity(long id, String name,
+                                                                MediaNameEntityConstant mediaNameEntityConstant,
+                                                                MediaNameEntityRepository<T, Long> repository) {
+        T nameEntity = findById(id, mediaNameEntityConstant.getName(), repository);
         name = validateNameEntity(name);
         if (nameEntity.getName().equals(name))
             return;
         nameEntity.setName(name);
-        addNameEntity(name, listName, nameEntity, repository);
+        addNameEntity(name, mediaNameEntityConstant, nameEntity, repository);
     }
 
     @Transactional
-    protected <T extends MediaNameEntityWithThumbnail> void updateNameEntity(long id, NameAndThumbnailPostRequest request, String listName, MediaNameEntityRepository<T, Long> repository) {
+    protected <T extends MediaNameEntityWithThumbnail> void updateNameEntity(long id, NameAndThumbnailPostRequest request,
+                                                                             MediaNameEntityConstant mediaNameEntityConstant,
+                                                                             MediaNameEntityRepository<T, Long> repository) {
         if (request.getThumbnail() == null && (request.getName() == null || request.getName().isBlank()))
             throw new IllegalArgumentException("No name or thumbnail provided");
 
-        T nameEntity = findById(id, listName, repository);
+        T nameEntity = findById(id, mediaNameEntityConstant.getName(), repository);
         String oldName = nameEntity.getName();
         String newName = request.getName() == null ? oldName : validateNameEntity(request.getName());
 
@@ -170,67 +169,70 @@ public class NameEntityModifyService {
         String newThumbnailPath = null;
 
         try {
-            // --- 1. UPLOAD NEW FILE FIRST (OUTSIDE TRANSACTION) ---
+            // UPLOAD NEW FILE FIRST (OUTSIDE TRANSACTION) ---
             if (request.getThumbnail() != null) {
                 String extension = request.getThumbnail().getOriginalFilename() == null ? ".jpg" :
                         request.getThumbnail().getOriginalFilename().substring(request.getThumbnail().getOriginalFilename().lastIndexOf("."));
 
-                newThumbnailPath = listName + "/" + UUID.randomUUID() + extension;
-                
+                newThumbnailPath = mediaNameEntityConstant.getName() + "/" + UUID.randomUUID() + extension;
                 minIOService.uploadFile(ThumbnailService.thumbnailBucket, newThumbnailPath, request.getThumbnail());
             }
-
-            // START/COMMIT TRANSACTION ---
-            if (newThumbnailPath != null) {
-                nameEntity.setThumbnail(newThumbnailPath);
-            }
-
-            if (!oldName.equals(newName)) {
-                nameEntity.setName(newName);
-                openSearchService.partialUpdateDocument(listName, id, Map.of(ContentMetaData.NAME, newName));
-            }
-            if (newThumbnailPath != null || !oldName.equals(newName)) {
-                repository.save(nameEntity);
-            }
-
-            if (newThumbnailPath != null && oldThumbnailPath != null) {
-                // New file is saved and DB committed. Now delete the old file.
-                minIOService.removeFile(ThumbnailService.thumbnailBucket, oldThumbnailPath);
-            }
-
-        } catch (DataIntegrityViolationException e) {
-            // Handle constraint violation (DB rolled back automatically)
-            handleUploadRollback(newThumbnailPath);
-            handleSetOldNameBackOnFailure(listName, id, oldName, newName);
-            throw new DuplicateEntryException("The name entry '" + request.getName() + "' already exists in the " + listName + " list.");
         } catch (Exception e) {
-            // Handle other failures (e.g., MinIO upload failed, or other exceptions)
-            handleSetOldNameBackOnFailure(listName, id, oldName, newName);
-            handleUploadRollback(newThumbnailPath);
-            throw new RuntimeException("Update failed for entity ID " + id, e);
+            throw new RuntimeException("Failed to update thumbnail for " + mediaNameEntityConstant.getName() + " " + id, e);
         }
-    }
 
-    private void handleUploadRollback(String uploadedPath) {
-        if (uploadedPath != null) {
-            // If the DB save failed, this file should NOT exist. Delete the newly uploaded file.
-            try {
-                minIOService.removeFile(ThumbnailService.thumbnailBucket, uploadedPath);
-                System.out.println("Rollback compensation: Deleted newly uploaded file: " + uploadedPath);
-            } catch (Exception deleteEx) {
-                // Log the critical failure
-                System.err.println("CRITICAL: Failed to clean up temporary orphan file: " + uploadedPath);
-            }
-        }
-    }
-
-    private void handleSetOldNameBackOnFailure(String indexName, Long id, String oldName, String newName) {
-        if (oldName.equals(newName))
-            return;
         try {
-            openSearchService.partialUpdateDocument(indexName, id, Map.of(ContentMetaData.NAME, oldName));
-        } catch (IOException e) {
-            throw new RuntimeException("Critical: Failed to update OpenSearch index to revert name change", e);
+            boolean nameChanged = !oldName.equals(newName);
+            boolean thumbnailChanged = newThumbnailPath != null;
+
+            if (nameChanged) nameEntity.setName(newName);
+            if (thumbnailChanged) nameEntity.setThumbnail(newThumbnailPath);
+
+            if (nameChanged || thumbnailChanged) repository.save(nameEntity);
+
+            String finalNewName = newName;
+            String finalNewThumbnail = newThumbnailPath;
+
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            if (nameChanged) {
+                                try {
+                                    openSearchService.partialUpdateDocument(mediaNameEntityConstant.getName(), id, Map.of(ContentMetaData.NAME, finalNewName));
+                                } catch (IOException ie) {
+                                    throw new RuntimeException("Failed to update OpenSearch index for " + mediaNameEntityConstant.getName() + " " + id, ie);
+                                }
+                            }
+                            if (thumbnailChanged && oldThumbnailPath != null) {
+                                try {
+                                    minIOService.removeFile(ThumbnailService.thumbnailBucket, oldThumbnailPath);
+                                } catch (Exception e) {
+                                    throw new RuntimeException("Failed to clean up old thumbnail file: " + oldThumbnailPath, e);
+                                }
+                            }
+                        }
+
+                        @Override
+                        public void afterCompletion(int status) {
+                            if (status == STATUS_ROLLED_BACK && finalNewThumbnail != null) {
+                                try {
+                                    minIOService.removeFile(ThumbnailService.thumbnailBucket, finalNewThumbnail);
+                                } catch (Exception e) {
+                                    throw new RuntimeException("Failed to clean up newly uploaded thumbnail file: " + finalNewThumbnail, e);
+                                }
+                            }
+                        }
+                    }
+            );
+        } catch (Exception e) {
+            if (newThumbnailPath != null) {
+                try {
+                    minIOService.removeFile(ThumbnailService.thumbnailBucket, newThumbnailPath);
+                } catch (Exception deleteEx) {
+                    System.err.println("CRITICAL: Failed to clean up orphan file: " + newThumbnailPath);
+                }
+            }
         }
     }
 
@@ -259,27 +261,47 @@ public class NameEntityModifyService {
     @Transactional
     protected <T extends MediaNameEntity> void deleteNameEntity(long id, String listName, MediaNameEntityRepository<T, Long> repository) {
         T nameEntity = findById(id, listName, repository);
-        try {
-            openSearchService.deleteDocument(listName, id);
 
-            repository.delete(nameEntity);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to delete " + listName + " entry with ID " + id, e);
-        }
+        repository.delete(nameEntity);
+
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            openSearchService.deleteDocument(listName, id);
+                        } catch (IOException e) {
+                            throw new RuntimeException("Failed to delete opensearch name index" + listName + " entry with ID " + id, e);
+                        }
+                    }
+                });
     }
 
     @Transactional
     protected <T extends MediaNameEntityWithThumbnail> void deleteNameEntityWithThumbnail(long id, String listName, MediaNameEntityRepository<T, Long> repository) {
         T nameEntity = findById(id, listName, repository);
-        try {
-            openSearchService.deleteDocument(listName, id);
-            if (nameEntity.getThumbnail() != null)
-                minIOService.removeFile(ThumbnailService.thumbnailBucket, nameEntity.getThumbnail());
 
-            repository.delete(nameEntity);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to delete " + listName + " entry with ID " + id, e);
-        }
+        String thumbnailPath = nameEntity.getThumbnail();
+
+        repository.delete(nameEntity);
+
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            openSearchService.deleteDocument(listName, id);
+                        } catch (IOException e) {
+                            throw new RuntimeException("Failed to delete opensearch name index" + listName + " entry with ID " + id, e);
+                        }
+                        try {
+                            if (nameEntity.getThumbnail() != null)
+                                minIOService.removeFile(ThumbnailService.thumbnailBucket, thumbnailPath);
+                        } catch (Exception e) {
+                            throw new RuntimeException("Failed to delete thumbnail file: " + thumbnailPath, e);
+                        }
+                    }
+                });
     }
 
 
@@ -300,6 +322,4 @@ public class NameEntityModifyService {
             throw new IllegalArgumentException("Name must be at most 200 chars");
         return name;
     }
-
-
 }
