@@ -3,17 +3,16 @@ package dev.chinh.streamingservice.modify.service;
 import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.service.MediaMetadataService;
-import dev.chinh.streamingservice.search.service.OpenSearchService;
+import dev.chinh.streamingservice.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.modify.MediaNameEntityConstant;
 import dev.chinh.streamingservice.modify.NameEntityDTO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -21,7 +20,8 @@ public class MediaMetadataModifyService {
 
     private final MediaMetaDataRepository mediaMetaDataRepository;
     private final MediaMetadataService mediaMetadataService;
-    private final OpenSearchService openSearchService;
+
+    private final ApplicationEventPublisher eventPublisher;
 
     public List<NameEntityDTO> getMediaNameEntityInfo(long mediaId, MediaNameEntityConstant nameEntity) {
         return switch (nameEntity.getName()) {
@@ -47,11 +47,9 @@ public class MediaMetadataModifyService {
             throw new IllegalArgumentException("Name must be at most 300 chars");
 
         mediaMetaDataRepository.updateMediaTitle(mediaId, newTitle);
-        try {
-            openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, mediaId, Map.of(ContentMetaData.TITLE, newTitle));
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to update OpenSearch index title field for media " + mediaId, e);
-        }
+
+        eventPublisher.publishEvent(new MediaUpdateEvent.MediaTitleUpdated(mediaId));
+
         mediaMetadataService.removeCachedMediaSearchItem(mediaId);
         return newTitle;
     }
@@ -71,11 +69,9 @@ public class MediaMetadataModifyService {
         }
         List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(mediaId, updateList.nameEntity);
         List<String> nameEntityList = updatedMediaNameEntityList.stream().map(NameEntityDTO::getName).toList();
-        try {
-            openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, mediaId, Map.of(updateList.nameEntity.getName(), nameEntityList));
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to update OpenSearch index field for media " + mediaId, e);
-        }
+
+        eventPublisher.publishEvent(new MediaUpdateEvent.MediaNameEntityUpdated(mediaId, updateList.nameEntity));
+
         mediaMetadataService.removeCachedMediaSearchItem(mediaId);
         return nameEntityList;
     }
