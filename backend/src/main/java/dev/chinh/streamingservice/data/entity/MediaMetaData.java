@@ -23,7 +23,8 @@ public class MediaMetaData extends MediaDescription {
     @JoinTable(
             name = "tags_media",
             joinColumns = @JoinColumn(name = "media_id"),
-            inverseJoinColumns = @JoinColumn(name = "tags_id")
+            inverseJoinColumns = @JoinColumn(name = "tags_id"),
+            uniqueConstraints = @UniqueConstraint(columnNames = { "media_id", "tags_id" })
     )
     private Set<MediaTag> tags;
 
@@ -32,7 +33,8 @@ public class MediaMetaData extends MediaDescription {
     @JoinTable(
             name = "characters_media",
             joinColumns = @JoinColumn(name = "media_id"),
-            inverseJoinColumns = @JoinColumn(name = "characters_id")
+            inverseJoinColumns = @JoinColumn(name = "characters_id"),
+            uniqueConstraints = @UniqueConstraint(columnNames = { "media_id", "characters_id" })
     )
     private Set<MediaCharacter> characters;
 
@@ -41,7 +43,8 @@ public class MediaMetaData extends MediaDescription {
     @JoinTable(
             name = "universes_media",
             joinColumns = @JoinColumn(name = "media_id"),
-            inverseJoinColumns = @JoinColumn(name = "universes_id")
+            inverseJoinColumns = @JoinColumn(name = "universes_id"),
+            uniqueConstraints = @UniqueConstraint(columnNames = { "media_id", "universes_id" })
     )
     private Set<MediaUniverse> universes;
 
@@ -50,7 +53,8 @@ public class MediaMetaData extends MediaDescription {
     @JoinTable(
             name = "authors_media",
             joinColumns = @JoinColumn(name = "media_id"),
-            inverseJoinColumns = @JoinColumn(name = "authors_id")
+            inverseJoinColumns = @JoinColumn(name = "authors_id"),
+            uniqueConstraints = @UniqueConstraint(columnNames = { "media_id", "authors_id" })
     )
     private Set<MediaAuthor> authors;
 
