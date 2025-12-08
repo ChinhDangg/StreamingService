@@ -2,26 +2,23 @@ package dev.chinh.streamingservice.upload.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.chinh.streamingservice.MediaMapper;
 import dev.chinh.streamingservice.OSUtil;
 import dev.chinh.streamingservice.content.constant.MediaType;
 import dev.chinh.streamingservice.content.service.MinIOService;
-import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.data.entity.MediaGroupMetaData;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
 import dev.chinh.streamingservice.data.repository.MediaGroupMetaDataRepository;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.service.MediaMetadataService;
 import dev.chinh.streamingservice.data.service.ThumbnailService;
+import dev.chinh.streamingservice.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.exception.ResourceNotFoundException;
-import dev.chinh.streamingservice.search.data.MediaGroupInfo;
-import dev.chinh.streamingservice.search.data.MediaSearchItem;
-import dev.chinh.streamingservice.search.service.OpenSearchService;
 import dev.chinh.streamingservice.serve.service.MediaDisplayService;
 import dev.chinh.streamingservice.upload.MediaBasicInfo;
 import io.minio.Result;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -31,7 +28,6 @@ import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedUploadPartRequest;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -52,11 +48,11 @@ public class MediaUploadService {
 
     private final ObjectMapper mapper;
     private final MinIOService minIOService;
-    private final MediaMapper mediaMapper;
-    private final OpenSearchService openSearchService;
     private final ThumbnailService thumbnailService;
     private final MediaDisplayService mediaDisplayService;
     private final MediaMetadataService mediaMetadataService;
+
+    private final ApplicationEventPublisher eventPublisher;
 
     private final MediaMetaDataRepository mediaRepository;
     private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
@@ -182,7 +178,6 @@ public class MediaUploadService {
                 : basicInfo.getThumbnail().getOriginalFilename().substring(basicInfo.getThumbnail().getOriginalFilename().lastIndexOf("."));
         String path = "grouper/" + mediaMetaData.getUploadDate() + "_" + validateObject(basicInfo.getTitle(), MediaType.ALBUM) + extension;
 
-        Long savedId = null;
         try {
             minIOService.uploadFile(ThumbnailService.thumbnailBucket, path, basicInfo.getThumbnail());
             ImageMetadata imageMetadata = parseMediaMetadata(probeMediaInfo(ThumbnailService.thumbnailBucket, path), ImageMetadata.class);
@@ -193,23 +188,16 @@ public class MediaUploadService {
             mediaMetaData.setFormat(imageMetadata.format);
 
             MediaMetaData saved = mediaRepository.save(mediaMetaData);
-            savedId = saved.getId();
-            MediaSearchItem searchItem = mediaMapper.map(mediaMetaData);
-            searchItem.setMediaGroupInfo(new MediaGroupInfo(-1L));
-            openSearchService.indexDocument(OpenSearchService.MEDIA_INDEX_NAME, savedId, searchItem);
+            long savedId = saved.getId();
+
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, true));
+
             return savedId;
         } catch (Exception e) {
             try {
                 minIOService.removeFile(ThumbnailService.thumbnailBucket, path);
             } catch (Exception ex) {
                 throw new RuntimeException("Critical: Failed to delete thumbnail from MinIO to rollback", ex);
-            }
-            try {
-                if (savedId != null) {
-                    openSearchService.deleteDocument(OpenSearchService.MEDIA_INDEX_NAME, savedId);
-                }
-            } catch (IOException ie) {
-                throw new RuntimeException("Critical: Failed to delete media from OpenSearch to rollback", ie);
             }
             throw new RuntimeException("Failed to save media grouper metadata", e);
         }
@@ -238,11 +226,6 @@ public class MediaUploadService {
         mediaMetaData.setAbsoluteFilePath(mediaBucket + "/" + upload.objectName);
         mediaMetaData.setParentPath(upload.objectName);
 
-        MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
-        mediaGroupInfo.setGrouperMetaData(grouperGroupInfo);
-        mediaGroupInfo.setMediaMetaData(mediaMetaData);
-        mediaGroupInfo.setNumInfo(grouperGroupInfo.getNumInfo() + 1);
-        mediaMetaData.setGroupInfo(mediaGroupInfo);
         var results = minIOService.getAllItemsInBucketWithPrefix(mediaBucket, upload.objectName);
         int count = 0;
         long totalSize = 0;
@@ -264,35 +247,28 @@ public class MediaUploadService {
         mediaMetaData.setHeight(imageMetadata.height);
         mediaMetaData.setFormat(imageMetadata.format);
 
-        Integer previousLength = null;
-        try {
-            previousLength = grouperMedia.getLength();
-            grouperMedia.setLength(previousLength + 1);
-            openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, grouperMediaId, Map.of(ContentMetaData.LENGTH, grouperMedia.getLength()));
+        mediaRepository.incrementLength(grouperMedia.getId());
+        mediaGroupMetaDataRepository.incrementNumInfo(grouperGroupInfo.getId());
 
-            grouperGroupInfo.setNumInfo(grouperGroupInfo.getNumInfo() + 1);
+        Integer updatedNumInfo = mediaGroupMetaDataRepository.getNumInfo(grouperGroupInfo.getId());
+        Integer updatedLength = mediaRepository.getMediaLength(grouperMedia.getId());
 
-            Long savedId = mediaRepository.save(mediaMetaData).getId();
+        MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
+        mediaGroupInfo.setGrouperMetaData(grouperGroupInfo);
+        mediaGroupInfo.setMediaMetaData(mediaMetaData);
+        mediaGroupInfo.setNumInfo(updatedNumInfo);
+        mediaMetaData.setGroupInfo(mediaGroupInfo);
 
-            mediaRepository.save(grouperMedia);
-            mediaGroupMetaDataRepository.save(grouperGroupInfo);
+        Long savedId = mediaRepository.save(mediaMetaData).getId();
 
-            mediaMetadataService.removeCachedMediaSearchItem(grouperMediaId);
-            mediaDisplayService.removeCacheGroupOfMedia(grouperMediaId);
+        eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMedia.getId(), updatedLength));
 
-            removeCacheMediaSessionRequest(sessionId);
-            removeUploadSessionCacheLastAccess(sessionId);
-            return savedId;
-        } catch (Exception e) {
-            try {
-                if (previousLength != null) {
-                    openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, grouperMediaId, Map.of(ContentMetaData.LENGTH, previousLength));
-                }
-            } catch (IOException ex) {
-                throw new RuntimeException("Critical: Failed to rollback media length update to OpenSearch to rollback", ex);
-            }
-            throw new RuntimeException("Failed to save media metadata", e);
-        }
+        mediaMetadataService.removeCachedMediaSearchItem(grouperMediaId);
+        mediaDisplayService.removeCacheGroupOfMedia(grouperMediaId);
+
+        removeCacheMediaSessionRequest(sessionId);
+        removeUploadSessionCacheLastAccess(sessionId);
+        return savedId;
     }
 
     @Transactional
@@ -347,24 +323,15 @@ public class MediaUploadService {
             mediaMetaData.setFormat(imageMetadata.format);
         }
 
-        Long savedId = null;
-        try {
-            MediaMetaData saved = mediaRepository.save(mediaMetaData);
-            savedId = saved.getId();
-            MediaSearchItem searchItem = mediaMapper.map(saved);
-            openSearchService.indexDocument(OpenSearchService.MEDIA_INDEX_NAME, savedId, searchItem);
-            removeCacheMediaSessionRequest(sessionId);
-            removeUploadSessionCacheLastAccess(sessionId);
-            return savedId;
-        } catch (Exception e) {
-            try {
-                if (savedId != null)
-                    openSearchService.deleteDocument(OpenSearchService.MEDIA_INDEX_NAME, savedId);
-            } catch (IOException ie) {
-                throw new RuntimeException("Critical: Failed to delete media from OpenSearch to rollback", ie);
-            }
-            throw new RuntimeException("Failed to save media metadata", e);
-        }
+        MediaMetaData saved = mediaRepository.save(mediaMetaData);
+        long savedId = saved.getId();
+
+        eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, false));
+
+        removeCacheMediaSessionRequest(sessionId);
+        removeUploadSessionCacheLastAccess(sessionId);
+
+        return savedId;
     }
 
     public void removeUploadObject(String object) throws Exception {
