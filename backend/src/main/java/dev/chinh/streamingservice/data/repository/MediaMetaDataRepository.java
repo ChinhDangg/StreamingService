@@ -35,6 +35,17 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Query("UPDATE MediaMetaData m SET m.length = m.length + 1 WHERE m.id = :id")
     void incrementLength(@Param("id") Long id);
 
+    @Modifying
+    @Transactional
+    @Query(
+            value = "UPDATE media " +
+                    "SET length = length + 1 " +
+                    "WHERE id = :id " +
+                    "RETURNING length",
+            nativeQuery = true
+    )
+    Integer incrementLengthReturning(@Param("id") Long id);
+
 
     @Query("SELECT m.title FROM MediaMetaData m WHERE m.id = :id")
     String getMediaTitle(@Param("id") Long id);
