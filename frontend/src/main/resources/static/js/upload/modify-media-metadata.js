@@ -223,11 +223,18 @@ async function initializeEdit() {
             alert(`Failed to save edit: ${await response.text()}`);
             return;
         }
-        allNameEntityMap.get(currentNameEntity).clear();
         editAreaContainer.classList.add('hidden');
+        allNameEntityMap.get(currentNameEntity).get('current').clear();
+        allNameEntityMap.get(currentNameEntity).get('adding').clear();
+        allNameEntityMap.get(currentNameEntity).get('removing').clear();
         const updatedNameEntities = await response.json();
+        const names = [];
+        for (const { id, name } of updatedNameEntities) {
+            names.push(name);
+            allNameEntityMap.get(currentNameEntity).get('current').set(id, name);
+        }
         const mediaInfoTemp = {
-            [currentNameEntity]: updatedNameEntities,
+            [currentNameEntity]: names,
         };
         const mainContainer = document.getElementById(document.body.dataset.mainContainerId);
         displayContentInfo(mediaInfoTemp, mainContainer);
@@ -248,6 +255,7 @@ async function initializeEditAddingArea() {
         searchEntry.textContent = nameEntity.name;
         searchEntry.addEventListener('click', () => {
             if (currentNameEntityEditMap.get('adding').has(nameEntity.id)) return;
+            if (currentNameEntityEditMap.get('current').has(nameEntity.id)) return;
             addToAdding(nameEntity.name, nameEntity.id);
         });
         searchEntryList.appendChild(searchEntry);
