@@ -44,7 +44,9 @@
     "size":       { "type": "long" },
     "groupInfo":  {
       "properties": {
-        "grouperId": { "type": "long" }
+        "id": { "type": "long" },
+        "grouperId": { "type": "long" },
+        "numInfo": { "type": "integer" }
       }
     }
   }
