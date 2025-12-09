@@ -11,6 +11,9 @@ import lombok.*;
 @AllArgsConstructor
 public class MediaGroupInfo {
 
+    @JsonProperty(ContentMetaData.ID)
+    private Long id;
+
     @JsonProperty(ContentMetaData.GROUPER_ID)
     private Long grouperId;
 
