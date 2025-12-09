@@ -28,7 +28,7 @@ public class MediaMetadataModifyController {
     }
 
     @PutMapping("/update/{id}")
-    public ResponseEntity<List<String>> updateMediaAuthorInfo(@PathVariable long id,
+    public ResponseEntity<List<NameEntityDTO>> updateMediaNameEntityInfo(@PathVariable long id,
                                                       @RequestBody MediaMetadataModifyService.UpdateList updateList) {
         return ResponseEntity.ok().body(mediaMetadataModifyService.updateNameEntityInMedia(updateList, id));
     }
