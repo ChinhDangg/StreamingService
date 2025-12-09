@@ -180,7 +180,6 @@ public class OpenSearchService {
     /**
      * Example:
      * Map<String, Property> newProperties = Map.of(
-     *     // NOTE: We now use Property.of() instead of TypeMapping.of()
      *     "description", Property.of(m -> m.text(t -> t.analyzer("english"))),
      *     "sku",         Property.of(m -> m.keyword(k -> k))
      * );
