@@ -11,7 +11,7 @@ import java.time.Instant;
 @Getter
 @Setter
 @NoArgsConstructor
-@Entity(name = ContentMetaData.AUTHORS)
+@Entity
 @Table(name = ContentMetaData.AUTHORS)
 public class MediaAuthor extends MediaNameEntity{
 

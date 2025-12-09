@@ -11,7 +11,7 @@ import java.time.Instant;
 @Getter
 @Setter
 @NoArgsConstructor
-@Entity(name = ContentMetaData.TAGS)
+@Entity
 @Table(name = ContentMetaData.TAGS)
 public class MediaTag extends MediaNameEntity {
 

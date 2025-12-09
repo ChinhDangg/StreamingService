@@ -13,7 +13,7 @@ import java.util.Set;
 @Getter
 @Setter
 @NoArgsConstructor
-@Entity(name = ContentMetaData.UNIVERSES)
+@Entity
 @Table(name = ContentMetaData.UNIVERSES)
 public class MediaUniverse extends MediaNameEntityWithThumbnail {
 

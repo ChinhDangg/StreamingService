@@ -13,7 +13,7 @@ import java.util.Set;
 @Getter
 @Setter
 @NoArgsConstructor
-@Entity(name = ContentMetaData.CHARACTERS)
+@Entity
 @Table(name = ContentMetaData.CHARACTERS)
 public class MediaCharacter extends MediaNameEntityWithThumbnail {
 
