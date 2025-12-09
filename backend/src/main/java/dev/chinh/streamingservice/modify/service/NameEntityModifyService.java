@@ -34,6 +34,27 @@ public class NameEntityModifyService {
     private final OpenSearchService openSearchService;
     private final MinIOService minIOService;
 
+    public void incrementNameEntityLengthCount(MediaNameEntityConstant nameEntityConstant, long nameEntityId) {
+        int updated = switch (nameEntityConstant) {
+            case MediaNameEntityConstant.AUTHORS -> mediaAuthorRepository.incrementLength(nameEntityId);
+            case MediaNameEntityConstant.CHARACTERS -> mediaCharacterRepository.incrementLength(nameEntityId);
+            case MediaNameEntityConstant.UNIVERSES -> mediaUniverseRepository.incrementLength(nameEntityId);
+            case MediaNameEntityConstant.TAGS -> mediaTagRepository.incrementLength(nameEntityId);
+        };
+        if (updated == 0) throw new ResourceNotFoundException("No " + nameEntityConstant.getName() + " entry found with id: " + nameEntityId);
+    }
+
+    public void decrementNameEntityLengthCount(MediaNameEntityConstant nameEntityConstant, long nameEntityId) {
+        int updated = switch (nameEntityConstant) {
+            case MediaNameEntityConstant.AUTHORS -> mediaAuthorRepository.decrementLength(nameEntityId);
+            case MediaNameEntityConstant.CHARACTERS -> mediaCharacterRepository.decrementLength(nameEntityId);
+            case MediaNameEntityConstant.UNIVERSES -> mediaUniverseRepository.decrementLength(nameEntityId);
+            case MediaNameEntityConstant.TAGS -> mediaTagRepository.decrementLength(nameEntityId);
+        };
+        if (updated == 0) throw new ResourceNotFoundException("No " + nameEntityConstant.getName() + " entry found with id: " + nameEntityId);
+    }
+
+
     public List<NameEntityDTO> searchNameContaining(String index, String name) throws IOException {
         SearchResponse<NameEntityDTO> response = openSearchService.searchContaining(index, ContentMetaData.NAME, name, NameEntityDTO.class);
         return response.hits().hits().stream()
