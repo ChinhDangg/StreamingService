@@ -3,6 +3,7 @@ package dev.chinh.streamingservice.search.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.data.ContentMetaData;
+import dev.chinh.streamingservice.modify.MediaNameEntityConstant;
 import dev.chinh.streamingservice.search.constant.SortBy;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import dev.chinh.streamingservice.search.data.MediaSearchRangeField;
@@ -21,6 +22,7 @@ import org.opensearch.client.opensearch._types.query_dsl.RangeQuery;
 import org.opensearch.client.opensearch._types.query_dsl.TextQueryType;
 import org.opensearch.client.opensearch.core.*;
 import org.opensearch.client.opensearch.indices.*;
+import org.opensearch.client.opensearch.indices.ExistsRequest;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
@@ -141,6 +143,23 @@ public class OpenSearchService {
         ClassPathResource resource = new ClassPathResource(path);
         try (InputStream is = resource.getInputStream()) {
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private boolean indexExists(String indexName) throws IOException {
+        ExistsRequest existsRequest = ExistsRequest.of(e -> e.index(indexName));
+        return client.indices().exists(existsRequest).value();
+    }
+
+    public void _initializeIndexes() throws IOException {
+        if (!indexExists(MEDIA_INDEX_NAME)) {
+            createIndexWithMapping("media_v1", "/mapping/media-mapping.json");
+            addAliasToIndex("media_v1", MEDIA_INDEX_NAME);
+        }
+        for (MediaNameEntityConstant constant : MediaNameEntityConstant.values()) {
+            if (!indexExists(constant.getName())) {
+                createIndexWithSettingAndMapping(constant.getName(), "/mapping/media-name-entity-mapping.json");
+            }
         }
     }
 
