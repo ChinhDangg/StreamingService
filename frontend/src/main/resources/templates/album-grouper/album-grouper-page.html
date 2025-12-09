@@ -148,71 +148,8 @@
 </main>
 
 
-
 <!-- Full Page Overlay -->
-<div id="quickViewOverlay" class="hidden fixed inset-0 z-50 bg-gray-950/50 text-gray-100 border border-gray-800/50 flex flex-col transition-all duration-300">
-    <!-- Fixed Top Bar -->
-    <div class="fixed top-0 left-0 w-full z-20 bg-gray-900/90 backdrop-blur-md border-b border-gray-800 px-4 py-2">
-        <div class="flex items-center justify-between w-full">
-            <h2 class="quick-view-title text-lg font-semibold tracking-wide">Quick View <span>Item: 0</span></h2>
-            <button id="closeOverlayBtn"
-                    class="text-gray-400 hover:text-gray-200 transition">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                     stroke-width="2" stroke="currentColor" class="w-6 h-6">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-        <div class="border-t border-gray-700 mt-2"></div>
-        <div class="w-full bg-gray-900 text-white mt-2 flex items-center justify-between">
-            <!-- Left buttons -->
-            <div class="left-buttons flex gap-3">
-                <!-- Prev -->
-                <button class="prev-btn select-none flex items-center gap-1 bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M15 19l-7-7 7-7" />
-                    </svg>
-                    Prev
-                </button>
-
-                <!-- Next -->
-                <button class="next-btn select-none flex items-center gap-1 bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7" />
-                    </svg>
-                    Next
-                </button>
-            </div>
-
-            <!-- Right buttons -->
-            <div class="right-buttons flex gap-3">
-                <!-- Prev -->
-                <button class="prev-btn select-none flex items-center gap-1 bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M15 19l-7-7 7-7" />
-                    </svg>
-                    Prev
-                </button>
-
-                <!-- Next -->
-                <button class="next-btn select-none flex items-center gap-1 bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7" />
-                    </svg>
-                    Next
-                </button>
-            </div>
-        </div>
-    </div>
-
-
-    <!-- Scrollable Content Area -->
-    <div id="overlayContent" class="flex-1 overflow-y-auto pt-[72px] pb-10 flex justify-center">
-        <div class="overlayContent-inner-wrapper relative bg-gray-900/90 rounded-lg shadow-xl w-[95%] max-w-7xl mt-6 mb-16 animate-slideIn self-start"
-             onclick="event.stopPropagation();">
-
-        </div>
-    </div>
+<div th:replace="~{overlay :: overlay-html}">
 </div>
 
 <script type="module" th:src="@{/static/js/album-grouper/album-grouper-page.js}" src="/static/js/album-grouper/album-grouper-page.js"></script>

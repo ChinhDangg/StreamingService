@@ -243,10 +243,10 @@
     </article>
 </div>
 
-<div th:insert="pagination :: pagination-html" th:remove="tag">
+<div th:replace="~{pagination :: pagination-html}">
 </div>
 
-<div th:insert="overlay :: overlay-html" th:remove="tag">
+<div th:replace="~{overlay :: overlay-html}">
 </div>
 
 <script type="module" th:src="@{/static/js/search/search-page.js}" src="/static/js/search/search-page.js"></script>
