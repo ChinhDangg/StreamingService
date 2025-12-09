@@ -122,7 +122,7 @@ public class MediaDisplayService {
         }
 
         Pageable pageable = PageRequest.of(offset, maxBatchSize, Sort.by(sortOrder, ContentMetaData.NUM_INFO));
-        Slice<Long> groupOfMedia = mediaGroupMetaDataRepository.findMediaMetadataIdsByGrouperMetaDataId(mediaId, pageable);
+        Slice<Long> groupOfMedia = mediaGroupMetaDataRepository.findMediaMetadataIdsByGrouperMetaDataId(mediaItem.getGrouperId(), pageable);
         GroupSlice groupSlice = new GroupSlice(groupOfMedia.getContent(), offset, maxBatchSize, groupOfMedia.hasNext());
 
         addCacheGroupOfMedia(mediaId, offset, sortOrder, groupSlice);
