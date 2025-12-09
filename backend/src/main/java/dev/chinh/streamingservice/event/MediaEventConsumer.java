@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -27,12 +28,6 @@ public class MediaEventConsumer {
     private final MediaMetadataModifyService mediaMetadataModifyService;
 
     private final String media_group_id = "media-service";
-
-    private MediaMetaData findMediaById(Long mediaId) {
-        return mediaMetaDataRepository.findById(mediaId).orElseThrow(
-                () -> new IllegalArgumentException("Media not found with id " + mediaId)
-        );
-    }
 
     @KafkaListener(topics = MediaEventProducer.updateLengthOpenSearchTopic, groupId = media_group_id)
     public void onUpdateLengthOpenSearch(MediaUpdateEvent.LengthUpdated event) {
@@ -47,15 +42,18 @@ public class MediaEventConsumer {
     @KafkaListener(topics = MediaEventProducer.createMediaOpenSearchTopic, groupId = media_group_id)
     public void onCreateMediaIndexOpenSearch(MediaUpdateEvent.MediaCreated event) {
         System.out.println("Received new index event: " + event.mediaId());
-        MediaMetaData mediaMetaData = findMediaById(event.mediaId());
-        MediaSearchItem mediaSearchItem = mediaMapper.map(mediaMetaData);
+        Optional<MediaMetaData> mediaMetaData = mediaMetaDataRepository.findByIdWithAllInfo(event.mediaId());
+        if (mediaMetaData.isEmpty()) {
+            return;
+        }
+        MediaSearchItem mediaSearchItem = mediaMapper.map(mediaMetaData.get());
         if (event.isGrouper()) {
             mediaSearchItem.setMediaGroupInfo(new MediaGroupInfo(-1L));
         }
         try {
-            openSearchService.indexDocument(OpenSearchService.MEDIA_INDEX_NAME, mediaMetaData.getId(), mediaSearchItem);
+            openSearchService.indexDocument(OpenSearchService.MEDIA_INDEX_NAME, mediaMetaData.get().getId(), mediaSearchItem);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to index media " + mediaMetaData.getId() + " to OpenSearch", e);
+            throw new RuntimeException("Failed to index media " + mediaMetaData.get().getId() + " to OpenSearch", e);
         }
     }
 
