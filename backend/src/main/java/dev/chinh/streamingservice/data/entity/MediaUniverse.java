@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.data.entity;
 
+import dev.chinh.streamingservice.data.ContentMetaData;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,8 +13,8 @@ import java.util.Set;
 @Getter
 @Setter
 @NoArgsConstructor
-@Entity
-@Table(name = "universes")
+@Entity(name = ContentMetaData.UNIVERSES)
+@Table(name = ContentMetaData.UNIVERSES)
 public class MediaUniverse extends MediaNameEntityWithThumbnail {
 
     public MediaUniverse(String name, Instant uploadDate) {
