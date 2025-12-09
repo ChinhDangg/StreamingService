@@ -222,7 +222,6 @@ async function displayItem(nameItems) {
             itemNode = helperCloneAndUnHideNode(browseContainer.querySelector('.text-item'));
         }
         itemNode.querySelector('.name-title').textContent = capitalizeWords(item.name);
-        itemNode.querySelector('.date-note').textContent = item.uploadDate;
         itemNode.querySelector('.total-note').textContent = item.length;
         itemNode.querySelector('.item-link').href = `/page/search?${NameEntry[currentNameEntry]}=${item.name}`;
         nameContainer.appendChild(itemNode);
