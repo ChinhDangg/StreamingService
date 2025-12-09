@@ -18,23 +18,18 @@ public class MediaNameEntry {
     @JsonProperty(ContentMetaData.LENGTH)
     private int length;
 
-    @JsonProperty(ContentMetaData.UPLOAD_DATE)
-    private Instant uploadDate;
-
     @JsonProperty(ContentMetaData.THUMBNAIL)
     private String thumbnail;
 
     @Default
-    public MediaNameEntry(String name, int length, Instant uploadDate, String thumbnail) {
+    public MediaNameEntry(String name, int length, String thumbnail) {
         this.name = name;
         this.length = length;
-        this.uploadDate = uploadDate;
         this.thumbnail = thumbnail;
     }
 
-    public MediaNameEntry(String name, int length, Instant uploadDate) {
+    public MediaNameEntry(String name, int length) {
         this.name = name;
         this.length = length;
-        this.uploadDate = uploadDate;
     }
 }

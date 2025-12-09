@@ -17,8 +17,7 @@ import java.util.Set;
 @Table(name = ContentMetaData.CHARACTERS)
 public class MediaCharacter extends MediaNameEntityWithThumbnail {
 
-    public MediaCharacter(String name, Instant uploadDate) {
+    public MediaCharacter(String name) {
         this.name = name;
-        this.uploadDate = uploadDate;
     }
 }

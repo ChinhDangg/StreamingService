@@ -17,8 +17,7 @@ import java.util.Set;
 @Table(name = ContentMetaData.UNIVERSES)
 public class MediaUniverse extends MediaNameEntityWithThumbnail {
 
-    public MediaUniverse(String name, Instant uploadDate) {
+    public MediaUniverse(String name) {
         this.name = name;
-        this.uploadDate = uploadDate;
     }
 }

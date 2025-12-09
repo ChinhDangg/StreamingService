@@ -11,7 +11,7 @@ import org.springframework.stereotype.Repository;
 public interface MediaCharacterRepository extends MediaNameEntityRepository<MediaCharacter, Long> {
 
     @Override
-    @Query("SELECT new dev.chinh.streamingservice.data.dto.MediaNameEntry(e.name, e.length, e.uploadDate, e.thumbnail)" +
+    @Query("SELECT new dev.chinh.streamingservice.data.dto.MediaNameEntry(e.name, e.length, e.thumbnail)" +
             " FROM MediaCharacter e")
     Page<MediaNameEntry> findAllNames(Pageable pageable);
 }

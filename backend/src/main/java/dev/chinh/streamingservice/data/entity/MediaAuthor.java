@@ -15,8 +15,7 @@ import java.time.Instant;
 @Table(name = ContentMetaData.AUTHORS)
 public class MediaAuthor extends MediaNameEntity{
 
-    public MediaAuthor(String name, Instant uploadDate) {
+    public MediaAuthor(String name) {
         this.name = name;
-        this.uploadDate = uploadDate;
     }
 }

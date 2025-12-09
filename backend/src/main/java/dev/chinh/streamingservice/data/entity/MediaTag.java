@@ -15,8 +15,7 @@ import java.time.Instant;
 @Table(name = ContentMetaData.TAGS)
 public class MediaTag extends MediaNameEntity {
 
-    public MediaTag(String name, Instant uploadDate) {
+    public MediaTag(String name) {
         this.name = name;
-        this.uploadDate = uploadDate;
     }
 }

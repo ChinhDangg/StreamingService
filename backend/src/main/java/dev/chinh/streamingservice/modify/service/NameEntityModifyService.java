@@ -18,7 +18,6 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -71,22 +70,22 @@ public class NameEntityModifyService {
 
     @Transactional
     public void addAuthor(String name) {
-        addNameEntity(name, MediaNameEntityConstant.AUTHORS, new MediaAuthor(name, Instant.now()), mediaAuthorRepository);
+        addNameEntity(name, MediaNameEntityConstant.AUTHORS, new MediaAuthor(name), mediaAuthorRepository);
     }
 
     @Transactional
     public void addCharacter(NameAndThumbnailPostRequest request) {
-        addNameEntity(request, MediaNameEntityConstant.CHARACTERS, new MediaCharacter(request.getName(), Instant.now()), mediaCharacterRepository);
+        addNameEntity(request, MediaNameEntityConstant.CHARACTERS, new MediaCharacter(request.getName()), mediaCharacterRepository);
     }
 
     @Transactional
     public void addUniverse(NameAndThumbnailPostRequest request) {
-        addNameEntity(request, MediaNameEntityConstant.UNIVERSES, new MediaUniverse(request.getName(), Instant.now()), mediaUniverseRepository);
+        addNameEntity(request, MediaNameEntityConstant.UNIVERSES, new MediaUniverse(request.getName()), mediaUniverseRepository);
     }
 
     @Transactional
     public void addTag(String name) {
-        addNameEntity(name, MediaNameEntityConstant.TAGS, new MediaTag(name, Instant.now()), mediaTagRepository);
+        addNameEntity(name, MediaNameEntityConstant.TAGS, new MediaTag(name), mediaTagRepository);
     }
 
     @Transactional

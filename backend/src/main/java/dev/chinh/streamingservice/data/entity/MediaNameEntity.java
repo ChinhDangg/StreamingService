@@ -7,8 +7,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.Instant;
-
 @Getter
 @Setter
 @MappedSuperclass
@@ -24,8 +22,4 @@ public abstract class MediaNameEntity {
 
     @JsonProperty(ContentMetaData.LENGTH)
     protected int length;
-
-    @Column(nullable = false)
-    @JsonProperty(ContentMetaData.UPLOAD_DATE)
-    protected Instant uploadDate;
 }
