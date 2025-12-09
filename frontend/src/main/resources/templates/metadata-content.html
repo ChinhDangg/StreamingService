@@ -10,9 +10,9 @@
 <div th:fragment="metadata-title-html(extraClasses)" class="mb-5">
     <div class="flex items-center mb-1">
         <h3 th:class="'main-title ' + ${extraClasses}">Media Title</h3>
-        <button th:replace="upload/edit-name-section :: editButton('editTitleBtn')"></button>
+        <button th:replace="~{upload/edit-name-section :: editButton('editTitleBtn')}"></button>
     </div>
-    <div th:replace="upload/edit-name-section :: edit-title-area-html"></div>
+    <div th:replace="~{upload/edit-name-section :: edit-title-area-html}"></div>
 </div>
 
 
@@ -25,7 +25,7 @@
             Celestial / Cityscape
         </a>
     </div>
-    <button th:replace="upload/edit-name-section :: editButton('editUniverseBtn')"></button>
+    <button th:replace="~{upload/edit-name-section :: editButton('editUniverseBtn')}"></button>
 </div>
 
 
@@ -38,7 +38,7 @@
             Jane Doe
         </a>
     </div>
-    <button th:replace="upload/edit-name-section :: editButton('editAuthorBtn')"></button>
+    <button th:replace="~{upload/edit-name-section :: editButton('editAuthorBtn')}"></button>
 </div>
 
 <div th:fragment="metadata-character-html" class="flex items-center">
@@ -50,7 +50,7 @@
             John Doe
         </a>
     </div>
-    <button th:replace="upload/edit-name-section :: editButton('editCharacterBtn')"></button>
+    <button th:replace="~{upload/edit-name-section :: editButton('editCharacterBtn')}"></button>
 </div>
 
 
@@ -61,7 +61,7 @@
             #Astrophotography
         </a>
     </div>
-    <button th:replace="upload/edit-name-section :: editButton('editTagBtn')"></button>
+    <button th:replace="~{upload/edit-name-section :: editButton('editTagBtn')}"></button>
 </div>
 
 </body>
