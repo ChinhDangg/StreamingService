@@ -35,7 +35,7 @@ public class MediaSearchItem extends MediaDescription {
 
     @Override
     public Long getGrouperId() {
-        return mediaGroupInfo == null ? null : mediaGroupInfo.getGrouperId();
+        return mediaGroupInfo == null ? null : isGrouper() ? mediaGroupInfo.getId() : mediaGroupInfo.getGrouperId();
     }
 
 }

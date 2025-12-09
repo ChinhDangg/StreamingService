@@ -72,7 +72,7 @@ public class MediaMetaData extends MediaDescription {
 
     @Override
     public Long getGrouperId() {
-        return groupInfo == null ? null : groupInfo.getGrouperMetaDataId();
+        return groupInfo == null ? null : isGrouper() ? groupInfo.getId() : groupInfo.getGrouperMetaDataId();
     }
 
     // Technical
