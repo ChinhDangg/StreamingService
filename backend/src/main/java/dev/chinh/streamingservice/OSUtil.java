@@ -45,7 +45,7 @@ public class OSUtil {
         }
     }
 
-    public static void initializeRAMInfo() throws IOException, InterruptedException {
+    public static void _initializeRAMInfo() throws IOException, InterruptedException {
         MEMORY_TOTAL = getMemoryTotalSpace();
         MEMORY_USABLE = new AtomicLong(getActualMemoryUsableSpace());
     }
