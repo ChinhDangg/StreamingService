@@ -153,8 +153,9 @@ public class OpenSearchService {
 
     public void _initializeIndexes() throws IOException {
         if (!indexExists(MEDIA_INDEX_NAME)) {
-            createIndexWithMapping("media_v1", "/mapping/media-mapping.json");
-            addAliasToIndex("media_v1", MEDIA_INDEX_NAME);
+            String version1 = MEDIA_INDEX_NAME + "_v1";
+            createIndexWithMapping(version1, "/mapping/media-mapping.json");
+            addAliasToIndex(version1, MEDIA_INDEX_NAME);
         }
         for (MediaNameEntityConstant constant : MediaNameEntityConstant.values()) {
             if (!indexExists(constant.getName())) {
