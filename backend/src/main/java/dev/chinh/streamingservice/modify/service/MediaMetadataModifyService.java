@@ -4,10 +4,12 @@ import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.service.MediaMetadataService;
 import dev.chinh.streamingservice.event.MediaUpdateEvent;
+import dev.chinh.streamingservice.exception.DuplicateEntryException;
 import dev.chinh.streamingservice.modify.MediaNameEntityConstant;
 import dev.chinh.streamingservice.modify.NameEntityDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,7 +63,7 @@ public class MediaMetadataModifyService {
     ) {}
 
     @Transactional
-    public List<String> updateNameEntityInMedia(UpdateList updateList, long mediaId) {
+    public List<NameEntityDTO> updateNameEntityInMedia(UpdateList updateList, long mediaId) {
         if (updateList.adding.isEmpty() && updateList.removing.isEmpty()) return new ArrayList<>();
 
         List<NameEntityDTO> uniqueAdding = new ArrayList<>(updateList.adding.stream().distinct().toList());
@@ -81,12 +83,11 @@ public class MediaMetadataModifyService {
             nameEntityModifyService.incrementNameEntityLengthCount(updateList.nameEntity, nameEntityDTO.getId());
         }
         List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(mediaId, updateList.nameEntity);
-        List<String> nameEntityList = updatedMediaNameEntityList.stream().map(NameEntityDTO::getName).toList();
 
         eventPublisher.publishEvent(new MediaUpdateEvent.MediaNameEntityUpdated(mediaId, updateList.nameEntity));
 
         mediaMetadataService.removeCachedMediaSearchItem(mediaId);
-        return nameEntityList;
+        return updatedMediaNameEntityList;
     }
 
     private int removeNameEntityInMedia(long mediaId, long nameEntityId, MediaNameEntityConstant nameEntity) {
@@ -99,11 +100,15 @@ public class MediaMetadataModifyService {
     }
 
     private int addNameEntityInMedia(long mediaId, long nameEntityId, MediaNameEntityConstant nameEntity) {
-        return switch (nameEntity) {
-            case MediaNameEntityConstant.AUTHORS -> mediaMetaDataRepository.addAuthorToMedia(mediaId, nameEntityId);
-            case MediaNameEntityConstant.CHARACTERS -> mediaMetaDataRepository.addCharacterToMedia(mediaId, nameEntityId);
-            case MediaNameEntityConstant.UNIVERSES -> mediaMetaDataRepository.addUniverseToMedia(mediaId, nameEntityId);
-            case MediaNameEntityConstant.TAGS -> mediaMetaDataRepository.addTagToMedia(mediaId, nameEntityId);
-        };
+        try {
+            return switch (nameEntity) {
+                case MediaNameEntityConstant.AUTHORS -> mediaMetaDataRepository.addAuthorToMedia(mediaId, nameEntityId);
+                case MediaNameEntityConstant.CHARACTERS -> mediaMetaDataRepository.addCharacterToMedia(mediaId, nameEntityId);
+                case MediaNameEntityConstant.UNIVERSES -> mediaMetaDataRepository.addUniverseToMedia(mediaId, nameEntityId);
+                case MediaNameEntityConstant.TAGS -> mediaMetaDataRepository.addTagToMedia(mediaId, nameEntityId);
+            };
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateEntryException("Duplicate name entity in media: " + nameEntityId);
+        }
     }
 }
