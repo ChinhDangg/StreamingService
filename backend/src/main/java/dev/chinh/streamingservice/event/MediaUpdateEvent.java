@@ -2,29 +2,24 @@ package dev.chinh.streamingservice.event;
 
 import dev.chinh.streamingservice.modify.MediaNameEntityConstant;
 
-public class MediaUpdateEvent {
+public interface MediaUpdateEvent {
 
-    public record LengthUpdated(
+    record LengthUpdated(
             long mediaId,
             Integer newLength
-    ) {}
+    ) implements MediaUpdateEvent {}
 
-    public record MediaCreated(
+    record MediaCreated(
             long mediaId,
             boolean isGrouper
-    ) {}
+    ) implements MediaUpdateEvent{}
 
-    public record MediaNameEntityUpdated(
+    record MediaNameEntityUpdated(
             long mediaId,
             MediaNameEntityConstant nameEntityConstant
-    ) {}
+    ) implements MediaUpdateEvent{}
 
-    public record MediaTitleUpdated(
+    record MediaTitleUpdated(
             long mediaId
-    ) {}
-
-
-    public record NameEntityCreated(
-            long nameEntityId
-    ) {}
+    ) implements MediaUpdateEvent{}
 }
