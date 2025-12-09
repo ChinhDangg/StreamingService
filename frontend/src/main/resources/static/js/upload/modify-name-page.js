@@ -119,7 +119,11 @@ function initializeUploadImageInput() {
     });
     entityImageInput.addEventListener('change', () => {
         const file = entityImageInput.files[0];
-        if (!file) return;
+        if (!file) {
+            currentImagePreview.src = '';
+            currentImagePreview.classList.add('hidden');
+            return;
+        }
         const reader = new FileReader();
         reader.onload = (e) => {
             currentImagePreview.src = e.target.result;
