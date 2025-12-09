@@ -151,15 +151,28 @@ public class OpenSearchService {
         return client.indices().exists(existsRequest).value();
     }
 
-    public void _initializeIndexes() throws IOException {
-        if (!indexExists(MEDIA_INDEX_NAME)) {
-            String version1 = MEDIA_INDEX_NAME + "_v1";
-            createIndexWithMapping(version1, "/mapping/media-mapping.json");
-            addAliasToIndex(version1, MEDIA_INDEX_NAME);
-        }
-        for (MediaNameEntityConstant constant : MediaNameEntityConstant.values()) {
-            if (!indexExists(constant.getName())) {
-                createIndexWithSettingAndMapping(constant.getName(), "/mapping/media-name-entity-mapping.json");
+    public void _initializeIndexes() throws InterruptedException {
+        int retryCount = 20;
+        while (retryCount-- > 0) {
+            try {
+                if (!indexExists(MEDIA_INDEX_NAME)) {
+                    String version1 = MEDIA_INDEX_NAME + "_v1";
+                    createIndexWithMapping(version1, "/mapping/media-mapping.json");
+                    addAliasToIndex(version1, MEDIA_INDEX_NAME);
+                }
+                for (MediaNameEntityConstant constant : MediaNameEntityConstant.values()) {
+                    if (!indexExists(constant.getName())) {
+                        createIndexWithSettingAndMapping(constant.getName(), "/mapping/media-name-entity-mapping.json");
+                    }
+                }
+                break;
+            } catch (IOException e) {
+                if (e.getMessage().contains("Connection reset")) {
+                    System.out.println("Retrying opensearch connection: " + retryCount);
+                    Thread.sleep(500);
+                } else {
+                    throw new RuntimeException(e);
+                }
             }
         }
     }
