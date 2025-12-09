@@ -20,6 +20,7 @@ public class MediaMetadataModifyService {
 
     private final MediaMetaDataRepository mediaMetaDataRepository;
     private final MediaMetadataService mediaMetadataService;
+    private final NameEntityModifyService nameEntityModifyService;
 
     private final ApplicationEventPublisher eventPublisher;
 
@@ -46,7 +47,8 @@ public class MediaMetadataModifyService {
         if (newTitle.length() > 300)
             throw new IllegalArgumentException("Name must be at most 300 chars");
 
-        mediaMetaDataRepository.updateMediaTitle(mediaId, newTitle);
+        int updated = mediaMetaDataRepository.updateMediaTitle(mediaId, newTitle);
+        if (updated == 0) throw new IllegalArgumentException("Media not found: " + mediaId);
 
         eventPublisher.publishEvent(new MediaUpdateEvent.MediaTitleUpdated(mediaId));
 
@@ -61,11 +63,22 @@ public class MediaMetadataModifyService {
     @Transactional
     public List<String> updateNameEntityInMedia(UpdateList updateList, long mediaId) {
         if (updateList.adding.isEmpty() && updateList.removing.isEmpty()) return new ArrayList<>();
-        for (NameEntityDTO nameEntityDTO : updateList.removing) {
-            removeNameEntityInMedia(mediaId, nameEntityDTO.getId(), updateList.nameEntity);
+
+        List<NameEntityDTO> uniqueAdding = new ArrayList<>(updateList.adding.stream().distinct().toList());
+        List<NameEntityDTO> uniqueRemoving = updateList.removing.stream().distinct().toList();
+        uniqueAdding.removeAll(uniqueRemoving);
+
+        if (uniqueAdding.isEmpty() && uniqueRemoving.isEmpty()) return new ArrayList<>();
+
+        for (NameEntityDTO nameEntityDTO : uniqueRemoving) {
+            int removed = removeNameEntityInMedia(mediaId, nameEntityDTO.getId(), updateList.nameEntity);
+            if (removed == 0) throw new IllegalArgumentException("Name entity not found: " + nameEntityDTO.getId());
+            nameEntityModifyService.decrementNameEntityLengthCount(updateList.nameEntity, nameEntityDTO.getId());
         }
-        for (NameEntityDTO nameEntityDTO : updateList.adding) {
-            addNameEntityInMedia(mediaId, nameEntityDTO.getId(), updateList.nameEntity);
+        for (NameEntityDTO nameEntityDTO : uniqueAdding) {
+            int added = addNameEntityInMedia(mediaId, nameEntityDTO.getId(), updateList.nameEntity);
+            if (added == 0) throw new IllegalArgumentException("Name entity not found: " + nameEntityDTO.getId());
+            nameEntityModifyService.incrementNameEntityLengthCount(updateList.nameEntity, nameEntityDTO.getId());
         }
         List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(mediaId, updateList.nameEntity);
         List<String> nameEntityList = updatedMediaNameEntityList.stream().map(NameEntityDTO::getName).toList();
@@ -76,23 +89,21 @@ public class MediaMetadataModifyService {
         return nameEntityList;
     }
 
-    private void removeNameEntityInMedia(long mediaId, long nameEntityId, MediaNameEntityConstant nameEntity) {
-        switch (nameEntity.getName()) {
-            case ContentMetaData.AUTHORS -> mediaMetaDataRepository.deleteAuthorFromMedia(mediaId, nameEntityId);
-            case ContentMetaData.CHARACTERS -> mediaMetaDataRepository.deleteCharacterFromMedia(mediaId, nameEntityId);
-            case ContentMetaData.UNIVERSES -> mediaMetaDataRepository.deleteUniverseFromMedia(mediaId, nameEntityId);
-            case ContentMetaData.TAGS -> mediaMetaDataRepository.deleteTagFromMedia(mediaId, nameEntityId);
-            default -> throw new IllegalArgumentException("Invalid name entity type: " + nameEntity);
-        }
+    private int removeNameEntityInMedia(long mediaId, long nameEntityId, MediaNameEntityConstant nameEntity) {
+        return switch (nameEntity) {
+            case MediaNameEntityConstant.AUTHORS -> mediaMetaDataRepository.deleteAuthorFromMedia(mediaId, nameEntityId);
+            case MediaNameEntityConstant.CHARACTERS -> mediaMetaDataRepository.deleteCharacterFromMedia(mediaId, nameEntityId);
+            case MediaNameEntityConstant.UNIVERSES -> mediaMetaDataRepository.deleteUniverseFromMedia(mediaId, nameEntityId);
+            case MediaNameEntityConstant.TAGS -> mediaMetaDataRepository.deleteTagFromMedia(mediaId, nameEntityId);
+        };
     }
 
-    private void addNameEntityInMedia(long mediaId, long nameEntityId, MediaNameEntityConstant nameEntity) {
-        switch (nameEntity.getName()) {
-            case ContentMetaData.AUTHORS -> mediaMetaDataRepository.addAuthorToMedia(mediaId, nameEntityId);
-            case ContentMetaData.CHARACTERS -> mediaMetaDataRepository.addCharacterToMedia(mediaId, nameEntityId);
-            case ContentMetaData.UNIVERSES -> mediaMetaDataRepository.addUniverseToMedia(mediaId, nameEntityId);
-            case ContentMetaData.TAGS -> mediaMetaDataRepository.addTagToMedia(mediaId, nameEntityId);
-            default -> throw new IllegalArgumentException("Invalid name entity type: " + nameEntity);
-        }
+    private int addNameEntityInMedia(long mediaId, long nameEntityId, MediaNameEntityConstant nameEntity) {
+        return switch (nameEntity) {
+            case MediaNameEntityConstant.AUTHORS -> mediaMetaDataRepository.addAuthorToMedia(mediaId, nameEntityId);
+            case MediaNameEntityConstant.CHARACTERS -> mediaMetaDataRepository.addCharacterToMedia(mediaId, nameEntityId);
+            case MediaNameEntityConstant.UNIVERSES -> mediaMetaDataRepository.addUniverseToMedia(mediaId, nameEntityId);
+            case MediaNameEntityConstant.TAGS -> mediaMetaDataRepository.addTagToMedia(mediaId, nameEntityId);
+        };
     }
 }
