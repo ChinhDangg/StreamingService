@@ -25,8 +25,6 @@ public interface MediaGroupMetaDataRepository extends JpaRepository<MediaGroupMe
     @Query("UPDATE MediaGroupMetaData m SET m.numInfo = m.numInfo + 1 WHERE m.mediaMetaDataId = :mediaId")
     void incrementNumInfo(@Param("mediaId") long mediaId);
 
-    @Modifying
-    @Transactional
     @Query(
             value = "UPDATE media_groups " +
                     "SET num_info = num_info + 1 " +
