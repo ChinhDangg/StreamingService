@@ -71,9 +71,11 @@ public abstract class MediaService {
         MediaMetaData mediaMetaData = mediaRepository.findByIdWithAllInfo(id).orElseThrow(() ->
                 new IllegalArgumentException("Media not found with id " + id));
         MediaSearchItem mediaSearchItem = mediaMapper.map(mediaMetaData);
-        if (mediaMetaData.getGrouperId() != null || mediaMetaData.isGrouper()) {
+        if (mediaMetaData.isGrouper()) {
+            mediaSearchItem.setMediaGroupInfo(new MediaGroupInfo(mediaMetaData.getGrouperId(), null, mediaMetaData.getGroupInfo().getNumInfo()));
+        } else if (mediaMetaData.getGrouperId() != null) {
             mediaSearchItem.setMediaGroupInfo(
-                    new MediaGroupInfo(mediaMetaData.getGrouperId(), mediaMetaData.getGroupInfo().getNumInfo()));
+                    new MediaGroupInfo(null, mediaMetaData.getGrouperId(), mediaMetaData.getGroupInfo().getNumInfo()));
         }
         mediaMetadataService.cacheMediaSearchItem(mediaSearchItem);
         return mediaMetaData;
