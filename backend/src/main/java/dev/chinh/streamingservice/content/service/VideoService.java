@@ -72,7 +72,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
         MediaDescription mediaDescription = getMediaDescription(videoId);
 
         double duration = mediaDescription.getLength();
-        int segments = Math.min(Math.toIntExact(Math.round(duration / 60 / 5 * 10)), 20);
+        int segments = Math.max(1, Math.min(Math.toIntExact(Math.round(duration / 60 / 5 * 10)), 20));
         double previewLength = Math.min(duration, 60);
         double clipLength = previewLength / segments;
         double interval = duration / segments;
