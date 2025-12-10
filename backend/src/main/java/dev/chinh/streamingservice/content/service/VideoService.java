@@ -370,6 +370,8 @@ public class VideoService extends MediaService implements ResourceCleanable {
                     addCacheVideoJobStatus(videoId, null, null, MediaJobStatus.COMPLETED);
                 if (exit == 0)
                     OSUtil.writeTextToTempFile(videoMasterFilePath.replaceFirst("/chunks/", ""), List.of("#EXT-X-ENDLIST"), false);
+                else
+                    addCacheVideoJobStatus(videoId, null, null, MediaJobStatus.FAILED);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
