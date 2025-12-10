@@ -76,6 +76,7 @@ async function initialize() {
     initializeSortByOptions();
     initializeSortOrderOptions();
     initializeAdvanceSearchArea();
+    initializeViewStepButtons();
 
     await sendSearchRequestOnCurrentInfo(false);
 }
@@ -746,6 +747,8 @@ function getAdvanceSearchUrl(page, sortBy, sortOrder) {
     return `/api/search/advance?${queryParams}`;
 }
 
+let currentPageInfo = null;
+
 function displaySearchResults(results, searchType, sortBy, sortOrder,
                               searchString,
                               keywordField, keywordValueList) {
@@ -784,6 +787,12 @@ function displaySearchResults(results, searchType, sortBy, sortOrder,
     //     "totalPages": 20,
     //     "total": 2
     // }
+    currentPageInfo = {
+        page: results.page,
+        pageSize: results.pageSize,
+        totalPages: results.totalPages,
+        total: results.total
+    };
     const getPageUrl = (page) => getPageSearchUrl(page, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList);
     displayPagination(results.page, results.totalPages, getPageUrl, pageClickHandler);
 
@@ -804,6 +813,8 @@ function formatTime(s) {
 }
 
 const videoContainer = document.getElementById('videoContainer-preview');
+const currentItemTypeMap = new Map();
+let currentViewItemIndex = null;
 
 function displaySearchItems(searchItems) {
     const mainItemContainer = document.getElementById('main-item-container');
@@ -817,7 +828,7 @@ function displaySearchItems(searchItems) {
     const horizontalItemTem = searchItemsContainer.querySelector('.horizontal-item');
     const verticalItemTem = searchItemsContainer.querySelector('.vertical-item');
 
-    searchItems.forEach(item => {
+    searchItems.forEach((item, index) => {
         const itemContainer = (item.width >= item.height) ? helperCloneAndUnHideNode(horizontalItemTem)
                                         : helperCloneAndUnHideNode(verticalItemTem);
         if (item.thumbnail)
@@ -828,9 +839,11 @@ function displaySearchItems(searchItems) {
         itemContainer.querySelector('.name-note').textContent = (item.authors && item.authors.length) ? item.authors.join(", ") : 'Unknown';
         const itemLink = itemContainer.querySelector('.item-link');
         itemLink.href = `/api/media/content-page/${item.id}`;
+        currentItemTypeMap.set(index, { id: item.id, mediaType: item.mediaType});
         if (item.mediaType !== 'GROUPER') {
             itemLink.addEventListener('click', async (e) => {
                 e.preventDefault();
+                currentViewItemIndex = index;
                 await quickViewContentInOverlay(item.id, item.mediaType);
             });
         }
@@ -861,6 +874,90 @@ function displaySearchItems(searchItems) {
 
         mainItemContainer.appendChild(itemContainer);
     });
+}
+
+const quickViewOverlay = document.getElementById('quickViewOverlay');
+const leftButtons = quickViewOverlay.querySelector('.left-buttons');
+const rightButtons = quickViewOverlay.querySelector('.right-buttons');
+const leftNextBtn = leftButtons.querySelector('.next-btn');
+const rightNextBtn = rightButtons.querySelector('.next-btn');
+const leftPrevBtn = leftButtons.querySelector('.prev-btn');
+const rightPrevBtn = rightButtons.querySelector('.prev-btn');
+
+async function viewNextMedia() {
+    let nextIndex = null;
+    const dummyButton = {
+        preventDefault: () => {},
+        target: {
+            disabled: false
+        }
+    };
+    do {
+        for (let index = currentViewItemIndex + 1; index < currentItemTypeMap.size; index++) {
+            console.log(`index next: ${index}`);
+            if (currentItemTypeMap.get(index).mediaType !== 'GROUPER') {
+                nextIndex = index;
+                break;
+            }
+        }
+        if (nextIndex === null && currentPageInfo.page < currentPageInfo.totalPages - 1)
+            await pageClickHandler(dummyButton, currentPageInfo.page + 1);
+        else
+            break;
+    }
+    while (currentPageInfo.page < (currentPageInfo.totalPages - 1))
+
+    if (nextIndex !== null) {
+        leftPrevBtn.classList.remove('invisible');
+        rightPrevBtn.classList.remove('invisible');
+        currentViewItemIndex = nextIndex;
+        await quickViewContentInOverlay(currentItemTypeMap.get(nextIndex).id, currentItemTypeMap.get(nextIndex).mediaType);
+    } else {
+        leftNextBtn.classList.add('invisible');
+        rightNextBtn.classList.add('invisible');
+    }
+    console.log(currentViewItemIndex);
+}
+
+async function viewPreviousMedia() {
+    let prevIndex = null;
+    const dummyButton = {
+        preventDefault: () => {},
+        target: {
+            disabled: false
+        }
+    };
+    do {
+        for (let index = currentViewItemIndex - 1; index >= 0; index--) {
+            console.log(`index prev: ${index}`);
+            if (currentItemTypeMap.get(index).mediaType !== 'GROUPER') {
+                prevIndex = index;
+                break;
+            }
+        }
+        if (prevIndex === null && currentPageInfo.page > 0)
+            await pageClickHandler(dummyButton, currentPageInfo.page - 1);
+        else
+            break;
+    } while (currentPageInfo.page > 0)
+
+    if (prevIndex !== null) {
+        leftNextBtn.classList.remove('invisible');
+        rightNextBtn.classList.remove('invisible');
+        currentViewItemIndex = prevIndex;
+        await quickViewContentInOverlay(currentItemTypeMap.get(prevIndex).id, currentItemTypeMap.get(prevIndex).mediaType);
+    } else {
+        leftPrevBtn.classList.add('invisible');
+        rightPrevBtn.classList.add('invisible');
+    }
+    console.log(currentViewItemIndex);
+}
+
+function initializeViewStepButtons() {
+    leftNextBtn.addEventListener('click', viewNextMedia);
+    rightNextBtn.addEventListener('click', viewNextMedia);
+    leftPrevBtn.addEventListener('click', viewPreviousMedia);
+    rightPrevBtn.addEventListener('click', viewPreviousMedia);
 }
 
 function createLoader(container) {
