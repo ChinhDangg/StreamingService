@@ -77,6 +77,10 @@ public class VideoService extends MediaService implements ResourceCleanable {
         double clipLength = previewLength / segments;
         double interval = duration / segments;
 
+        if (duration <= 60) {
+            return getPartialVideoUrl(videoId, resolution);
+        }
+
         long estimatedSize = (long) (Resolution.getEstimatedSize(
                         mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight(), resolution)
                         / (duration / previewLength));
