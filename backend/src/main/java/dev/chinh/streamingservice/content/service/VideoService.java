@@ -168,7 +168,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
         MediaJobStatus mediaJobStatus = getVideoJobStatus(cacheJobId);
         boolean prevJobStopped = false;
         if (mediaJobStatus != null) {
-            if (!mediaJobStatus.equals(MediaJobStatus.STOPPED))
+            if (mediaJobStatus.equals(MediaJobStatus.COMPLETED) || mediaJobStatus.equals(MediaJobStatus.RUNNING))
                 return getNginxVideoStreamUrl(videoDir);
             else
                 prevJobStopped = true;
