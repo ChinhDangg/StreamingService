@@ -1,0 +1,9 @@
+{
+  "content": [
+    "./src/main/resources/templates/**/*.{html,htm}",
+  ],
+  "theme": {
+    "extend": {}
+  },
+  "plugins": []
+}
