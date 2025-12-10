@@ -152,7 +152,7 @@ public class MediaSearchService {
         MediaSearchResult result = new MediaSearchResult(itemResponses);
         result.setPage(page);
         result.setPageSize(size);
-        result.setTotal(response.hits().hits().size());
+        result.setTotal(response.hits().total() == null ? 0 : response.hits().total().value());
         result.setTotalPages((result.getTotal() + size -1) / size);
 
         return new MapSearchResult(result, items);
