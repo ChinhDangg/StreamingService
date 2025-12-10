@@ -167,7 +167,7 @@ public class OpenSearchService {
                 }
                 break;
             } catch (IOException e) {
-                if (e.getMessage().contains("Connection reset")) {
+                if (e.getMessage().contains("Connection reset") || e.getMessage().contains("Connection closed")) {
                     System.out.println("Retrying opensearch connection: " + retryCount);
                     Thread.sleep(500);
                 } else {
