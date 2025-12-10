@@ -480,10 +480,9 @@ public class OpenSearchService {
                 .from(page * size)
                 .size(size)
                 .query(query)
-                .sort(primarySort, scoreTieBreaker), Object.class
+                .sort(primarySort, scoreTieBreaker)
+                .trackTotalHits(t -> t.count(1000)), Object.class
         );
-
-        response.hits().hits().forEach(hit -> System.out.println(hit.source()));
 
         return response;
     }
