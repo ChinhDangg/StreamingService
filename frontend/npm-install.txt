@@ -1,0 +1,37 @@
+--command
+npm init
+
+--command
+npm install hls.js
+--copy
+node_modules/hls.js/dist/hls.min.js
+node_modules/hls.js/dist/hls.js
+
+--command
+npm install lucide
+--copy
+node_modules/lucide/dist/umd/lucide.min.js
+
+--command
+npm install -g tailwindcss
+--create file at root folder
+tailwind.config.json
+--write to file
+{
+  "content": [
+    "./src/main/resources/templates/**/*.{html,htm}",
+    "./src/main/resources/static/**/*.js"
+  ],
+  "theme": {
+    "extend": {}
+  },
+  "plugins": []
+}
+--create file
+src/main/resources/static/css/input.css
+--write to file
+@import "tailwindcss";
+--command
+npx @tailwindcss/cli -i ./src/main/resources/static/css/input.css -o ./src/main/resources/static/css/tailwind.css --minify
+--use tailwind.css
+src/main/resources/static/css/tailwind.css
