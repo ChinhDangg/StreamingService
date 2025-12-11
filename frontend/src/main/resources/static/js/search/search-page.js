@@ -812,7 +812,7 @@ function formatTime(s) {
     return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 }
 
-const videoContainer = document.getElementById('videoContainer-preview');
+let videoContainer = document.getElementById('videoContainer-preview');
 const currentItemTypeMap = new Map();
 let currentViewItemIndex = null;
 
@@ -854,18 +854,35 @@ function displaySearchItems(searchItems) {
             itemContainer.querySelector('.time-note').textContent = formatTime(item.length);
             const thumbnailContainer = itemContainer.querySelector('.thumbnail-container');
             const imageContainer = thumbnailContainer.querySelector('.image-container');
+            let hoverTimer = null;
+            let triggerDelay = 400;
             thumbnailContainer.addEventListener('mouseenter', async () => {
-                await requestVideoPreview(item.id, itemContainer);
+                hoverTimer = setTimeout(() => {
+                    console.log("hover preview triggered");
+                    requestVideoPreview(item.id, thumbnailContainer);
+                    hoverTimer = null;
+                }, triggerDelay);
             });
             thumbnailContainer.addEventListener('touchstart', async () => {
-                await requestVideoPreview(item.id, itemContainer);
+                if (hoverTimer) clearTimeout(hoverTimer);
+
+                hoverTimer = setTimeout(() => {
+                    console.log("touch preview triggered");
+                    requestVideoPreview(item.id, thumbnailContainer);
+                    hoverTimer = null;
+                }, triggerDelay);
             });
             thumbnailContainer.addEventListener('mouseleave', async () => {
-                videoContainer.classList.add('hidden');
+                if (hoverTimer) {
+                    clearTimeout(hoverTimer);
+                    hoverTimer = null;
+                }
+                thumbnailContainer.querySelector('.video-container-preview')?.classList.add('hidden');
                 imageContainer.classList.remove('hidden');
             });
             thumbnailContainer.addEventListener('touchend', async () => {
-                videoContainer.classList.add('hidden');
+                if (hoverTimer) clearTimeout(hoverTimer);
+                thumbnailContainer.querySelector('.video-container-preview')?.classList.add('hidden');
                 imageContainer.classList.remove('hidden');
             });
         }
@@ -960,7 +977,7 @@ function initializeViewStepButtons() {
     rightPrevBtn.addEventListener('click', viewPreviousMedia);
 }
 
-function createLoader(container) {
+function createLoader() {
     // Create overlay wrapper
     const loader = document.createElement("div");
     loader.className = "custom-loader-overlay";
@@ -983,15 +1000,6 @@ function createLoader(container) {
         zIndex: 999,
         borderRadius: "inherit",
     });
-
-    // Ensure container can hold absolutely positioned children
-    const computed = window.getComputedStyle(container);
-    if (computed.position === "static") {
-        container.style.position = "relative";
-    }
-
-    // Add the loader inside container
-    container.appendChild(loader);
 
     // Spinner style
     const spinner = loader.querySelector(".custom-loader-spinner");
@@ -1020,19 +1028,29 @@ function createLoader(container) {
     return loader;
 }
 
-async function requestVideoPreview(videoId, itemNode) {
-    const thumbnailContainer = itemNode.querySelector('.thumbnail-container');
-    thumbnailContainer.querySelector('.image-container').classList.add('hidden');
-    videoContainer.classList.remove('hidden');
+let isRequestingVideoPreview = false;
+async function requestVideoPreview(videoId, thumbnailContainer) {
+    if (isRequestingVideoPreview) return;
+    isRequestingVideoPreview = true;
 
-    if (thumbnailContainer.contains(videoContainer)) {
-        thumbnailContainer.querySelector('.image-container').classList.add('hidden');
+    thumbnailContainer.querySelector('.image-container').classList.add('hidden');
+
+    const videoContainerPreview = thumbnailContainer.querySelector('.video-container-preview');
+    if (videoContainerPreview) {
+        videoContainerPreview.classList.remove('hidden');
+        isRequestingVideoPreview = false;
         return;
     } else {
+        const videoContainerCopy = helperCloneAndUnHideNode(videoContainer);
+        videoContainerCopy.removeAttribute('id');
+        videoContainer = videoContainerCopy;
+
+        videoContainer.classList.remove('hidden');
         thumbnailContainer.appendChild(videoContainer);
     }
 
-    const loader = createLoader(thumbnailContainer);
+    const loader = createLoader();
+
     let playlistUrl;
     try {
         thumbnailContainer.appendChild(loader);
@@ -1047,26 +1065,28 @@ async function requestVideoPreview(videoId, itemNode) {
         setAlertStatus('Preview Failed', err.message);
         return;
     } finally {
-        loader.remove(); // remove loading indicator
+        thumbnailContainer.removeChild(loader);
     }
 
-    const video = videoContainer.querySelector('video');
+    setVideoUrl(videoContainer, playlistUrl, true, true);
 
-    setVideoUrl(videoContainer, playlistUrl);
+    const video = videoContainer.querySelector('video');
 
     video.addEventListener('mouseenter', () => {
         video.play();
     });
+
     video.addEventListener('touchstart', () => {
         video.play();
     });
-
     video.addEventListener('mouseleave', () => {
         video.pause();
         video.currentTime = 0;
     });
+
     video.addEventListener('touchend', () => {
         video.pause();
         video.currentTime = 0;
     });
+    isRequestingVideoPreview = false;
 }
