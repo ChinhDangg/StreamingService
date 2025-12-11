@@ -242,7 +242,9 @@ public class VideoService extends MediaService implements ResourceCleanable {
                 "-vf", scale,                 // video filter: resize to 360p height, keep aspect ratio
                 "-c:v", "h264",               // encode video with H.264 codec
                 "-preset", "veryfast",        // encoder speed/efficiency tradeoff: "veryfast" = low CPU, larger file
-                //"-c:a", "aac",                // encode audio with AAC codec
+                "-force_key_frames", "expr:gte(t,n_forced*" + segmentDuration + ")", // force keyframe every 4 seconds as hls_time is just a target
+                "-sc_threshold", "0",             // disable scene change detection as it inserts extra keyframes
+                "-c:a", "aac",                // encode audio with AAC codec
                 "-metadata", "job_id=" + partialVideoJobId,    // unique tag
                 "-f", "hls",                  // output format = HTTP Live Streaming (HLS)
                 "-hls_time", String.valueOf(segmentDuration),  // segment duration: ~4 seconds per .ts file
@@ -381,7 +383,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
                     OSUtil.writeTextToTempFile(videoMasterFilePath.replaceFirst("/chunks/", ""), List.of("#EXT-X-ENDLIST"), false);
                 else {
                     addCacheVideoJobStatus(videoId, null, null, MediaJobStatus.FAILED);
-                    System.out.println(logs);
+                    logs.forEach(System.out::println);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
