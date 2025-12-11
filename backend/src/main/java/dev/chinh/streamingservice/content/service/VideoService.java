@@ -64,8 +64,6 @@ public class VideoService extends MediaService implements ResourceCleanable {
                 prevJobStopped = true;
         }
 
-        OSUtil.createTempDir(videoDir);
-
         // === resolution control ===
         final Resolution resolution = Resolution.p240;
 
@@ -81,6 +79,8 @@ public class VideoService extends MediaService implements ResourceCleanable {
             return getPartialVideoUrl(videoId, resolution);
         }
 
+        OSUtil.createTempDir(videoDir);
+
         long estimatedSize = (long) (Resolution.getEstimatedSize(
                         mediaDescription.getSize(), mediaDescription.getWidth(), mediaDescription.getHeight(), resolution)
                         / (duration / previewLength));
@@ -93,20 +93,27 @@ public class VideoService extends MediaService implements ResourceCleanable {
             double start = i * interval;
             double end   = start + clipLength;
 
+//            fc.append(String.format(
+//                    "[0:v]trim=start=%.3f:end=%.3f,setpts=PTS-STARTPTS[v%d];" +
+//                            "[0:a]atrim=start=%.3f:end=%.3f,asetpts=PTS-STARTPTS[a%d];",
+//                    start, end, i, start, end, i
+//            ));
+//            concatInputs.append(String.format("[v%d][a%d]", i, i));
             fc.append(String.format(
-                    "[0:v]trim=start=%.3f:end=%.3f,setpts=PTS-STARTPTS[v%d];" +
-                            "[0:a]atrim=start=%.3f:end=%.3f,asetpts=PTS-STARTPTS[a%d];",
-                    start, end, i, start, end, i
+                    "[0:v]trim=start=%.3f:end=%.3f,setpts=PTS-STARTPTS[v%d];",
+                    start, end, i
             ));
-            concatInputs.append(String.format("[v%d][a%d]", i, i));
+            concatInputs.append(String.format("[v%d]", i));
         }
 
         String scale = getFfmpegScaleString(mediaDescription.getWidth(), mediaDescription.getHeight(), resolution.getResolution());
 
         // concat -> scale
         fc.append(String.format(
-                "%sconcat=n=%d:v=1:a=1[vcat][acat];" +      // stitch video+audio
-                        "[vcat]%s[v]",                     // scale once after concat
+//                "%sconcat=n=%d:v=1:a=1[vcat][acat];" +     // stitch video+audio
+//                        "[vcat]%s[v]",                     // scale once after concat
+                "%sconcat=n=%d:v=1:a=0[vcat];" +            // stitch video
+                        "[vcat]%s[v]",                      // scale once after concat
                 concatInputs, segments, scale
         )); // scale=-2:%d[v]
         String filterComplex = fc.toString();
@@ -135,9 +142,10 @@ public class VideoService extends MediaService implements ResourceCleanable {
         command.addAll(List.of(
                 "-i", nginxUrl,
                 "-filter_complex", filterComplex,
-                "-map", "[v]", "-map", "[acat]",
+                "-map", "[v]",
+//                "-map", "[acat]",
                 "-c:v", "h264", "-preset", "veryfast",
-//                "-c:a", "aac",
+//                "-c:a", "aac",    // encode audio with AAC codec
                 "-metadata", "job_id=" + partialVideoJobId,
                 // Optional: improve HLS segmenting/keyframes consistency
                 "-g", "48", "-keyint_min", "48", "-sc_threshold", "0",
@@ -234,7 +242,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
                 "-vf", scale,                 // video filter: resize to 360p height, keep aspect ratio
                 "-c:v", "h264",               // encode video with H.264 codec
                 "-preset", "veryfast",        // encoder speed/efficiency tradeoff: "veryfast" = low CPU, larger file
-                "-c:a", "aac",                // encode audio with AAC codec
+                //"-c:a", "aac",                // encode audio with AAC codec
                 "-metadata", "job_id=" + partialVideoJobId,    // unique tag
                 "-f", "hls",                  // output format = HTTP Live Streaming (HLS)
                 "-hls_time", String.valueOf(segmentDuration),  // segment duration: ~4 seconds per .ts file
@@ -352,26 +360,29 @@ public class VideoService extends MediaService implements ResourceCleanable {
                 .redirectErrorStream(true)
                 .start();
 
-        // Start a new thread just for logging
+        // Start a new thread
         new Thread(() -> {
+            List<String> logs = new ArrayList<>();
             try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
                 while ((line = br.readLine()) != null) {
-                    System.out.println("[ffmpeg] " + line);
+                    logs.add("[ffmpeg] " + line);
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
             try {
                 int exit = process.waitFor();
-                System.out.println("ffmpeg exited with code " + exit);
+                System.out.println("ffmpeg video " + videoMasterFilePath + " exited with code " + exit);
                 // mark as completed
                 if (videoId != null && exit == 0)
                     addCacheVideoJobStatus(videoId, null, null, MediaJobStatus.COMPLETED);
                 if (exit == 0)
                     OSUtil.writeTextToTempFile(videoMasterFilePath.replaceFirst("/chunks/", ""), List.of("#EXT-X-ENDLIST"), false);
-                else
+                else {
                     addCacheVideoJobStatus(videoId, null, null, MediaJobStatus.FAILED);
+                    System.out.println(logs);
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
