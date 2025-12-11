@@ -976,6 +976,7 @@ function createLoader(container) {
         width: "100%",
         height: "100%",
         background: "rgba(0,0,0,0.4)",
+        pointerEvents: "none", // prevents loader from intercepting mouse events on container
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
