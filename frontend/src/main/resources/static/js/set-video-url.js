@@ -1,19 +1,9 @@
 
-export function setVideoUrl(videoContainerNode, playlistUrl = "p720/master.m3u8", restart = true, startPlaying = false) {
+export function setVideoUrl(videoContainerNode, playlistUrl, restart = true, startPlaying = false) {
     const video = videoContainerNode.querySelector('video');
     const totalTime = videoContainerNode.querySelector('.total-time');
     const currentTime = video.currentTime;
     if (playlistUrl.endsWith(".m3u8")) {
-        if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = playlistUrl + '?_=' + Date.now(); // cache-buster
-            if (!restart) {
-                video.addEventListener("loadedmetadata", () => {
-                    if (video.duration && video.duration >= currentTime) {
-                        video.currentTime = currentTime;
-                    }
-                }, { once: true });
-            }
-        } else if (Hls.isSupported()) {
             const hls = new Hls();
             hls.loadSource(playlistUrl + '?_=' + Date.now());
             hls.attachMedia(video);
@@ -32,21 +22,20 @@ export function setVideoUrl(videoContainerNode, playlistUrl = "p720/master.m3u8"
             }
             hls.on(Hls.Events.MANIFEST_PARSED, onManifestParsed);
 
-            if (!totalTime)
-                return;
-            const onLevelLoaded = (event, data) => {
-                const d = data.details;
-                if (!d.live) {
-                    hls.off(Hls.Events.LEVEL_LOADED, onLevelLoaded);
-                    totalTime.textContent = formatTime(video.duration);
-                } else {
-                    setTimeout(() => {
-                        totalTime.textContent = formatTime(video.duration);
-                    }, 100);
+            if (totalTime) {
+                const onLevelLoaded = (event, data) => {
+                    const d = data.details;
+                    if (!d.live) {
+                        hls.off(Hls.Events.LEVEL_LOADED, onLevelLoaded);
+                        totalTime.textContent = formatTime(d.totalduration);
+                    } else {
+                        setTimeout(() => {
+                            totalTime.textContent = formatTime(d.totalduration);
+                        }, 100);
+                    }
                 }
+                hls.on(Hls.Events.LEVEL_LOADED, onLevelLoaded);
             }
-            hls.on(Hls.Events.LEVEL_LOADED, onLevelLoaded);
-        }
     } else {
         video.src = playlistUrl;
         if (!restart) {
