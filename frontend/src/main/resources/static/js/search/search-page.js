@@ -858,16 +858,13 @@ function displaySearchItems(searchItems) {
             let triggerDelay = 400;
             thumbnailContainer.addEventListener('mouseenter', async () => {
                 hoverTimer = setTimeout(() => {
-                    console.log("hover preview triggered");
                     requestVideoPreview(item.id, thumbnailContainer);
                     hoverTimer = null;
                 }, triggerDelay);
             });
             thumbnailContainer.addEventListener('touchstart', async () => {
                 if (hoverTimer) clearTimeout(hoverTimer);
-
                 hoverTimer = setTimeout(() => {
-                    console.log("touch preview triggered");
                     requestVideoPreview(item.id, thumbnailContainer);
                     hoverTimer = null;
                 }, triggerDelay);
@@ -1030,63 +1027,158 @@ function createLoader() {
 
 let isRequestingVideoPreview = false;
 async function requestVideoPreview(videoId, thumbnailContainer) {
-    if (isRequestingVideoPreview) return;
-    isRequestingVideoPreview = true;
+    const requestPreview = async () => {
+        thumbnailContainer.querySelector('.image-container').classList.add('hidden');
 
-    thumbnailContainer.querySelector('.image-container').classList.add('hidden');
-
-    const videoContainerPreview = thumbnailContainer.querySelector('.video-container-preview');
-    if (videoContainerPreview) {
-        videoContainerPreview.classList.remove('hidden');
-        isRequestingVideoPreview = false;
-        return;
-    } else {
+        const videoContainerPreview = thumbnailContainer.querySelector('.video-container-preview');
+        if (videoContainerPreview) {
+            if (videoContainerPreview.querySelector('video').src) {
+                videoContainerPreview.classList.remove('hidden');
+                console.log('video already loaded');
+                return;
+            }
+            thumbnailContainer.removeChild(videoContainerPreview);
+        }
         const videoContainerCopy = helperCloneAndUnHideNode(videoContainer);
         videoContainerCopy.removeAttribute('id');
         videoContainer = videoContainerCopy;
 
         videoContainer.classList.remove('hidden');
         thumbnailContainer.appendChild(videoContainer);
-    }
 
-    const loader = createLoader();
+        const video = videoContainer.querySelector('video');
+        video.addEventListener('mouseenter', () => {
+            if (video.src)
+                video.play();
+        });
+        video.addEventListener('touchstart', () => {
+            video.play();
+        });
+        video.addEventListener('mouseleave', () => {
+            if (window.currentPolling)
+                window.currentPolling.cancel();
+            if (video.src) {
+                video.pause();
+                video.currentTime = 0;
+            }
+        });
+        video.addEventListener('touchend', () => {
+            if (window.currentPolling)
+                window.currentPolling.cancel();
+            if (video.src) {
+                video.pause();
+                video.currentTime = 0;
+            }
+        });
 
-    let playlistUrl;
-    try {
-        thumbnailContainer.appendChild(loader);
-        const response = await fetch(`/api/videos/preview/${videoId}`);
-        if (!response.ok) {
-            setAlertStatus('Preview Failed', await response.text());
-            return;
+        if (window.currentPolling) {
+            window.currentPolling.cancel();
         }
-        playlistUrl = await response.text()
-    } catch (err) {
-        console.error("Error:", err);
-        setAlertStatus('Preview Failed', err.message);
+
+        window.currentPolling = pollPlaylistUrl(videoId);
+
+        const loader = createLoader();
+
+        let playlistUrl;
+        try {
+            thumbnailContainer.appendChild(loader);
+            playlistUrl = await window.currentPolling.promise;
+        } catch (err) {
+            if (err === 'cancelled') {
+                console.log('preview cancelled');
+                return;
+            }
+            if (err === 'timeout') {
+                setAlertStatus('Preview Timeout');
+                return;
+            }
+            setAlertStatus('Preview Failed', err);
+            return;
+        } finally {
+            thumbnailContainer.removeChild(loader);
+        }
+
+        setVideoUrl(videoContainer, playlistUrl, true, true);
+    };
+
+    if (isRequestingVideoPreview)
         return;
-    } finally {
-        thumbnailContainer.removeChild(loader);
-    }
-
-    setVideoUrl(videoContainer, playlistUrl, true, true);
-
-    const video = videoContainer.querySelector('video');
-
-    video.addEventListener('mouseenter', () => {
-        video.play();
-    });
-
-    video.addEventListener('touchstart', () => {
-        video.play();
-    });
-    video.addEventListener('mouseleave', () => {
-        video.pause();
-        video.currentTime = 0;
-    });
-
-    video.addEventListener('touchend', () => {
-        video.pause();
-        video.currentTime = 0;
-    });
+    isRequestingVideoPreview = true;
+    await requestPreview();
     isRequestingVideoPreview = false;
 }
+
+function pollPlaylistUrl(videoId, maxWaitMs = 5000, intervalMs = 500) {
+    let cancelRequested = false;
+    let previewInterval = null;
+    let previewTimeout = null;
+
+    const promise = new Promise((resolve, reject) => {
+        previewTimeout = setTimeout(() => {
+            clearInterval(previewInterval);
+            if (!cancelRequested) reject('Timeout');
+        }, maxWaitMs);
+
+        previewInterval = setInterval(async () => {
+            if (cancelRequested) {
+                console.log('request cancelled');
+                clearInterval(previewInterval);
+                clearTimeout(previewTimeout);
+                reject('cancelled');
+                return;
+            }
+
+            let response;
+            try {
+                response = await fetch(`/api/videos/preview/${videoId}`);
+            } catch (err) {
+                clearInterval(previewInterval);
+                clearTimeout(previewTimeout);
+                reject('network error: ' + err);
+                return;
+            }
+            if (!response.ok) {
+                clearInterval(previewInterval);
+                clearTimeout(previewTimeout);
+                reject(await response.text());
+                return;
+            }
+
+            const playlistUrl = await response.text();
+            if (playlistUrl !== 'RUNNING') {
+                clearInterval(previewInterval);
+                clearTimeout(previewTimeout);
+                resolve(playlistUrl);
+            }
+        }, intervalMs);
+    });
+
+    return {
+        promise,
+        cancel: () => {
+            cancelRequested = true;
+        }
+    };
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
