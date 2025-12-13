@@ -1,5 +1,8 @@
-import { initializeHeader } from "/static/js/header.js";
-import { setVideoUrl, setVideoResolution } from "/static/js/set-video-url.js";
+import {initializeHeader, setAlertStatus} from "/static/js/header.js";
+import {
+    setVideoResolution,
+    requestVideoPartial
+} from "/static/js/set-video-url.js";
 import { displayContentInfo } from "/static/js/metadata-display.js";
 
 const container = document.querySelector('[data-player="videoPlayerContainer"]');
@@ -75,13 +78,12 @@ async function displayVideoInfo(videoId, videoInfo = null) {
 async function getVideoUrl(videoId, originalRes) {
     const baseUrl = `/api/videos/partial/${videoId}`;
     let defaultRes = 'p' + (originalRes > 480 ? 480 : originalRes);
-    const response = await fetch(baseUrl + "/" + defaultRes);
-    if (!response.ok) {
-        alert("Failed to fetch video");
+    const fetchUrl = baseUrl + "/" + defaultRes;
+    const container = document.querySelector('[data-player="videoPagePlayerContainer"]');
+    const requestMessage = await requestVideoPartial(fetchUrl, container);
+    if (requestMessage !== null) {
+        setAlertStatus(requestMessage);
         return;
     }
-    const videoUrl = await response.text();
-    const container = document.querySelector('[data-player="videoPagePlayerContainer"]');
-    setVideoUrl(container, videoUrl);
     setVideoResolution(container, baseUrl, originalRes, defaultRes);
 }
