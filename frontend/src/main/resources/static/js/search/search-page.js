@@ -1,4 +1,4 @@
-import {setVideoUrl} from "/static/js/set-video-url.js";
+import {createLoader, pollPlaylistUrl, setVideoUrl} from "/static/js/set-video-url.js";
 import {displayPagination} from "/static/js/pagination.js";
 import {
     helperCloneAndUnHideNode,
@@ -974,57 +974,6 @@ function initializeViewStepButtons() {
     rightPrevBtn.addEventListener('click', viewPreviousMedia);
 }
 
-function createLoader() {
-    // Create overlay wrapper
-    const loader = document.createElement("div");
-    loader.className = "custom-loader-overlay";
-    loader.innerHTML = `
-    <div class="custom-loader-spinner"></div>
-  `;
-
-    // Style: covers container but not entire page
-    Object.assign(loader.style, {
-        position: "absolute",
-        top: 0,
-        left: 0,
-        width: "100%",
-        height: "100%",
-        background: "rgba(0,0,0,0.4)",
-        pointerEvents: "none", // prevents loader from intercepting mouse events on container
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 999,
-        borderRadius: "inherit",
-    });
-
-    // Spinner style
-    const spinner = loader.querySelector(".custom-loader-spinner");
-    Object.assign(spinner.style, {
-        width: "48px",
-        height: "48px",
-        border: "6px solid #fff",
-        borderTopColor: "transparent",
-        borderRadius: "50%",
-        animation: "spin 1s linear infinite",
-    });
-
-    // Add keyframes (only once)
-    if (!document.getElementById("custom-loader-style")) {
-        const style = document.createElement("style");
-        style.id = "custom-loader-style";
-        style.textContent = `
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-    `;
-        document.head.appendChild(style);
-    }
-
-    // Return the loader so caller can remove it later
-    return loader;
-}
-
 let isRequestingVideoPreview = false;
 async function requestVideoPreview(videoId, thumbnailContainer) {
     const requestPreview = async () => {
@@ -1055,34 +1004,34 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
             video.play();
         });
         video.addEventListener('mouseleave', () => {
-            if (window.currentPolling)
-                window.currentPolling.cancel();
+            if (window.currentPreviewPolling)
+                window.currentPreviewPolling.cancel();
             if (video.src) {
                 video.pause();
                 video.currentTime = 0;
             }
         });
         video.addEventListener('touchend', () => {
-            if (window.currentPolling)
-                window.currentPolling.cancel();
+            if (window.currentPreviewPolling)
+                window.currentPreviewPolling.cancel();
             if (video.src) {
                 video.pause();
                 video.currentTime = 0;
             }
         });
 
-        if (window.currentPolling) {
-            window.currentPolling.cancel();
+        if (window.currentPreviewPolling) {
+            window.currentPreviewPolling.cancel();
         }
 
-        window.currentPolling = pollPlaylistUrl(videoId);
+        window.currentPreviewPolling = pollPlaylistUrl(`/api/videos/preview/${videoId}`);
 
         const loader = createLoader();
 
         let playlistUrl;
         try {
             thumbnailContainer.appendChild(loader);
-            playlistUrl = await window.currentPolling.promise;
+            playlistUrl = await window.currentPreviewPolling.promise;
         } catch (err) {
             if (err === 'cancelled') {
                 console.log('preview cancelled');
@@ -1106,59 +1055,6 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
     isRequestingVideoPreview = true;
     await requestPreview();
     isRequestingVideoPreview = false;
-}
-
-function pollPlaylistUrl(videoId, maxWaitMs = 5000, intervalMs = 500) {
-    let cancelRequested = false;
-    let previewInterval = null;
-    let previewTimeout = null;
-
-    const promise = new Promise((resolve, reject) => {
-        previewTimeout = setTimeout(() => {
-            clearInterval(previewInterval);
-            if (!cancelRequested) reject('Timeout');
-        }, maxWaitMs);
-
-        previewInterval = setInterval(async () => {
-            if (cancelRequested) {
-                console.log('request cancelled');
-                clearInterval(previewInterval);
-                clearTimeout(previewTimeout);
-                reject('cancelled');
-                return;
-            }
-
-            let response;
-            try {
-                response = await fetch(`/api/videos/preview/${videoId}`);
-            } catch (err) {
-                clearInterval(previewInterval);
-                clearTimeout(previewTimeout);
-                reject('network error: ' + err);
-                return;
-            }
-            if (!response.ok) {
-                clearInterval(previewInterval);
-                clearTimeout(previewTimeout);
-                reject(await response.text());
-                return;
-            }
-
-            const playlistUrl = await response.text();
-            if (playlistUrl !== 'RUNNING') {
-                clearInterval(previewInterval);
-                clearTimeout(previewTimeout);
-                resolve(playlistUrl);
-            }
-        }, intervalMs);
-    });
-
-    return {
-        promise,
-        cancel: () => {
-            cancelRequested = true;
-        }
-    };
 }
 
 
