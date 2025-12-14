@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.content.constant;
+package dev.chinh.streamingservice.common.constant;
 
 import java.util.Set;
 
