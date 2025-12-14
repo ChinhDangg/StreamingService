@@ -100,8 +100,8 @@ export async function requestVideoPartial(fetchUrl, container, restart = true, s
     let playlistUrl;
     try {
         container.appendChild(loader);
-        const videoPolling = pollPlaylistUrl(fetchUrl);
-        playlistUrl = await videoPolling.promise;
+        const urlPolling = pollPlaylistUrl(fetchUrl);
+        playlistUrl = await urlPolling.promise;
     } catch (error) {
         if (err === 'cancelled') {
             return 'Video Cancelled';
