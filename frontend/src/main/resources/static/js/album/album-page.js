@@ -1,5 +1,5 @@
-import { initializeHeader } from "/static/js/header.js";
-import { setVideoUrl, setVideoResolution } from "/static/js/set-video-url.js";
+import {initializeHeader, setAlertStatus} from "/static/js/header.js";
+import {setVideoUrl, setVideoResolution, pollPlaylistUrl} from "/static/js/set-video-url.js";
 import { displayContentInfo, helperCloneAndUnHideNode } from "/static/js/metadata-display.js";
 
 let albumId = null;
@@ -155,16 +155,21 @@ const fetchCheckResized = async (albumId, start) => {
         || albumCheckResizedMap.get(albumResolution) >= albumResUrlMap.get(albumResolution).length) {
         return true;
     }
-    const response = await fetch(`/api/album/${albumId}/${albumResolution}/${start}/check-resized`, {
-        method: 'POST',
-    });
-    if (!response.ok) {
-        alert("Failed to fetch album items");
-        return false;
+    const fetchResizedCountUrl = `/api/album/${albumId}/${albumResolution}/${start}/check-resized`;
+    try {
+        const checkResizedPolling = pollPlaylistUrl(fetchResizedCountUrl);
+        const resizedCount = await checkResizedPolling.promise;
+        albumCheckResizedMap.set(albumResolution, parseInt(resizedCount));
+        console.log(resizedCount);
+        return true;
+    } catch (err) {
+        if (err === 'timeout') {
+            setAlertStatus('Error', 'Time out');
+            return false;
+        }
+        setAlertStatus('Error', 'Failed to fetch resized count: ' + err);
+        throw new Error(err);
     }
-    const resizedCount = await response.text();
-    albumCheckResizedMap.set(albumResolution, parseInt(resizedCount));
-    return true;
 };
 
 function initializeResolutionSelector() {
@@ -206,12 +211,19 @@ function initializeResolutionSelector() {
 }
 
 async function fetchAlbumItemUrlsByResolution(albumId, resolution) {
-    const response = await fetch(`/api/album/${albumId}/${resolution}`);
-    if (!response.ok) {
-        alert("Failed to fetch album items");
-        return [];
+    const fetchAlbumUrls = `/api/album/${albumId}/${resolution}`;
+    try {
+        const urlPolling = pollPlaylistUrl(fetchAlbumUrls);
+        const albumUrls = await urlPolling.promise;
+        return JSON.parse(albumUrls);
+    } catch (err) {
+        if (err === 'timeout') {
+            setAlertStatus('Error', 'Time out');
+            return;
+        }
+        setAlertStatus('Error', 'Failed to fetch album items: ' + err);
+        throw new Error(err);
     }
-    return await response.json();
 }
 
 async function displayAlbumItems(albumId) {
