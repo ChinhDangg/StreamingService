@@ -1,7 +1,6 @@
-package dev.chinh.streamingservice;
+package dev.chinh.streamingservice.common;
 
 import org.springframework.stereotype.Component;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
 import java.nio.file.*;
@@ -25,14 +24,14 @@ public class OSUtil {
     public static long MEMORY_TOTAL = 0;
     public static AtomicLong MEMORY_USABLE;
 
-    public static void init() throws Exception {
-        currentOS = detectOS();
-        RAMDISK = getRAMDISKName();
-        OSUtil.createRamDisk();
-        OSUtil.startDockerCompose();
+    public static void _init() throws Exception {
+        currentOS = _detectOS();
+        RAMDISK = _getRAMDISKName();
+        _createRamDisk();
+        _initializeRAMInfo();
     }
 
-    private static OS detectOS() {
+    private static OS _detectOS() {
         String osName = System.getProperty("os.name").toLowerCase();
         if (osName.contains("win")) {
             return OS.WINDOWS;
@@ -45,12 +44,7 @@ public class OSUtil {
         }
     }
 
-    public static void _initializeRAMInfo() throws IOException, InterruptedException {
-        MEMORY_TOTAL = getMemoryTotalSpace();
-        MEMORY_USABLE = new AtomicLong(getActualMemoryUsableSpace());
-    }
-
-    private static String getRAMDISKName() {
+    private static String _getRAMDISKName() {
         if (currentOS == OS.WINDOWS) {
             return "R:";
         } else if (currentOS == OS.MAC) {
@@ -61,7 +55,7 @@ public class OSUtil {
         throw new RuntimeException("Unsupported OS: " + currentOS);
     }
 
-    public static void createRamDisk() throws Exception {
+    private static void _createRamDisk() throws Exception {
         if (Files.exists(Paths.get(RAMDISK))) {
             System.out.println("Ramdisk already exists");
             return;
@@ -97,6 +91,11 @@ public class OSUtil {
         System.out.println("RAMDisk creation finished");
     }
 
+    private static void _initializeRAMInfo() throws IOException, InterruptedException {
+        MEMORY_TOTAL = getMemoryTotalSpace();
+        MEMORY_USABLE = new AtomicLong(getActualMemoryUsableSpace());
+    }
+
     public static void startDockerCompose() throws IOException, InterruptedException {
         String composeFile = switch (currentOS) {
             case OS.MAC -> "compose.mac.yaml";
@@ -117,6 +116,64 @@ public class OSUtil {
         System.out.println("docker compose finished with exit code: " + exit);
     }
 
+    private static long getMemoryTotalSpace() throws IOException, InterruptedException {
+        if  (currentOS == OS.WINDOWS) {
+            return getMemoryTotalFromContainer();
+        } else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
+            return getMemoryTotalFromRAMDisk();
+        }
+        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+    }
+
+    private static long getMemoryTotalFromRAMDisk() throws IOException {
+        FileStore store = Files.getFileStore(Paths.get(RAMDISK));
+        return store.getTotalSpace();
+    }
+
+    private static long getMemoryTotalFromContainer() throws InterruptedException, IOException {
+        Process process = new ProcessBuilder("docker", "exec", "nginx", "df", "-B1", "/chunks")
+                .start();
+        String output = new String(process.getInputStream().readAllBytes());
+        process.waitFor();
+
+        String[] lines = output.split("\n");
+        // [Filesystem      1B-blocks  Used  Available Use% Mounted on, tmpfs          1073741824     0 1073741824   0% /chunks]
+        if (lines.length >= 2) {
+            String[] parts = lines[1].trim().split("\\s+");
+            return Long.parseLong(parts[1]);
+        }
+        throw new RuntimeException("Unable to get RAM total from container");
+    }
+
+    public static long getActualMemoryUsableSpace() throws IOException, InterruptedException {
+        if (currentOS == OS.WINDOWS) {
+            return getActualMemoryUsableSpaceFromContainer();
+        }  else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
+            return getActualMemoryUsableSpaceFromRAMDisk();
+        }
+        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+    }
+
+    private static long getActualMemoryUsableSpaceFromRAMDisk() throws IOException {
+        FileStore store = Files.getFileStore(Paths.get(RAMDISK));
+        return store.getUsableSpace();
+    }
+
+    private static long getActualMemoryUsableSpaceFromContainer() throws IOException, InterruptedException {
+        ProcessBuilder pb = new ProcessBuilder("docker", "exec", "nginx", "df", "-B1", "/chunks");
+        Process process = pb.start();
+        String output = new String(process.getInputStream().readAllBytes());
+        process.waitFor();
+
+        // Filesystem   1B-blocks      Used Available Use% Mounted on
+        String[] lines = output.split("\n");
+        if (lines.length >= 2) {
+            String[] parts = lines[1].trim().split("\\s+");
+            return Long.parseLong(parts[3]);
+        }
+        throw new RuntimeException("Unable to get RAM usable space from container");
+    }
+
     public static long getUsableMemory() {
         return MEMORY_USABLE.get();
     }
@@ -127,6 +184,124 @@ public class OSUtil {
 
     public static void refreshUsableMemory() throws IOException, InterruptedException {
         MEMORY_USABLE.set(getActualMemoryUsableSpace());
+    }
+
+    public static void deleteForceMemoryDirectory(String dir) {
+        if (currentOS == OS.WINDOWS) {
+            deleteForceDirectoryInContainer(dir);
+            return;
+        } else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
+            deleteForceDirectoryForRAMDisk(dir);
+            return;
+        }
+        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+    }
+
+    private static void deleteForceDirectoryForRAMDisk(String dir) {
+        dir = normalizePath(RAMDISK, dir);
+        if (!Files.exists(Paths.get(dir))) {
+            System.out.println("RAM disk does not exist to delete: " + dir);
+            return;
+        }
+
+        String[] cmd = new String[]{"rm", "-rf", dir};
+
+        try {
+            runCommandAndLog(cmd, null);
+        } catch (Exception e) {
+            System.err.println("Deletion failed for " + dir);
+        }
+
+        System.out.println("RAM disk successfully deleted: " + dir);
+    }
+
+    private static void deleteForceDirectoryInContainer(String path) {
+        path = normalizePath(BASE_DIR, path);
+        String[] cmd = {"docker", "exec", CONTAINER, "rm", "-rf", path};
+
+        try {
+            runCommandAndLog(cmd, null);
+        } catch (Exception e) {
+            System.err.println("Failed to delete in container: ");
+        }
+        System.out.println("Deleted " + path + " in container");
+    }
+
+
+
+    public static String readPlayListFromTempDir(String videoDir) throws IOException, InterruptedException {
+        if  (currentOS == OS.WINDOWS) {
+            return readPlaylistFromContainer(videoDir);
+        } else if (currentOS == OS.MAC) {
+            return readPlaylistFromRAMDisk(videoDir);
+        }
+        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+    }
+
+    private static String readPlaylistFromRAMDisk(String videoDir) throws IOException {
+        // Base directory for macOS RAMDISK mount — adjust if needed
+        Path playlistPath = Paths.get(RAMDISK, videoDir, "master.m3u8");
+        if (!Files.exists(playlistPath)) {
+            return null;
+        }
+
+        // Efficient tail: only keep last 2 lines
+        Deque<String> lastLines = new ArrayDeque<>(2);
+        try (BufferedReader br = Files.newBufferedReader(playlistPath)) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (lastLines.size() == 2) lastLines.removeFirst();
+                lastLines.addLast(line);
+            }
+        }
+        return String.join("\n", lastLines);
+    }
+
+    private static String readPlaylistFromContainer(String videoDir) throws IOException, InterruptedException {
+        Process process = new ProcessBuilder(
+                "docker", "exec", CONTAINER, "cat", "/chunks/" + videoDir + "/master.m3u8"
+        ).redirectErrorStream(true).start();
+
+        // Only keep the last 2 lines
+        Deque<String> lastLines = new ArrayDeque<>(2);
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (lastLines.size() == 2) lastLines.removeFirst(); // drop oldest
+                lastLines.addLast(line);
+            }
+        }
+        process.waitFor();
+        if (lastLines.isEmpty()) {
+            return null;
+        }
+        // Join the two last lines into a single string
+        return String.join("\n", lastLines);
+    }
+
+
+    public static boolean checkTempFileExists(String fileName) {
+        if (currentOS == OS.MAC || currentOS == OS.LINUX) {
+            File playlist = new File(normalizePath(RAMDISK, fileName));
+            return playlist.exists();
+        }
+        return containerFileExists(fileName);
+    }
+
+    private static boolean containerFileExists(String relativePath) {
+        String targetPath = normalizePath(BASE_DIR, relativePath);
+
+        String[] commands = {
+                "docker", "exec", CONTAINER,
+                "test", "-f", targetPath
+        };
+
+        try {
+            runCommandAndLog(commands, null);
+        } catch (Exception e) {
+            return false;
+        }
+        return true; // 0 = exists, else doesn't
     }
 
 
@@ -209,184 +384,6 @@ public class OSUtil {
     }
 
 
-    public static long getActualMemoryUsableSpace() throws IOException, InterruptedException {
-        if (currentOS == OS.WINDOWS) {
-            return getActualMemoryUsableSpaceFromContainer();
-        }  else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
-            return getActualMemoryUsableSpaceFromRAMDisk();
-        }
-        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
-    }
-
-    private static long getActualMemoryUsableSpaceFromRAMDisk() throws IOException {
-        FileStore store = Files.getFileStore(Paths.get(RAMDISK));
-        return store.getUsableSpace();
-    }
-
-    private static long getActualMemoryUsableSpaceFromContainer() throws IOException, InterruptedException {
-        ProcessBuilder pb = new ProcessBuilder("docker", "exec", "nginx", "df", "-B1", "/chunks");
-        Process process = pb.start();
-        String output = new String(process.getInputStream().readAllBytes());
-        process.waitFor();
-
-        // Filesystem   1B-blocks      Used Available Use% Mounted on
-        String[] lines = output.split("\n");
-        if (lines.length >= 2) {
-            String[] parts = lines[1].trim().split("\\s+");
-            return Long.parseLong(parts[3]);
-        }
-        throw new RuntimeException("Unable to get RAM usable space from container");
-    }
-
-
-    public static void deleteForceMemoryDirectory(String dir) {
-        if (currentOS == OS.WINDOWS) {
-            deleteForceDirectoryInContainer(dir);
-            return;
-        } else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
-            deleteForceDirectoryForRAMDisk(dir);
-            return;
-        }
-        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
-    }
-
-    private static void deleteForceDirectoryForRAMDisk(String dir) {
-        dir = normalizePath(RAMDISK, dir);
-        if (!Files.exists(Paths.get(dir))) {
-            System.out.println("RAM disk does not exist to delete: " + dir);
-            return;
-        }
-
-        String[] cmd = new String[]{"rm", "-rf", dir};
-
-        try {
-            runCommandAndLog(cmd, null);
-        } catch (Exception e) {
-            System.err.println("Deletion failed for " + dir);
-        }
-
-        System.out.println("RAM disk successfully deleted: " + dir);
-    }
-
-    private static void deleteForceDirectoryInContainer(String path) {
-        path = normalizePath(BASE_DIR, path);
-        String[] cmd = {"docker", "exec", CONTAINER, "rm", "-rf", path};
-
-        try {
-            runCommandAndLog(cmd, null);
-        } catch (Exception e) {
-            System.err.println("Failed to delete in container: ");
-        }
-        System.out.println("Deleted " + path + " in container");
-    }
-
-
-    private static long getMemoryTotalSpace() throws IOException, InterruptedException {
-        if  (currentOS == OS.WINDOWS) {
-            return getMemoryTotalFromContainer();
-        } else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
-            return getMemoryTotalFromRAMDisk();
-        }
-        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
-    }
-
-    private static long getMemoryTotalFromRAMDisk() throws IOException {
-        FileStore store = Files.getFileStore(Paths.get(RAMDISK));
-        return store.getTotalSpace();
-    }
-
-    private static long getMemoryTotalFromContainer() throws InterruptedException, IOException {
-        Process process = new ProcessBuilder("docker", "exec", "nginx", "df", "-B1", "/chunks")
-                .start();
-        String output = new String(process.getInputStream().readAllBytes());
-        process.waitFor();
-
-        String[] lines = output.split("\n");
-        // [Filesystem      1B-blocks  Used  Available Use% Mounted on, tmpfs          1073741824     0 1073741824   0% /chunks]
-        if (lines.length >= 2) {
-            String[] parts = lines[1].trim().split("\\s+");
-            return Long.parseLong(parts[1]);
-        }
-        throw new RuntimeException("Unable to get RAM total from container");
-    }
-
-
-    public static String readPlayListFromTempDir(String videoDir) throws IOException, InterruptedException {
-        if  (currentOS == OS.WINDOWS) {
-            return readPlaylistFromContainer(videoDir);
-        } else if (currentOS == OS.MAC) {
-            return readPlaylistFromRAMDisk(videoDir);
-        }
-        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
-    }
-
-    private static String readPlaylistFromRAMDisk(String videoDir) throws IOException {
-        // Base directory for macOS RAMDISK mount — adjust if needed
-        Path playlistPath = Paths.get(RAMDISK, videoDir, "master.m3u8");
-        if (!Files.exists(playlistPath)) {
-            return null;
-        }
-
-        // Efficient tail: only keep last 2 lines
-        Deque<String> lastLines = new ArrayDeque<>(2);
-        try (BufferedReader br = Files.newBufferedReader(playlistPath)) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                if (lastLines.size() == 2) lastLines.removeFirst();
-                lastLines.addLast(line);
-            }
-        }
-        return String.join("\n", lastLines);
-    }
-
-    private static String readPlaylistFromContainer(String videoDir) throws IOException, InterruptedException {
-        Process process = new ProcessBuilder(
-                "docker", "exec", CONTAINER, "cat", "/chunks/" + videoDir + "/master.m3u8"
-        ).redirectErrorStream(true).start();
-
-        // Only keep the last 2 lines
-        Deque<String> lastLines = new ArrayDeque<>(2);
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                if (lastLines.size() == 2) lastLines.removeFirst(); // drop oldest
-                lastLines.addLast(line);
-            }
-        }
-        process.waitFor();
-        if (lastLines.isEmpty()) {
-            return null;
-        }
-        // Join the two last lines into a single string
-        return String.join("\n", lastLines);
-    }
-
-
-    public static boolean checkTempFileExists(String fileName) throws IOException, InterruptedException {
-        if (currentOS == OS.MAC) {
-            File playlist = new File(normalizePath(RAMDISK, fileName));
-            return playlist.exists();
-        }
-        return containerFileExists(fileName);
-    }
-
-    private static boolean containerFileExists(String relativePath) {
-        String targetPath = normalizePath(BASE_DIR, relativePath);
-
-        String[] commands = {
-                "docker", "exec", CONTAINER,
-                "test", "-f", targetPath
-        };
-
-        try {
-            runCommandAndLog(commands, null);
-        } catch (Exception e) {
-            return false;
-        }
-        return true; // 0 = exists, else doesn't
-    }
-
-
     public static void createTempDir(String dir) throws Exception {
         if (currentOS == OS.MAC ||  currentOS == OS.LINUX) {
             createPathInRAMDisk(dir);
@@ -423,88 +420,6 @@ public class OSUtil {
         } catch (Exception e) {
             throw new IOException("Failed to create directory: " + dirPath, e);
         }
-    }
-
-
-    public static boolean saveMultipartFileToTempDir(String relativePath, MultipartFile file, boolean createDir) throws Exception {
-        if (currentOS == OS.WINDOWS) {
-            return streamMultipartFileToContainer(relativePath, file, createDir);
-        } else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
-            return saveMultipartFileToRAMDisk(relativePath, file, createDir);
-        }
-        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
-    }
-
-    private static boolean saveMultipartFileToRAMDisk(String relativePath, MultipartFile file, boolean createDir) throws Exception {
-        String targetPath = normalizePath(RAMDISK, relativePath);
-        if (createDir) {
-            createTempDir(relativePath.substring(0, relativePath.lastIndexOf('/')));
-        }
-        if (!Files.exists(Paths.get(Paths.get(targetPath).getParent().toString())))
-            return false;
-        try {
-            file.transferTo(new File(targetPath));
-            return true;
-        } catch (Exception e) {
-            System.err.println("Failed to save file to RAMDISK: " + targetPath);
-            System.err.println(e.getMessage());
-            return false;
-        }
-    }
-
-    private static boolean streamMultipartFileToContainer(String relativePath, MultipartFile file, boolean createDir) throws Exception {
-        if (createDir) {
-            String parentDir = relativePath.substring(0, relativePath.lastIndexOf('/'));
-            createDirectoryInContainer(parentDir);
-        }
-
-        String targetPath = normalizePath(BASE_DIR, relativePath);
-
-        ProcessBuilder pb = new ProcessBuilder(
-                "docker", "exec", "-i", CONTAINER,
-                "sh", "-c", "cat > " + targetPath
-        );
-
-        Process process = pb.start();
-
-        // Use piped streams to stream MultipartFile without loading fully in memory
-        try (PipedOutputStream pipedOut = new PipedOutputStream();
-             PipedInputStream pipedIn = new PipedInputStream(pipedOut);
-             OutputStream dockerStdin = process.getOutputStream()) {
-
-            // Writer thread: read from MultipartFile and write into pipedOut
-            Thread writerThread = new Thread(() -> {
-                try (InputStream fileInput = file.getInputStream()) {
-                    byte[] buffer = new byte[8192];
-                    int bytesRead;
-                    while ((bytesRead = fileInput.read(buffer)) != -1) {
-                        pipedOut.write(buffer, 0, bytesRead);
-                    }
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                } finally {
-                    try {
-                        pipedOut.close();
-                    } catch (IOException ignored) {}
-                }
-            });
-            writerThread.start();
-
-            // Main thread: read from pipedIn and write directly to docker stdin
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-            while ((bytesRead = pipedIn.read(buffer)) != -1) {
-                dockerStdin.write(buffer, 0, bytesRead);
-            }
-        }
-
-        int exitCode = process.waitFor();
-        if (exitCode != 0) {
-            throw new IOException("Failed to stream file to container: " + targetPath + ", exit code: " + exitCode);
-        }
-
-        System.out.println("✅ Successfully streamed file to " + targetPath + " in " + CONTAINER);
-        return true;
     }
 
 
