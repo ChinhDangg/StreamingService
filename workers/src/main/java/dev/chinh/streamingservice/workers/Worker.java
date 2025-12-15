@@ -7,22 +7,31 @@ import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.RecordId;
+import org.springframework.data.redis.connection.stream.StreamRecords;
+import org.springframework.data.redis.core.RedisTemplate;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RequiredArgsConstructor
 public abstract class Worker implements Runnable {
 
     protected final WorkerRedisService workerRedisService;
+    protected final RedisTemplate<String, String> queueRedisTemplate;
     protected final ObjectMapper objectMapper;
 
     protected abstract String streamKey();
     protected abstract String groupName();
     protected abstract String tokenKey();
+    protected abstract String streamKeyDLQ();
 
+    private final String jobDescriptionKey = "job_description";
     private final String consumerName = getClass().getSimpleName() + "-" + UUID.randomUUID();
+    private static final int MAX_RETRIES = 5;
 
     @Override
     public void run() {
@@ -47,7 +56,16 @@ public abstract class Worker implements Runnable {
     }
 
     private void handleRecord(MapRecord<String, Object, Object> record) {
-        String jobJson = (String) record.getValue().get("job_description");
+        Map<Object, Object> fields = record.getValue();
+
+        int retry = Integer.parseInt(fields.getOrDefault("retry", 0).toString());
+        if (retry >= MAX_RETRIES) {
+            sendToDLQ(record, "max retries reached");
+            workerRedisService.ack(streamKey(), groupName(), record.getId());
+            return;
+        }
+
+        String jobJson = (String) fields.get(jobDescriptionKey);
 
         MediaJobDescription mediaJobDescription;
         try {
@@ -55,6 +73,7 @@ public abstract class Worker implements Runnable {
         } catch (JsonProcessingException e) {
             // Poison pill - ACK and drop
             workerRedisService.ack(streamKey(), groupName(), record.getId());
+            System.out.println("Failed to parse job description: " + jobJson);
             return;
         }
 
@@ -70,11 +89,44 @@ public abstract class Worker implements Runnable {
             workerRedisService.ack(streamKey(), groupName(), record.getId());
         } catch (Exception e) {
             workerRedisService.updateStatus(mediaJobDescription.getWorkId(), MediaJobStatus.FAILED.name());
-            // NO ACK stays in PEL for retry
+            // ack old one but readd with incremented retry
+            workerRedisService.ack(streamKey(), groupName(), record.getId());
+            incrementRetry(streamKey(), record.getId(), retry);
+            backoff(retry);
             e.printStackTrace();
         } finally {
             workerRedisService.releaseToken(tokenKey());
         }
+    }
+
+    // Redis Streams are append-only — add metadata and don’t mutate.
+    public void incrementRetry(String stream, RecordId id, int retry) {
+        queueRedisTemplate.opsForStream().add(
+                StreamRecords.mapBacked(
+                        Map.of("retry", retry + 1)
+                ).withStreamKey(stream)
+        );
+    }
+
+    private void backoff(int retry) {
+        long delay = Math.min(1000L * (1L << retry), 30000);
+        sleep(delay);
+    }
+
+    // Dead-Letter Queue
+    // Debug failures
+    // Avoid infinite retries
+    // Preserve bad inputs
+    private void sendToDLQ(MapRecord<String, Object, Object> record, String reason) {
+        queueRedisTemplate.opsForStream().add(
+                StreamRecords.mapBacked(
+                        Map.of(
+                                jobDescriptionKey, record.getValue().get(jobDescriptionKey),
+                                "reason", reason,
+                                "failed_at", Instant.now().toString()
+                        )
+                ).withStreamKey(streamKeyDLQ())
+        );
     }
 
     private void sleep(long ms) {
@@ -84,4 +136,27 @@ public abstract class Worker implements Runnable {
     }
 
     public abstract void performJob(MediaJobDescription mediaJobDescription) throws Exception;
+
+
+
+    // for future claiming failed to ack job
+//    PendingMessages pending =
+//            redisTemplate.opsForStream()
+//                    .pending(stream, group);
+//
+//    if (pending.getTotalPendingMessages() == 0) return;
+//
+//    List<RecordId> ids = pending.getPendingMessages().stream()
+//            .filter(p -> p.getIdleTimeMs() > 60_000)
+//            .map(PendingMessage::getId)
+//            .toList();
+//
+//    redisTemplate.opsForStream().claim(
+//                stream,
+//                Consumer.from(group, consumerName),
+//        Duration.ofSeconds(60),
+//                ids.toArray(new RecordId[0])
+//                );
+
+
 }

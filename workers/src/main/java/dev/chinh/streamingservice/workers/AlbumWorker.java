@@ -5,6 +5,7 @@ import dev.chinh.streamingservice.service.WorkerRedisService;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import dev.chinh.streamingservice.service.AlbumService;
 import org.springframework.context.annotation.Scope;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,10 +19,13 @@ public class AlbumWorker extends Worker {
     public static final String STREAM = "ffmpeg_album_stream";
     public static final String GROUP = "album_workers";
     public static final String TOKEN_KEY = "ffmpeg_album_tokens";
+    public static final String DLQ_STREAM = "ffmpeg_album_dlq";
 
-    public AlbumWorker(WorkerRedisService workerRedisService, ObjectMapper objectMapper,
+    public AlbumWorker(WorkerRedisService workerRedisService,
+                       RedisTemplate<String, String> queueRedisTemplate,
+                       ObjectMapper objectMapper,
                        AlbumService albumService) {
-        super(workerRedisService, objectMapper);
+        super(workerRedisService, queueRedisTemplate, objectMapper);
         this.albumService = albumService;
     }
 
@@ -38,6 +42,11 @@ public class AlbumWorker extends Worker {
     @Override
     protected String tokenKey() {
         return TOKEN_KEY;
+    }
+
+    @Override
+    protected String streamKeyDLQ() {
+        return DLQ_STREAM;
     }
 
     @Override
