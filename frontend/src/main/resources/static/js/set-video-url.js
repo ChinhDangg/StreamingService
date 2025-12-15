@@ -102,7 +102,7 @@ export async function requestVideoPartial(fetchUrl, container, restart = true, s
         container.appendChild(loader);
         const urlPolling = pollPlaylistUrl(fetchUrl);
         playlistUrl = await urlPolling.promise;
-    } catch (error) {
+    } catch (err) {
         if (err === 'cancelled') {
             return 'Video Cancelled';
         }
