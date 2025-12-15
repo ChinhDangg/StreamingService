@@ -1,10 +1,11 @@
 package dev.chinh.streamingservice;
 
-import dev.chinh.streamingservice.content.constant.MediaJobStatus;
-import dev.chinh.streamingservice.content.service.AlbumService;
-import dev.chinh.streamingservice.content.service.VideoService;
-import dev.chinh.streamingservice.data.service.ThumbnailService;
-import dev.chinh.streamingservice.upload.service.MediaUploadService;
+import dev.chinh.streamingservice.common.OSUtil;
+import dev.chinh.streamingservice.common.constant.MediaJobStatus;
+import dev.chinh.streamingservice.service.AlbumService;
+import dev.chinh.streamingservice.service.MediaUploadService;
+import dev.chinh.streamingservice.service.ThumbnailService;
+import dev.chinh.streamingservice.service.VideoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -28,18 +29,18 @@ public class ScheduleService {
     @Scheduled(fixedRate = 60_000, initialDelay = 60_000)
     public void scheduled() throws Exception {
         stopNonViewingVideoRunningJob();
-        cleanThumbnails();
         removeAlbumCreationInfo();
+        cleanThumbnails();
         removeExpiredUploadSession();
         OSUtil.refreshUsableMemory();
     }
 
     private void stopNonViewingVideoRunningJob() throws Exception {
-        Set<Object> runningVideoJobs = videoService.getCacheRunningJobs(System.currentTimeMillis());
+        Set<String> runningVideoJobs = videoService.getCacheRunningJobs(System.currentTimeMillis());
 
-        for (Object runningVideoJob : runningVideoJobs) {
+        for (String runningVideoJob : runningVideoJobs) {
 
-            String videoJobId = (String) runningVideoJob;
+            String videoJobId = runningVideoJob;
             double lastAccess = videoService.getCacheVideoLastAccess(videoJobId);
             long millisPassed = (long) (System.currentTimeMillis() - lastAccess);
             if (millisPassed < 60_000) {
@@ -58,33 +59,15 @@ public class ScheduleService {
         }
     }
 
-    private void cleanThumbnails() {
-        long now = System.currentTimeMillis();
-        Set<ZSetOperations.TypedTuple<Object>> lastAccessThumbnails = thumbnailService.getAllThumbnailCacheLastAccess(now);
-        for (ZSetOperations.TypedTuple<Object> thumbnail : lastAccessThumbnails) {
-            long millisPassed = (long) (System.currentTimeMillis() - thumbnail.getScore());
-            if (millisPassed < 60_000) {
-                break;
-            }
-
-            String thumbnailFileName = (String) thumbnail.getValue();
-
-            System.out.println("Removing: " + thumbnailFileName);
-            String path = ThumbnailService.getThumbnailParentPath() + "/" + thumbnailFileName;
-            OSUtil.deleteForceMemoryDirectory(path);
-            thumbnailService.removeThumbnailLastAccess(thumbnailFileName);
-        }
-    }
-
     private void removeAlbumCreationInfo() {
         long now = System.currentTimeMillis();
-        Set<ZSetOperations.TypedTuple<Object>> lastAccessMediaJob = albumService.getAllAlbumCacheLastAccess(now);
-        for (ZSetOperations.TypedTuple<Object> albumJob : lastAccessMediaJob) {
+        Set<ZSetOperations.TypedTuple<String>> lastAccessMediaJob = albumService.getAllAlbumCacheLastAccess(now);
+        for (ZSetOperations.TypedTuple<String> albumJob : lastAccessMediaJob) {
             if (now - albumJob.getScore() < 60_000) {
                 break;
             }
 
-            String albumJobId = Objects.requireNonNull(albumJob.getValue()).toString();
+            String albumJobId = Objects.requireNonNull(albumJob.getValue());
             if (!albumJobId.endsWith(":album"))
                 continue;
 
@@ -93,15 +76,33 @@ public class ScheduleService {
         }
     }
 
+    private void cleanThumbnails() {
+        long now = System.currentTimeMillis();
+        Set<ZSetOperations.TypedTuple<String>> lastAccessThumbnails = thumbnailService.getAllThumbnailCacheLastAccess(now);
+        for (ZSetOperations.TypedTuple<String> thumbnail : lastAccessThumbnails) {
+            long millisPassed = (long) (System.currentTimeMillis() - thumbnail.getScore());
+            if (millisPassed < 60_000) {
+                break;
+            }
+
+            String thumbnailFileName = thumbnail.getValue();
+
+            System.out.println("Removing: " + thumbnailFileName);
+            String path = ThumbnailService.getThumbnailParentPath() + "/" + thumbnailFileName;
+            OSUtil.deleteForceMemoryDirectory(path);
+            thumbnailService.removeThumbnailLastAccess(thumbnailFileName);
+        }
+    }
+
     private void removeExpiredUploadSession() throws Exception {
         long now = System.currentTimeMillis();
-        Set<ZSetOperations.TypedTuple<Object>> lastAccessSessions = mediaUploadService.getAllUploadSessionCacheLastAccess(now);
-        for (ZSetOperations.TypedTuple<Object> session : lastAccessSessions) {
+        Set<ZSetOperations.TypedTuple<String>> lastAccessSessions = mediaUploadService.getAllUploadSessionCacheLastAccess(now);
+        for (ZSetOperations.TypedTuple<String> session : lastAccessSessions) {
             if (now - session.getScore() < 60_000) {
                 break;
             }
 
-            String sessionId = Objects.requireNonNull(session.getValue()).toString();
+            String sessionId = Objects.requireNonNull(session.getValue());
             Map<Object, Object> objectMap = mediaUploadService.getUploadSessionObjects(sessionId);
             if (objectMap.isEmpty()) continue;
 
