@@ -1,20 +1,18 @@
 package dev.chinh.streamingservice.data.service;
 
-import dev.chinh.streamingservice.OSUtil;
-import dev.chinh.streamingservice.content.constant.MediaType;
-import dev.chinh.streamingservice.content.constant.Resolution;
-import dev.chinh.streamingservice.content.service.AlbumService;
+import dev.chinh.streamingservice.common.OSUtil;
+import dev.chinh.streamingservice.common.constant.MediaType;
+import dev.chinh.streamingservice.common.constant.Resolution;
 import dev.chinh.streamingservice.content.service.MinIOService;
 import dev.chinh.streamingservice.data.dto.MediaNameEntry;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
-import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import dev.chinh.streamingservice.upload.service.MediaUploadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -25,15 +23,18 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ThumbnailService {
 
-    private final RedisTemplate<String, Object> redisTemplate;
-    private final AlbumService albumService;
+    private final RedisTemplate<String, String> redisStringTemplate;
     private final MinIOService minIOService;
 
     public static final String thumbnailBucket = "thumbnail";
     public static final Resolution thumbnailResolution = Resolution.p360;
     private static final String diskDir = "disk";
 
+    public record MediaUrl(MediaType type, String url) {}
+    public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, List<String> buckets, List<String> pathList) {}
+
     public void processThumbnails(List<MediaNameEntry> items) {
+
         long now = System.currentTimeMillis() + 60 * 60 * 1000;
         List<MediaNameEntry> newThumbnails = new ArrayList<>();
         for (MediaNameEntry item : items) {
@@ -50,7 +51,7 @@ public class ThumbnailService {
         try {
             if (albumUrlInfo.mediaUrlList().isEmpty())
                 return;
-            int exitCode = albumService.processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), true);
+            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), true);
             if (exitCode != 0) {
                 throw new RuntimeException("Failed to resize thumbnails");
             }
@@ -78,7 +79,7 @@ public class ThumbnailService {
         try {
             if (albumUrlInfo.mediaUrlList().isEmpty())
                 return;
-            int exitCode = albumService.processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), false);
+            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), false);
             if (exitCode != 0) {
                 throw new RuntimeException("Failed to resize thumbnails");
             }
@@ -91,9 +92,9 @@ public class ThumbnailService {
         }
     }
 
-    public AlbumService.AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList) {
+    private AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList) {
         List<String> pathList = new ArrayList<>();
-        List<AlbumService.MediaUrl> albumUrlList = new ArrayList<>();
+        List<MediaUrl> albumUrlList = new ArrayList<>();
         List<String> bucketList = new ArrayList<>();
         for (MediaDescription mediaDescription : mediaDescriptionList) {
             if (!mediaDescription.hasThumbnail())
@@ -106,14 +107,14 @@ public class ThumbnailService {
             pathList.add(mediaDescription.getThumbnail());
 
             String pathString = "/chunks" + getThumbnailPath(mediaDescription.getId(), mediaDescription.getThumbnail());
-            albumUrlList.add(new AlbumService.MediaUrl(MediaType.IMAGE, pathString));
+            albumUrlList.add(new MediaUrl(MediaType.IMAGE, pathString));
         }
-        return new AlbumService.AlbumUrlInfo(albumUrlList, bucketList, pathList);
+        return new AlbumUrlInfo(albumUrlList, bucketList, pathList);
     }
 
-    public AlbumService.AlbumUrlInfo getThumbnailImagesAsAlbumUrls(List<MediaNameEntry> mediaNameEntryList) {
+    private AlbumUrlInfo getThumbnailImagesAsAlbumUrls(List<MediaNameEntry> mediaNameEntryList) {
         List<String> pathList = new ArrayList<>();
-        List<AlbumService.MediaUrl> albumUrlList = new ArrayList<>();
+        List<MediaUrl> albumUrlList = new ArrayList<>();
         for (MediaNameEntry mediaNameEntry : mediaNameEntryList) {
             if (mediaNameEntry.getThumbnail() == null)
                 continue;
@@ -121,26 +122,17 @@ public class ThumbnailService {
             pathList.add(mediaNameEntry.getThumbnail());
 
             String pathString = "/chunks" + getThumbnailPath(mediaNameEntry.getName(), mediaNameEntry.getThumbnail());
-            albumUrlList.add(new AlbumService.MediaUrl(MediaType.IMAGE, pathString));
+            albumUrlList.add(new MediaUrl(MediaType.IMAGE, pathString));
         }
-        return new AlbumService.AlbumUrlInfo(albumUrlList, List.of(thumbnailBucket), pathList);
+        return new AlbumUrlInfo(albumUrlList, List.of(thumbnailBucket), pathList);
     }
 
     private void addCacheThumbnails(String thumbnailFileName, long expiry) {
-        redisTemplate.opsForZSet().add("thumbnail-cache", thumbnailFileName, expiry);
+        redisStringTemplate.opsForZSet().add("thumbnail-cache", thumbnailFileName, expiry);
     }
 
     private boolean hasCacheThumbnails(String thumbnailFileName) {
-        return redisTemplate.opsForZSet().score("thumbnail-cache", thumbnailFileName) != null;
-    }
-
-    public Set<ZSetOperations.TypedTuple<Object>> getAllThumbnailCacheLastAccess(long max) {
-        return redisTemplate.opsForZSet()
-                .rangeByScoreWithScores("thumbnail-cache", 0, max, 0, 50);
-    }
-
-    public void removeThumbnailLastAccess(String thumbnailFileName) {
-        redisTemplate.opsForZSet().remove("thumbnail-cache", thumbnailFileName);
+        return redisStringTemplate.opsForZSet().score("thumbnail-cache", thumbnailFileName) != null;
     }
 
     public static String getThumbnailPath(String id, String thumbnail) {
@@ -159,6 +151,64 @@ public class ThumbnailService {
         return "/thumbnail-cache/" + thumbnailResolution;
     }
 
+
+    private int processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String albumDir, boolean isAlbum) throws InterruptedException, IOException {
+        // Start one persistent bash session inside ffmpeg container
+        ProcessBuilder pb = new ProcessBuilder("docker", "exec", "-i", "ffmpeg", "bash").redirectErrorStream(true);
+        Process process = pb.start();
+
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8))) {
+
+            OSUtil.createTempDir(albumDir);
+
+            String scale = getFfmpegScaleString(resolution, true);
+            for (int i = 0; i < albumUrlInfo.mediaUrlList.size(); i++) {
+                String output = albumUrlInfo.mediaUrlList.get(i).url;
+
+                String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(i);
+                String input = minIOService.getSignedUrlForContainerNginx(bucket, albumUrlInfo.pathList.get(i), 5 * 60);
+
+                String ffmpegCmd = String.format(
+                        "ffmpeg -n -hide_banner -loglevel info " +
+                                "-i \"%s\" -vf %s -q:v 2 -frames:v 1 \"%s\"",
+                        input, scale, output
+                );
+                writer.write(ffmpegCmd + "\n");
+                writer.flush();
+            }
+
+            // close stdin to end the bash session
+            writer.write("exit\n");
+            writer.flush();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        // Capture ffmpeg combined logs
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            reader.lines().forEach(System.out::println);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        int exit = process.waitFor();
+        System.out.println("ffmpeg exited with code " + exit);
+        return exit;
+    }
+
+    private String getFfmpegScaleString(Resolution resolution, boolean wrapInDoubleQuotes) {
+        if (wrapInDoubleQuotes)
+            return String.format(
+                    "\"scale='if(gte(iw,ih),-2,min(iw,%1$d))':'if(gte(ih,iw),-2,min(ih,%1$d))'\"",
+                    resolution.getResolution()
+            );
+        return String.format(
+                "scale='if(gte(iw,ih),-2,min(iw,%1$d))':'if(gte(ih,iw),-2,min(ih,%1$d))'",
+                resolution.getResolution()
+        );
+    }
 
     public String generateThumbnailFromVideo(String bucket, String objectName) throws Exception {
         String thumbnailObject = objectName.substring(0, objectName.lastIndexOf(".")) + "-thumb.jpg";
