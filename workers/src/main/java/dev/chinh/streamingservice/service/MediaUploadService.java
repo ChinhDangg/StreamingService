@@ -15,6 +15,8 @@ public class MediaUploadService {
     private final RedisTemplate<String, String> queueRedisTemplate;
     private final MinIOService minIOService;
 
+    public static final String defaultVidPath = "vid";
+
     public Set<ZSetOperations.TypedTuple<String>> getAllUploadSessionCacheLastAccess(long max) {
         return queueRedisTemplate.opsForZSet().rangeByScoreWithScores("upload::lastAccess", 0, max, 0, 50);
     }
