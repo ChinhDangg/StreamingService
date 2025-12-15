@@ -39,7 +39,7 @@ services:
     command: [ "tail -f /dev/null" ]  # keep alive
     volumes:
       - chunks:/chunks   # use shared tmpfs volume
-      - ./disk:/disk   # to generate thumbnails and then move to minio
+      - ${WORKERS_DISK}:/disk   # to generate thumbnails and then move to minio
 
   opensearch:
     image: opensearchproject/opensearch:3.3.2
