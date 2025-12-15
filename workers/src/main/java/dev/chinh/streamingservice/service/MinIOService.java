@@ -72,4 +72,14 @@ public class MinIOService {
         );
         System.out.println("Removed object " + bucket + "/" + object);
     }
+
+    public void moveFileToObject(String bucket, String object, String filePath) throws Exception {
+        minioClient.uploadObject(
+                UploadObjectArgs.builder()
+                        .bucket(bucket)
+                        .object(object)
+                        .filename(filePath)
+                        .build()
+        );
+    }
 }
