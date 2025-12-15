@@ -1,5 +1,5 @@
 import {initializeHeader, setAlertStatus} from "/static/js/header.js";
-import {setVideoUrl, setVideoResolution, pollPlaylistUrl} from "/static/js/set-video-url.js";
+import {setVideoResolution, pollPlaylistUrl, requestVideoPartial} from "/static/js/set-video-url.js";
 import { displayContentInfo, helperCloneAndUnHideNode } from "/static/js/metadata-display.js";
 
 let albumId = null;
@@ -447,13 +447,6 @@ const fullScreenTouchEnd = async (e) => {
 async function requestVideo(videoUrlRequest, videoWrapper) {
     if (!await getVideoPlayer())
         return;
-    const videoDefaultRes = 'p480';
-    const response = await fetch(videoUrlRequest + "/" + videoDefaultRes);
-    if (!response.ok) {
-        alert("Failed to fetch video");
-        return;
-    }
-    const videoUrl = await response.text();
     if (previousVideoWrapper) {
         previousVideoWrapper.querySelector('.temp-video-holder').classList.remove('hidden');
     }
@@ -462,7 +455,13 @@ async function requestVideo(videoUrlRequest, videoWrapper) {
     videoWrapper.querySelector('.temp-video-holder').classList.add('hidden');
     videoWrapper.querySelector('.video-holder').appendChild(videoPlayer);
 
-    setVideoUrl(videoPlayer, videoUrl);
+    const videoDefaultRes = 'p480';
+    const fetchUrl = videoUrlRequest + "/" + videoDefaultRes;
+    const requestMessage = await requestVideoPartial(fetchUrl, videoPlayer);
+    if (requestMessage !== null) {
+        setAlertStatus(requestMessage);
+        return;
+    }
     setVideoResolution(videoPlayer, videoUrlRequest, 1080, videoDefaultRes);
 }
 
