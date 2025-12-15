@@ -1,6 +1,6 @@
 package dev.chinh.streamingservice.upload.controller;
 
-import dev.chinh.streamingservice.content.constant.MediaType;
+import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.upload.MediaBasicInfo;
 import dev.chinh.streamingservice.upload.service.MediaUploadService;
 import jakarta.validation.Valid;

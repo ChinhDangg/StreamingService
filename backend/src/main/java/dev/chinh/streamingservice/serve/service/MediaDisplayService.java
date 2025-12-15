@@ -3,7 +3,7 @@ package dev.chinh.streamingservice.serve.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.MediaMapper;
-import dev.chinh.streamingservice.content.constant.MediaType;
+import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.content.service.AlbumService;
 import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.data.entity.MediaDescription;

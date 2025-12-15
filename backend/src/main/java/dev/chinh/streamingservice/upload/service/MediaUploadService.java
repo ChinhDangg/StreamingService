@@ -2,8 +2,8 @@ package dev.chinh.streamingservice.upload.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.chinh.streamingservice.OSUtil;
-import dev.chinh.streamingservice.content.constant.MediaType;
+import dev.chinh.streamingservice.common.OSUtil;
+import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.content.service.MinIOService;
 import dev.chinh.streamingservice.data.entity.MediaGroupMetaData;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;

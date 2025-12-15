@@ -1,6 +1,6 @@
 package dev.chinh.streamingservice;
 
-import dev.chinh.streamingservice.content.constant.Resolution;
+import dev.chinh.streamingservice.common.constant.Resolution;
 import dev.chinh.streamingservice.content.service.AlbumService;
 import dev.chinh.streamingservice.content.service.VideoService;
 import lombok.RequiredArgsConstructor;

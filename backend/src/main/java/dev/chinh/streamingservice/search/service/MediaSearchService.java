@@ -2,7 +2,7 @@ package dev.chinh.streamingservice.search.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.MediaMapper;
-import dev.chinh.streamingservice.content.constant.MediaType;
+import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.data.ContentMetaData;
 import dev.chinh.streamingservice.data.service.MediaMetadataService;
 import dev.chinh.streamingservice.data.service.ThumbnailService;
