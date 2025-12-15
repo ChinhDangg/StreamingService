@@ -1,8 +1,11 @@
 package dev.chinh.streamingservice.content.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.MediaMapper;
-import dev.chinh.streamingservice.content.constant.Resolution;
+import dev.chinh.streamingservice.common.constant.MediaJobStatus;
+import dev.chinh.streamingservice.common.constant.Resolution;
+import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
@@ -10,14 +13,19 @@ import dev.chinh.streamingservice.data.service.MediaMetadataService;
 import dev.chinh.streamingservice.search.data.MediaGroupInfo;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.connection.stream.StreamRecords;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 
 @RequiredArgsConstructor
 public abstract class MediaService {
 
+    private final RedisTemplate<String, String> redisStringTemplate;
     protected final RedisTemplate<String, Object> redisTemplate;
     protected final ObjectMapper objectMapper;
     protected final MediaMapper mediaMapper;
@@ -25,7 +33,41 @@ public abstract class MediaService {
     protected final MinIOService minIOService;
     protected final MediaMetadataService mediaMetadataService;
 
-    protected final String masterFileName = "/master.m3u8";
+    protected String addJobToFfmpegQueue(String queueKey, String cacheJobId, MediaJobDescription mediaJobDescription) throws JsonProcessingException {
+        Map<Object, Object> jobQueueStatus = getQueueJobStatus(cacheJobId);
+        if (!jobQueueStatus.isEmpty()) {
+            String status = (String) jobQueueStatus.get("status");
+            if (status.equals(MediaJobStatus.COMPLETED.name())) {
+                return jobQueueStatus.get("result").toString();
+            } else if (status.equals(MediaJobStatus.RUNNING.name())) {
+                return MediaJobStatus.RUNNING.name();
+            }
+        }
+
+        addJobToQueue(queueKey, mediaJobDescription);
+        return MediaJobStatus.RUNNING.name();
+    }
+
+    protected MediaJobDescription getMediaJobDescription(long mediaId, String cacheJobId, Resolution resolution, String jobType) {
+        MediaDescription mediaDescription = getMediaDescription(mediaId);
+        MediaJobDescription mediaJobDescription = mediaMapper.mapToJobDescription(mediaDescription);
+        mediaJobDescription.setJobType(jobType);
+        mediaJobDescription.setWorkId(cacheJobId);
+        mediaJobDescription.setResolution(resolution);
+        return mediaJobDescription;
+    }
+
+    protected Map<Object, Object> getQueueJobStatus(String cacheJobId) {
+        return redisStringTemplate.opsForHash().entries("ffmpeg_job_status:" + cacheJobId);
+    }
+
+    protected void addJobToQueue(String queueKey, MediaJobDescription mediaJobDescription) throws JsonProcessingException {
+        System.out.println("Adding job to queue: " + mediaJobDescription.getWorkId());
+        redisStringTemplate.opsForStream().add(
+                StreamRecords.string(
+                        Collections.singletonMap("job_description", objectMapper.writeValueAsString(mediaJobDescription))
+                ).withStreamKey(queueKey));
+    }
 
     /**
      * @param mediaWorkId: specific media content saved to memory e.g. 1:p360
@@ -35,29 +77,8 @@ public abstract class MediaService {
         redisTemplate.opsForZSet().add(key, mediaWorkId, expiry);
     }
 
-    protected Double getCacheLastAccess(String key, String mediaWorkId) {
-        return redisTemplate.opsForZSet().score(key, mediaWorkId);
-    }
-
-    protected void removeCacheLastAccess(String key, String mediaWorkId) {
-        redisTemplate.opsForZSet().remove(key, mediaWorkId);
-    }
-
-    /**
-     * Already sorted by default. Get oldest one first
-     * @return mediaJobId in batch of 50.
-     */
-    protected Set<ZSetOperations.TypedTuple<Object>> getAllCacheLastAccess(String key, long max) {
-        return redisTemplate.opsForZSet()
-                .rangeByScoreWithScores(key, 0, max, 0, 50);
-    }
-
     public String getCacheMediaJobId(long mediaId, Resolution res) {
         return mediaId + ":" + res;
-    }
-
-    protected String getNginxVideoStreamUrl(String videoDir) {
-        return "/stream/" + videoDir + masterFileName;
     }
 
     protected MediaDescription getMediaDescription(long mediaId) {
@@ -79,13 +100,5 @@ public abstract class MediaService {
         }
         mediaMetadataService.cacheMediaSearchItem(mediaSearchItem);
         return mediaMetaData;
-    }
-
-    protected boolean checkSrcSmallerThanTarget(int width, int height, int target) {
-        if (width >= height) { // Landscape
-            return height <= target;
-        } else { // Portrait
-            return width <= target;
-        }
     }
 }
