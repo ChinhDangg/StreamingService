@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice;
 
+import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import dev.chinh.streamingservice.data.dto.MediaNameEntry;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
@@ -20,4 +21,6 @@ public interface MediaMapper {
     MediaSearchItem map(MediaMetaData source);
 
     MediaNameEntry map(MediaNameEntity source);
+
+    MediaJobDescription mapToJobDescription(MediaDescription source);
 }
