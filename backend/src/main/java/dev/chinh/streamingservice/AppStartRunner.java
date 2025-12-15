@@ -14,7 +14,6 @@ public class AppStartRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
-        OSUtil._initializeRAMInfo();
         openSearchService._initializeIndexes();
     }
 }
