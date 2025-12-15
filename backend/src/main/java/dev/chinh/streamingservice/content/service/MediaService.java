@@ -61,7 +61,7 @@ public abstract class MediaService {
         return redisStringTemplate.opsForHash().entries("ffmpeg_job_status:" + cacheJobId);
     }
 
-    protected void addJobToQueue(String queueKey, MediaJobDescription mediaJobDescription) throws JsonProcessingException {
+    public void addJobToQueue(String queueKey, MediaJobDescription mediaJobDescription) throws JsonProcessingException {
         System.out.println("Adding job to queue: " + mediaJobDescription.getWorkId());
         redisStringTemplate.opsForStream().add(
                 StreamRecords.string(
