@@ -1,12 +1,16 @@
 package dev.chinh.streamingservice.data.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.constant.Resolution;
+import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import dev.chinh.streamingservice.content.service.MinIOService;
+import dev.chinh.streamingservice.content.service.VideoService;
 import dev.chinh.streamingservice.data.dto.MediaNameEntry;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.upload.service.MediaUploadService;
+import jakarta.json.Json;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -25,10 +29,10 @@ public class ThumbnailService {
 
     private final RedisTemplate<String, String> redisStringTemplate;
     private final MinIOService minIOService;
+    private final VideoService videoService;
 
     public static final String thumbnailBucket = "thumbnail";
     public static final Resolution thumbnailResolution = Resolution.p360;
-    private static final String diskDir = "disk";
 
     public record MediaUrl(MediaType type, String url) {}
     public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, List<String> buckets, List<String> pathList) {}
@@ -186,15 +190,21 @@ public class ThumbnailService {
         }
 
         // Capture ffmpeg combined logs
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-            reader.lines().forEach(System.out::println);
-        } catch (IOException e) {
+        List<String> logs = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                logs.add("[ffmpeg] " + line);
+            }
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
         int exit = process.waitFor();
-        System.out.println("ffmpeg exited with code " + exit);
+        System.out.println("ffmpeg transcode media thumbnails exited with code " + exit);
+        if (exit != 0) {
+            logs.forEach(System.out::println);
+        }
         return exit;
     }
 
@@ -210,42 +220,23 @@ public class ThumbnailService {
         );
     }
 
-    public String generateThumbnailFromVideo(String bucket, String objectName) throws Exception {
+    public String generateThumbnailFromVideo(String bucket, String objectName) {
         String thumbnailObject = objectName.substring(0, objectName.lastIndexOf(".")) + "-thumb.jpg";
-        String thumbnailOutput = OSUtil.normalizePath(diskDir, thumbnailObject);
-        Files.createDirectories(Path.of(thumbnailOutput.substring(0, thumbnailOutput.lastIndexOf("/"))));
-        String videoInput = minIOService.getSignedUrlForContainerNginx(bucket, objectName, (int) Duration.ofMinutes(15).toSeconds());
-
-        List<String> command = Arrays.asList(
-                "docker", "exec", "ffmpeg",
-                "ffmpeg",
-                "-v", "error",                 // only show errors, no logs
-                "-skip_frame", "nokey",        // skip NON-keyframes → decode only I-frames - fast operation
-                "-ss", "2",                    // FAST SEEK: jump to keyframe nearest the 1-second mark
-                "-i", videoInput,              // input video
-                "-frames:v", "1",              // output exactly one frame
-                "-vsync", "vfr",               // variable frame rate; ensures correct frame extraction
-                "-q:v", "2",                   // high JPEG quality (2 = very high, 1 = max)
-                // select only keyframes (only I-frames). Escaped for Java.
-                "-vf", "select='eq(pict_type\\,I)'",
-                thumbnailOutput                // output thumbnail (original resolution)
-        );
-
-        ProcessBuilder pb = new ProcessBuilder(command);
-        pb.redirectErrorStream(true); // merge STDOUT + STDERR
-
-        Process process = pb.start();
-
-        int exitCode = process.waitFor();
-        if (exitCode != 0) {
-            throw new RuntimeException("Failed to generate thumbnail from video");
-        }
-
         thumbnailObject = thumbnailObject.startsWith(MediaUploadService.defaultVidPath)
                 ? thumbnailObject
                 : OSUtil.normalizePath(MediaUploadService.defaultVidPath, thumbnailObject);
-        minIOService.moveFileToObject(ThumbnailService.thumbnailBucket, thumbnailObject, thumbnailOutput);
-        Files.delete(Path.of(thumbnailOutput));
+
+        MediaJobDescription jobDescription = new MediaJobDescription();
+        jobDescription.setBucket(bucket);
+        jobDescription.setPath(objectName);
+        jobDescription.setWorkId(thumbnailObject);
+        jobDescription.setJobType("videoThumbnail");
+
+        try {
+            videoService.addJobToQueue(videoService.ffmpegQueueKey, jobDescription);
+        } catch (JsonProcessingException e) {
+            System.err.println("Failed to generate thumbnail for video " + objectName);
+        }
 
         return thumbnailObject;
     }

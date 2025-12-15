@@ -15,7 +15,7 @@ import java.util.*;
 @Service
 public class VideoService extends MediaService {
 
-    private final String ffmpegQueueKey = "ffmpeg_video_stream";
+    public final String ffmpegQueueKey = "ffmpeg_video_stream";
 
     public VideoService(RedisTemplate<String, String> redisStringTemplate,
                         RedisTemplate<String, Object> redisTemplate,
