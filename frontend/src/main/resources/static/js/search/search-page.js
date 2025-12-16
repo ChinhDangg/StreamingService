@@ -899,6 +899,7 @@ const rightNextBtn = rightButtons.querySelector('.next-btn');
 const leftPrevBtn = leftButtons.querySelector('.prev-btn');
 const rightPrevBtn = rightButtons.querySelector('.prev-btn');
 
+let viewStepTimeout = null;
 async function viewNextMedia() {
     let nextIndex = null;
     let currentIndex = currentViewItemIndex;
@@ -926,7 +927,10 @@ async function viewNextMedia() {
         leftPrevBtn.classList.remove('invisible');
         rightPrevBtn.classList.remove('invisible');
         currentViewItemIndex = nextIndex;
-        await quickViewContentInOverlay(currentItemTypeMap.get(nextIndex).id, currentItemTypeMap.get(nextIndex).mediaType);
+        clearTimeout(viewStepTimeout);
+        viewStepTimeout = setTimeout(async () => {
+            await quickViewContentInOverlay(currentItemTypeMap.get(nextIndex).id, currentItemTypeMap.get(nextIndex).mediaType);
+        }, 300);
     } else {
         leftNextBtn.classList.add('invisible');
         rightNextBtn.classList.add('invisible');
@@ -958,7 +962,10 @@ async function viewPreviousMedia() {
         leftNextBtn.classList.remove('invisible');
         rightNextBtn.classList.remove('invisible');
         currentViewItemIndex = prevIndex;
-        await quickViewContentInOverlay(currentItemTypeMap.get(prevIndex).id, currentItemTypeMap.get(prevIndex).mediaType);
+        clearTimeout(viewStepTimeout);
+        viewStepTimeout = setTimeout(async () => {
+            await quickViewContentInOverlay(currentItemTypeMap.get(prevIndex).id, currentItemTypeMap.get(prevIndex).mediaType);
+        }, 300);
     } else {
         leftPrevBtn.classList.add('invisible');
         rightPrevBtn.classList.add('invisible');
