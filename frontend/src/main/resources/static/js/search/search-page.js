@@ -612,7 +612,7 @@ async function sendSearchRequest(searchType, page, sortBy, sortOrder,
             sessionStorage.setItem(SEARCH_INFO.ADVANCE_REQUEST_BODY, JSON.stringify(advanceRequestBody));
             return requestAdvanceSearch(advanceRequestBody, page, sortBy, sortOrder);
         default:
-            console.log('default to search match all');
+            console.log('default to send search request match all');
             return requestMatchAllSearch(page, sortBy, sortOrder);
     }
 }
@@ -702,7 +702,7 @@ function getSearchUrl(searchType, page, sortBy, sortOrder,
         case SEARCH_TYPES.ADVANCE:
             return getAdvanceSearchUrl(page, sortBy, sortOrder);
         default:
-            console.log('default to search match all');
+            console.log('default to get search url match all');
             return getMatchAllSearchUrl(page, sortBy, sortOrder);
     }
 }
@@ -793,6 +793,7 @@ function displaySearchResults(results, searchType, sortBy, sortOrder,
         totalPages: results.totalPages,
         total: results.total
     };
+    currentSearchInfo.set(SEARCH_INFO.PAGE, results.page);
     const getPageUrl = (page) => getPageSearchUrl(page, searchType, sortBy, sortOrder, searchString, keywordField, keywordValueList);
     displayPagination(results.page, results.totalPages, getPageUrl, pageClickHandler);
 
@@ -900,26 +901,26 @@ const rightPrevBtn = rightButtons.querySelector('.prev-btn');
 
 async function viewNextMedia() {
     let nextIndex = null;
-    const dummyButton = {
-        preventDefault: () => {},
-        target: {
-            disabled: false
-        }
-    };
+    let currentIndex = currentViewItemIndex;
     do {
-        for (let index = currentViewItemIndex + 1; index < currentItemTypeMap.size; index++) {
+        console.log('viewNextMedia');
+        console.log(currentItemTypeMap);
+        for (let index = currentIndex + 1; index < currentItemTypeMap.size; index++) {
             console.log(`index next: ${index}`);
             if (currentItemTypeMap.get(index).mediaType !== 'GROUPER') {
                 nextIndex = index;
                 break;
             }
         }
-        if (nextIndex === null && currentPageInfo.page < currentPageInfo.totalPages - 1)
-            await pageClickHandler(dummyButton, currentPageInfo.page + 1);
+        if (nextIndex === null && currentPageInfo.page < currentPageInfo.totalPages - 1) {
+            currentSearchInfo.set(SEARCH_INFO.PAGE, ++currentPageInfo.page);
+            await sendSearchRequestOnCurrentInfo();
+            currentIndex = -1;
+        }
         else
             break;
     }
-    while (currentPageInfo.page < (currentPageInfo.totalPages - 1))
+    while (currentPageInfo.page <= (currentPageInfo.totalPages - 1))
 
     if (nextIndex !== null) {
         leftPrevBtn.classList.remove('invisible');
@@ -935,25 +936,23 @@ async function viewNextMedia() {
 
 async function viewPreviousMedia() {
     let prevIndex = null;
-    const dummyButton = {
-        preventDefault: () => {},
-        target: {
-            disabled: false
-        }
-    };
+    let currentIndex = currentViewItemIndex;
     do {
-        for (let index = currentViewItemIndex - 1; index >= 0; index--) {
+        for (let index = currentIndex - 1; index >= 0; index--) {
             console.log(`index prev: ${index}`);
             if (currentItemTypeMap.get(index).mediaType !== 'GROUPER') {
                 prevIndex = index;
                 break;
             }
         }
-        if (prevIndex === null && currentPageInfo.page > 0)
-            await pageClickHandler(dummyButton, currentPageInfo.page - 1);
+        if (prevIndex === null && currentPageInfo.page > 0) {
+            currentSearchInfo.set(SEARCH_INFO.PAGE, --currentPageInfo.page);
+            await sendSearchRequestOnCurrentInfo();
+            currentIndex = currentItemTypeMap.size;
+        }
         else
             break;
-    } while (currentPageInfo.page > 0)
+    } while (currentPageInfo.page >= 0)
 
     if (prevIndex !== null) {
         leftNextBtn.classList.remove('invisible');
