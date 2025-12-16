@@ -36,12 +36,13 @@ public abstract class MediaService {
             String status = (String) jobQueueStatus.get("status");
             if (status.equals(MediaJobStatus.COMPLETED.name())) {
                 return jobQueueStatus.get("result").toString();
-            } else if (status.equals(MediaJobStatus.RUNNING.name())) {
-                return MediaJobStatus.RUNNING.name();
+            } else if (status.equals(MediaJobStatus.RUNNING.name()) || status.equals(MediaJobStatus.PROCESSING.name())) {
+                return status;
             }
         }
 
         addJobToQueue(queueKey, mediaJobDescription);
+        updateQueueJobStatus(cacheJobId, MediaJobStatus.PROCESSING.name());
         return MediaJobStatus.RUNNING.name();
     }
 
@@ -56,6 +57,10 @@ public abstract class MediaService {
 
     protected Map<Object, Object> getQueueJobStatus(String cacheJobId) {
         return redisStringTemplate.opsForHash().entries("ffmpeg_job_status:" + cacheJobId);
+    }
+
+    protected void updateQueueJobStatus(String jobId, String status) {
+        redisTemplate.opsForHash().put("ffmpeg_job_status:" + jobId, "status", status);
     }
 
     public void addJobToQueue(String queueKey, MediaJobDescription mediaJobDescription) throws JsonProcessingException {
