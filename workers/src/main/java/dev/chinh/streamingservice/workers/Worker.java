@@ -6,13 +6,12 @@ import dev.chinh.streamingservice.service.WorkerRedisService;
 import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.connection.stream.MapRecord;
-import org.springframework.data.redis.connection.stream.RecordId;
-import org.springframework.data.redis.connection.stream.StreamRecords;
+import org.springframework.data.redis.connection.stream.*;
 import org.springframework.data.redis.core.RedisTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -36,6 +35,8 @@ public abstract class Worker implements Runnable {
     @Override
     public void run() {
         workerRedisService.createGroupIfAbsent(streamKey(), groupName());
+
+        reclaimStaleJobs();
 
         while (true) {
             List<MapRecord<String, Object, Object>> records = workerRedisService.readFromStream(
@@ -137,26 +138,33 @@ public abstract class Worker implements Runnable {
 
     public abstract void performJob(MediaJobDescription mediaJobDescription) throws Exception;
 
+    // claiming failed to ack job
+    protected void reclaimStaleJobs() {
+        // 1. Fetch pending messages (with details)
+        PendingMessages pending = workerRedisService.getPendingMessages(
+                streamKey(),
+                groupName(),
+                50
+        );
 
+        if (!pending.iterator().hasNext()) {
+            return;
+        }
 
-    // for future claiming failed to ack job
-//    PendingMessages pending =
-//            redisTemplate.opsForStream()
-//                    .pending(stream, group);
-//
-//    if (pending.getTotalPendingMessages() == 0) return;
-//
-//    List<RecordId> ids = pending.getPendingMessages().stream()
-//            .filter(p -> p.getIdleTimeMs() > 60_000)
-//            .map(PendingMessage::getId)
-//            .toList();
-//
-//    redisTemplate.opsForStream().claim(
-//                stream,
-//                Consumer.from(group, consumerName),
-//        Duration.ofSeconds(60),
-//                ids.toArray(new RecordId[0])
-//                );
+        // 2. Select stale jobs (idle > 60s)
+        List<RecordId> staleIds = new ArrayList<>();
+        for (PendingMessage p : pending) {
+            Duration idle = p.getElapsedTimeSinceLastDelivery();
+            if (idle.toMillis() > 60_000) {
+                staleIds.add(p.getId());
+            }
+        }
 
+        if (staleIds.isEmpty()) {
+            return;
+        }
 
+        // 3. Claim them for THIS consumer
+        workerRedisService.claim(streamKey(), groupName(), consumerName, Duration.ofSeconds(60), staleIds);
+    }
 }

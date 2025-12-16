@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.service;
 
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.stream.*;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -91,5 +92,34 @@ public class WorkerRedisService {
 
     public void ack(String stream, String group, RecordId recordId) {
         redisTemplate.opsForStream().acknowledge(stream, group, recordId);
+    }
+
+    public PendingMessages getPendingMessages(String stream, String group, int count) {
+        return redisTemplate.opsForStream().pending(
+                stream,
+                group,
+                Range.unbounded(),
+                count
+        );
+    }
+
+    public List<MapRecord<String, Object, Object>> claim(
+            String stream,
+            String group,
+            String consumer,
+            Duration minIdleTime,
+            List<RecordId> ids
+    ) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+
+        return redisTemplate.opsForStream().claim(
+                stream,
+                group,
+                consumer,
+                minIdleTime,
+                ids.toArray(new RecordId[0])
+        );
     }
 }
