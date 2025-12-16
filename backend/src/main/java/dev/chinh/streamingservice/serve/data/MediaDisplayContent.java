@@ -2,7 +2,7 @@ package dev.chinh.streamingservice.serve.data;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.common.constant.MediaType;
-import dev.chinh.streamingservice.data.ContentMetaData;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.serve.service.MediaDisplayService;
 import lombok.AllArgsConstructor;
 import lombok.Getter;

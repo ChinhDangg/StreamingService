@@ -2,7 +2,7 @@ package dev.chinh.streamingservice.modify;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
-import dev.chinh.streamingservice.data.ContentMetaData;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 
 public enum MediaNameEntityConstant {
 

@@ -1,6 +1,6 @@
 package dev.chinh.streamingservice.data.entity;
 
-import dev.chinh.streamingservice.data.ContentMetaData;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

@@ -2,7 +2,7 @@ package dev.chinh.streamingservice.data.entity;
 
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import dev.chinh.streamingservice.data.ContentMetaData;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import jakarta.persistence.MappedSuperclass;
 import lombok.Getter;
 import lombok.Setter;

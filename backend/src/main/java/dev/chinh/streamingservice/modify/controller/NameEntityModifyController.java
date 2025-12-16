@@ -1,6 +1,6 @@
 package dev.chinh.streamingservice.modify.controller;
 
-import dev.chinh.streamingservice.data.ContentMetaData;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.modify.NameAndThumbnailPostRequest;
 import dev.chinh.streamingservice.modify.NameEntityDTO;
 import dev.chinh.streamingservice.modify.service.NameEntityModifyService;

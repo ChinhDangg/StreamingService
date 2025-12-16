@@ -1,7 +1,7 @@
 package dev.chinh.streamingservice.modify;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import dev.chinh.streamingservice.data.ContentMetaData;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

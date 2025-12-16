@@ -3,7 +3,7 @@ package dev.chinh.streamingservice.search.data;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.common.constant.MediaType;
-import dev.chinh.streamingservice.data.ContentMetaData;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import lombok.*;
 
 import java.time.LocalDateTime;

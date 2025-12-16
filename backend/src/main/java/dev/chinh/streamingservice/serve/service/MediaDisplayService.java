@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.MediaMapper;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.content.service.AlbumService;
-import dev.chinh.streamingservice.data.ContentMetaData;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.data.repository.MediaGroupMetaDataRepository;
 import dev.chinh.streamingservice.data.service.ThumbnailService;

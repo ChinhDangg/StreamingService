@@ -1,7 +1,7 @@
 package dev.chinh.streamingservice.event;
 
 import dev.chinh.streamingservice.MediaMapper;
-import dev.chinh.streamingservice.data.ContentMetaData;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.event.config.KafkaRedPandaConfig;

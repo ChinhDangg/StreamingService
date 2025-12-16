@@ -1,7 +1,7 @@
 package dev.chinh.streamingservice.modify.service;
 
 import dev.chinh.streamingservice.content.service.MinIOService;
-import dev.chinh.streamingservice.data.ContentMetaData;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.data.entity.*;
 import dev.chinh.streamingservice.data.repository.*;
 import dev.chinh.streamingservice.data.service.ThumbnailService;
