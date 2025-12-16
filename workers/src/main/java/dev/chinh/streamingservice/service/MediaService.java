@@ -13,13 +13,16 @@ public abstract class MediaService {
     protected final RedisTemplate<String, String> redisTemplate;
     protected final ObjectMapper objectMapper;
     protected final MinIOService minIOService;
+    protected final WorkerRedisService workerRedisService;
 
     public MediaService(@Qualifier("queueRedisTemplate") RedisTemplate<String, String> redisTemplate,
                         ObjectMapper objectMapper,
-                        MinIOService minIOService) {
+                        MinIOService minIOService,
+                        WorkerRedisService workerRedisService) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.minIOService = minIOService;
+        this.workerRedisService = workerRedisService;
     }
 
     protected final String masterFileName = "/master.m3u8";
@@ -38,6 +41,10 @@ public abstract class MediaService {
 
     protected void removeCacheLastAccess(String key, String mediaWorkId) {
         redisTemplate.opsForZSet().remove(key, mediaWorkId);
+    }
+
+    protected void removeJobStatus(String jobId) {
+        workerRedisService.removeStatus(jobId);
     }
 
     /**

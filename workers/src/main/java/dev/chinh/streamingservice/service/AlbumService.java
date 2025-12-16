@@ -32,9 +32,10 @@ public class AlbumService extends MediaService implements ResourceCleanable {
     public AlbumService(@Qualifier("queueRedisTemplate") RedisTemplate<String, String> redisTemplate,
                         ObjectMapper objectMapper,
                         MinIOService minIOService,
+                        WorkerRedisService workerRedisService,
                         MemoryManager memoryManager,
                         VideoService videoService) {
-        super(redisTemplate, objectMapper, minIOService);
+        super(redisTemplate, objectMapper, minIOService, workerRedisService);
         this.memoryManager = memoryManager;
         this.videoService = videoService;
     }
@@ -517,6 +518,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             removeCacheAlbumJobInfo(albumId, mediaJobId);
             removeCacheAlbumCreatedUrl(albumId, mediaJobId);
             removeAlbumCacheLastAccess(mediaJobId);
+            removeJobStatus(mediaJobId);
         }
         if (!enough && removingSpace - headRoom <= 0)
             enough = true;

@@ -69,6 +69,10 @@ public class WorkerRedisService {
         redisTemplate.opsForHash().put("ffmpeg_job_status:" + jobId, resultKey, result);
     }
 
+    public void removeStatus(String jobId) {
+        redisTemplate.delete("ffmpeg_job_status:" + jobId);
+    }
+
 
     // stream init
     public void createGroupIfAbsent(String stream, String group) {

@@ -26,8 +26,9 @@ public class VideoService extends MediaService implements ResourceCleanable {
     public VideoService(@Qualifier("queueRedisTemplate") RedisTemplate<String, String> redisTemplate,
                         ObjectMapper objectMapper,
                         MinIOService minIOService,
+                        WorkerRedisService workerRedisService,
                         MemoryManager memoryManager) {
-        super(redisTemplate, objectMapper, minIOService);
+        super(redisTemplate, objectMapper, minIOService, workerRedisService);
         this.memoryManager = memoryManager;
     }
 
@@ -340,6 +341,15 @@ public class VideoService extends MediaService implements ResourceCleanable {
         removeCacheLastAccess(videoLastAccessKey, videoId);
     }
 
+    public void addCacheVideoJobStatus(String id, String jobId, Long size, MediaJobStatus status) {
+        if (jobId != null)
+            redisTemplate.opsForHash().put(id, "jobId", jobId);
+        if (size != null) {
+            redisTemplate.opsForHash().put(id, "size", String.valueOf(size));
+        }
+        redisTemplate.opsForHash().put(id, "status", status.name());
+    }
+
     public MediaJobStatus getVideoJobStatus(String videoJobId) {
         Map<Object, Object> cachedJobStatus = getVideoJobStatusInfo(videoJobId);
         if (!cachedJobStatus.isEmpty())
@@ -353,15 +363,6 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
     private void removeCacheVideoJobStatus(String videoJobId) {
         redisTemplate.delete(videoJobId);
-    }
-
-    public void addCacheVideoJobStatus(String id, String jobId, Long size, MediaJobStatus status) {
-        if (jobId != null)
-            redisTemplate.opsForHash().put(id, "jobId", jobId);
-        if (size != null) {
-            redisTemplate.opsForHash().put(id, "size", size);
-        }
-        redisTemplate.opsForHash().put(id, "status", status.name());
     }
 
     public void addCacheRunningJob(String jobId) {
@@ -415,7 +416,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
             String mediaJobId = Objects.requireNonNull(mediaJob.getValue());
             System.out.println("Removing: " + mediaJobId);
 
-            long estimatedSize = (long) getVideoJobStatusInfo(mediaJobId).get("size");
+            long estimatedSize = Long.parseLong((String) getVideoJobStatusInfo(mediaJobId).get("size"));
             removingSpace = removingSpace - estimatedSize;
 
             String mediaMemoryPath = mediaJobId.replace(":", "/");
@@ -423,6 +424,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
             removeCacheVideoLastAccess(mediaJobId);
             removeCacheVideoJobStatus(mediaJobId);
+            removeJobStatus(mediaJobId);
         }
         if (!enough && removingSpace - headRoom <= 0)
             enough = true;
