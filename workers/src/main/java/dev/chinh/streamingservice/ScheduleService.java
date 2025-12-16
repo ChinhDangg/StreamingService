@@ -6,7 +6,11 @@ import dev.chinh.streamingservice.service.AlbumService;
 import dev.chinh.streamingservice.service.MediaUploadService;
 import dev.chinh.streamingservice.service.ThumbnailService;
 import dev.chinh.streamingservice.service.VideoService;
+import dev.chinh.streamingservice.workers.AlbumWorker;
+import dev.chinh.streamingservice.workers.VideoWorker;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -26,16 +30,41 @@ public class ScheduleService {
     private final ThumbnailService thumbnailService;
     private final MediaUploadService mediaUploadService;
 
+    private final RedisTemplate<String, String> queueRedisTemplate;
+
     @Scheduled(fixedRate = 60_000, initialDelay = 60_000)
-    public void scheduled() throws Exception {
+    public void scheduled() {
         stopNonViewingVideoRunningJob();
-        removeAlbumCreationInfo();
-        cleanThumbnails();
-        removeExpiredUploadSession();
-        OSUtil.refreshUsableMemory();
+        try {
+            OSUtil.refreshUsableMemory();
+        } catch (Exception e) {
+            System.out.println("Failed to refresh memory usage");
+        }
     }
 
-    private void stopNonViewingVideoRunningJob() throws Exception {
+    @Scheduled(fixedDelay = 15 * 60 * 1000) // 15 mins
+    public void trimJobStreams() {
+
+        removeAlbumCreationInfo();
+        removeExpiredUploadSession();
+        cleanThumbnails();
+
+        queueRedisTemplate.execute((RedisCallback<Void>) conn -> {
+            var streams = new String[] {
+                    VideoWorker.STREAM,
+                    AlbumWorker.STREAM
+            };
+            // RedisConnection -> RedisCommandsProvider -> streamCommands()
+            var streamCommands = conn.streamCommands();
+            for (String stream : streams) {
+                streamCommands.xTrim(stream.getBytes(), 100_000, true);
+            }
+            return null;
+        });
+    }
+
+
+    private void stopNonViewingVideoRunningJob() {
         Set<String> runningVideoJobs = videoService.getCacheRunningJobs(System.currentTimeMillis());
 
         for (String runningVideoJob : runningVideoJobs) {
@@ -54,7 +83,11 @@ public class ScheduleService {
                 continue;
             }
             String jobId = cachedJobStatus.get("jobId").toString(); // UUID
-            videoService.stopFfmpegJob(jobId);
+            try {
+                videoService.stopFfmpegJob(jobId);
+            } catch (Exception e) {
+                System.out.println("Failed to stop ffmpeg job: " + jobId);
+            }
             videoService.addCacheVideoJobStatus(videoJobId, null, null, MediaJobStatus.STOPPED);
         }
     }
@@ -94,7 +127,7 @@ public class ScheduleService {
         }
     }
 
-    private void removeExpiredUploadSession() throws Exception {
+    private void removeExpiredUploadSession() {
         long now = System.currentTimeMillis();
         Set<ZSetOperations.TypedTuple<String>> lastAccessSessions = mediaUploadService.getAllUploadSessionCacheLastAccess(now);
         for (ZSetOperations.TypedTuple<String> session : lastAccessSessions) {
@@ -113,7 +146,11 @@ public class ScheduleService {
             for (Object value : objectMap.values()) {
                 String objectName = value.toString();
                 if (seen.add(objectName)) {
-                    mediaUploadService.removeUploadObject(objectName);
+                    try {
+                        mediaUploadService.removeUploadObject(objectName);
+                    } catch (Exception e) {
+                        System.out.println("Failed to remove object: " + objectName);
+                    }
                 }
             }
         }
