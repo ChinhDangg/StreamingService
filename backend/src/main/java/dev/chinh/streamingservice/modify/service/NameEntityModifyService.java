@@ -7,7 +7,7 @@ import dev.chinh.streamingservice.data.repository.*;
 import dev.chinh.streamingservice.data.service.ThumbnailService;
 import dev.chinh.streamingservice.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.modify.MediaNameEntityConstant;
-import dev.chinh.streamingservice.search.service.OpenSearchService;
+import dev.chinh.streamingservice.search.service.MediaSearchService;
 import dev.chinh.streamingservice.modify.NameAndThumbnailPostRequest;
 import dev.chinh.streamingservice.modify.NameEntityDTO;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +30,7 @@ public class NameEntityModifyService {
     private final MediaCharacterRepository mediaCharacterRepository;
     private final MediaUniverseRepository mediaUniverseRepository;
     private final MediaTagRepository mediaTagRepository;
-    private final OpenSearchService openSearchService;
+    private final MediaSearchService mediaSearchService;
     private final MinIOService minIOService;
 
     public void incrementNameEntityLengthCount(MediaNameEntityConstant nameEntityConstant, long nameEntityId) {
@@ -55,7 +55,7 @@ public class NameEntityModifyService {
 
 
     public List<NameEntityDTO> searchNameContaining(String index, String name) throws IOException {
-        SearchResponse<NameEntityDTO> response = openSearchService.searchContaining(index, ContentMetaData.NAME, name, NameEntityDTO.class);
+        SearchResponse<NameEntityDTO> response = mediaSearchService.searchContaining(index, ContentMetaData.NAME, name, NameEntityDTO.class);
         return response.hits().hits().stream()
                 .map(h -> {
                     NameEntityDTO dto = h.source();
@@ -103,7 +103,7 @@ public class NameEntityModifyService {
                     @Override
                     public void afterCommit() {
                         try {
-                            openSearchService.indexDocument(mediaNameEntityConstant.getName(), id,
+                            mediaSearchService.indexDocument(mediaNameEntityConstant.getName(), id,
                                     Map.of(ContentMetaData.NAME, finalName));
                         } catch (IOException e) {
                             throw new RuntimeException("Failed to index " + mediaNameEntityConstant.getName() + " " + id + " to OpenSearch");
@@ -219,7 +219,7 @@ public class NameEntityModifyService {
                         public void afterCommit() {
                             if (nameChanged) {
                                 try {
-                                    openSearchService.partialUpdateDocument(mediaNameEntityConstant.getName(), id, Map.of(ContentMetaData.NAME, finalNewName));
+                                    mediaSearchService.partialUpdateDocument(mediaNameEntityConstant.getName(), id, Map.of(ContentMetaData.NAME, finalNewName));
                                 } catch (IOException ie) {
                                     throw new RuntimeException("Failed to update OpenSearch index for " + mediaNameEntityConstant.getName() + " " + id, ie);
                                 }
@@ -289,7 +289,7 @@ public class NameEntityModifyService {
                     @Override
                     public void afterCommit() {
                         try {
-                            openSearchService.deleteDocument(listName, id);
+                            mediaSearchService.deleteDocument(listName, id);
                         } catch (IOException e) {
                             throw new RuntimeException("Failed to delete opensearch name index" + listName + " entry with ID " + id, e);
                         }
@@ -310,7 +310,7 @@ public class NameEntityModifyService {
                     @Override
                     public void afterCommit() {
                         try {
-                            openSearchService.deleteDocument(listName, id);
+                            mediaSearchService.deleteDocument(listName, id);
                         } catch (IOException e) {
                             throw new RuntimeException("Failed to delete opensearch name index" + listName + " entry with ID " + id, e);
                         }

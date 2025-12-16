@@ -15,12 +15,9 @@ import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.connection.stream.StreamRecords;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ZSetOperations;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
-import java.util.Set;
 
 @RequiredArgsConstructor
 public abstract class MediaService {

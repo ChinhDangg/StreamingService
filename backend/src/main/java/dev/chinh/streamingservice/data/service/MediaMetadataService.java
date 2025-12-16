@@ -3,7 +3,6 @@ package dev.chinh.streamingservice.data.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.*;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import java.time.Duration;

@@ -1,11 +1,9 @@
-package dev.chinh.streamingservice.search.service;
+package dev.chinh.streamingservice.search;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.chinh.streamingservice.data.ContentMetaData;
-import dev.chinh.streamingservice.modify.MediaNameEntityConstant;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.search.constant.SortBy;
-import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import dev.chinh.streamingservice.search.data.MediaSearchRangeField;
 import dev.chinh.streamingservice.search.data.SearchFieldGroup;
 import lombok.RequiredArgsConstructor;
@@ -39,8 +37,6 @@ public class OpenSearchService {
 
     private final OpenSearchClient client;
     private final ObjectMapper objectMapper;
-
-    public static final String MEDIA_INDEX_NAME = "media";
 
     public void createIndexWithSettingAndMapping(String indexName, String mappingPath) throws IOException {
         Map<String, Object> map;
@@ -146,35 +142,9 @@ public class OpenSearchService {
         }
     }
 
-    private boolean indexExists(String indexName) throws IOException {
+    public boolean indexExists(String indexName) throws IOException {
         ExistsRequest existsRequest = ExistsRequest.of(e -> e.index(indexName));
         return client.indices().exists(existsRequest).value();
-    }
-
-    public void _initializeIndexes() throws InterruptedException {
-        int retryCount = 20;
-        while (retryCount-- > 0) {
-            try {
-                if (!indexExists(MEDIA_INDEX_NAME)) {
-                    String version1 = MEDIA_INDEX_NAME + "_v1";
-                    createIndexWithMapping(version1, "/mapping/media-mapping.json");
-                    addAliasToIndex(version1, MEDIA_INDEX_NAME);
-                }
-                for (MediaNameEntityConstant constant : MediaNameEntityConstant.values()) {
-                    if (!indexExists(constant.getName())) {
-                        createIndexWithSettingAndMapping(constant.getName(), "/mapping/media-name-entity-mapping.json");
-                    }
-                }
-                break;
-            } catch (IOException e) {
-                if (e.getMessage().contains("Connection reset") || e.getMessage().contains("Connection closed")) {
-                    System.out.println("Retrying opensearch connection: " + retryCount);
-                    Thread.sleep(500);
-                } else {
-                    throw new RuntimeException(e);
-                }
-            }
-        }
     }
 
     /**
@@ -272,8 +242,8 @@ public class OpenSearchService {
         System.out.println("Indexed doc with id: " + response.id());
     }
 
-    public void indexDocument(String indexName, long id, MediaSearchItem searchItem) throws IOException {
-        IndexRequest<MediaSearchItem> request = IndexRequest.of(i -> i
+    public <TDocument> void indexDocument(String indexName, long id, TDocument searchItem) throws IOException {
+        IndexRequest<TDocument> request = IndexRequest.of(i -> i
                 .index(indexName)
                 .id(String.valueOf(id))
                 .document(searchItem)
@@ -334,8 +304,10 @@ public class OpenSearchService {
         );
     }
 
-    public SearchResponse<Object> advanceSearch(List<SearchFieldGroup> includeGroups, List<SearchFieldGroup> excludeGroups,
-                                        List<MediaSearchRangeField> mediaSearchRanges,
+    public SearchResponse<Object> advanceSearch(String index,
+                                                List<SearchFieldGroup> includeGroups,
+                                                List<SearchFieldGroup> excludeGroups,
+                                                List<MediaSearchRangeField> mediaSearchRanges,
                                         int page, int size, SortBy sortBy, SortOrder sortOrder) throws IOException {
         BoolQuery.Builder rootBool = new BoolQuery.Builder();
 
@@ -387,7 +359,7 @@ public class OpenSearchService {
 
         Query rootQuery = Query.of(q -> q.bool(rootBool.build()));
 
-        return searchWithQuery(rootQuery, page, size, sortBy, sortOrder);
+        return searchWithQuery(index, rootQuery, page, size, sortBy, sortOrder);
     }
 
     private Query buildTermOrMatch(String field, Object value, boolean searchTerm) {
@@ -410,7 +382,7 @@ public class OpenSearchService {
         }
     }
 
-    public SearchResponse<Object> search(Object text, int page, int size, SortBy sortBy,
+    public SearchResponse<Object> search(String index, Object text, int page, int size, SortBy sortBy,
                                     SortOrder sortOrder) throws IOException {
         Query multiMatch = Query.of(q -> q
                 .multiMatch(m -> m
@@ -427,21 +399,21 @@ public class OpenSearchService {
                         .type(TextQueryType.BestFields)
                 )
         );
-        return searchWithQuery(multiMatch, page, size, sortBy, sortOrder);
+        return searchWithQuery(index, multiMatch, page, size, sortBy, sortOrder);
     }
 
-    public SearchResponse<Object> searchMatchAll(int page, int size, SortBy sortBy, SortOrder sortOrder) throws IOException {
+    public SearchResponse<Object> searchMatchAll(String index, int page, int size, SortBy sortBy, SortOrder sortOrder) throws IOException {
         Query matchAll = Query.of(q -> q
                 .matchAll(m -> m)
         );
-        return searchWithQuery(matchAll, page, size, sortBy, sortOrder);
+        return searchWithQuery(index, matchAll, page, size, sortBy, sortOrder);
     }
 
     /**
      * Search exactly with given search strings by field.
      * Does not work with fields that have text type. Use search match for that.
      */
-    public SearchResponse<Object> searchTermByOneField(String field, List<Object> text, boolean matchAll, int page, int size,
+    public SearchResponse<Object> searchTermByOneField(String index, String field, List<Object> text, boolean matchAll, int page, int size,
                                                SortBy sortBy, SortOrder sortOrder) throws IOException {
         BoolQuery.Builder termBoolBuilder = new BoolQuery.Builder();
         if (matchAll) {
@@ -455,17 +427,17 @@ public class OpenSearchService {
             termBoolBuilder.minimumShouldMatch("1");
         }
         Query termBoolQuery = Query.of(q -> q.bool(termBoolBuilder.build()));
-        return searchWithQuery(termBoolQuery, page, size, sortBy, sortOrder);
+        return searchWithQuery(index, termBoolQuery, page, size, sortBy, sortOrder);
     }
 
-    private SearchResponse<Object> searchWithQuery(Query query, int page, int size, SortBy sortBy,
+    private SearchResponse<Object> searchWithQuery(String index, Query query, int page, int size, SortBy sortBy,
                                                    SortOrder sortOrder) throws IOException {
 
         String sortByField = switch (sortBy) {
-            case UPLOAD_DATE -> ContentMetaData.UPLOAD_DATE;
-            case LENGTH -> ContentMetaData.LENGTH;
-            case SIZE -> ContentMetaData.SIZE;
-            case YEAR -> ContentMetaData.YEAR;
+            case SortBy.UPLOAD_DATE -> ContentMetaData.UPLOAD_DATE;
+            case SortBy.LENGTH -> ContentMetaData.LENGTH;
+            case SortBy.SIZE -> ContentMetaData.SIZE;
+            case SortBy.YEAR -> ContentMetaData.YEAR;
             default -> null;
         };
 
@@ -476,7 +448,7 @@ public class OpenSearchService {
                 : SortOptions.of(o -> o.field(f -> f.field(sortByField).order(sortOrder)));
 
         SearchResponse<Object> response = client.search(s -> s
-                .index(MEDIA_INDEX_NAME)
+                .index(index)
                 .from(page * size)
                 .size(size)
                 .query(query)

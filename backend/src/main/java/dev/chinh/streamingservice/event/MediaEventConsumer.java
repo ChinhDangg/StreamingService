@@ -9,7 +9,7 @@ import dev.chinh.streamingservice.modify.NameEntityDTO;
 import dev.chinh.streamingservice.modify.service.MediaMetadataModifyService;
 import dev.chinh.streamingservice.search.data.MediaGroupInfo;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
-import dev.chinh.streamingservice.search.service.OpenSearchService;
+import dev.chinh.streamingservice.search.service.MediaSearchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
@@ -24,7 +24,7 @@ import java.util.Optional;
 public class MediaEventConsumer {
 
     private final MediaMetaDataRepository mediaMetaDataRepository;
-    private final OpenSearchService openSearchService;
+    private final MediaSearchService mediaSearchService;
     private final MediaMapper mediaMapper;
     private final MediaMetadataModifyService mediaMetadataModifyService;
 
@@ -35,7 +35,7 @@ public class MediaEventConsumer {
     private void onUpdateLengthOpenSearch(MediaUpdateEvent.LengthUpdated event) {
         System.out.println("Received update length event: " + event.mediaId());
         try {
-            openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, event.mediaId(), Map.of(ContentMetaData.LENGTH, event.newLength()));
+            mediaSearchService.partialUpdateDocument(MediaSearchService.MEDIA_INDEX_NAME, event.mediaId(), Map.of(ContentMetaData.LENGTH, event.newLength()));
         } catch (IOException e) {
             throw new RuntimeException("Failed to update OpenSearch index length field for media " + event.mediaId(), e);
         }
@@ -52,7 +52,7 @@ public class MediaEventConsumer {
             mediaSearchItem.setMediaGroupInfo(new MediaGroupInfo(-1L));
         }
         try {
-            openSearchService.indexDocument(OpenSearchService.MEDIA_INDEX_NAME, mediaMetaData.get().getId(), mediaSearchItem);
+            mediaSearchService.indexDocument(MediaSearchService.MEDIA_INDEX_NAME, mediaMetaData.get().getId(), mediaSearchItem);
         } catch (IOException e) {
             throw new RuntimeException("Failed to index media " + mediaMetaData.get().getId() + " to OpenSearch", e);
         }
@@ -64,7 +64,7 @@ public class MediaEventConsumer {
                 event.mediaId(), event.nameEntityConstant());
         List<String> nameEntityList = updatedMediaNameEntityList.stream().map(NameEntityDTO::getName).toList();
         try {
-            openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, event.mediaId(), Map.of(event.nameEntityConstant().getName(), nameEntityList));
+            mediaSearchService.partialUpdateDocument(MediaSearchService.MEDIA_INDEX_NAME, event.mediaId(), Map.of(event.nameEntityConstant().getName(), nameEntityList));
         } catch (IOException e) {
             throw new RuntimeException("Failed to update OpenSearch index field for media " + event.mediaId(), e);
         }
@@ -74,7 +74,7 @@ public class MediaEventConsumer {
         System.out.println("Received update media title event: " + event.mediaId());
         String title = mediaMetaDataRepository.getMediaTitle(event.mediaId());
         try {
-            openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, event.mediaId(), Map.of(ContentMetaData.TITLE, title));
+            mediaSearchService.partialUpdateDocument(MediaSearchService.MEDIA_INDEX_NAME, event.mediaId(), Map.of(ContentMetaData.TITLE, title));
         } catch (IOException e) {
             throw new RuntimeException("Failed to update OpenSearch index title field for media " + event.mediaId(), e);
         }

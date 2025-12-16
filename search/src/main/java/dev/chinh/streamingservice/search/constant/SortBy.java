@@ -1,6 +1,6 @@
 package dev.chinh.streamingservice.search.constant;
 
-import dev.chinh.streamingservice.data.ContentMetaData;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import lombok.Getter;
 
 @Getter
