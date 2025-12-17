@@ -34,16 +34,17 @@ public abstract class MediaService {
         Map<Object, Object> jobQueueStatus = getQueueJobStatus(cacheJobId);
         if (!jobQueueStatus.isEmpty()) {
             String status = (String) jobQueueStatus.get("status");
-            if (status.equals(MediaJobStatus.COMPLETED.name())) {
+            if (status.equals(MediaJobStatus.RUNNING.name()) || status.equals(MediaJobStatus.COMPLETED.name())) {
                 return jobQueueStatus.get("result").toString();
-            } else if (status.equals(MediaJobStatus.RUNNING.name()) || status.equals(MediaJobStatus.PROCESSING.name())) {
+            } else if (status.equals(MediaJobStatus.PROCESSING.name())) {
                 return status;
             }
         }
 
+        // no status or stopped
         addJobToQueue(queueKey, mediaJobDescription);
         updateQueueJobStatus(cacheJobId, MediaJobStatus.PROCESSING.name());
-        return MediaJobStatus.RUNNING.name();
+        return MediaJobStatus.PROCESSING.name();
     }
 
     protected MediaJobDescription getMediaJobDescription(long mediaId, String cacheJobId, Resolution resolution, String jobType) {
