@@ -8,8 +8,6 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
 @Service
 @Scope("prototype")
 public class AlbumWorker extends Worker {
@@ -50,23 +48,7 @@ public class AlbumWorker extends Worker {
     }
 
     @Override
-    public void performJob(MediaJobDescription description) throws Exception{
-        switch (description.getJobType()) {
-            case "albumUrlList" -> {
-                var mediaUrlList = albumService.getAllMediaUrlInAnAlbum(description);
-                String mediaUrlListString = objectMapper.writeValueAsString(mediaUrlList);
-                workerRedisService.addResultToStatus(description.getWorkId(), "result", mediaUrlListString);
-                workerRedisService.addResultToStatus(description.getWorkId(), "offset",
-                        objectMapper.writeValueAsString(List.of(description.getOffset() + description.getBatch(), mediaUrlList.size())));
-            }
-            case "checkResized" -> {
-                String offset = objectMapper.writeValueAsString(albumService.processResizedAlbumImagesInBatch(description));
-                workerRedisService.addResultToStatus(description.getWorkId(), "offset", offset);
-            }
-            case "albumVideoUrl" -> {
-                String videoPartialUrl = albumService.getAlbumPartialVideoUrl(description);
-                workerRedisService.addResultToStatus(description.getWorkId(), "result", videoPartialUrl);
-            }
-        }
+    public void performJob(MediaJobDescription description) {
+        albumService.handleJob(TOKEN_KEY, description);
     }
 }

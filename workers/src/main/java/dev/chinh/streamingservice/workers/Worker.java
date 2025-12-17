@@ -84,9 +84,7 @@ public abstract class Worker implements Runnable {
         }
 
         try {
-            workerRedisService.updateStatus(mediaJobDescription.getWorkId(), MediaJobStatus.RUNNING.name());
             performJob(mediaJobDescription);
-            workerRedisService.updateStatus(mediaJobDescription.getWorkId(), MediaJobStatus.COMPLETED.name());
             workerRedisService.ack(streamKey(), groupName(), record.getId());
         } catch (Exception e) {
             workerRedisService.updateStatus(mediaJobDescription.getWorkId(), MediaJobStatus.FAILED.name());
@@ -95,13 +93,12 @@ public abstract class Worker implements Runnable {
             incrementRetry(streamKey(), record.getId(), retry);
             backoff(retry);
             e.printStackTrace();
-        } finally {
-            workerRedisService.releaseToken(tokenKey());
         }
+        // release token is handled by the job caller not worker to handle async jobs
     }
 
     // Redis Streams are append-only — add metadata and don’t mutate.
-    public void incrementRetry(String stream, RecordId id, int retry) {
+    private void incrementRetry(String stream, RecordId id, int retry) {
         queueRedisTemplate.opsForStream().add(
                 StreamRecords.mapBacked(
                         Map.of("retry", retry + 1)
@@ -139,7 +136,7 @@ public abstract class Worker implements Runnable {
     public abstract void performJob(MediaJobDescription mediaJobDescription) throws Exception;
 
     // claiming failed to ack job
-    protected void reclaimStaleJobs() {
+    private void reclaimStaleJobs() {
         // 1. Fetch pending messages (with details)
         PendingMessages pending = workerRedisService.getPendingMessages(
                 streamKey(),

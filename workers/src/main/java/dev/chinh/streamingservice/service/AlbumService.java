@@ -8,6 +8,7 @@ import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.constant.Resolution;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
+import dev.chinh.streamingservice.workers.AlbumWorker;
 import io.minio.Result;
 import io.minio.messages.Item;
 import org.apache.coyote.BadRequestException;
@@ -24,7 +25,7 @@ import java.util.Objects;
 import java.util.Set;
 
 @Service
-public class AlbumService extends MediaService implements ResourceCleanable {
+public class AlbumService extends MediaService implements ResourceCleanable, JobHandler {
 
     private final MemoryManager memoryManager;
     private final VideoService videoService;
@@ -47,7 +48,38 @@ public class AlbumService extends MediaService implements ResourceCleanable {
     public record AlbumUrlInfoWithSizeAndDimensions(AlbumUrlInfo albumUrlInfo, SizeAndDimensions sizeAndDimensions) {}
     public record SizeAndDimensions(long size, int width, int height, int length) {}
 
-    public List<MediaUrl> getAllMediaUrlInAnAlbum(MediaJobDescription mediaJobDescription) throws Exception {
+    @Override
+    public void handleJob(String tokenKey, MediaJobDescription description) {
+        try {
+            workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
+            switch (description.getJobType()) {
+                case "albumUrlList" -> {
+                    var mediaUrlList = getAllMediaUrlInAnAlbum(description);
+                    String mediaUrlListString = objectMapper.writeValueAsString(mediaUrlList);
+                    workerRedisService.addResultToStatus(description.getWorkId(), "result", mediaUrlListString);
+                    workerRedisService.addResultToStatus(description.getWorkId(), "offset",
+                            objectMapper.writeValueAsString(List.of(description.getOffset() + description.getBatch(), mediaUrlList.size())));
+                    workerRedisService.releaseToken(tokenKey);
+                }
+                case "checkResized" -> {
+                    String offset = objectMapper.writeValueAsString(processResizedAlbumImagesInBatch(description));
+                    workerRedisService.addResultToStatus(description.getWorkId(), "offset", offset);
+                    workerRedisService.releaseToken(tokenKey);
+                }
+                case "albumVideoUrl" -> {
+                    String videoPartialUrl = getAlbumPartialVideoUrl(tokenKey, description);
+                    workerRedisService.addResultToStatus(description.getWorkId(), "result", videoPartialUrl);
+                }
+                default -> throw new BadRequestException("Invalid jobType: " + description.getJobType());
+            }
+            workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.COMPLETED.name());
+        } catch (Exception e) {
+            workerRedisService.releaseToken(tokenKey);
+            throw new RuntimeException(e);
+        }
+    }
+
+    private List<MediaUrl> getAllMediaUrlInAnAlbum(MediaJobDescription mediaJobDescription) throws Exception {
         long albumId = mediaJobDescription.getId();
         Resolution resolution = mediaJobDescription.getResolution();
 
@@ -130,7 +162,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         return new AlbumUrlInfo(albumUrlList, new ArrayList<>(List.of(mediaJobDescription.getBucket())), albumPathList);
     }
 
-    public List<Integer> processResizedAlbumImagesInBatch(MediaJobDescription mediaJobDescription) throws Exception {
+    private List<Integer> processResizedAlbumImagesInBatch(MediaJobDescription mediaJobDescription) throws Exception {
         long albumId = mediaJobDescription.getId();
         Resolution resolution = mediaJobDescription.getResolution();
         int offset = mediaJobDescription.getOffset();
@@ -204,7 +236,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         return List.of(previousProcessedOffset + notResized.size(), size);
     }
 
-    public int processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String albumDir, boolean isAlbum) throws InterruptedException, IOException {
+    private int processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String albumDir, boolean isAlbum) throws InterruptedException, IOException {
         // Start one persistent bash session inside ffmpeg container
         ProcessBuilder pb = new ProcessBuilder("docker", "exec", "-i", "ffmpeg", "bash").redirectErrorStream(true);
         Process process = pb.start();
@@ -237,16 +269,13 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             throw new RuntimeException(e);
         }
 
-        // Capture ffmpeg combined logs
-//        try (BufferedReader reader = new BufferedReader(
-//                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-//            reader.lines().forEach(System.out::println);
-//        } catch (IOException e) {
-//            throw new RuntimeException(e);
-//        }
+        List<String> logs = getLogsFromInputStream(process.getInputStream());
 
         int exit = process.waitFor();
         System.out.println("ffmpeg Resizing Images exited with code " + exit);
+        if (exit != 0) {
+            logs.forEach(System.out::println);
+        }
         return exit;
     }
 
@@ -254,7 +283,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         return albumId + ":" + vidNum + ":" + resolution;
     }
 
-    public String getAlbumPartialVideoUrl(MediaJobDescription mediaJobDescription) throws Exception {
+    private String getAlbumPartialVideoUrl(String tokenKey, MediaJobDescription mediaJobDescription) throws Exception {
         long albumId = mediaJobDescription.getId();
         Resolution albumRes = mediaJobDescription.getResolution();
         int vidNum = mediaJobDescription.getVidNum();
@@ -309,7 +338,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
 
         String scale = getFfmpegScaleString(res, false);
         String input = minIOService.getSignedUrlForContainerNginx(bucket, videoPath, expirySeconds);
-        String partialVideoJobId = videoService.createPartialVideo(input, scale, videoDir, outPath, prevJobStopped, albumVidCacheJobId);
+        String partialVideoJobId = videoService.createPartialVideo(tokenKey, input, scale, videoDir, outPath, prevJobStopped, albumVidCacheJobId);
 
         videoService.addCacheVideoJobStatus(albumVidCacheJobId, partialVideoJobId, objectSize, MediaJobStatus.RUNNING);
         videoService.addCacheRunningJob(albumVidCacheJobId);
@@ -358,7 +387,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         return new AlbumUrlInfoWithSizeAndDimensions(albumUrlInfo, sizeAndDimensions);
     }
 
-    public AlbumUrlInfoWithSizeAndDimensions getCacheAlbumCreationInfoWithSizeAndDimensions(long albumId) throws JsonProcessingException {
+    private AlbumUrlInfoWithSizeAndDimensions getCacheAlbumCreationInfoWithSizeAndDimensions(long albumId) throws JsonProcessingException {
         AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumId);
         if (albumUrlInfo == null)
             return null;
@@ -436,7 +465,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         redisTemplate.opsForHash().put(albumHashId, albumId + ":sizeAndDimensions", sizeAndDimensionsString);
     }
 
-    public AlbumUrlInfo getCacheAlbumCreationInfo(long albumId) throws JsonProcessingException {
+    private AlbumUrlInfo getCacheAlbumCreationInfo(long albumId) throws JsonProcessingException {
         String albumHashId = getAlbumCacheHashIdString(albumId);
         Object pathListValue = redisTemplate.opsForHash().get(albumHashId, albumId + ":pathList");
         if (pathListValue == null)
@@ -454,6 +483,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
     /**
      * Only free album image info. Videos in album is handled by video service free memory
      */
+    @Override
     public boolean freeMemorySpaceForSize(long size) {
         if (OSUtil.getUsableMemory() >= size) {
             OSUtil.updateUsableMemory(-size);

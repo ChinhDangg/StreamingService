@@ -1,7 +1,6 @@
 package dev.chinh.streamingservice.workers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.chinh.streamingservice.service.ThumbnailService;
 import dev.chinh.streamingservice.service.WorkerRedisService;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import dev.chinh.streamingservice.service.VideoService;
@@ -14,7 +13,6 @@ import org.springframework.stereotype.Service;
 public class VideoWorker extends Worker {
 
     private final VideoService videoService;
-    private final ThumbnailService thumbnailService;
 
     public static final String STREAM = "ffmpeg_video_stream";
     public static final String GROUP = "video_workers";
@@ -24,11 +22,9 @@ public class VideoWorker extends Worker {
     public VideoWorker(WorkerRedisService workerRedisService,
                        RedisTemplate<String, String> queueRedisTemplate,
                        ObjectMapper objectMapper,
-                       VideoService videoService,
-                       ThumbnailService thumbnailService) {
+                       VideoService videoService) {
         super(workerRedisService, queueRedisTemplate, objectMapper);
         this.videoService = videoService;
-        this.thumbnailService = thumbnailService;
     }
 
     @Override
@@ -52,13 +48,7 @@ public class VideoWorker extends Worker {
     }
 
     @Override
-    public void performJob(MediaJobDescription mediaJobDescription) throws Exception{
-        String url = switch (mediaJobDescription.getJobType()) {
-            case "preview" -> videoService.getPreviewVideoUrl(mediaJobDescription);
-            case "partial" -> videoService.getPartialVideoUrl(mediaJobDescription, mediaJobDescription.getResolution());
-            case "videoThumbnail" -> thumbnailService.generateThumbnailFromVideo(mediaJobDescription);
-            case null, default -> throw new IllegalArgumentException("Unknown job type");
-        };
-        workerRedisService.addResultToStatus(mediaJobDescription.getWorkId(), "result", url);
+    public void performJob(MediaJobDescription mediaJobDescription) {
+        videoService.handleJob(TOKEN_KEY, mediaJobDescription);
     }
 }
