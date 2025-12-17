@@ -18,13 +18,12 @@ public class VideoService extends MediaService {
     public final String ffmpegQueueKey = "ffmpeg_video_stream";
 
     public VideoService(RedisTemplate<String, String> redisStringTemplate,
-                        RedisTemplate<String, Object> redisTemplate,
                         ObjectMapper objectMapper,
                         MediaMapper mediaMapper,
                         MediaMetaDataRepository mediaRepository,
                         MinIOService minIOService,
                         MediaMetadataService mediaMetadataService) {
-        super(redisStringTemplate, redisTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaMetadataService);
+        super(redisStringTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaMetadataService);
     }
 
     public String getOriginalVideoUrl(long videoId) throws Exception {

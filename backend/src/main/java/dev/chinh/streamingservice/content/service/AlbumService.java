@@ -23,14 +23,13 @@ public class AlbumService extends MediaService {
     private final VideoService videoService;
 
     public AlbumService(RedisTemplate<String, String> redisStringTemplate,
-                        RedisTemplate<String, Object> redisTemplate,
                         ObjectMapper objectMapper,
                         MediaMapper mediaMapper,
                         MediaMetaDataRepository mediaRepository,
                         MinIOService minIOService,
                         MediaMetadataService mediaMetadataService,
                         VideoService videoService) {
-        super(redisStringTemplate, redisTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaMetadataService);
+        super(redisStringTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaMetadataService);
         this.videoService = videoService;
     }
 

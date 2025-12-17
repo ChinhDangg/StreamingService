@@ -23,7 +23,6 @@ import java.util.Map;
 public abstract class MediaService {
 
     private final RedisTemplate<String, String> redisStringTemplate;
-    protected final RedisTemplate<String, Object> redisTemplate;
     protected final ObjectMapper objectMapper;
     protected final MediaMapper mediaMapper;
     private final MediaMetaDataRepository mediaRepository;
@@ -61,7 +60,7 @@ public abstract class MediaService {
     }
 
     protected void updateQueueJobStatus(String jobId, String status) {
-        redisTemplate.opsForHash().put("ffmpeg_job_status:" + jobId, "status", status);
+        redisStringTemplate.opsForHash().put("ffmpeg_job_status:" + jobId, "status", status);
     }
 
     public void addJobToQueue(String queueKey, MediaJobDescription mediaJobDescription) throws JsonProcessingException {
@@ -77,7 +76,7 @@ public abstract class MediaService {
      */
     protected void addCacheLastAccess(String key, String mediaWorkId, Long expiry) {
         expiry = expiry == null ? System.currentTimeMillis() : expiry;
-        redisTemplate.opsForZSet().add(key, mediaWorkId, expiry);
+        redisStringTemplate.opsForZSet().add(key, mediaWorkId, expiry);
     }
 
     public String getCacheMediaJobId(long mediaId, Resolution res) {

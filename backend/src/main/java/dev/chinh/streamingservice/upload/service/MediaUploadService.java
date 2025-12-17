@@ -44,7 +44,7 @@ public class MediaUploadService {
 
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisTemplate<String, String> redisStringTemplate;
 
     private final ObjectMapper mapper;
     private final MinIOService minIOService;
@@ -474,29 +474,21 @@ public class MediaUploadService {
 
 
     private void cacheFileUploadRequest(String sessionId, String uploadId, String object) {
-        redisTemplate.opsForHash().put("upload::" + sessionId, uploadId, object);
+        redisStringTemplate.opsForHash().put("upload::" + sessionId, uploadId, object);
     }
 
     private MediaType getCachedFileUploadRequest(String sessionId, String uploadId) {
         String key = "upload::" + sessionId;
-        Object cached = redisTemplate.opsForHash().get(key, uploadId);
+        Object cached = redisStringTemplate.opsForHash().get(key, uploadId);
 
         if (cached == null) return null;
 
-        return MediaType.valueOf((String) redisTemplate.opsForHash().get(key, "mediaType"));
+        return MediaType.valueOf((String) redisStringTemplate.opsForHash().get(key, "mediaType"));
     }
 
     private void removeCacheFileUploadRequest(String sessionId, String uploadId) {
         String key = "upload::" + sessionId;
-        redisTemplate.opsForHash().delete(key, uploadId);
-    }
-
-    public Map<Object, Object> getUploadSessionObjects(String sessionId) {
-        var map = redisTemplate.opsForHash().entries("upload::" + sessionId);
-        if (map.isEmpty()) return Map.of();
-        map.remove("objectName");
-        map.remove("mediaType");
-        return map;
+        redisStringTemplate.opsForHash().delete(key, uploadId);
     }
 
     public record MediaUploadRequest(String objectName, MediaType mediaType) {}
@@ -505,39 +497,35 @@ public class MediaUploadService {
         String id = Instant.now().toEpochMilli() + "-" + UUID.randomUUID();
         String redisKey = "upload::" + id;
 
-        redisTemplate.opsForHash().put(redisKey, "objectName", objectName);
-        redisTemplate.opsForHash().put(redisKey, "mediaType", mediaType.name());
+        redisStringTemplate.opsForHash().put(redisKey, "objectName", objectName);
+        redisStringTemplate.opsForHash().put(redisKey, "mediaType", mediaType.name());
         addUploadSessionCacheLastAccess(id);
         return id;
     }
 
     public MediaUploadRequest getCachedMediaUploadRequest(String mediaUploadId) {
         String key = "upload::" + mediaUploadId;
-        Object cached = redisTemplate.opsForHash().get(key, "objectName");
+        Object cached = redisStringTemplate.opsForHash().get(key, "objectName");
 
         if (cached == null) return null;
 
         return new MediaUploadRequest(
                 (String) cached,
-                MediaType.valueOf((String) redisTemplate.opsForHash().get(key, "mediaType"))
+                MediaType.valueOf((String) redisStringTemplate.opsForHash().get(key, "mediaType"))
         );
     }
 
     public void removeCacheMediaSessionRequest(String sessionId) {
         String key = "upload::" + sessionId;
-        redisTemplate.delete(key);
+        redisStringTemplate.delete(key);
     }
 
     private void addUploadSessionCacheLastAccess(String sessionId) {
-        redisTemplate.opsForZSet().add("upload::lastAccess", sessionId, Instant.now().toEpochMilli());
-    }
-
-    public Set<ZSetOperations.TypedTuple<Object>> getAllUploadSessionCacheLastAccess(long max) {
-        return redisTemplate.opsForZSet().rangeByScoreWithScores("upload::lastAccess", 0, max, 0, 50);
+        redisStringTemplate.opsForZSet().add("upload::lastAccess", sessionId, Instant.now().toEpochMilli());
     }
 
     public void removeUploadSessionCacheLastAccess(String sessionId) {
-        redisTemplate.opsForZSet().remove("upload::lastAccess", sessionId);
+        redisStringTemplate.opsForZSet().remove("upload::lastAccess", sessionId);
     }
 
 

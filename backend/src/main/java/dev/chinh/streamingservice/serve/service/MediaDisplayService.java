@@ -32,7 +32,7 @@ public class MediaDisplayService {
     private final ThumbnailService thumbnailService;
     private final ObjectMapper objectMapper;
     private final MediaMapper mediaMapper;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisTemplate<String, String> redisStringTemplate;
     private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
 
     private final int maxBatchSize = 20;
@@ -65,13 +65,13 @@ public class MediaDisplayService {
 
     private void addCacheGroupOfMedia(long mediaId, int offset, Sort.Direction sortOrder, GroupSlice mediaIds) throws JsonProcessingException {
         String id = "grouper::" + mediaId;
-        redisTemplate.opsForHash().put(id, offset + ":" + sortOrder, objectMapper.writeValueAsString(mediaIds));
-        redisTemplate.expire(id, Duration.ofMinutes(15));
+        redisStringTemplate.opsForHash().put(id, offset + ":" + sortOrder, objectMapper.writeValueAsString(mediaIds));
+        redisStringTemplate.expire(id, Duration.ofMinutes(15));
     }
 
     public GroupSlice getCacheGroupOfMedia(long mediaId, int offset, Sort.Direction sortOrder) {
         String id = "grouper::" + mediaId;
-        Object json = redisTemplate.opsForHash().get(id, offset + ":" + sortOrder);
+        Object json = redisStringTemplate.opsForHash().get(id, offset + ":" + sortOrder);
 
         if (json == null)
             return null;
@@ -84,7 +84,7 @@ public class MediaDisplayService {
 
     public void removeCacheGroupOfMedia(long mediaId) {
         String id = "grouper::" + mediaId;
-        redisTemplate.delete(id);
+        redisStringTemplate.delete(id);
     }
 
     public void deleteAllCacheForMedia(long mediaId) {
@@ -92,7 +92,7 @@ public class MediaDisplayService {
 
         // 1. Use the non-deprecated redisTemplate.scan() method
         //    It respects the configured KeySerializer (StringRedisSerializer) and returns String keys.
-        try (Cursor<String> cursor = redisTemplate.scan(ScanOptions.scanOptions()
+        try (Cursor<String> cursor = redisStringTemplate.scan(ScanOptions.scanOptions()
                 .match(pattern)
                 .count(1000)
                 .build())) {
@@ -104,7 +104,7 @@ public class MediaDisplayService {
             // 3. Delete the keys in a single operation
             if (!keysToDelete.isEmpty()) {
                 // redisTemplate.delete(Collection<K> keys) is safe and respects serialization
-                redisTemplate.delete(keysToDelete);
+                redisStringTemplate.delete(keysToDelete);
             }
         }
         // The try-with-resources block ensures the cursor is closed automatically.

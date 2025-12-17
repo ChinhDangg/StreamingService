@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.data.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import lombok.RequiredArgsConstructor;
@@ -11,24 +12,41 @@ import java.time.Duration;
 @RequiredArgsConstructor
 public class MediaMetadataService {
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisTemplate<String, String> redisStringTemplate;
     private final ObjectMapper objectMapper;
 
     public void cacheMediaSearchItem(MediaSearchItem item) {
         String id = "media::" + item.getId();
-        redisTemplate.opsForValue().set(id, item, Duration.ofHours(1));
+        try {
+            String json = objectMapper.writeValueAsString(item);
+            redisStringTemplate.opsForValue().set(id, json, Duration.ofHours(1));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to parse json", e);
+        }
     }
 
     public void cacheMediaSearchItem(MediaSearchItem item, Duration duration) {
         String id = "media::" + item.getId();
-        redisTemplate.opsForValue().set(id, item, duration);
+        try {
+            String json = objectMapper.writeValueAsString(item);
+            redisStringTemplate.opsForValue().set(id, json, duration);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to parse json", e);
+        }
     }
 
     public MediaSearchItem getCachedMediaSearchItem(long id) {
-        return objectMapper.convertValue(redisTemplate.opsForValue().get("media::" + id), MediaSearchItem.class);
+        String json = redisStringTemplate.opsForValue().get("media::" + id);
+        if (json == null)
+            return null;
+        try {
+            return objectMapper.readValue(json, MediaSearchItem.class);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to parse json", e);
+        }
     }
 
     public void removeCachedMediaSearchItem(long id) {
-        redisTemplate.delete("media::" + id);
+        redisStringTemplate.delete("media::" + id);
     }
 }
