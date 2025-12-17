@@ -84,6 +84,7 @@ public abstract class Worker implements Runnable {
         }
 
         try {
+            System.out.println("Performing job: " + mediaJobDescription.getWorkId() + " " + mediaJobDescription.getJobType());
             performJob(mediaJobDescription);
             workerRedisService.ack(streamKey(), groupName(), record.getId());
         } catch (Exception e) {
