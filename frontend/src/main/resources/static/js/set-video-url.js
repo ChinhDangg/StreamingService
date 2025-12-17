@@ -154,7 +154,7 @@ export function pollPlaylistUrl(fetchUrl, maxWaitMs = 5000, intervalMs = 500) {
             }
 
             const playlistUrl = await response.text();
-            if (playlistUrl !== 'RUNNING' && playlistUrl !== 'PROCESSING') {
+            if (playlistUrl !== 'PROCESSING') {
                 clearInterval(previewInterval);
                 clearTimeout(previewTimeout);
                 resolve(playlistUrl);
