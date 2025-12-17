@@ -8,7 +8,6 @@ import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.constant.Resolution;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
-import dev.chinh.streamingservice.workers.AlbumWorker;
 import io.minio.Result;
 import io.minio.messages.Item;
 import org.apache.coyote.BadRequestException;

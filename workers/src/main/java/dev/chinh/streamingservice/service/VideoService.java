@@ -28,19 +28,16 @@ public class VideoService extends MediaService implements ResourceCleanable, Job
     private final ExecutorService ffmpegExecutor;
 
     private final MemoryManager memoryManager;
-    private final ThumbnailService thumbnailService;
 
     public VideoService(@Qualifier("queueRedisTemplate") RedisTemplate<String, String> redisTemplate,
                         ObjectMapper objectMapper,
                         MinIOService minIOService,
                         WorkerRedisService workerRedisService,
                         MemoryManager memoryManager,
-                        ExecutorService ffmpegExecutor,
-                        ThumbnailService thumbnailService) {
+                        ExecutorService ffmpegExecutor) {
         super(redisTemplate, objectMapper, minIOService, workerRedisService);
         this.memoryManager = memoryManager;
         this.ffmpegExecutor = ffmpegExecutor;
-        this.thumbnailService = thumbnailService;
     }
 
     @PostConstruct

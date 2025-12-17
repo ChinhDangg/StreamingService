@@ -6,8 +6,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.simpleframework.xml.Default;
 
-import java.time.Instant;
-
 @Getter
 @Setter
 public class MediaNameEntry {
