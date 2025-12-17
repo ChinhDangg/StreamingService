@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.backend.content.config;
+package dev.chinh.streamingservice.backend.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
