@@ -9,7 +9,7 @@ import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
-import dev.chinh.streamingservice.data.service.MediaMetadataService;
+import dev.chinh.streamingservice.search.service.MediaSearchCacheService;
 import dev.chinh.streamingservice.search.data.MediaGroupInfo;
 import dev.chinh.streamingservice.search.data.MediaSearchItem;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +27,7 @@ public abstract class MediaService {
     protected final MediaMapper mediaMapper;
     private final MediaMetaDataRepository mediaRepository;
     protected final MinIOService minIOService;
-    protected final MediaMetadataService mediaMetadataService;
+    protected final MediaSearchCacheService mediaSearchCacheService;
 
     protected String addJobToFfmpegQueue(String queueKey, String cacheJobId, MediaJobDescription mediaJobDescription) throws JsonProcessingException {
         Map<Object, Object> jobQueueStatus = getQueueJobStatus(cacheJobId);
@@ -84,7 +84,7 @@ public abstract class MediaService {
     }
 
     protected MediaDescription getMediaDescription(long mediaId) {
-        MediaDescription mediaDescription = mediaMetadataService.getCachedMediaSearchItem(mediaId);
+        MediaDescription mediaDescription = mediaSearchCacheService.getCachedMediaSearchItem(mediaId);
         if (mediaDescription == null)
             mediaDescription = findMediaMetaDataAllInfo(mediaId);
         return mediaDescription;
@@ -100,7 +100,7 @@ public abstract class MediaService {
             mediaSearchItem.setMediaGroupInfo(
                     new MediaGroupInfo(null, mediaMetaData.getGrouperId(), mediaMetaData.getGroupInfo().getNumInfo()));
         }
-        mediaMetadataService.cacheMediaSearchItem(mediaSearchItem);
+        mediaSearchCacheService.cacheMediaSearchItem(mediaSearchItem);
         return mediaMetaData;
     }
 }

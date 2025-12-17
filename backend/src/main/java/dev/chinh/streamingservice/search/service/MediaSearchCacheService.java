@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.data.service;
+package dev.chinh.streamingservice.search.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,7 +10,7 @@ import java.time.Duration;
 
 @Service
 @RequiredArgsConstructor
-public class MediaMetadataService {
+public class MediaSearchCacheService {
 
     private final RedisTemplate<String, String> redisStringTemplate;
     private final ObjectMapper objectMapper;

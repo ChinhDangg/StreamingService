@@ -2,7 +2,7 @@ package dev.chinh.streamingservice.modify.service;
 
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
-import dev.chinh.streamingservice.data.service.MediaMetadataService;
+import dev.chinh.streamingservice.search.service.MediaSearchCacheService;
 import dev.chinh.streamingservice.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.exception.DuplicateEntryException;
 import dev.chinh.streamingservice.modify.MediaNameEntityConstant;
@@ -21,7 +21,7 @@ import java.util.List;
 public class MediaMetadataModifyService {
 
     private final MediaMetaDataRepository mediaMetaDataRepository;
-    private final MediaMetadataService mediaMetadataService;
+    private final MediaSearchCacheService mediaSearchCacheService;
     private final NameEntityModifyService nameEntityModifyService;
 
     private final ApplicationEventPublisher eventPublisher;
@@ -54,7 +54,7 @@ public class MediaMetadataModifyService {
 
         eventPublisher.publishEvent(new MediaUpdateEvent.MediaTitleUpdated(mediaId));
 
-        mediaMetadataService.removeCachedMediaSearchItem(mediaId);
+        mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
         return newTitle;
     }
 
@@ -86,7 +86,7 @@ public class MediaMetadataModifyService {
 
         eventPublisher.publishEvent(new MediaUpdateEvent.MediaNameEntityUpdated(mediaId, updateList.nameEntity));
 
-        mediaMetadataService.removeCachedMediaSearchItem(mediaId);
+        mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
         return updatedMediaNameEntityList;
     }
 

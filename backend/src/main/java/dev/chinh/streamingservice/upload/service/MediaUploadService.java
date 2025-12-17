@@ -9,7 +9,7 @@ import dev.chinh.streamingservice.data.entity.MediaGroupMetaData;
 import dev.chinh.streamingservice.data.entity.MediaMetaData;
 import dev.chinh.streamingservice.data.repository.MediaGroupMetaDataRepository;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
-import dev.chinh.streamingservice.data.service.MediaMetadataService;
+import dev.chinh.streamingservice.search.service.MediaSearchCacheService;
 import dev.chinh.streamingservice.data.service.ThumbnailService;
 import dev.chinh.streamingservice.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.exception.ResourceNotFoundException;
@@ -20,7 +20,6 @@ import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -33,8 +32,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -50,7 +47,7 @@ public class MediaUploadService {
     private final MinIOService minIOService;
     private final ThumbnailService thumbnailService;
     private final MediaDisplayService mediaDisplayService;
-    private final MediaMetadataService mediaMetadataService;
+    private final MediaSearchCacheService mediaSearchCacheService;
 
     private final ApplicationEventPublisher eventPublisher;
 
@@ -267,7 +264,7 @@ public class MediaUploadService {
 
         eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMedia.getId(), updatedLength));
 
-        mediaMetadataService.removeCachedMediaSearchItem(grouperMedia.getId());
+        mediaSearchCacheService.removeCachedMediaSearchItem(grouperMedia.getId());
         mediaDisplayService.removeCacheGroupOfMedia(grouperMedia.getId());
 
         removeCacheMediaSessionRequest(sessionId);

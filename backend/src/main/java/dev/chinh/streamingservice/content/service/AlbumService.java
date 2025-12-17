@@ -8,13 +8,12 @@ import dev.chinh.streamingservice.common.constant.Resolution;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
-import dev.chinh.streamingservice.data.service.MediaMetadataService;
+import dev.chinh.streamingservice.search.service.MediaSearchCacheService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.coyote.BadRequestException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.io.*;
 import java.util.*;
 
 @Service
@@ -27,9 +26,9 @@ public class AlbumService extends MediaService {
                         MediaMapper mediaMapper,
                         MediaMetaDataRepository mediaRepository,
                         MinIOService minIOService,
-                        MediaMetadataService mediaMetadataService,
+                        MediaSearchCacheService mediaSearchCacheService,
                         VideoService videoService) {
-        super(redisStringTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaMetadataService);
+        super(redisStringTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaSearchCacheService);
         this.videoService = videoService;
     }
 

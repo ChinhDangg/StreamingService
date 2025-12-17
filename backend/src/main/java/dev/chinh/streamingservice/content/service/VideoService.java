@@ -5,12 +5,9 @@ import dev.chinh.streamingservice.MediaMapper;
 import dev.chinh.streamingservice.common.constant.Resolution;
 import dev.chinh.streamingservice.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.data.entity.MediaDescription;
-import dev.chinh.streamingservice.data.service.MediaMetadataService;
+import dev.chinh.streamingservice.search.service.MediaSearchCacheService;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-
-import java.io.*;
-import java.util.*;
 
 @Service
 public class VideoService extends MediaService {
@@ -22,8 +19,8 @@ public class VideoService extends MediaService {
                         MediaMapper mediaMapper,
                         MediaMetaDataRepository mediaRepository,
                         MinIOService minIOService,
-                        MediaMetadataService mediaMetadataService) {
-        super(redisStringTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaMetadataService);
+                        MediaSearchCacheService mediaSearchCacheService) {
+        super(redisStringTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaSearchCacheService);
     }
 
     public String getOriginalVideoUrl(long videoId) throws Exception {

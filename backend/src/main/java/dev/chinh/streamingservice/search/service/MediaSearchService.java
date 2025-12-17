@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.MediaMapper;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
-import dev.chinh.streamingservice.data.service.MediaMetadataService;
 import dev.chinh.streamingservice.data.service.ThumbnailService;
 import dev.chinh.streamingservice.modify.MediaNameEntityConstant;
 import dev.chinh.streamingservice.search.OpenSearchService;
@@ -28,7 +27,7 @@ public class MediaSearchService {
     private final ObjectMapper mapper;
     private final MediaMapper mediaMapper;
     private final OpenSearchService openSearchService;
-    private final MediaMetadataService mediaMetadataService;
+    private final MediaSearchCacheService mediaSearchCacheService;
     private final ThumbnailService thumbnailService;
 
     public static final String MEDIA_INDEX_NAME = "media";
@@ -57,7 +56,7 @@ public class MediaSearchService {
 
     private void cacheMediaSearchItems(Collection<MediaSearchItem> items) {
         for (MediaSearchItem item : items) {
-            mediaMetadataService.cacheMediaSearchItem(item, Duration.ofMinutes(15));
+            mediaSearchCacheService.cacheMediaSearchItem(item, Duration.ofMinutes(15));
         }
     }
 
