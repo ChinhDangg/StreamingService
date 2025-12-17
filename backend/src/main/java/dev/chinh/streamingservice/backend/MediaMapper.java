@@ -1,13 +1,11 @@
 package dev.chinh.streamingservice.backend;
 
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
-import dev.chinh.streamingservice.backend.data.projection.MediaNameEntry;
-import dev.chinh.streamingservice.backend.data.entity.MediaDescription;
-import dev.chinh.streamingservice.backend.data.entity.MediaMetaData;
-import dev.chinh.streamingservice.backend.data.entity.MediaNameEntity;
 import dev.chinh.streamingservice.backend.search.data.MediaSearchItem;
 import dev.chinh.streamingservice.backend.search.data.MediaSearchItemResponse;
 import dev.chinh.streamingservice.backend.serve.data.MediaDisplayContent;
+import dev.chinh.streamingservice.persistence.entity.MediaDescription;
+import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
 import org.mapstruct.Builder;
 import org.mapstruct.Mapper;
 
@@ -19,8 +17,6 @@ public interface MediaMapper {
     MediaDisplayContent map(MediaDescription source);
 
     MediaSearchItem map(MediaMetaData source);
-
-    MediaNameEntry map(MediaNameEntity source);
 
     MediaJobDescription mapToJobDescription(MediaDescription source);
 }

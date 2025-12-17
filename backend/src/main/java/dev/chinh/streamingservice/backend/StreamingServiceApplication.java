@@ -1,16 +1,6 @@
 package dev.chinh.streamingservice.backend;
 
 import dev.chinh.streamingservice.common.OSUtil;
-import dev.chinh.streamingservice.backend.content.service.AlbumService;
-import dev.chinh.streamingservice.backend.content.service.MinIOService;
-import dev.chinh.streamingservice.backend.data.repository.MediaGroupMetaDataRepository;
-import dev.chinh.streamingservice.backend.data.repository.MediaMetaDataRepository;
-import dev.chinh.streamingservice.backend.data.repository.MediaTagRepository;
-import dev.chinh.streamingservice.backend.data.service.ThumbnailService;
-import dev.chinh.streamingservice.backend.event.MediaEventProducer;
-import dev.chinh.streamingservice.backend.search.service.MediaSearchService;
-import dev.chinh.streamingservice.backend.upload.service.MediaUploadService;
-import dev.chinh.streamingservice.backend.modify.service.NameEntityModifyService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -33,7 +23,7 @@ public class StreamingServiceApplication {
     }
 
     @Bean
-    public CommandLineRunner commandLineRunner(MediaSearchService mediaSearchService, AlbumService albumService, MinIOService minIOService, NameEntityModifyService nameEntityModifyService, MediaMetaDataRepository mediaMetaDataRepository, MediaGroupMetaDataRepository mediaGroupMetaDataRepository, MediaUploadService mediaUploadService, ThumbnailService thumbnailService, MediaTagRepository mediaTagRepository, MediaEventProducer mediaEventProducer) {
+    public CommandLineRunner commandLineRunner() {
         return args -> {
 //            openSearchService.createIndexWithMapping("media_v1", "/mapping/media-mapping.json");
 //            openSearchService.addAliasToIndex("media_v1", OpenSearchService.MEDIA_INDEX_NAME);

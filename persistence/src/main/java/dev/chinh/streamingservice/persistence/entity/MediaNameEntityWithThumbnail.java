@@ -1,0 +1,17 @@
+package dev.chinh.streamingservice.persistence.entity;
+
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
+import jakarta.persistence.MappedSuperclass;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+@MappedSuperclass
+public abstract class MediaNameEntityWithThumbnail extends MediaNameEntity {
+
+    @JsonProperty(ContentMetaData.THUMBNAIL)
+    protected String thumbnail;
+}

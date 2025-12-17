@@ -2,8 +2,8 @@ package dev.chinh.streamingservice.backend.modify.controller;
 
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.backend.modify.NameAndThumbnailPostRequest;
-import dev.chinh.streamingservice.backend.modify.NameEntityDTO;
 import dev.chinh.streamingservice.backend.modify.service.NameEntityModifyService;
+import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.apache.hc.core5.http.HttpStatus;

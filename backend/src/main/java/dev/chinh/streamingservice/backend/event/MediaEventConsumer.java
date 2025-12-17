@@ -2,14 +2,14 @@ package dev.chinh.streamingservice.backend.event;
 
 import dev.chinh.streamingservice.backend.MediaMapper;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
-import dev.chinh.streamingservice.backend.data.entity.MediaMetaData;
-import dev.chinh.streamingservice.backend.data.repository.MediaMetaDataRepository;
 import dev.chinh.streamingservice.backend.event.config.KafkaRedPandaConfig;
-import dev.chinh.streamingservice.backend.modify.NameEntityDTO;
 import dev.chinh.streamingservice.backend.modify.service.MediaMetadataModifyService;
 import dev.chinh.streamingservice.backend.search.data.MediaGroupInfo;
 import dev.chinh.streamingservice.backend.search.data.MediaSearchItem;
 import dev.chinh.streamingservice.backend.search.service.MediaSearchService;
+import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
+import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
+import dev.chinh.streamingservice.persistence.repository.MediaMetaDataRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;

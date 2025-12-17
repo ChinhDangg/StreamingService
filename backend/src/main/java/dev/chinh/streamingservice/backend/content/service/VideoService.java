@@ -3,9 +3,9 @@ package dev.chinh.streamingservice.backend.content.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.backend.MediaMapper;
 import dev.chinh.streamingservice.common.constant.Resolution;
-import dev.chinh.streamingservice.backend.data.repository.MediaMetaDataRepository;
-import dev.chinh.streamingservice.backend.data.entity.MediaDescription;
 import dev.chinh.streamingservice.backend.search.service.MediaSearchCacheService;
+import dev.chinh.streamingservice.persistence.entity.MediaDescription;
+import dev.chinh.streamingservice.persistence.repository.MediaMetaDataRepository;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 

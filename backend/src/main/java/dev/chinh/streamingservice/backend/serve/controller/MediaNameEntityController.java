@@ -1,6 +1,6 @@
 package dev.chinh.streamingservice.backend.serve.controller;
 
-import dev.chinh.streamingservice.backend.data.service.MediaNameEntityService;
+import dev.chinh.streamingservice.backend.serve.service.MediaNameEntityService;
 import dev.chinh.streamingservice.searchclient.constant.SortBy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;

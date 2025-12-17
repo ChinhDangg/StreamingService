@@ -2,14 +2,14 @@ package dev.chinh.streamingservice.backend.modify.service;
 
 import dev.chinh.streamingservice.backend.content.service.MinIOService;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
-import dev.chinh.streamingservice.backend.data.entity.*;
-import dev.chinh.streamingservice.backend.data.repository.*;
-import dev.chinh.streamingservice.backend.data.service.ThumbnailService;
+import dev.chinh.streamingservice.backend.content.service.ThumbnailService;
 import dev.chinh.streamingservice.backend.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.backend.modify.MediaNameEntityConstant;
 import dev.chinh.streamingservice.backend.search.service.MediaSearchService;
 import dev.chinh.streamingservice.backend.modify.NameAndThumbnailPostRequest;
-import dev.chinh.streamingservice.backend.modify.NameEntityDTO;
+import dev.chinh.streamingservice.persistence.entity.*;
+import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
+import dev.chinh.streamingservice.persistence.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.client.opensearch.core.SearchResponse;
 import org.springframework.stereotype.Service;
