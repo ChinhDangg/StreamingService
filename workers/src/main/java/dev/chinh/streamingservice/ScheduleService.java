@@ -84,11 +84,10 @@ public class ScheduleService {
             }
             String jobId = cachedJobStatus.get("jobId").toString(); // UUID
             try {
-                videoService.stopFfmpegJob(jobId);
+                videoService.stopFfmpegJob(videoJobId, jobId);
             } catch (Exception e) {
                 System.out.println("Failed to stop ffmpeg job: " + jobId);
             }
-            videoService.addCacheVideoJobStatus(videoJobId, null, null, MediaJobStatus.STOPPED);
         }
     }
 
