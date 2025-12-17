@@ -24,10 +24,10 @@ public class WorkersApplication {
             OSUtil._init();
 
             WorkerRedisService workerRedisService = ctx.getBean(WorkerRedisService.class);
-            workerRedisService.initializeTokens(VideoWorker.TOKEN_KEY, 1);
-            workerRedisService.initializeTokens(AlbumWorker.TOKEN_KEY, 1);
+            workerRedisService.initializeTokens(VideoWorker.TOKEN_KEY, 2);
+            workerRedisService.initializeTokens(AlbumWorker.TOKEN_KEY, 2);
 
-            int workerCount = 1;
+            int workerCount = 2;
             createAndStartWorkers(ctx, VideoWorker.class, workerCount, "video-worker");
             createAndStartWorkers(ctx, AlbumWorker.class, workerCount, "album-worker");
         };
