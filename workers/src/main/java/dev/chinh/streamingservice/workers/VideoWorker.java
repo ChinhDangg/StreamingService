@@ -1,9 +1,9 @@
 package dev.chinh.streamingservice.workers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.chinh.streamingservice.service.WorkerRedisService;
+import dev.chinh.streamingservice.workers.service.WorkerRedisService;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
-import dev.chinh.streamingservice.service.VideoService;
+import dev.chinh.streamingservice.workers.service.VideoService;
 import org.springframework.context.annotation.Scope;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;

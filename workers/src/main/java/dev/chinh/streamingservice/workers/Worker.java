@@ -2,7 +2,7 @@ package dev.chinh.streamingservice.workers;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.chinh.streamingservice.service.WorkerRedisService;
+import dev.chinh.streamingservice.workers.service.WorkerRedisService;
 import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import lombok.RequiredArgsConstructor;
