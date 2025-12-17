@@ -6,6 +6,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 public abstract class MediaService {
@@ -27,14 +32,6 @@ public abstract class MediaService {
 
     protected final String masterFileName = "/master.m3u8";
 
-    /**
-     * @param mediaWorkId: specific media content saved to memory e.g. 1:p360
-     */
-    protected void addCacheLastAccess(String key, String mediaWorkId, Long expiry) {
-        expiry = expiry == null ? System.currentTimeMillis() : expiry;
-        redisTemplate.opsForZSet().add(key, mediaWorkId, expiry);
-    }
-
     protected Double getCacheLastAccess(String key, String mediaWorkId) {
         return redisTemplate.opsForZSet().score(key, mediaWorkId);
     }
@@ -47,6 +44,19 @@ public abstract class MediaService {
         workerRedisService.removeStatus(jobId);
     }
 
+    public List<String> getLogsFromInputStream(InputStream inputStream) {
+        List<String> logs = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                logs.add("[ffmpeg] " + line);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return logs;
+    }
+
     /**
      * Already sorted by default. Get oldest one first
      * @return mediaJobId in batch of 50.
@@ -56,7 +66,7 @@ public abstract class MediaService {
                 .rangeByScoreWithScores(key, 0, max, 0, 50);
     }
 
-    public String getCacheMediaJobIdString(long mediaId, Resolution res) {
+    protected String getCacheMediaJobIdString(long mediaId, Resolution res) {
         return mediaId + ":" + res;
     }
 
