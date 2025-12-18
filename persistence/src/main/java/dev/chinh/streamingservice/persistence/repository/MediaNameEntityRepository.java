@@ -41,4 +41,6 @@ public interface MediaNameEntityRepository<T extends MediaNameEntity, ID> extend
     """)
     int decrementLength(@Param("id") long id);
 
+    @Query("SELECT e.name FROM #{#entityName} e WHERE e.id = :id")
+    String getNameEntityName(@Param("id") long id);
 }
