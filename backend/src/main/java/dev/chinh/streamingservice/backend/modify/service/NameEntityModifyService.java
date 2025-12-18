@@ -4,14 +4,16 @@ import dev.chinh.streamingservice.backend.content.service.MinIOService;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.backend.content.service.ThumbnailService;
 import dev.chinh.streamingservice.backend.exception.ResourceNotFoundException;
-import dev.chinh.streamingservice.backend.modify.MediaNameEntityConstant;
+import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.backend.search.service.MediaSearchService;
 import dev.chinh.streamingservice.backend.modify.NameAndThumbnailPostRequest;
+import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.persistence.entity.*;
 import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
 import dev.chinh.streamingservice.persistence.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.client.opensearch.core.SearchResponse;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -19,7 +21,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -32,6 +33,7 @@ public class NameEntityModifyService {
     private final MediaTagRepository mediaTagRepository;
     private final MediaSearchService mediaSearchService;
     private final MinIOService minIOService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public void incrementNameEntityLengthCount(MediaNameEntityConstant nameEntityConstant, long nameEntityId) {
         int updated = switch (nameEntityConstant) {
@@ -97,20 +99,7 @@ public class NameEntityModifyService {
         T added = repository.save(mediaNameEntity);
         long id = added.getId();
 
-        String finalName = name;
-        TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        try {
-                            mediaSearchService.indexDocument(mediaNameEntityConstant.getName(), id,
-                                    Map.of(ContentMetaData.NAME, finalName));
-                        } catch (IOException e) {
-                            throw new RuntimeException("Failed to index " + mediaNameEntityConstant.getName() + " " + id + " to OpenSearch");
-                        }
-                    }
-                }
-        );
+        eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityCreated(mediaNameEntityConstant, id));
     }
 
     @Transactional
@@ -165,7 +154,7 @@ public class NameEntityModifyService {
     protected <T extends MediaNameEntity> void updateNameEntity(long id, String name,
                                                                 MediaNameEntityConstant mediaNameEntityConstant,
                                                                 MediaNameEntityRepository<T, Long> repository) {
-        T nameEntity = findById(id, mediaNameEntityConstant.getName(), repository);
+        T nameEntity = findById(id, mediaNameEntityConstant, repository);
         name = validateNameEntity(name);
         if (nameEntity.getName().equals(name))
             return;
@@ -180,7 +169,7 @@ public class NameEntityModifyService {
         if (request.getThumbnail() == null && (request.getName() == null || request.getName().isBlank()))
             throw new IllegalArgumentException("No name or thumbnail provided");
 
-        T nameEntity = findById(id, mediaNameEntityConstant.getName(), repository);
+        T nameEntity = findById(id, mediaNameEntityConstant, repository);
         String oldName = nameEntity.getName();
         String newName = request.getName() == null ? oldName : validateNameEntity(request.getName());
 
@@ -210,7 +199,6 @@ public class NameEntityModifyService {
 
             if (nameChanged || thumbnailChanged) repository.save(nameEntity);
 
-            String finalNewName = newName;
             String finalNewThumbnail = newThumbnailPath;
 
             TransactionSynchronizationManager.registerSynchronization(
@@ -219,16 +207,17 @@ public class NameEntityModifyService {
                         public void afterCommit() {
                             if (nameChanged) {
                                 try {
-                                    mediaSearchService.partialUpdateDocument(mediaNameEntityConstant.getName(), id, Map.of(ContentMetaData.NAME, finalNewName));
-                                } catch (IOException ie) {
-                                    throw new RuntimeException("Failed to update OpenSearch index for " + mediaNameEntityConstant.getName() + " " + id, ie);
+                                    eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityUpdated(mediaNameEntityConstant, id));
+                                } catch (Exception e) {
+                                    throw new RuntimeException("Failed to publish event name entity updated for " + mediaNameEntityConstant.getName() + " " + id, e);
                                 }
                             }
+
                             if (thumbnailChanged && oldThumbnailPath != null) {
                                 try {
                                     minIOService.removeFile(ThumbnailService.thumbnailBucket, oldThumbnailPath);
                                 } catch (Exception e) {
-                                    throw new RuntimeException("Failed to clean up old thumbnail file: " + oldThumbnailPath, e);
+                                    throw new RuntimeException("WARN: Failed to clean up old thumbnail file: " + oldThumbnailPath, e);
                                 }
                             }
                         }
@@ -239,7 +228,7 @@ public class NameEntityModifyService {
                                 try {
                                     minIOService.removeFile(ThumbnailService.thumbnailBucket, finalNewThumbnail);
                                 } catch (Exception e) {
-                                    throw new RuntimeException("Failed to clean up newly uploaded thumbnail file: " + finalNewThumbnail, e);
+                                    throw new RuntimeException("WARN: Failed to clean up newly uploaded thumbnail file: " + finalNewThumbnail, e);
                                 }
                             }
                         }
@@ -259,47 +248,35 @@ public class NameEntityModifyService {
 
     @Transactional
     public void deleteAuthor(long id) {
-        deleteNameEntity(id, ContentMetaData.AUTHORS, mediaAuthorRepository);
+        deleteNameEntity(id, MediaNameEntityConstant.AUTHORS, mediaAuthorRepository);
     }
 
     @Transactional
     public void deleteCharacter(long id) {
-        deleteNameEntityWithThumbnail(id, ContentMetaData.CHARACTERS, mediaCharacterRepository);
+        deleteNameEntityWithThumbnail(id, MediaNameEntityConstant.CHARACTERS, mediaCharacterRepository);
     }
 
     @Transactional
     public void deleteUniverse(long id) {
-        deleteNameEntityWithThumbnail(id, ContentMetaData.UNIVERSES, mediaUniverseRepository);
+        deleteNameEntityWithThumbnail(id, MediaNameEntityConstant.UNIVERSES, mediaUniverseRepository);
     }
 
     @Transactional
     public void deleteTag(long id) {
-        deleteNameEntity(id, ContentMetaData.TAGS, mediaTagRepository);
+        deleteNameEntity(id, MediaNameEntityConstant.TAGS, mediaTagRepository);
     }
 
     // to be used locally for check
     @Transactional
-    protected <T extends MediaNameEntity> void deleteNameEntity(long id, String listName, MediaNameEntityRepository<T, Long> repository) {
-        T nameEntity = findById(id, listName, repository);
-
-        repository.delete(nameEntity);
-
-        TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        try {
-                            mediaSearchService.deleteDocument(listName, id);
-                        } catch (IOException e) {
-                            throw new RuntimeException("Failed to delete opensearch name index" + listName + " entry with ID " + id, e);
-                        }
-                    }
-                });
+    protected <T extends MediaNameEntity> void deleteNameEntity(long id, MediaNameEntityConstant mediaNameEntityConstant, MediaNameEntityRepository<T, Long> repository) {
+        repository.deleteById(id);
+        eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityDeleted(mediaNameEntityConstant, id));
     }
 
     @Transactional
-    protected <T extends MediaNameEntityWithThumbnail> void deleteNameEntityWithThumbnail(long id, String listName, MediaNameEntityRepository<T, Long> repository) {
-        T nameEntity = findById(id, listName, repository);
+    protected <T extends MediaNameEntityWithThumbnail> void deleteNameEntityWithThumbnail(long id, MediaNameEntityConstant mediaNameEntityConstant,
+                                                                                          MediaNameEntityRepository<T, Long> repository) {
+        T nameEntity = findById(id, mediaNameEntityConstant, repository);
 
         String thumbnailPath = nameEntity.getThumbnail();
 
@@ -310,9 +287,9 @@ public class NameEntityModifyService {
                     @Override
                     public void afterCommit() {
                         try {
-                            mediaSearchService.deleteDocument(listName, id);
-                        } catch (IOException e) {
-                            throw new RuntimeException("Failed to delete opensearch name index" + listName + " entry with ID " + id, e);
+                            eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityDeleted(mediaNameEntityConstant, id));
+                        } catch (Exception e) {
+                            throw new RuntimeException("Failed to publish event delete opensearch name index" + mediaNameEntityConstant.getName() + " " + id, e);
                         }
                         try {
                             if (nameEntity.getThumbnail() != null)
@@ -325,9 +302,9 @@ public class NameEntityModifyService {
     }
 
 
-    private <T extends MediaNameEntity> T findById(long id, String listName, MediaNameEntityRepository<T, Long> repository) {
+    private <T extends MediaNameEntity> T findById(long id, MediaNameEntityConstant mediaNameEntityConstant, MediaNameEntityRepository<T, Long> repository) {
         return repository.findById(id).orElseThrow(() ->
-                new ResourceNotFoundException("No " + listName + " entry found with id: " + id));
+                new ResourceNotFoundException("No " + mediaNameEntityConstant.getName() + " entry found with id: " + id));
     }
 
     private String validateNameEntity(String name) {
