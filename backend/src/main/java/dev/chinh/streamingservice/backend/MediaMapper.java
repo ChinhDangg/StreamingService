@@ -1,7 +1,7 @@
 package dev.chinh.streamingservice.backend;
 
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
-import dev.chinh.streamingservice.backend.search.data.MediaSearchItem;
+import dev.chinh.streamingservice.persistence.projection.MediaSearchItem;
 import dev.chinh.streamingservice.backend.search.data.MediaSearchItemResponse;
 import dev.chinh.streamingservice.backend.serve.data.MediaDisplayContent;
 import dev.chinh.streamingservice.persistence.entity.MediaDescription;

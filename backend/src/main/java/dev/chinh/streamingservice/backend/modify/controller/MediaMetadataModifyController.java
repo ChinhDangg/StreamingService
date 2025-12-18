@@ -1,7 +1,7 @@
 package dev.chinh.streamingservice.backend.modify.controller;
 
 import dev.chinh.streamingservice.backend.modify.service.MediaMetadataModifyService;
-import dev.chinh.streamingservice.backend.modify.MediaNameEntityConstant;
+import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

@@ -3,7 +3,7 @@ package dev.chinh.streamingservice.backend.search.controller;
 import dev.chinh.streamingservice.backend.search.data.MediaSearchRequest;
 import dev.chinh.streamingservice.backend.search.data.MediaSearchResult;
 import dev.chinh.streamingservice.backend.search.service.MediaSearchService;
-import dev.chinh.streamingservice.backend.modify.MediaNameEntityConstant;
+import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.searchclient.constant.SortBy;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.client.opensearch._types.SortOrder;

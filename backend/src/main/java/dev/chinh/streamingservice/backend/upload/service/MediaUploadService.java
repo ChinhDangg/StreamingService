@@ -7,7 +7,7 @@ import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.backend.content.service.MinIOService;
 import dev.chinh.streamingservice.backend.search.service.MediaSearchCacheService;
 import dev.chinh.streamingservice.backend.content.service.ThumbnailService;
-import dev.chinh.streamingservice.backend.event.MediaUpdateEvent;
+import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.backend.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.backend.serve.service.MediaDisplayService;
 import dev.chinh.streamingservice.backend.upload.MediaBasicInfo;
