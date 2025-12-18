@@ -89,6 +89,7 @@ public class KafkaRedPandaConfig {
         return TopicBuilder.name(MEDIA_UPDATE_DLQ_TOPIC)
                 .partitions(1)
                 .replicas(1)
+                .config("retention.ms", "604800000") // keep dlq messages for 7 days
                 .build();
     }
 
