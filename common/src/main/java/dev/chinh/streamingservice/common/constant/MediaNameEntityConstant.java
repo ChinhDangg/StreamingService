@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.backend.modify;
+package dev.chinh.streamingservice.common.constant;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;

@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.backend.search.data;
+package dev.chinh.streamingservice.persistence.projection;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;

@@ -1,6 +1,5 @@
-package dev.chinh.streamingservice.backend;
+package dev.chinh.streamingservice.searchindexer;
 
-import dev.chinh.streamingservice.backend.search.service.MediaSearchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -10,10 +9,10 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AppStartRunner implements ApplicationRunner {
 
-    private final MediaSearchService mediaSearchService;
+    private final OpenSearchService openSearchService;
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
-        mediaSearchService._initializeIndexes();
+        openSearchService._initializeIndexes();
     }
 }

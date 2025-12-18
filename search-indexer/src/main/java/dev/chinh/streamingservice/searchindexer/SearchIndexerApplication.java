@@ -1,13 +1,13 @@
-package dev.chinh.streamingservice.persistence;
+package dev.chinh.streamingservice.searchindexer;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class PersistenceApplication {
+public class SearchIndexerApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(PersistenceApplication.class, args);
+        SpringApplication.run(SearchIndexerApplication.class, args);
     }
 
 }
