@@ -12,6 +12,10 @@ import dev.chinh.streamingservice.searchindexer.config.KafkaRedPandaConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.MessageHeaders;
+import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.messaging.handler.annotation.Headers;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -148,12 +152,38 @@ public class MediaEventConsumer {
                 onUpdateNameEntityOpenSearch(e);
             } else if (event instanceof MediaUpdateEvent.NameEntityDeleted e) {
                 onDeleteNameEntityOpenSearch(e);
+            } else {
+                // unknown event type → log and skip
+                System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
             }
             acknowledgment.acknowledge();
         } catch (Exception e) {
-
+            // throwing the exception lets DefaultErrorHandler apply retry + DLQ
+            throw e;
         }
     }
+
+    // listen to DLQ and print out the event details for now - later log to a file or database or consume it
+    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_UPDATE_DLQ_TOPIC, groupId = "dlq-admin")
+    public void handleDlq(
+            Object message,
+            @Headers MessageHeaders headers,
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.OFFSET) long offset
+    ) {
+        System.out.println("\n===== DLQ EVENT =====");
+        System.out.printf("Offset: %d, Partition: %d%n", offset, partition);
+        System.out.println("Payload:");
+        System.out.println(message);
+
+        System.out.println("Headers:");
+        headers.forEach((k, v) -> {
+            Object val = v instanceof byte[] ? new String((byte[]) v) : v;
+            System.out.println(" - " + k + ": " + val);
+        });
+        System.out.println("=====================\n");
+    }
+
 
 }
 
