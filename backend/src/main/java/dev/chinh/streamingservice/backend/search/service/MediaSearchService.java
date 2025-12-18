@@ -5,7 +5,7 @@ import dev.chinh.streamingservice.backend.MediaMapper;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.backend.content.service.ThumbnailService;
-import dev.chinh.streamingservice.backend.modify.MediaNameEntityConstant;
+import dev.chinh.streamingservice.persistence.projection.MediaSearchItem;
 import dev.chinh.streamingservice.searchclient.OpenSearchService;
 import dev.chinh.streamingservice.backend.search.data.*;
 import dev.chinh.streamingservice.searchclient.constant.SortBy;
@@ -168,43 +168,5 @@ public class MediaSearchService {
         result.setTotalPages((result.getTotal() + size -1) / size);
 
         return new MapSearchResult(result, items);
-    }
-
-    public void _initializeIndexes() throws InterruptedException {
-        int retryCount = 20;
-        while (retryCount-- > 0) {
-            try {
-                if (!openSearchService.indexExists(MEDIA_INDEX_NAME)) {
-                    String version1 = MEDIA_INDEX_NAME + "_v1";
-                    openSearchService.createIndexWithMapping(version1, "/mapping/media-mapping.json");
-                    openSearchService.addAliasToIndex(version1, MEDIA_INDEX_NAME);
-                }
-                for (MediaNameEntityConstant constant : MediaNameEntityConstant.values()) {
-                    if (!openSearchService.indexExists(constant.getName())) {
-                        openSearchService.createIndexWithSettingAndMapping(constant.getName(), "/mapping/media-name-entity-mapping.json");
-                    }
-                }
-                break;
-            } catch (IOException e) {
-                if (e.getMessage().contains("Connection reset") || e.getMessage().contains("Connection closed")) {
-                    System.out.println("Retrying opensearch connection: " + retryCount);
-                    Thread.sleep(500);
-                } else {
-                    throw new RuntimeException(e);
-                }
-            }
-        }
-    }
-
-    public void partialUpdateDocument(String indexName, long id, Map<String, Object> updateFields) throws IOException {
-        openSearchService.partialUpdateDocument(indexName, id, updateFields);
-    }
-
-    public <TDocument> void indexDocument(String indexName, long id, TDocument searchItem) throws IOException {
-        openSearchService.indexDocument(indexName, id, searchItem);
-    }
-
-    public void deleteDocument(String indexName, long id) throws IOException {
-        openSearchService.deleteDocument(indexName, id);
     }
 }
