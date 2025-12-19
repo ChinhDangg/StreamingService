@@ -39,20 +39,22 @@ public abstract class Worker implements Runnable {
         reclaimStaleJobs();
 
         while (true) {
-            List<MapRecord<String, Object, Object>> records = workerRedisService.readFromStream(
-                    streamKey(),
-                    groupName(),
-                    consumerName,
-                    Duration.ofSeconds(5)
-            );
+            try {
+                List<MapRecord<String, Object, Object>> records = workerRedisService.readFromStream(
+                        streamKey(),
+                        groupName(),
+                        consumerName,
+                        Duration.ofSeconds(5)
+                );
 
-            if (records == null || records.isEmpty()) {
-                continue;
-            }
+                if (records == null || records.isEmpty()) {
+                    continue;
+                }
 
-            for (MapRecord<String, Object, Object> record : records) {
-                handleRecord(record);
-            }
+                for (MapRecord<String, Object, Object> record : records) {
+                    handleRecord(record);
+                }
+            } catch (Exception ignored) {}
         }
     }
 
