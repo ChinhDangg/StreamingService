@@ -987,7 +987,7 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
 
         const videoContainerPreview = thumbnailContainer.querySelector('.video-container-preview');
         if (videoContainerPreview) {
-            if (videoContainerPreview.querySelector('video').dataset.playable === 'true') {
+            if (videoContainerPreview.querySelector('video').src) {
                 videoContainerPreview.classList.remove('hidden');
                 console.log('video already loaded');
                 return;
@@ -1002,17 +1002,17 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
 
         const video = videoContainerCopy.querySelector('video');
         video.addEventListener('mouseenter', () => {
-            if (video.dataset.playable === 'true')
+            if (video.src)
                 video.play();
         });
         video.addEventListener('touchstart', () => {
-            if (video.dataset.playable === 'true')
+            if (video.src)
                 video.play();
         });
         video.addEventListener('mouseleave', () => {
             if (window.currentPreviewPolling)
                 window.currentPreviewPolling.cancel();
-            if (video.dataset.playable === 'true') {
+            if (video.src) {
                 video.pause();
                 video.currentTime = 0;
             }
@@ -1020,7 +1020,7 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
         video.addEventListener('touchend', () => {
             if (window.currentPreviewPolling)
                 window.currentPreviewPolling.cancel();
-            if (video.dataset.playable === 'true') {
+            if (video.src) {
                 video.pause();
                 video.currentTime = 0;
             }
@@ -1052,8 +1052,6 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
         } finally {
             thumbnailContainer.removeChild(loader);
         }
-
-        video.dataset.playable = 'true';
 
         setVideoUrl(videoContainerCopy, playlistUrl, true, true);
     };

@@ -25,15 +25,3 @@ public class MinIOConfig {
                 .build();
     }
 }
-
-// enable Path-Style access for S3Client AND S3Presigner
-//AWS SDK will generate:
-//
-//POST https://mybucket.minio.local:9000/test-vid.mp4?uploads
-//
-//
-//MinIO doesn’t understand that → returns 400.
-//
-//With path-style
-//POST https://localhost:9000/mybucket/test-vid.mp4?uploads
-
