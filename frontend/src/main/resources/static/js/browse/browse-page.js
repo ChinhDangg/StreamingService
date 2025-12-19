@@ -124,7 +124,7 @@ function getSortOrderText(order) {
 async function fetchNameItems(nameEntry, p, by, order, pushtoHistory = true, nameItems = null) {
     if (!nameItems) {
         const urlParams = new URLSearchParams({p, by, order});
-        const response = await fetch(`/api/media/${nameEntry}?${urlParams}`);
+        const response = await fetch(`/api/name/${nameEntry}?${urlParams}`);
         if (!response.ok) {
             alert("Failed to fetch name items");
             return false;
