@@ -2,6 +2,7 @@ package dev.chinh.streamingservice.workers.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.common.constant.Resolution;
+import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
@@ -9,6 +10,8 @@ import org.springframework.data.redis.core.ZSetOperations;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -28,6 +31,14 @@ public abstract class MediaService {
         this.objectMapper = objectMapper;
         this.minIOService = minIOService;
         this.workerRedisService = workerRedisService;
+    }
+
+    public abstract void handleJob(String tokenKey, MediaJobDescription jobDescription);
+
+    public boolean isJobWithinHandleWindow(String tokenKey, MediaJobDescription jobDescription) {
+        Instant scheduledTime = jobDescription.getScheduledTime();
+        Instant fiveMinutesAgo = Instant.now().minus(5, ChronoUnit.MINUTES);
+        return !scheduledTime.isBefore(fiveMinutesAgo); // has passed 5 minutes then don't rehandle
     }
 
     protected final String masterFileName = "/master.m3u8";

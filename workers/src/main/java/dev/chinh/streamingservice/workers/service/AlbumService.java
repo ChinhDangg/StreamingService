@@ -24,7 +24,7 @@ import java.util.Objects;
 import java.util.Set;
 
 @Service
-public class AlbumService extends MediaService implements ResourceCleanable, JobHandler {
+public class AlbumService extends MediaService implements ResourceCleanable {
 
     private final MemoryManager memoryManager;
     private final VideoService videoService;
@@ -50,6 +50,12 @@ public class AlbumService extends MediaService implements ResourceCleanable, Job
     @Override
     public void handleJob(String tokenKey, MediaJobDescription description) {
         try {
+            boolean toHandleJob = isJobWithinHandleWindow(tokenKey, description);
+            if (!toHandleJob) { // check if job has passed too long or not
+                workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.STOPPED.name());
+                workerRedisService.releaseToken(tokenKey);
+                return;
+            }
             workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
             switch (description.getJobType()) {
                 case "albumUrlList" -> {

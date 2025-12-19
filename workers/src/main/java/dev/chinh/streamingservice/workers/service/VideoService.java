@@ -16,13 +16,15 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
-public class VideoService extends MediaService implements ResourceCleanable, JobHandler {
+public class VideoService extends MediaService implements ResourceCleanable {
 
     @Qualifier("ffmpegExecutor")
     private final ExecutorService ffmpegExecutor;
@@ -51,7 +53,13 @@ public class VideoService extends MediaService implements ResourceCleanable, Job
     @Override
     public void handleJob(String tokenKey, MediaJobDescription mediaJobDescription) {
         try {
-           String url = switch (mediaJobDescription.getJobType()) {
+            boolean toHandleJob = isJobWithinHandleWindow(tokenKey, mediaJobDescription);
+            if (!toHandleJob) { // check if job has passed too long or not
+                workerRedisService.updateStatus(mediaJobDescription.getWorkId(), MediaJobStatus.STOPPED.name());
+                workerRedisService.releaseToken(tokenKey);
+                return;
+            }
+            String url = switch (mediaJobDescription.getJobType()) {
                 case "preview" -> {
                     url = getPreviewVideoUrl(tokenKey, mediaJobDescription);
                     workerRedisService.updateStatus(mediaJobDescription.getWorkId(), MediaJobStatus.RUNNING.name());
@@ -77,6 +85,14 @@ public class VideoService extends MediaService implements ResourceCleanable, Job
             workerRedisService.releaseToken(tokenKey);
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public boolean isJobWithinHandleWindow(String tokenKey, MediaJobDescription mediaJobDescription) {
+        if (mediaJobDescription.getJobType().equals("videoThumbnail")) {
+            return true;
+        }
+        return super.isJobWithinHandleWindow(tokenKey, mediaJobDescription);
     }
 
     private String getOriginalVideoUrl(MediaJobDescription mediaJobDescription) throws Exception {
