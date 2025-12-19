@@ -56,7 +56,6 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                 workerRedisService.releaseToken(tokenKey);
                 return;
             }
-            workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
             switch (description.getJobType()) {
                 case "albumUrlList" -> {
                     var mediaUrlList = getAllMediaUrlInAnAlbum(description);
@@ -64,15 +63,18 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                     workerRedisService.addResultToStatus(description.getWorkId(), "result", mediaUrlListString);
                     workerRedisService.addResultToStatus(description.getWorkId(), "offset",
                             objectMapper.writeValueAsString(List.of(description.getOffset() + description.getBatch(), mediaUrlList.size())));
+                    workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
                     workerRedisService.releaseToken(tokenKey);
                 }
                 case "checkResized" -> {
                     String offset = objectMapper.writeValueAsString(processResizedAlbumImagesInBatch(description));
                     workerRedisService.addResultToStatus(description.getWorkId(), "offset", offset);
+                    workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
                     workerRedisService.releaseToken(tokenKey);
                 }
                 case "albumVideoUrl" -> {
                     String videoPartialUrl = getAlbumPartialVideoUrl(tokenKey, description);
+                    workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
                     workerRedisService.addResultToStatus(description.getWorkId(), "result", videoPartialUrl);
                 }
                 default -> throw new BadRequestException("Invalid jobType: " + description.getJobType());
