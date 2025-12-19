@@ -80,7 +80,6 @@ public abstract class Worker implements Runnable {
 
         if (!workerRedisService.tryAcquireToken(tokenKey())) {
             sleep(500);
-            return;
         }
 
         try {
@@ -148,6 +147,7 @@ public abstract class Worker implements Runnable {
         if (!pending.iterator().hasNext()) {
             return;
         }
+        System.out.println("Pending messages:");
 
         // 2. Select stale jobs (idle > 60s)
         List<RecordId> staleIds = new ArrayList<>();
@@ -155,6 +155,7 @@ public abstract class Worker implements Runnable {
             Duration idle = p.getElapsedTimeSinceLastDelivery();
             if (idle.toMillis() > 60_000) {
                 staleIds.add(p.getId());
+                System.out.println(p.getId() + " " + idle.toMillis());
             }
         }
 
@@ -163,6 +164,17 @@ public abstract class Worker implements Runnable {
         }
 
         // 3. Claim them for THIS consumer
-        workerRedisService.claim(streamKey(), groupName(), consumerName, Duration.ofSeconds(60), staleIds);
+        List<MapRecord<String,Object,Object>> claimed =
+                workerRedisService.claim(streamKey(), groupName(), consumerName,
+                        Duration.ofSeconds(60), staleIds);
+
+        if (claimed == null || claimed.isEmpty()) {
+            return;
+        }
+
+        // 4. Re-handle claimed jobs normally
+        for (MapRecord<String,Object,Object> record : claimed) {
+            handleRecord(record);
+        }
     }
 }
