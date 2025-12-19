@@ -987,7 +987,7 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
 
         const videoContainerPreview = thumbnailContainer.querySelector('.video-container-preview');
         if (videoContainerPreview) {
-            if (videoContainerPreview.querySelector('video').src) {
+            if (videoContainerPreview.querySelector('video').dataset.playable === 'true') {
                 videoContainerPreview.classList.remove('hidden');
                 console.log('video already loaded');
                 return;
@@ -996,23 +996,23 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
         }
         const videoContainerCopy = helperCloneAndUnHideNode(videoContainer);
         videoContainerCopy.removeAttribute('id');
-        videoContainer = videoContainerCopy;
 
-        videoContainer.classList.remove('hidden');
-        thumbnailContainer.appendChild(videoContainer);
+        videoContainerCopy.classList.remove('hidden');
+        thumbnailContainer.appendChild(videoContainerCopy);
 
-        const video = videoContainer.querySelector('video');
+        const video = videoContainerCopy.querySelector('video');
         video.addEventListener('mouseenter', () => {
-            if (video.src)
+            if (video.dataset.playable === 'true')
                 video.play();
         });
         video.addEventListener('touchstart', () => {
-            video.play();
+            if (video.dataset.playable === 'true')
+                video.play();
         });
         video.addEventListener('mouseleave', () => {
             if (window.currentPreviewPolling)
                 window.currentPreviewPolling.cancel();
-            if (video.src) {
+            if (video.dataset.playable === 'true') {
                 video.pause();
                 video.currentTime = 0;
             }
@@ -1020,7 +1020,7 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
         video.addEventListener('touchend', () => {
             if (window.currentPreviewPolling)
                 window.currentPreviewPolling.cancel();
-            if (video.src) {
+            if (video.dataset.playable === 'true') {
                 video.pause();
                 video.currentTime = 0;
             }
@@ -1053,7 +1053,9 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
             thumbnailContainer.removeChild(loader);
         }
 
-        setVideoUrl(videoContainer, playlistUrl, true, true);
+        video.dataset.playable = 'true';
+
+        setVideoUrl(videoContainerCopy, playlistUrl, true, true);
     };
 
     if (isRequestingVideoPreview)
