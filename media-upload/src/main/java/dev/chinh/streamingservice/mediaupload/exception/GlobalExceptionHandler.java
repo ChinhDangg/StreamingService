@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.backend.exception;
+package dev.chinh.streamingservice.mediaupload.exception;
 
 import dev.chinh.streamingservice.common.exception.DuplicateEntryException;
 import org.springframework.http.ResponseEntity;

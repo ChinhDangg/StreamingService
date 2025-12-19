@@ -4,8 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.constant.Resolution;
-import dev.chinh.streamingservice.common.data.MediaJobDescription;
-import dev.chinh.streamingservice.backend.upload.service.MediaUploadService;
 import dev.chinh.streamingservice.persistence.entity.MediaDescription;
 import dev.chinh.streamingservice.persistence.projection.MediaNameEntry;
 import lombok.RequiredArgsConstructor;
@@ -212,26 +210,5 @@ public class ThumbnailService {
                 "scale='if(gte(iw,ih),-2,min(iw,%1$d))':'if(gte(ih,iw),-2,min(ih,%1$d))'",
                 resolution.getResolution()
         );
-    }
-
-    public String generateThumbnailFromVideo(String bucket, String objectName) {
-        String thumbnailObject = objectName.substring(0, objectName.lastIndexOf(".")) + "-thumb.jpg";
-        thumbnailObject = thumbnailObject.startsWith(MediaUploadService.defaultVidPath)
-                ? thumbnailObject
-                : OSUtil.normalizePath(MediaUploadService.defaultVidPath, thumbnailObject);
-
-        MediaJobDescription jobDescription = new MediaJobDescription();
-        jobDescription.setBucket(bucket);
-        jobDescription.setPath(objectName);
-        jobDescription.setWorkId(thumbnailObject);
-        jobDescription.setJobType("videoThumbnail");
-
-        try {
-            videoService.addJobToQueue(videoService.ffmpegQueueKey, jobDescription);
-        } catch (JsonProcessingException e) {
-            System.err.println("Failed to generate thumbnail for video " + objectName);
-        }
-
-        return thumbnailObject;
     }
 }

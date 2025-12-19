@@ -7,12 +7,11 @@ import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.backend.content.service.AlbumService;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.backend.content.service.ThumbnailService;
-import dev.chinh.streamingservice.backend.exception.ResourceNotFoundException;
+import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.backend.serve.data.MediaDisplayContent;
 import dev.chinh.streamingservice.persistence.entity.MediaDescription;
 import dev.chinh.streamingservice.persistence.repository.MediaGroupMetaDataRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.*;
 import org.springframework.data.redis.core.*;
 import org.springframework.http.HttpHeaders;
@@ -22,7 +21,6 @@ import org.springframework.stereotype.Service;
 
 import java.net.URI;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -81,34 +79,6 @@ public class MediaDisplayService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse cached Slice<Long>", e);
         }
-    }
-
-    public void removeCacheGroupOfMedia(long mediaId) {
-        String id = "grouper::" + mediaId;
-        redisStringTemplate.delete(id);
-    }
-
-    public void deleteAllCacheForMedia(long mediaId) {
-        String pattern = "grouper::" + mediaId + ":*";
-
-        // 1. Use the non-deprecated redisTemplate.scan() method
-        //    It respects the configured KeySerializer (StringRedisSerializer) and returns String keys.
-        try (Cursor<String> cursor = redisStringTemplate.scan(ScanOptions.scanOptions()
-                .match(pattern)
-                .count(1000)
-                .build())) {
-
-            // 2. Collect all keys returned by the cursor into a list
-            List<String> keysToDelete = new ArrayList<>();
-            cursor.forEachRemaining(keysToDelete::add);
-
-            // 3. Delete the keys in a single operation
-            if (!keysToDelete.isEmpty()) {
-                // redisTemplate.delete(Collection<K> keys) is safe and respects serialization
-                redisStringTemplate.delete(keysToDelete);
-            }
-        }
-        // The try-with-resources block ensures the cursor is closed automatically.
     }
 
     public GroupSlice getNextGroupOfMedia(long mediaId, int offset, Sort.Direction sortOrder) throws JsonProcessingException {

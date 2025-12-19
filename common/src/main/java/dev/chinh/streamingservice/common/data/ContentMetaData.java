@@ -38,6 +38,13 @@ public class ContentMetaData {
     // Name entity
     public static final String NAME = "name";
 
+    // Buckets
+    public static final String THUMBNAIL_BUCKET = "thumbnail";
+    public static final String MEDIA_BUCKET = "media";
+
+    // Redis stream key
+    public static final String FFMPEG_VIDEO_QUEUE_KEY = "ffmpeg_video_stream";
+
     public static void validateFieldName(String fieldNameCheck) throws IllegalAccessException {
         ContentMetaData contentMetaData = new ContentMetaData();
 

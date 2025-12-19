@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.backend.MediaMapper;
 import dev.chinh.streamingservice.common.constant.Resolution;
 import dev.chinh.streamingservice.backend.search.service.MediaSearchCacheService;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.persistence.entity.MediaDescription;
 import dev.chinh.streamingservice.persistence.repository.MediaMetaDataRepository;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -12,7 +13,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class VideoService extends MediaService {
 
-    public final String ffmpegQueueKey = "ffmpeg_video_stream";
+    public final String ffmpegQueueKey = ContentMetaData.FFMPEG_VIDEO_QUEUE_KEY;
 
     public VideoService(RedisTemplate<String, String> redisStringTemplate,
                         ObjectMapper objectMapper,
