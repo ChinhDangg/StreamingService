@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>dev.chinh.streamingservice</groupId>
-    <artifactId>persistence</artifactId>
+    <artifactId>media-persistence</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>persistence</name>
-    <description>persistence</description>
+    <name>media-persistence</name>
+    <description>media-persistence</description>
     <url/>
     <licenses>
         <license/>

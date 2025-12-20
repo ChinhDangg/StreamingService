@@ -103,7 +103,7 @@
         </dependency>
         <dependency>
             <groupId>dev.chinh.streamingservice</groupId>
-            <artifactId>persistence</artifactId>
+            <artifactId>media-persistence</artifactId>
             <version>0.0.1-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>

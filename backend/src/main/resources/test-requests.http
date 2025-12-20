@@ -32,7 +32,7 @@ Content-Type: application/json
 ###
 # @no-log
 POST http://localhost/api/search?
-    searchString=Nier Automata&
+    searchString=Genshin&
     page=0&
     sortBy=YEAR&
     sortOrder=Desc
@@ -79,11 +79,11 @@ GET http://localhost/api/album/2/p1080
 
 ###
 # @no-log
-GET http://localhost/api/album/2/vid/0/p720
+GET http://localhost/api/album/2/p1080/vid/0/p720
 
 ###
 # @no-log
-POST http://localhost/api/album/2/p1080/0/check-resized
+POST http://localhost/api/album/2/p480/0/check-resized
 
 ###
 # @no-log
@@ -97,15 +97,15 @@ GET http://localhost/api/media/content-page/2
 # @no-log
 GET http://localhost/stream/2/p1080/1_1080.jpg
 
+
+
 ###
 # @no-log
-GET http://localhost/api/album/resize/2?res=p1080&key=0_1080.jpg
+GET http://localhost/api/search/suggestion/authors?s=au
 
 ###
 # @no-log
-GET http://localhost/api/album/original/2?res=p1080&key=0_1080.jpg
-
-
+GET http://localhost/api/media/authors
 
 
 ###
@@ -119,3 +119,16 @@ GET http://localhost:8081/page/frag/album
 ###
 # @no-log
 GET http://localhost:8081/page/frag/video
+
+
+
+###
+# @no-log
+GET http://localhost/api/media/modify/authors?name=author
+
+
+
+
+
+
+
