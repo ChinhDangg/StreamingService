@@ -59,7 +59,7 @@ public abstract class MediaDescription implements MetaDataProvider {
 
     @JsonProperty(ContentMetaData.YEAR)
     @Column(nullable = false)
-    protected Integer year;
+    protected short year;
 
     public String getPath() {
         if (parentPath != null && !parentPath.isBlank() && hasKey())
