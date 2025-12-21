@@ -77,7 +77,7 @@ public class WorkerRedisService {
     // stream init
     public void createGroupIfAbsent(String stream, String group) {
         try {
-            redisTemplate.opsForStream().createGroup(stream, ReadOffset.latest(), group);
+            redisTemplate.opsForStream().createGroup(stream, ReadOffset.from("0-0"), group);
         } catch (Exception ignored) {
             // BUSY-GROUP - already exists
         }
@@ -89,13 +89,17 @@ public class WorkerRedisService {
                 Consumer.from(group, consumer),
                 StreamReadOptions.empty()
                         .block(blockTime)
-                        .count(1),
+                        .count(5),
                 StreamOffset.create(stream, ReadOffset.lastConsumed())
         );
     }
 
     public void ack(String stream, String group, RecordId recordId) {
         redisTemplate.opsForStream().acknowledge(stream, group, recordId);
+    }
+
+    public void del(String stream, RecordId recordId) {
+        redisTemplate.opsForStream().delete(stream, recordId);
     }
 
     public PendingMessages getPendingMessages(String stream, String group, int count) {
