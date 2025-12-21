@@ -42,7 +42,7 @@ public class AuthController {
 
     @PostMapping("/logout")
     public void logout(HttpServletResponse response) {
-        response.addHeader(HttpHeaders.SET_COOKIE, tokenService.removeAuthCookie().toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, TokenService.removeAuthCookie().toString());
         response.setStatus(HttpServletResponse.SC_NO_CONTENT);
     }
 }

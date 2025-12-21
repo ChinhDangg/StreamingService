@@ -55,7 +55,7 @@ public class TokenService {
                 .build();
     }
 
-    public Cookie removeAuthCookie() {
+    public static Cookie removeAuthCookie() {
         Cookie cookie = new Cookie(AUTH_COOKIE_NAME, null);
         cookie.setMaxAge(0);
         cookie.setPath("/");
