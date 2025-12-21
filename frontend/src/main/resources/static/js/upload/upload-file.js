@@ -1,10 +1,23 @@
 
+function getCsrfToken() {
+    const name = "XSRF-TOKEN=";
+    const decoded = decodeURIComponent(document.cookie);
+    const parts = decoded.split('; ');
+
+    for (const part of parts) {
+        if (part.startsWith(name)) {
+            return part.substring(name.length);
+        }
+    }
+    return null;
+}
 
 export async function startUploadSession(objectKey, mediaType) {
     const sessionResponse = await fetch('/api/upload/media/create-session', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-XSRF-TOKEN': getCsrfToken()
         },
         body: JSON.stringify({
             objectKey: objectKey,
@@ -26,7 +39,8 @@ export async function endUploadSession(body) {
     const endResponse = await fetch('/api/upload/media/end-session', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-XSRF-TOKEN': getCsrfToken()
         },
         body: JSON.stringify(body)
     });
@@ -55,7 +69,8 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
     const response = await fetch('/api/upload/media/initiate', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-XSRF-TOKEN': getCsrfToken()
         },
         body: JSON.stringify({
             sessionId: sessionId,
@@ -76,7 +91,8 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
         const urlResponse = await fetch('/api/upload/media/presign-part-url', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-XSRF-TOKEN': getCsrfToken()
             },
             body: JSON.stringify({
                 sessionId: sessionId,
@@ -111,7 +127,8 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
     const completeResponse = await fetch('/api/upload/media/complete', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-XSRF-TOKEN': getCsrfToken()
         },
         body: JSON.stringify({
             sessionId: sessionId,

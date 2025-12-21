@@ -110,24 +110,4 @@ public class WorkerRedisService {
                 count
         );
     }
-
-    public List<MapRecord<String, Object, Object>> claim(
-            String stream,
-            String group,
-            String consumer,
-            Duration minIdleTime,
-            List<RecordId> ids
-    ) {
-        if (ids.isEmpty()) {
-            return List.of();
-        }
-
-        return redisTemplate.opsForStream().claim(
-                stream,
-                group,
-                consumer,
-                minIdleTime,
-                ids.toArray(new RecordId[0])
-        );
-    }
 }

@@ -10,6 +10,11 @@ const yearInput = document.getElementById('year-input');
 
 const submitBtn = document.getElementById('submit-btn');
 
+async function initialize() {
+    await fetch("/api/upload/media/csrf-init", { credentials: "include" });
+}
+initialize();
+
 let currentSavingPath = null;
 let currentFiles = null;
 const uploadingFiles = new Map();
