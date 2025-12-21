@@ -41,12 +41,16 @@ public class ScheduleService {
     }
 
     @Scheduled(fixedDelay = 15 * 60 * 1000) // 15 mins
-    public void trimJobStreams() {
-
+    public void scheduled15mins() {
         removeAlbumCreationInfo();
         removeExpiredUploadSession();
         cleanThumbnails();
 
+        trimJobStreams();
+    }
+
+
+    private void trimJobStreams() {
         queueRedisTemplate.execute((RedisCallback<Void>) conn -> {
             var streams = new String[] {
                     VideoWorker.STREAM,
@@ -60,7 +64,6 @@ public class ScheduleService {
             return null;
         });
     }
-
 
     private void stopNonViewingVideoRunningJob() {
         Set<String> runningVideoJobs = videoService.getCacheRunningJobs(System.currentTimeMillis());
