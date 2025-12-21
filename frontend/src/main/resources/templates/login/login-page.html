@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen flex items-center justify-center bg-gray-100">
+
+<form accept-charset="utf-8" method="POST" id="login-form"
+      class="bg-white shadow-lg rounded-xl p-8 w-full max-w-md">
+
+    <!-- Heading -->
+    <h1 class="text-2xl font-bold text-gray-800 mb-6 text-center">Sign In</h1>
+
+    <!-- Error message -->
+    <div id="login-error"
+         class="mb-4 text-red-600 text-sm hidden">
+        Wrong email or password
+    </div>
+
+    <!-- Email -->
+    <div class="mb-4">
+        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email:</label>
+        <input type="email"
+               name="email"
+               id="email"
+               autocapitalize="off"
+               autocomplete="off"
+               placeholder="Enter your email"
+               required
+               class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400">
+    </div>
+
+    <!-- Password -->
+    <div class="mb-6">
+        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password:</label>
+        <input type="password"
+               name="password"
+               id="password"
+               autocapitalize="off"
+               autocomplete="off"
+               placeholder="Enter your password"
+               required
+               class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400">
+    </div>
+
+    <!-- Submit Button -->
+    <button type="submit" id="sign-in-submit"
+            class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition">
+        Sign In
+    </button>
+</form>
+
+<script type="text/javascript" src="/static/js/login/login.js"></script>
+</body>
+</html>
