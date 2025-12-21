@@ -66,7 +66,8 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http,
                                     BearerTokenResolver tokenResolver,
-                                    JwtAuthenticationConverter jwtConverter) throws Exception {
+                                    JwtAuthenticationConverter jwtConverter,
+                                    RedirectToLoginEntryPoint entryPoint) throws Exception {
         http
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
@@ -75,13 +76,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .authenticationEntryPoint((request, response, authException) -> {
-                            String uri = request.getRequestURI();
-                            String query = request.getQueryString();
-                            String fullUri = (query == null ? uri : uri + "?" + query);
-                            String r = URLEncoder.encode(fullUri, StandardCharsets.UTF_8);
-                            response.sendRedirect("/page/login?r=" + r);
-                        })
+                        .authenticationEntryPoint(entryPoint)
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter))
                         .bearerTokenResolver(tokenResolver)
                 );
