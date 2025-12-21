@@ -16,11 +16,11 @@ public class MediaBasicInfo {
     private String title;
 
     @NotNull
-    private int year;
+    private short year;
 
     private MultipartFile thumbnail;
 
-    public MediaBasicInfo(String title, int year) {
+    public MediaBasicInfo(String title, short year) {
         this.title = title;
         this.year = year;
     }
