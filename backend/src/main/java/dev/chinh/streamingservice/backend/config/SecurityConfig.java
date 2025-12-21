@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.backend.config;
 
+import dev.chinh.streamingservice.common.security.EnforceCsrfFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -10,7 +11,10 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 
 @Configuration
 public class SecurityConfig {
@@ -61,8 +65,26 @@ public class SecurityConfig {
     SecurityFilterChain filterChain(HttpSecurity http,
                                     BearerTokenResolver tokenResolver,
                                     JwtAuthenticationConverter jwtConverter) throws Exception {
+
+        CookieCsrfTokenRepository tokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        tokenRepository.setCookiePath("/"); // Ensure it's available for ALL paths
+        tokenRepository.setCookieCustomizer(cookie -> {
+            // don't set max age as it will be async with jwt expiry - keep in session
+            cookie.sameSite("Strict"); // "Lax" is standard; "Strict" is even safer
+            cookie.secure(false); // change to true in production
+        });
+
         http
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .addFilterAfter(new EnforceCsrfFilter(), BearerTokenAuthenticationFilter.class)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(tokenRepository)
+                        .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                        .sessionAuthenticationStrategy((authentication, request, response) -> {
+                            // Do nothing. This prevents Spring from clearing the
+                            // CSRF token when the BearerTokenAuthenticationFilter succeeds.
+                        })
+                )
                 .authorizeHttpRequests(auth -> auth
                         .anyRequest().authenticated()
                 )
