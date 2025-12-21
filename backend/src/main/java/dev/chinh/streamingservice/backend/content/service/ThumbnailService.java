@@ -77,7 +77,7 @@ public class ThumbnailService {
                 return;
             int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), false);
             if (exitCode != 0) {
-                throw new RuntimeException("Failed to resize thumbnails");
+                System.out.println("Failed to resize thumbnails");
             }
             long now = System.currentTimeMillis() + 60 * 60 * 1000;
             for (MediaDescription item : newThumbnails) {
