@@ -14,7 +14,7 @@ import java.util.Set;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "media")
+@Table(name = "media_metadata")
 public class MediaMetaData extends MediaDescription {
 
     // Classification (will also be stored in search for fast information display)
