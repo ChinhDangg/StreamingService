@@ -3,9 +3,11 @@ package dev.chinh.streamingservice.mediaupload.controller;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.mediaupload.MediaBasicInfo;
 import dev.chinh.streamingservice.mediaupload.service.MediaUploadService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +20,15 @@ public class MediaUploadController {
     private final MediaUploadService mediaUploadService;
 
     public record InitiateMultipartUploadRequest(String sessionId, String objectKey, MediaType mediaType) {}
+
+    @GetMapping("/csrf-init")
+    public ResponseEntity<Void> csrfTest(HttpServletRequest request) {
+        CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+        if (csrfToken != null) {
+            csrfToken.getToken(); // triggers the cookie
+        }
+        return ResponseEntity.ok().build();
+    }
 
     @PostMapping("/create-session")
     public String initiateSession(@RequestBody InitiateMultipartUploadRequest request) {
