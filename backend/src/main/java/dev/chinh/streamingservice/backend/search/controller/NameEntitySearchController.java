@@ -18,6 +18,8 @@ import java.util.List;
 @RequestMapping("/api/search/name")
 public class NameEntitySearchController {
 
+    // for modifying page searching with id of name entity included
+
     private final NameEntitySearchService nameEntitySearchService;
 
     @GetMapping("/authors")
