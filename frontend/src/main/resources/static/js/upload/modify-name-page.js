@@ -1,3 +1,4 @@
+import {getCsrfToken, initCsrfToken} from "/static/js/upload/upload-file.js";
 
 const nameEntity = Object.freeze({
     Authors: 'authors',
@@ -18,6 +19,7 @@ function initialize() {
     initializeEntityTabs();
     initializeUploadImageInput();
     initializeModifyActionButtons();
+    initCsrfToken();
 }
 
 let currentModifyOption = modifyOption.Add;
@@ -243,6 +245,9 @@ function initializeModifyActionButtons() {
 
         const response = await fetch(url, {
             method: method,
+            headers: {
+                'X-XSRF-TOKEN': getCsrfToken(),
+            },
             body: body
         });
         if (currentModifyOption === modifyOption.Add && response.status !== 201) {

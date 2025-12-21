@@ -1,4 +1,10 @@
-import {uploadFile, startUploadSession, endUploadSession, validateDirectory} from "/static/js/upload/upload-file.js";
+import {
+    uploadFile,
+    startUploadSession,
+    endUploadSession,
+    validateDirectory,
+    initCsrfToken
+} from "/static/js/upload/upload-file.js";
 
 const singleFileInput = document.getElementById('single-file-input');
 const folderInput = document.getElementById('folder-input');
@@ -11,7 +17,7 @@ const yearInput = document.getElementById('year-input');
 const submitBtn = document.getElementById('submit-btn');
 
 async function initialize() {
-    await fetch("/api/upload/media/csrf-init", { credentials: "include" });
+    await initCsrfToken();
 }
 initialize();
 

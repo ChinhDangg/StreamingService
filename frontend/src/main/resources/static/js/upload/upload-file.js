@@ -1,5 +1,9 @@
 
-function getCsrfToken() {
+export async function initCsrfToken() {
+    await fetch("/api/upload/media/csrf-init", { credentials: "include" });
+}
+
+export function getCsrfToken() {
     const name = "XSRF-TOKEN=";
     const decoded = decodeURIComponent(document.cookie);
     const parts = decoded.split('; ');

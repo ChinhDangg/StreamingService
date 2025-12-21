@@ -1,4 +1,5 @@
 import { displayContentInfo } from "/static/js/metadata-display.js";
+import {getCsrfToken, initCsrfToken} from "/static/js/upload/upload-file.js";
 
 let mediaId = null;
 
@@ -8,6 +9,7 @@ async function initialize() {
     if (!mediaId) {
         alert("No mediaId found-bad request");
     }
+    await initCsrfToken()
     initializeEditTitle();
     await initializeEdit();
 }
@@ -39,6 +41,10 @@ function initializeEditTitle() {
         }
         const response = await fetch(`/api/modify/media/title/${mediaId}`, {
             method: 'PUT',
+            headers: {
+                'Content-Type': 'text/plain',
+                'X-XSRF-TOKEN': getCsrfToken()
+            },
             body: newTitle
         });
         if (!response.ok) {
@@ -215,7 +221,8 @@ async function initializeEdit() {
         const response = await fetch(`/api/modify/media/update/${mediaId}`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-XSRF-TOKEN': getCsrfToken()
             },
             body: JSON.stringify(body)
         });

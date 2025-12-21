@@ -1,4 +1,10 @@
-import {uploadFile, startUploadSession, validateDirectory} from "/static/js/upload/upload-file.js";
+import {
+    uploadFile,
+    startUploadSession,
+    validateDirectory,
+    initCsrfToken,
+    getCsrfToken
+} from "/static/js/upload/upload-file.js";
 import {addNewAlbumItem} from "/static/js/album-grouper/album-grouper-page.js";
 
 let grouperId = null;
@@ -10,6 +16,7 @@ function initialize() {
         alert('No grouper id found');
         window.location.href = '/';
     }
+    initCsrfToken();
 }
 
 window.addEventListener('DOMContentLoaded', initialize);
@@ -119,7 +126,8 @@ async function uploadAlbum(files, savingPath, parentPath, sessionId = null, uplo
     const response = await fetch('/api/upload/media/end-session-grouper', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-XSRF-TOKEN': getCsrfToken()
         },
         body: JSON.stringify(basicInfo)
     });
