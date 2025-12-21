@@ -46,14 +46,20 @@ public class PageController {
         return "album-grouper/album-grouper-page";
     }
 
+
     @GetMapping("/modify/name")
     public String modifyNamePage() {
         return "upload/modify-name-page";
     }
 
-
     @GetMapping("/upload/media")
     public String uploadMediaPage() {
         return "upload/media-upload-page";
+    }
+
+
+    @GetMapping("/login")
+    public String loginPage(){
+        return "login/login-page";
     }
 }
