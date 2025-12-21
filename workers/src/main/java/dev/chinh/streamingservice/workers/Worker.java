@@ -61,10 +61,14 @@ public abstract class Worker implements Runnable {
     private void handleRecord(MapRecord<String, Object, Object> record) {
         Map<Object, Object> fields = record.getValue();
 
-        int retry = Integer.parseInt(fields.getOrDefault("retry", 0).toString());
+        String workId = record.getId().getValue();
+
+        int retry = getRetryCount(workId);
+
         if (retry >= MAX_RETRIES) {
             sendToDLQ(record, "max retries reached");
             workerRedisService.ack(streamKey(), groupName(), record.getId());
+            clearRetry(workId);
             return;
         }
 
@@ -88,25 +92,29 @@ public abstract class Worker implements Runnable {
             System.out.println("Performing job: " + mediaJobDescription.getWorkId() + " " + mediaJobDescription.getJobType());
             performJob(mediaJobDescription);
             workerRedisService.ack(streamKey(), groupName(), record.getId());
+            clearRetry(workId);
         } catch (Exception e) {
             workerRedisService.updateStatus(mediaJobDescription.getWorkId(), MediaJobStatus.FAILED.name());
-            // ack old one but readd with incremented retry
-            workerRedisService.ack(streamKey(), groupName(), record.getId());
-            incrementRetry(streamKey(), record.getId(), retry);
+            incrementRetry(workId);
             backoff(retry);
             e.printStackTrace();
         }
         // release token is handled by the job caller not worker to handle async jobs
     }
 
-    // Redis Streams are append-only — add metadata and don’t mutate.
-    private void incrementRetry(String stream, RecordId id, int retry) {
-        queueRedisTemplate.opsForStream().add(
-                StreamRecords.mapBacked(
-                        Map.of("retry", retry + 1)
-                ).withStreamKey(stream)
-        );
+    public int getRetryCount(String workId) {
+        String value = (String) queueRedisTemplate.opsForHash().get("retry:"+workId, "count");
+        return value == null ? 0 : Integer.parseInt(value);
     }
+
+    public void incrementRetry(String workId) {
+        queueRedisTemplate.opsForHash().increment("retry:"+workId, "count", 1);
+    }
+
+    public void clearRetry(String workId) {
+        queueRedisTemplate.delete("retry:"+workId);
+    }
+
 
     private void backoff(int retry) {
         long delay = Math.min(1000L * (1L << retry), 30000);
@@ -146,35 +154,23 @@ public abstract class Worker implements Runnable {
                 50
         );
 
-        if (!pending.iterator().hasNext()) {
-            return;
-        }
-        System.out.println("Pending messages:");
+        List<RecordId> stale = pending.stream()
+                .filter(p -> p.getElapsedTimeSinceLastDelivery().toMillis() > 60000)
+                .map(PendingMessage::getId)
+                .toList();
 
-        // 2. Select stale jobs (idle > 60s)
-        List<RecordId> staleIds = new ArrayList<>();
-        for (PendingMessage p : pending) {
-            Duration idle = p.getElapsedTimeSinceLastDelivery();
-            if (idle.toMillis() > 60_000) {
-                staleIds.add(p.getId());
-                System.out.println(p.getId() + " " + idle.toMillis());
-            }
-        }
+        if (stale.isEmpty()) return;
 
-        if (staleIds.isEmpty()) {
-            return;
-        }
-
-        // 3. Claim them for THIS consumer
         List<MapRecord<String,Object,Object>> claimed =
-                workerRedisService.claim(streamKey(), groupName(), consumerName,
-                        Duration.ofSeconds(60), staleIds);
+                queueRedisTemplate.opsForStream().claim(
+                        streamKey(),
+                        groupName(),
+                        consumerName,
+                        Duration.ofSeconds(60),
+                        stale.toArray(new RecordId[0])
+                );
 
-        if (claimed == null || claimed.isEmpty()) {
-            return;
-        }
-
-        // 4. Re-handle claimed jobs normally
+        // Re-handle claimed jobs normally
         for (MapRecord<String,Object,Object> record : claimed) {
             handleRecord(record);
         }
