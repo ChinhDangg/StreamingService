@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.mediaupload.config;
+package dev.chinh.streamingservice.common.security;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

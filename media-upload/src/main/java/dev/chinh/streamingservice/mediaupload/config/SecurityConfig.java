@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.mediaupload.config;
 
+import dev.chinh.streamingservice.common.security.EnforceCsrfFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -79,8 +80,8 @@ public class SecurityConfig {
                 .addFilterAfter(new EnforceCsrfFilter(), BearerTokenAuthenticationFilter.class)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .csrf(csrf -> csrf
-                                .csrfTokenRepository(tokenRepository)
-                                .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                        .csrfTokenRepository(tokenRepository)
+                        .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                         .sessionAuthenticationStrategy((authentication, request, response) -> {
                             // Do nothing. This prevents Spring from clearing the
                             // CSRF token when the BearerTokenAuthenticationFilter succeeds.
