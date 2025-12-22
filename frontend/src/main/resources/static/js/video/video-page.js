@@ -4,6 +4,7 @@ import {
     requestVideoPartial
 } from "/static/js/set-video-url.js";
 import { displayContentInfo } from "/static/js/metadata-display.js";
+import {apiRequest} from "/static/js/common.js";
 
 const container = document.querySelector('[data-player="videoPlayerContainer"]');
 container.dataset.player = 'videoPagePlayerContainer';
@@ -32,7 +33,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 async function displayVideoInfo(videoId, videoInfo = null) {
     if (!videoInfo) {
-        const response = await fetch(`/api/media/content/${videoId}`);
+        const response = await apiRequest(`/api/media/content/${videoId}`);
         if (!response.ok) {
             alert("Failed to fetch video info");
             return;

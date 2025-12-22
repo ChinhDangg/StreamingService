@@ -1,5 +1,5 @@
 import { displayContentInfo } from "/static/js/metadata-display.js";
-import {getCsrfToken, initCsrfToken} from "/static/js/upload/upload-file.js";
+import {apiRequest} from "/static/js/common.js";
 
 let mediaId = null;
 
@@ -9,7 +9,6 @@ async function initialize() {
     if (!mediaId) {
         alert("No mediaId found-bad request");
     }
-    await initCsrfToken()
     initializeEditTitle();
     await initializeEdit();
 }
@@ -39,11 +38,10 @@ function initializeEditTitle() {
             alert('Title cannot be empty');
             return;
         }
-        const response = await fetch(`/api/modify/media/title/${mediaId}`, {
+        const response = await apiRequest(`/api/modify/media/title/${mediaId}`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'text/plain',
-                'X-XSRF-TOKEN': getCsrfToken()
+                'Content-Type': 'text/plain'
             },
             body: newTitle
         });
@@ -117,9 +115,9 @@ async function initializeEdit() {
 
     const fetchNameEntityInfoAndAddToCurrent = async () => {
         if (currentNameEntityEditMap.get('current').size === 0 && currentNameEntityEditMap.get('removing').size === 0) {
-            const response = await fetch(`/api/modify/media/${currentNameEntity}/${mediaId}`);
+            const response = await apiRequest(`/api/modify/media/${currentNameEntity}/${mediaId}`);
             if (!response.ok) {
-                alert(`Failed to get current ${nameEntity}:  ` + await response.text());
+                alert(`Failed to get current ${currentNameEntity}:  ` + await response.text());
                 return;
             }
             const currentNameEntities = await response.json();
@@ -218,11 +216,10 @@ async function initializeEdit() {
             removing: removing,
             nameEntity: currentNameEntity.toUpperCase(),
         }
-        const response = await fetch(`/api/modify/media/update/${mediaId}`, {
+        const response = await apiRequest(`/api/modify/media/update/${mediaId}`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json',
-                'X-XSRF-TOKEN': getCsrfToken()
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(body)
         });
@@ -270,7 +267,7 @@ async function initializeEditAddingArea() {
     }
 
     const searchName = async (nameString) => {
-        const response = await fetch(`/api/modify/name/${currentNameEntity}?name=${nameString}`);
+        const response = await apiRequest(`/api/modify/name/${currentNameEntity}?name=${nameString}`);
         if (!response.ok) {
             alert('Failed to fetch name info: ' + await response.text());
             return;

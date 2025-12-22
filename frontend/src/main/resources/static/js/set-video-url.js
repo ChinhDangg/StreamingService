@@ -1,3 +1,4 @@
+import {apiRequest} from "/static/js/common.js";
 
 export function setVideoUrl(videoContainerNode, playlistUrl, restart = true, startPlaying = false) {
     const video = videoContainerNode.querySelector('video');
@@ -139,7 +140,7 @@ export function pollPlaylistUrl(fetchUrl, maxWaitMs = 5000, intervalMs = 500) {
 
             let response;
             try {
-                response = await fetch(fetchUrl);
+                response = await apiRequest(fetchUrl);
             } catch (err) {
                 clearInterval(previewInterval);
                 clearTimeout(previewTimeout);

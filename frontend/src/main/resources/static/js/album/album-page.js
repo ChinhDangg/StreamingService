@@ -1,6 +1,7 @@
 import {initializeHeader, setAlertStatus} from "/static/js/header.js";
 import {setVideoResolution, pollPlaylistUrl, requestVideoPartial} from "/static/js/set-video-url.js";
 import { displayContentInfo, helperCloneAndUnHideNode } from "/static/js/metadata-display.js";
+import {apiRequest} from "../common";
 
 let albumId = null;
 const BATCH_SIZE = 5;
@@ -64,7 +65,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 async function displayAlbumInfo(albumId, albumInfo = null) {
     if (!albumInfo) {
-        const response = await fetch(`/api/media/content/${albumId}`);
+        const response = await apiRequest(`/api/media/content/${albumId}`);
         if (!response.ok) {
             alert("Failed to fetch album info");
             return;
@@ -470,7 +471,7 @@ async function getVideoPlayer() {
     if (videoPlayer)
         return true;
 
-    const response = await fetch('/page/frag/video-player');
+    const response = await apiRequest('/page/frag/video-player');
     if (!response.ok) {
         alert("Failed to fetch video player");
         return;

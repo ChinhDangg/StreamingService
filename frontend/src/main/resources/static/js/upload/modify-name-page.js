@@ -1,4 +1,4 @@
-import {getCsrfToken, initCsrfToken} from "/static/js/upload/upload-file.js";
+import {apiRequest} from "/static/js/common.js";
 
 const nameEntity = Object.freeze({
     Authors: 'authors',
@@ -19,7 +19,6 @@ function initialize() {
     initializeEntityTabs();
     initializeUploadImageInput();
     initializeModifyActionButtons();
-    initCsrfToken();
 }
 
 let currentModifyOption = modifyOption.Add;
@@ -153,7 +152,7 @@ function initializeSearchName() {
     }
 
     const searchName = async (nameString) => {
-        const response = await fetch(`/api/search/name/${currentNameEntity}?name=${nameString}`);
+        const response = await apiRequest(`/api/search/name/${currentNameEntity}?name=${nameString}`);
         if (!response.ok) {
             alert('Failed to fetch name info: ' + await response.text());
             return;
@@ -243,11 +242,8 @@ function initializeModifyActionButtons() {
             body = entityNameInput.value;
         }
 
-        const response = await fetch(url, {
+        const response = await apiRequest(url, {
             method: method,
-            headers: {
-                'X-XSRF-TOKEN': getCsrfToken(),
-            },
             body: body
         });
         if (currentModifyOption === modifyOption.Add && response.status !== 201) {

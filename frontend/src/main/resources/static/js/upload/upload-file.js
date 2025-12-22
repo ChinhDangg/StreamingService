@@ -1,27 +1,10 @@
-
-export async function initCsrfToken() {
-    await fetch("/api/upload/media/csrf-init", { credentials: "include" });
-}
-
-export function getCsrfToken() {
-    const name = "XSRF-TOKEN=";
-    const decoded = decodeURIComponent(document.cookie);
-    const parts = decoded.split('; ');
-
-    for (const part of parts) {
-        if (part.startsWith(name)) {
-            return part.substring(name.length);
-        }
-    }
-    return null;
-}
+import {apiRequest} from "/static/js/common.js";
 
 export async function startUploadSession(objectKey, mediaType) {
-    const sessionResponse = await fetch('/api/upload/media/create-session', {
+    const sessionResponse = await apiRequest('/api/upload/media/create-session', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'X-XSRF-TOKEN': getCsrfToken()
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
             objectKey: objectKey,
@@ -40,11 +23,10 @@ export async function endUploadSession(body) {
         alert('No sessionId found');
         return null;
     }
-    const endResponse = await fetch('/api/upload/media/end-session', {
+    const endResponse = await apiRequest('/api/upload/media/end-session', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'X-XSRF-TOKEN': getCsrfToken()
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify(body)
     });
@@ -70,11 +52,10 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
     if (uploadingFiles)
         uploadingFiles.set(file, { chunks: chunks, eTags: eTags, partNumber: chunks[0].partNumber });
 
-    const response = await fetch('/api/upload/media/initiate', {
+    const response = await apiRequest('/api/upload/media/initiate', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'X-XSRF-TOKEN': getCsrfToken()
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
             sessionId: sessionId,
@@ -92,11 +73,10 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
     console.log('uploadId: ' + uploadId);
 
     for (const c of chunks) {
-        const urlResponse = await fetch('/api/upload/media/presign-part-url', {
+        const urlResponse = await apiRequest('/api/upload/media/presign-part-url', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'X-XSRF-TOKEN': getCsrfToken()
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 sessionId: sessionId,
@@ -113,7 +93,7 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
         const urlRes = await urlResponse.text();
         console.log('Presigned url: ' + urlRes);
 
-        const res = await fetch(urlRes, {
+        const res = await apiRequest(urlRes, {
             method: 'PUT',
             body: c.blob
         });
@@ -128,11 +108,10 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
             uploadingFiles.get(file).partNumber++;
     }
 
-    const completeResponse = await fetch('/api/upload/media/complete', {
+    const completeResponse = await apiRequest('/api/upload/media/complete', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'X-XSRF-TOKEN': getCsrfToken()
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
             sessionId: sessionId,

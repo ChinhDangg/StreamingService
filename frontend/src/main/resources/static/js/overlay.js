@@ -1,3 +1,5 @@
+import {apiRequest} from "/static/js/common.js";
+
 export async function quickViewContentInOverlay(mediaId, mediaType, mediaInfo = null) {
     const url = new URL(window.location.href);
     const urlParams = url.searchParams;
@@ -11,7 +13,7 @@ export async function quickViewContentInOverlay(mediaId, mediaType, mediaInfo = 
 const mediaDocMap = new Map();
 
 async function getAlbumPageContent() {
-    const response = await fetch('/page/frag/album');
+    const response = await apiRequest('/page/frag/album');
     if (!response.ok) {
         alert("Failed to fetch album layout");
         return;
@@ -29,7 +31,7 @@ async function getAlbumPageContent() {
 }
 
 async function getVideoPageContent() {
-    const response = await fetch('/page/frag/video');
+    const response = await apiRequest('/page/frag/video');
     if (!response.ok) {
         alert("Failed to fetch video page layout");
         return;

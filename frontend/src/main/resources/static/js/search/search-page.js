@@ -7,6 +7,7 @@ import {
     validateSearchString
 } from "/static/js/header.js";
 import {quickViewContentInOverlay} from "/static/js/overlay.js";
+import {apiRequest} from "/static/js/common.js";
 
 const SORT_BY = Object.freeze({
     Upload: 'UPLOAD_DATE',
@@ -77,7 +78,6 @@ async function initialize() {
     initializeSortOrderOptions();
     initializeAdvanceSearchArea();
     initializeViewStepButtons();
-    await initCsrfToken();
 
     await sendSearchRequestOnCurrentInfo(false);
 }
@@ -291,7 +291,7 @@ function initializeKeywordSearchArea() {
     if (keywordSearchAreaInitialized) return;
     keywordSearchAreaInitialized = true;
     const fnKeywordSearch = async (pathVariable, value) => {
-        const response = await fetch(`/api/search/suggestion/${pathVariable}?s=${value}`);
+        const response = await apiRequest(`/api/search/suggestion/${pathVariable}?s=${value}`);
         if (!response.ok) {
             setAlertStatus('Search Suggestion Failed', await response.text());
             return [];
@@ -619,11 +619,8 @@ async function sendSearchRequest(searchType, page, sortBy, sortOrder,
 }
 
 async function requestMatchAllSearch(page, sortBy, sortOrder) {
-    const response = await fetch(getMatchAllSearchUrl(page, sortBy, sortOrder), {
-        method: 'POST',
-        headers: {
-            'X-XSRF-TOKEN': getCsrfToken()
-        }
+    const response = await apiRequest(getMatchAllSearchUrl(page, sortBy, sortOrder), {
+        method: 'POST'
     });
     if (!response.ok) {
         setAlertStatus('Search Match All Failed', await response.text());
@@ -634,11 +631,8 @@ async function requestMatchAllSearch(page, sortBy, sortOrder) {
 }
 
 async function requestSearch(searchString, page, sortBy, sortOrder) {
-    const response = await fetch(getSearchUrl(SEARCH_TYPES.BASIC, page, sortBy, sortOrder, searchString), {
-        method: 'POST',
-        headers: {
-            'X-XSRF-TOKEN': getCsrfToken()
-        }
+    const response = await apiRequest(getSearchUrl(SEARCH_TYPES.BASIC, page, sortBy, sortOrder, searchString), {
+        method: 'POST'
     });
     if (!response.ok) {
         setAlertStatus('Search Failed', await response.text());
@@ -649,11 +643,8 @@ async function requestSearch(searchString, page, sortBy, sortOrder) {
 }
 
 async function requestKeywordSearch(field, valueList, keywordMatchAll, page, sortBy, sortOrder) {
-    const response = await fetch(getSearchUrl(SEARCH_TYPES.KEYWORD, page, sortBy, sortOrder, null, field, valueList, keywordMatchAll), {
-        method: 'POST',
-        headers: {
-            'X-XSRF-TOKEN': getCsrfToken()
-        }
+    const response = await apiRequest(getSearchUrl(SEARCH_TYPES.KEYWORD, page, sortBy, sortOrder, null, field, valueList, keywordMatchAll), {
+        method: 'POST'
     });
     if (!response.ok) {
         setAlertStatus('Search Keyword Failed', await response.text());
@@ -670,11 +661,10 @@ async function requestAdvanceSearch(advanceRequestBody, page, sortBy, sortOrder)
         [SEARCH_INFO.SORT_ORDER]: sortOrder
     });
     const advanceSearchUrl = `/api/search/advance?${queryParams}`;
-    const response = await fetch(advanceSearchUrl, {
+    const response = await apiRequest(advanceSearchUrl, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'X-XSRF-TOKEN': getCsrfToken()
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify(advanceRequestBody)
     });
@@ -684,23 +674,6 @@ async function requestAdvanceSearch(advanceRequestBody, page, sortBy, sortOrder)
     }
     const results = await response.json();
     displaySearchResults(results, SEARCH_TYPES.ADVANCE, sortBy, sortOrder);
-}
-
-async function initCsrfToken() {
-    await fetch("/api/upload/media/csrf-init", { credentials: "include" });
-}
-
-function getCsrfToken() {
-    const name = "XSRF-TOKEN=";
-    const decoded = decodeURIComponent(document.cookie);
-    const parts = decoded.split('; ');
-
-    for (const part of parts) {
-        if (part.startsWith(name)) {
-            return part.substring(name.length);
-        }
-    }
-    return null;
 }
 
 function updatePageUrl(searchType, page, sortBy, sortOrder,

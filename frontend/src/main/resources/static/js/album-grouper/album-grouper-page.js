@@ -1,6 +1,7 @@
 import { initializeHeader } from "/static/js/header.js";
 import { displayContentInfo, helperCloneAndUnHideNode} from "/static/js/metadata-display.js";
 import { quickViewContentInOverlay } from "/static/js/overlay.js";
+import {apiRequest} from "/static/js/common.js";
 
 async function initialize() {
     const queryString = window.location.search;
@@ -23,7 +24,7 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 async function displayAlbumGrouperInfo(albumGrouperId) {
-    const response = await fetch(`/api/media/content/${albumGrouperId}`);
+    const response = await apiRequest(`/api/media/content/${albumGrouperId}`);
     if (!response.ok) {
         alert("Failed to fetch album grouper info");
         return;
@@ -372,7 +373,7 @@ export function addNewAlbumItem(newId) {
 }
 
 async function fetchMediaContent(mediaId) {
-    const response = await fetch(`/api/media/content/${mediaId}`);
+    const response = await apiRequest(`/api/media/content/${mediaId}`);
     if (!response.ok) {
         alert("Failed to fetch media info");
         return false;
@@ -381,7 +382,7 @@ async function fetchMediaContent(mediaId) {
 }
 
 async function fetchGrouperNext(albumGrouperId) {
-    const response = await fetch(`/api/media/grouper-next/${albumGrouperId}?offset=${offset}&order=${sortOrder}`);
+    const response = await apiRequest(`/api/media/grouper-next/${albumGrouperId}?offset=${offset}&order=${sortOrder}`);
     if (!response.ok) {
         alert("Failed to grouper next list");
         return null;

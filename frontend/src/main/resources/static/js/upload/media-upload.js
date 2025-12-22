@@ -3,8 +3,8 @@ import {
     startUploadSession,
     endUploadSession,
     validateDirectory,
-    initCsrfToken
 } from "/static/js/upload/upload-file.js";
+import {apiRequest} from "/static/js/common.js";
 
 const singleFileInput = document.getElementById('single-file-input');
 const folderInput = document.getElementById('folder-input');
@@ -15,11 +15,6 @@ const titleInput = document.getElementById('title-input');
 const yearInput = document.getElementById('year-input');
 
 const submitBtn = document.getElementById('submit-btn');
-
-async function initialize() {
-    await initCsrfToken();
-}
-initialize();
 
 let currentSavingPath = null;
 let currentFiles = null;
@@ -177,7 +172,7 @@ submitBtn.addEventListener('click',async () => {
             formData.append('title', title);
             formData.append('year', year);
 
-            const response = await fetch('/api/upload/media/create-grouper', {
+            const response = await apiRequest('/api/upload/media/create-grouper', {
                 method: 'POST',
                 body: formData
             });
