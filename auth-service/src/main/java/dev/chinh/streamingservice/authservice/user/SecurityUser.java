@@ -10,6 +10,10 @@ import java.util.List;
 
 public record SecurityUser(User user) implements UserDetails {
 
+    public Long getUserId() {
+        return user.getId();
+    }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority(user.getRole().name()));
