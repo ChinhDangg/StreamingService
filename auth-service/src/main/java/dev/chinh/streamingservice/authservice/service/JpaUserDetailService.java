@@ -29,6 +29,10 @@ public class JpaUserDetailService implements UserDetailsService {
         return userRepository.findByEmail(email).map(SecurityUser::new);
     }
 
+    public Optional<SecurityUser> findById(Long id) {
+        return userRepository.findById(id).map(SecurityUser::new);
+    }
+
     public User saveUser(User user) {
         return userRepository.save(user);
     }
