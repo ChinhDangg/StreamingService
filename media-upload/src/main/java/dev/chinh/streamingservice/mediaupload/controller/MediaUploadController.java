@@ -21,15 +21,6 @@ public class MediaUploadController {
 
     public record InitiateMultipartUploadRequest(String sessionId, String objectKey, MediaType mediaType) {}
 
-    @GetMapping("/csrf-init")
-    public ResponseEntity<Void> csrfTest(HttpServletRequest request) {
-        CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
-        if (csrfToken != null) {
-            csrfToken.getToken(); // triggers the cookie
-        }
-        return ResponseEntity.ok().build();
-    }
-
     @PostMapping("/create-session")
     public String initiateSession(@RequestBody InitiateMultipartUploadRequest request) {
         return mediaUploadService.initiateMediaUploadRequest(request.objectKey, request.mediaType);
