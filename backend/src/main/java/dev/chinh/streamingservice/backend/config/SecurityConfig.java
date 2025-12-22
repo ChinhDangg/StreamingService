@@ -66,20 +66,10 @@ public class SecurityConfig {
                                     BearerTokenResolver tokenResolver,
                                     JwtAuthenticationConverter jwtConverter) throws Exception {
 
-        CookieCsrfTokenRepository tokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        tokenRepository.setCookiePath("/"); // Ensure it's available for ALL paths
-        tokenRepository.setCookieCustomizer(cookie -> {
-            // don't set max age as it will be async with jwt expiry - keep in session
-            cookie.sameSite("Strict"); // "Lax" is standard; "Strict" is even safer
-            cookie.secure(false); // change to true in production
-        });
-
         http
-                .addFilterAfter(new EnforceCsrfFilter(), BearerTokenAuthenticationFilter.class)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                .addFilterBefore(new EnforceCsrfFilter(), BearerTokenAuthenticationFilter.class)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(csrf -> csrf
-                        .csrfTokenRepository(tokenRepository)
-                        .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                         .sessionAuthenticationStrategy((authentication, request, response) -> {
                             // Do nothing. This prevents Spring from clearing the
                             // CSRF token when the BearerTokenAuthenticationFilter succeeds.
