@@ -11,6 +11,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -63,7 +64,7 @@ public class SecurityConfig {
     SecurityFilterChain filterChain(HttpSecurity http,
                                     BearerTokenResolver tokenResolver,
                                     JwtAuthenticationConverter jwtConverter,
-                                    RedirectToLoginEntryPoint entryPoint) throws Exception {
+                                    JwtRefreshFilter refreshFilter) throws Exception {
         http
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
@@ -72,10 +73,16 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .authenticationEntryPoint(entryPoint)
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter))
                         .bearerTokenResolver(tokenResolver)
-                );
+                )
+                .addFilterAfter(refreshFilter, BearerTokenAuthenticationFilter.class);
+        //        SecurityContextHolderFilter
+        //        ...
+        //        BearerTokenAuthenticationFilter   <-- extracts & authenticates JWT
+        //        JwtRefreshFilter                  <-- custom filter (after it)
+        //        AuthorizationFilter               <-- checks roles / access
+        //        ExceptionTranslationFilter
         return http.build();
     }
 }
