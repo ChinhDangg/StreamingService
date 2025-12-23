@@ -12,6 +12,7 @@ services:
       - ./minio-data:/data
     command: server /data --console-address ":9001"
 
+  # docker compose -f compose.mac.yaml build nginx
   nginx:
     build:
       context: ./nginx
