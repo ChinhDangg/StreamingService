@@ -74,6 +74,13 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
             return;
         }
 
+        if (alreadyAttempted(request)) {
+            // avoid loops; don’t keep retrying refresh in same request
+            setUnauthorizedResponse(request, response);
+            return;
+        }
+        markAttempted(request);
+
         boolean expired = false;
         try {
             if (accessToken == null) {
@@ -154,6 +161,17 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
         String r = URLEncoder.encode(fullUri, StandardCharsets.UTF_8);
         response.sendRedirect("/page/login?r=" + r);
     }
+
+    private static final String ATTR_REFRESH_ATTEMPTED = "jwt_refresh_attempted";
+
+    private boolean alreadyAttempted(HttpServletRequest request) {
+        return request.getAttribute(ATTR_REFRESH_ATTEMPTED) != null;
+    }
+
+    private void markAttempted(HttpServletRequest request) {
+        request.setAttribute(ATTR_REFRESH_ATTEMPTED, Boolean.TRUE);
+    }
+
 }
 
 
