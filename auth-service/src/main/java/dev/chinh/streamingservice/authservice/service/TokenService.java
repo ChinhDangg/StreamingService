@@ -90,8 +90,14 @@ public class TokenService {
             return null;
         }
 
-        Jwt jwt = jwtDecoder.decode(refreshTokenCookie);
-        long userId = Long.parseLong(jwt.getSubject());
+        long userId;
+        try {
+            Jwt jwt = jwtDecoder.decode(refreshTokenCookie);
+            userId = Long.parseLong(jwt.getSubject());
+        } catch (JwtException e) {
+            System.out.println("Invalid refresh token cookie: " + e.getMessage());
+            return null;
+        }
 
         SecurityUser user = userDetailsService.findById(userId).orElse(null);
         if (user == null) {
