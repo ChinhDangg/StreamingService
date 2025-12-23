@@ -68,6 +68,7 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
         }
 
         if (alreadyAttempted(request)) {
+            System.out.println("Already attempted to refresh tokens");
             // avoid loops; don’t keep retrying refresh in same request
             setUnauthorizedResponse(request, response);
             return;
@@ -81,6 +82,8 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
                 AbstractAuthenticationToken authenticationToken = jwtConverter.convert(jwt);
                 SecurityContextHolder.getContext().setAuthentication(authenticationToken);
                 filterChain.doFilter(request, response);
+                System.out.println("Access token not expired:");
+                return;
             } catch (JwtValidationException ex) {
                 expired = ex.getErrors().stream()
                         .anyMatch(error ->
@@ -96,6 +99,7 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
 
         if (!expired) {
             // probably another jwt error
+            System.out.println("Failed to decode Auth cookie: ");
             setUnauthorizedResponse(request, response);
             return;
         }
@@ -165,9 +169,6 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
         String uri = request.getRequestURI();
         String query = request.getQueryString();
         String fullUri = (query == null ? uri : uri + "?" + query);
-        if (fullUri.startsWith("/page/login")) {
-            response.sendRedirect("/page/login");
-        }
         String r = URLEncoder.encode(fullUri, StandardCharsets.UTF_8);
         response.sendRedirect("/page/login?r=" + r);
     }
