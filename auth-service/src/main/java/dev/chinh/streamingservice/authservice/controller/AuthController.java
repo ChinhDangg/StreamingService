@@ -31,6 +31,7 @@ public class AuthController {
     public void authenticate(@RequestBody AuthenticationRequest authRequest, HttpServletRequest request, HttpServletResponse response) {
         String isValid = authRequest.isValid();
         if (isValid != null) {
+            logout(response);
             throw new BadCredentialsException(isValid);
         }
         UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(authRequest.username(), authRequest.password());
@@ -48,6 +49,7 @@ public class AuthController {
     public void refreshAccessToken(HttpServletRequest request, HttpServletResponse response) {
         ResponseCookie refreshCookie = tokenService.getRefreshAccessToken(request);
         if (refreshCookie == null) {
+            logout(response);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return;
         }
@@ -59,8 +61,21 @@ public class AuthController {
 
     @PostMapping("/logout")
     public void logout(HttpServletResponse response) {
-        response.addHeader(HttpHeaders.SET_COOKIE, TokenService.removeAuthCookie().toString());
+        expireCookie(response, TokenService.ACCESS_AUTH_COOKIE_NAME);
+        expireCookie(response, TokenService.REFRESH_AUTH_COOKIE_NAME);
+        expireCookie(response, "XSRF-TOKEN");
         response.setStatus(HttpServletResponse.SC_NO_CONTENT);
+    }
+
+    private void expireCookie(HttpServletResponse response, String name) {
+        ResponseCookie cookie = ResponseCookie.from(name, "")
+                .path("/")
+                .maxAge(0)
+                .secure(false) // change to true in production
+                .sameSite("Strict")
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     private CsrfToken addCsrfCookie(HttpServletRequest request, HttpServletResponse response) {

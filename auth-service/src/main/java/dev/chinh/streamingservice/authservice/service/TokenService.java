@@ -43,8 +43,8 @@ public class TokenService {
         return this.jwtEncoder.encode(JwtEncoderParameters.from(claimsSet)).getTokenValue();
     }
 
-    private static final String ACCESS_AUTH_COOKIE_NAME = "Auth";
-    private static final String REFRESH_AUTH_COOKIE_NAME = "Refresh";
+    public static final String ACCESS_AUTH_COOKIE_NAME = "Auth";
+    public static final String REFRESH_AUTH_COOKIE_NAME = "Refresh";
 
     private ResponseCookie makeAuthenticateCookie(SecurityUser securityUser, String cookieName, long expirySeconds) {
 
@@ -122,12 +122,5 @@ public class TokenService {
         }
         System.out.println("Refresh token mismatch: " + storedRefreshToken + " " + refreshTokenCookie);
         return null;
-    }
-
-    public static Cookie removeAuthCookie() {
-        Cookie cookie = new Cookie(ACCESS_AUTH_COOKIE_NAME, null);
-        cookie.setMaxAge(0);
-        cookie.setPath("/");
-        return cookie;
     }
 }
