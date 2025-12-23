@@ -59,19 +59,11 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
         String csrfToken = null;
 
         for (Cookie cookie : request.getCookies()) {
-            if ("Auth".equals(cookie.getName())) {
-                accessToken = cookie.getValue();
-            } else if ("Refresh".equals(cookie.getName())) {
-                refreshToken = cookie.getValue();
-            } else if ("XSRF-TOKEN".equals(cookie.getName())) {
-                csrfToken = cookie.getValue();
+            switch (cookie.getName()) {
+                case "Auth" -> accessToken = cookie.getValue();
+                case "Refresh" -> refreshToken = cookie.getValue();
+                case "XSRF-TOKEN" -> csrfToken = cookie.getValue();
             }
-        }
-
-        if (refreshToken == null || csrfToken == null) {
-            System.out.println("No refresh token cookie or csrf token in request");
-            setUnauthorizedResponse(request, response);
-            return;
         }
 
         if (alreadyAttempted(request)) {
@@ -79,31 +71,42 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
             setUnauthorizedResponse(request, response);
             return;
         }
-        markAttempted(request);
 
-        boolean expired = false;
-        try {
-            if (accessToken == null) {
-                System.out.println("No access token cookie in request");
-                expired = true;
-            } else
-                jwtDecoder.decode(accessToken);
-            // Token is fully valid (not expired)
-        } catch (JwtValidationException ex) {
-            expired = ex.getErrors().stream()
-                    .anyMatch(error ->
-                            "invalid_token".equals(error.getErrorCode()) &&
-                                    error.getDescription().toLowerCase().contains("expired")
-                    );
-        } catch (JwtException ex) {
+        boolean expired = accessToken == null;
+        if (!expired) {
+            try {
+                Jwt jwt = jwtDecoder.decode(accessToken);
+                // Token is fully valid (not expired)
+                AbstractAuthenticationToken authenticationToken = jwtConverter.convert(jwt);
+                SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+                filterChain.doFilter(request, response);
+            } catch (JwtValidationException ex) {
+                expired = ex.getErrors().stream()
+                        .anyMatch(error ->
+                                "invalid_token".equals(error.getErrorCode()) &&
+                                        error.getDescription().toLowerCase().contains("expired")
+                        );
+            } catch (JwtException ex) {
+                // invalid token format
+                setUnauthorizedResponse(request, response);
+                return;
+            }
+        }
+
+        if (!expired) {
+            // probably another jwt error
             setUnauthorizedResponse(request, response);
             return;
         }
 
-        if (!expired) {
-            filterChain.doFilter(request, response);
+        // access token can be valid while refresh token is expired
+        if (refreshToken == null || csrfToken == null) {
+            System.out.println("No refresh token cookie or csrf token in request");
+            setUnauthorizedResponse(request, response);
             return;
         }
+
+        markAttempted(request);
 
         ResponseEntity<Void> newTokenResponse = authClient.getRefreshAccessToken(refreshToken, csrfToken);
 
@@ -116,7 +119,7 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
         System.out.println("Got new tokens: " + newTokenResponse);
 
         List<String> cookies = newTokenResponse.getHeaders().get(HttpHeaders.SET_COOKIE);
-        if (cookies == null) {
+        if (cookies == null || cookies.isEmpty()) {
             System.out.println("No cookies in response");
             setUnauthorizedResponse(request, response);
             return;
@@ -142,10 +145,16 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
         response.addHeader(HttpHeaders.SET_COOKIE, newAuthCookie);
         response.addHeader(HttpHeaders.SET_COOKIE, newCsrfCookie);
 
-        Jwt jwt = jwtDecoder.decode(newAuthCookie.substring("Auth=".length(), newAuthCookie.indexOf(";")));
-        // to keep role mapping
-        AbstractAuthenticationToken authenticationToken = jwtConverter.convert(jwt);
-        SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+        try {
+            Jwt jwt = jwtDecoder.decode(newAuthCookie.substring("Auth=".length(), newAuthCookie.indexOf(";")));
+            // to keep role mapping
+            AbstractAuthenticationToken authenticationToken = jwtConverter.convert(jwt);
+            SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+        } catch (JwtException ex) {
+            System.out.println("Failed to decode new Auth cookie: " + ex.getMessage());
+            setUnauthorizedResponse(request, response);
+            return;
+        }
 
         filterChain.doFilter(request, response);
     }
