@@ -35,10 +35,7 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
         String requestURI = request.getRequestURI();
-        if (requestURI.startsWith("/page/login") || requestURI.startsWith("/static/js/login/login.js")) {
-            return true;
-        }
-        return false;
+        return requestURI.startsWith("/page/login") || requestURI.startsWith("/static/js/login/login.js");
     }
 
     @Override
@@ -58,11 +55,15 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
         String refreshToken = null;
         String csrfToken = null;
 
+        final String AUTH_COOKIE_NAME = "Auth";
+        final String REFRESH_COOKIE_NAME = "Refresh";
+        final String CSRF_COOKIE_NAME = "XSRF-TOKEN";
+
         for (Cookie cookie : request.getCookies()) {
             switch (cookie.getName()) {
-                case "Auth" -> accessToken = cookie.getValue();
-                case "Refresh" -> refreshToken = cookie.getValue();
-                case "XSRF-TOKEN" -> csrfToken = cookie.getValue();
+                case AUTH_COOKIE_NAME -> accessToken = cookie.getValue();
+                case REFRESH_COOKIE_NAME -> refreshToken = cookie.getValue();
+                case CSRF_COOKIE_NAME -> csrfToken = cookie.getValue();
             }
         }
 
@@ -129,9 +130,9 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
         String newCsrfCookie = null;
 
         for (String cookie : cookies) {
-            if (cookie.startsWith("Auth=")) {
+            if (cookie.startsWith(AUTH_COOKIE_NAME + "=")) {
                 newAuthCookie = cookie;
-            } else if (cookie.startsWith("XSRF-TOKEN=")) {
+            } else if (cookie.startsWith(CSRF_COOKIE_NAME + "=")) {
                 newCsrfCookie = cookie;
             }
         }
@@ -146,7 +147,7 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
         response.addHeader(HttpHeaders.SET_COOKIE, newCsrfCookie);
 
         try {
-            Jwt jwt = jwtDecoder.decode(newAuthCookie.substring("Auth=".length(), newAuthCookie.indexOf(";")));
+            Jwt jwt = jwtDecoder.decode(newAuthCookie.substring((AUTH_COOKIE_NAME +"=").length(), newAuthCookie.indexOf(";")));
             // to keep role mapping
             AbstractAuthenticationToken authenticationToken = jwtConverter.convert(jwt);
             SecurityContextHolder.getContext().setAuthentication(authenticationToken);
