@@ -3,6 +3,7 @@ package dev.chinh.streamingservice.authservice.controller;
 import dev.chinh.streamingservice.authservice.service.AuthenticationRequest;
 import dev.chinh.streamingservice.authservice.service.TokenService;
 import dev.chinh.streamingservice.authservice.user.SecurityUser;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +62,7 @@ public class AuthController {
 
     @PostMapping("/logout")
     public void logout(HttpServletResponse response) {
+        System.out.println("Logging out");
         expireCookie(response, TokenService.ACCESS_AUTH_COOKIE_NAME);
         expireCookie(response, TokenService.REFRESH_AUTH_COOKIE_NAME);
         expireCookie(response, "XSRF-TOKEN");
@@ -68,14 +70,13 @@ public class AuthController {
     }
 
     private void expireCookie(HttpServletResponse response, String name) {
-        ResponseCookie cookie = ResponseCookie.from(name, "")
-                .path("/")
-                .maxAge(0)
-                .secure(false) // change to true in production
-                .sameSite("Strict")
-                .build();
+        Cookie cookie = new Cookie(name, null);
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+        cookie.setSecure(false); // change to true in production
+        cookie.setAttribute("SameSite", "Strict");
 
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        response.addCookie(cookie);
     }
 
     private CsrfToken addCsrfCookie(HttpServletRequest request, HttpServletResponse response) {
