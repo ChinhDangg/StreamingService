@@ -1,7 +1,8 @@
 document.getElementById('login-form').addEventListener('submit', async function (e) {
     e.preventDefault();
+    const username = document.getElementById('email').value;
     const login = {
-        username: document.getElementById('email').value,
+        username: username,
         password: document.getElementById('password').value,
     }
     const response = await fetch('/auth/login', {
@@ -9,7 +10,8 @@ document.getElementById('login-form').addEventListener('submit', async function 
         credentials: "include",
         body: JSON.stringify(login),
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-Login-Username': username,
         }
     });
     if (response.ok) {
