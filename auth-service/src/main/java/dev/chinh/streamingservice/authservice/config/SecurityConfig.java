@@ -12,6 +12,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -37,7 +38,8 @@ public class SecurityConfig {
     // Spring will use Beans UserDetailsService + PasswordEncoder to authenticate.
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                            LoginRateLimitFilter loginRateLimitFilter) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -46,7 +48,8 @@ public class SecurityConfig {
                                 "/.well-known/jwks.json"
                         ).permitAll()
                         .anyRequest().authenticated()
-                );
+                )
+                .addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }
