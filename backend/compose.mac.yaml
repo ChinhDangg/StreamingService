@@ -6,8 +6,8 @@ services:
       - "9000:9000"   # S3 API
       - "9001:9001"   # Web console
     environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: admin123
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     volumes:
       - ./minio-data:/data
     command: server /data --console-address ":9001"
@@ -50,7 +50,7 @@ services:
       - bootstrap.memory_lock=true
       - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
       - plugins.security.disabled=true
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=MyStrongPassword123!
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD= ${OPENSEARCH_INITIAL_ADMIN_PASSWORD}
     ulimits:
       memlock:
         soft: -1
@@ -72,13 +72,14 @@ services:
     image: postgres:18
     container_name: postgres
     environment:
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: secret
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: media_db
     ports:
       - "5432:5432"
     volumes:
       - ./postgres_data:/var/lib/postgresql
+      - ./postgres/initdb.d:/docker-entrypoint-initdb.d
 
   redpanda:
     image: redpandadata/redpanda:v25.2.12
@@ -95,6 +96,22 @@ services:
       - --reserve-memory=0M
       - --node-id=0
       - --check=false
+
+  bootstrap:
+    image: postgres:18
+    depends_on:
+      - postgres
+    restart: "no"
+    entrypoint: [ "/bin/bash", "/scripts/bootstrap.sh" ]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_SUPERUSER: ${DB_USERNAME}
+      DB_SUPERUSER_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./postgres/initdb.d:/scripts
+
 
 #  logstash:
 #    image: docker.elastic.co/logstash/logstash:8.17.10
