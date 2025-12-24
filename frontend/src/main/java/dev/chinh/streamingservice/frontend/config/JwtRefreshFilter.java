@@ -117,6 +117,12 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
 
         if (newTokenResponse.getStatusCode().is4xxClientError()) {
             System.out.println("Failed to refresh tokens: " + newTokenResponse.getBody());
+            List<String> cookies = newTokenResponse.getHeaders().get(HttpHeaders.SET_COOKIE);
+            if (cookies != null && !cookies.isEmpty()) {
+                for (String cookie : cookies) {
+                    response.addHeader(HttpHeaders.SET_COOKIE, cookie);
+                }
+            }
             setUnauthorizedResponse(request, response);
             return;
         }
