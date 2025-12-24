@@ -68,7 +68,10 @@ public class SecurityConfig {
         http
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/page/login", "/static/js/login/login.js").permitAll()
+                        .requestMatchers(
+                                "/page/login", "/static/js/login/login.js",
+                                "/static/css/tailwind.css"
+                        ).permitAll()
                         .requestMatchers("/page/upload/**", "/page/modify/**", "/static/js/upload/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )

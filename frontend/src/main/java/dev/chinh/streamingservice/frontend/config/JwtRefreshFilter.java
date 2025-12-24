@@ -35,7 +35,8 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
         String requestURI = request.getRequestURI();
-        return requestURI.startsWith("/page/login") || requestURI.startsWith("/static/js/login/login.js");
+        return requestURI.startsWith("/page/login") || requestURI.startsWith("/static/js/login/login.js")
+                || requestURI.startsWith("/static/css/tailwind.css");
     }
 
     @Override
