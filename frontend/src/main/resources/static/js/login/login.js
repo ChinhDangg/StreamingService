@@ -18,6 +18,8 @@ document.getElementById('login-form').addEventListener('submit', async function 
         const params = new URLSearchParams(window.location.search);
         window.location.href = params.get('r') || '/';
     } else if (response.status === 401) {
-        document.getElementById('login-error').classList.remove('hidden');
+        const loginErrorContainer = document.getElementById('login-error');
+        loginErrorContainer.textContent = await response.text();
+        loginErrorContainer.classList.remove('hidden');
     }
 });
