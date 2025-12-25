@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.constant.Resolution;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.persistence.entity.MediaDescription;
 import dev.chinh.streamingservice.persistence.projection.MediaNameEntry;
 import lombok.RequiredArgsConstructor;
@@ -21,9 +22,7 @@ public class ThumbnailService {
 
     private final RedisTemplate<String, String> redisStringTemplate;
     private final MinIOService minIOService;
-    private final VideoService videoService;
 
-    public static final String thumbnailBucket = "thumbnail";
     public static final Resolution thumbnailResolution = Resolution.p360;
 
     public record MediaUrl(MediaType type, String url) {}
@@ -97,7 +96,7 @@ public class ThumbnailService {
                 continue;
 
             if (mediaDescription.hasKey()) // video
-                bucketList.add(ThumbnailService.thumbnailBucket);
+                bucketList.add(ContentMetaData.THUMBNAIL_BUCKET);
             else
                 bucketList.add(mediaDescription.getBucket());
             pathList.add(mediaDescription.getThumbnail());
@@ -120,7 +119,7 @@ public class ThumbnailService {
             String pathString = "/chunks" + getThumbnailPath(mediaNameEntry.getName(), mediaNameEntry.getThumbnail());
             albumUrlList.add(new MediaUrl(MediaType.IMAGE, pathString));
         }
-        return new AlbumUrlInfo(albumUrlList, List.of(thumbnailBucket), pathList);
+        return new AlbumUrlInfo(albumUrlList, List.of(ContentMetaData.THUMBNAIL_BUCKET), pathList);
     }
 
     private void addCacheThumbnails(String thumbnailFileName, long expiry) {
