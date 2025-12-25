@@ -58,24 +58,24 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             }
             switch (description.getJobType()) {
                 case "albumUrlList" -> {
+                    workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
                     var mediaUrlList = getAllMediaUrlInAnAlbum(description);
                     String mediaUrlListString = objectMapper.writeValueAsString(mediaUrlList);
                     workerRedisService.addResultToStatus(description.getWorkId(), "result", mediaUrlListString);
                     workerRedisService.addResultToStatus(description.getWorkId(), "offset",
                             objectMapper.writeValueAsString(List.of(description.getOffset() + description.getBatch(), mediaUrlList.size())));
-                    workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
                     workerRedisService.releaseToken(tokenKey);
                 }
                 case "checkResized" -> {
+                    workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
                     String offset = objectMapper.writeValueAsString(processResizedAlbumImagesInBatch(description));
                     workerRedisService.addResultToStatus(description.getWorkId(), "offset", offset);
-                    workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
                     workerRedisService.releaseToken(tokenKey);
                 }
                 case "albumVideoUrl" -> {
                     String videoPartialUrl = getAlbumPartialVideoUrl(tokenKey, description);
-                    workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
                     workerRedisService.addResultToStatus(description.getWorkId(), "result", videoPartialUrl);
+                    workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
                 }
                 default -> throw new BadRequestException("Invalid jobType: " + description.getJobType());
             }
