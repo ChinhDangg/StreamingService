@@ -30,7 +30,7 @@
       }
     },
 
-    "uploadDate": { "type": "date", "format": "epoch_millis" },
+    "uploadDate": { "type": "date", "format": "strict_date_optional_time_nanos" },
     "year":       { "type": "integer" },
     "width":      { "type": "integer" },
     "height":     { "type": "integer" },
