@@ -6,6 +6,7 @@ import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import lombok.*;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -24,7 +25,7 @@ public class MediaSearchItemResponse {
     @JsonProperty(ContentMetaData.THUMBNAIL)
     private String thumbnail;
     @JsonProperty(ContentMetaData.UPLOAD_DATE)
-    private LocalDateTime uploadDate;
+    private Instant uploadDate;
     @JsonProperty(ContentMetaData.AUTHORS)
     private List<String> authors;
     private MediaType mediaType;

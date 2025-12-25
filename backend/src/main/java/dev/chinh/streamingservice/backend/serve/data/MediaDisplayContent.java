@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -52,7 +53,7 @@ public class MediaDisplayContent {
     private Integer height;
 
     @JsonProperty(ContentMetaData.UPLOAD_DATE)
-    private LocalDateTime uploadDate;
+    private Instant uploadDate;
 
     @JsonProperty(ContentMetaData.YEAR)
     private Integer year;
