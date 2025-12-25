@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.mediaupload;
 
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.mediaupload.service.MinIOService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
@@ -14,9 +15,9 @@ public class AppStartRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if (!minIOService.bucketExists("media"))
-            minIOService.createBucket("media");
-        if (!minIOService.bucketExists("thumbnails"))
-            minIOService.createBucket("thumbnails");
+        if (!minIOService.bucketExists(ContentMetaData.MEDIA_BUCKET))
+            minIOService.createBucket(ContentMetaData.MEDIA_BUCKET);
+        if (!minIOService.bucketExists(ContentMetaData.THUMBNAIL_BUCKET))
+            minIOService.createBucket(ContentMetaData.THUMBNAIL_BUCKET);
     }
 }
