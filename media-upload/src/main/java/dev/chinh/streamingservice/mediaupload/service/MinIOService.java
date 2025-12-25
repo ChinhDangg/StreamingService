@@ -2,13 +2,17 @@ package dev.chinh.streamingservice.mediaupload.service;
 
 import io.minio.*;
 import io.minio.errors.ErrorResponseException;
+import io.minio.errors.MinioException;
 import io.minio.http.Method;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 
 @Service
 @RequiredArgsConstructor
@@ -128,6 +132,31 @@ public class MinIOService {
                         .filename(filePath)
                         .build()
         );
+    }
+
+    public boolean bucketExists(String bucketName) {
+        try {
+            return minioClient.bucketExists(
+                    BucketExistsArgs.builder()
+                            .bucket(bucketName)
+                            .build()
+            );
+        } catch (MinioException | InvalidKeyException | IOException | NoSuchAlgorithmException e) {
+            System.err.println("Error checking bucket existence: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public void createBucket(String bucketName) {
+        try {
+            minioClient.makeBucket(
+                    MakeBucketArgs.builder()
+                            .bucket(bucketName)
+                            .build()
+            );
+        } catch (MinioException | InvalidKeyException | IOException | NoSuchAlgorithmException e) {
+            System.err.println("Error creating bucket: " + e.getMessage());
+        }
     }
 
 }
