@@ -10,6 +10,7 @@ import org.apache.hc.client5.http.auth.AuthScope;
 import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
 import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
 import org.apache.hc.core5.http.HttpHost;
+import org.opensearch.client.json.jackson.JacksonJsonpMapper;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.transport.OpenSearchTransport;
 import org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder;
@@ -20,7 +21,7 @@ import org.springframework.context.annotation.Configuration;
 public class OpenSearchConfig {
 
     @Bean
-    public OpenSearchClient createClient() {
+    public OpenSearchClient createClient(ObjectMapper objectMapper) {
 
         HttpHost host = new HttpHost("http", "localhost", 9200);
 
@@ -30,9 +31,12 @@ public class OpenSearchConfig {
                 new UsernamePasswordCredentials("username", "password".toCharArray())
         );
 
+        JacksonJsonpMapper jsonpMapper = new JacksonJsonpMapper(objectMapper);
+
         // Create the low-level Apache HTTP client transport
         OpenSearchTransport transport = ApacheHttpClient5TransportBuilder
                 .builder(host)
+                .setMapper(jsonpMapper)
 //                .setHttpClientConfigCallback(httpClientBuilder ->
 //                        httpClientBuilder.setDefaultCredentialsProvider(credsProvider)
 //                )
