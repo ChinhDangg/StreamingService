@@ -340,11 +340,18 @@ public class VideoService extends MediaService implements ResourceCleanable {
         Process process = pb.start();
 
         List<String> logs = getLogsFromInputStream(process.getInputStream());
+        Path thumbnailPath = Path.of(thumbnailOutput);
 
         int exitCode = process.waitFor();
         System.out.println("ffmpeg generate thumbnail from video exited with code " + exitCode);
         if (exitCode != 0) {
             logs.forEach(System.out::println);
+            try {
+                Files.deleteIfExists(thumbnailPath);
+            } catch (IOException e) {
+                System.out.println("Failed to clean up thumbnail file: ");
+                System.out.println(e.getMessage());
+            }
             throw new RuntimeException("Failed to generate thumbnail from video");
         }
 
@@ -352,7 +359,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
                 ? thumbnailObject
                 : OSUtil.normalizePath(MediaUploadService.defaultVidPath, thumbnailObject);
         minIOService.moveFileToObject(ContentMetaData.THUMBNAIL_BUCKET, thumbnailObject, thumbnailOutput);
-        Files.delete(Path.of(thumbnailOutput));
+        Files.delete(thumbnailPath);
 
         return thumbnailObject;
     }
