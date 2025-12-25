@@ -1,7 +1,7 @@
 import {initializeHeader, setAlertStatus} from "/static/js/header.js";
 import {setVideoResolution, pollPlaylistUrl, requestVideoPartial} from "/static/js/set-video-url.js";
 import { displayContentInfo, helperCloneAndUnHideNode } from "/static/js/metadata-display.js";
-import {apiRequest} from "../common";
+import {apiRequest} from "/static/js/common.js";
 
 let albumId = null;
 const BATCH_SIZE = 5;
