@@ -29,10 +29,15 @@ public class RedisConfig {
     public RedisTemplate<String, String> queueRedisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, String> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
-        // Key: String
-        template.setKeySerializer(new StringRedisSerializer());
-        // Value: String
-        template.setValueSerializer(new StringRedisSerializer());
+
+        StringRedisSerializer stringSerializer = new StringRedisSerializer();
+
+        template.setKeySerializer(stringSerializer);
+        template.setValueSerializer(stringSerializer);
+
+        template.setHashKeySerializer(stringSerializer);
+        template.setHashValueSerializer(stringSerializer);
+
         template.afterPropertiesSet();
         return template;
     }
