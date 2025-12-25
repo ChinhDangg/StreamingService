@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS media.media_metadata
     size               BIGINT       NOT NULL,
     thumbnail          VARCHAR(255),
     title              VARCHAR(255) NOT NULL,
-    upload_date        TIMESTAMP(6) NOT NULL,
+    upload_date        TIMESTAMPTZ  NOT NULL,
     width              INTEGER      NOT NULL,
     year               SMALLINT     NOT NULL,
     absolute_file_path VARCHAR(255) NOT NULL,
