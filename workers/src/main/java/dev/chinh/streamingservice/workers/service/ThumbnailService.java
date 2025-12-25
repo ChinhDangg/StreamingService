@@ -14,7 +14,6 @@ public class ThumbnailService {
 
     private final RedisTemplate<String, String> queueRedisTemplate;
 
-    public static final String thumbnailBucket = "thumbnail";
     private static final Resolution thumbnailResolution = Resolution.p360;
 
     public Set<ZSetOperations.TypedTuple<String>> getAllThumbnailCacheLastAccess(long max) {

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.constant.Resolution;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import dev.chinh.streamingservice.workers.VideoWorker;
 import jakarta.annotation.PostConstruct;
@@ -16,8 +17,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.regex.Matcher;
@@ -352,7 +351,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
         thumbnailObject = thumbnailObject.startsWith(MediaUploadService.defaultVidPath)
                 ? thumbnailObject
                 : OSUtil.normalizePath(MediaUploadService.defaultVidPath, thumbnailObject);
-        minIOService.moveFileToObject(ThumbnailService.thumbnailBucket, thumbnailObject, thumbnailOutput);
+        minIOService.moveFileToObject(ContentMetaData.THUMBNAIL_BUCKET, thumbnailObject, thumbnailOutput);
         Files.delete(Path.of(thumbnailOutput));
 
         return thumbnailObject;
