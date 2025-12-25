@@ -156,7 +156,7 @@ public class MediaUploadService {
         MediaMetaData mediaMetaData = new MediaMetaData();
         mediaMetaData.setTitle(basicInfo.getTitle());
         mediaMetaData.setYear(basicInfo.getYear());
-        mediaMetaData.setUploadDate(LocalDateTime.ofInstant(Instant.now(), ZoneId.of("UTC")));
+        mediaMetaData.setUploadDate(Instant.now());
         mediaMetaData.setBucket(mediaBucket);
         mediaMetaData.setAbsoluteFilePath(mediaBucket + "/grouper-not-media");
         mediaMetaData.setParentPath("grouper-not-media");
@@ -219,7 +219,7 @@ public class MediaUploadService {
         MediaMetaData mediaMetaData = new MediaMetaData();
         mediaMetaData.setTitle(title);
         mediaMetaData.setYear(grouperMedia.getYear());
-        mediaMetaData.setUploadDate(LocalDateTime.ofInstant(Instant.now(), ZoneId.of("UTC")));
+        mediaMetaData.setUploadDate(Instant.now());
         mediaMetaData.setBucket(mediaBucket);
         mediaMetaData.setAbsoluteFilePath(mediaBucket + "/" + upload.objectName);
         mediaMetaData.setParentPath(upload.objectName);
@@ -279,7 +279,7 @@ public class MediaUploadService {
         MediaMetaData mediaMetaData = new MediaMetaData();
         mediaMetaData.setTitle(basicInfo.getTitle());
         mediaMetaData.setYear(basicInfo.getYear());
-        mediaMetaData.setUploadDate(LocalDateTime.ofInstant(Instant.now(), ZoneId.of("UTC")));
+        mediaMetaData.setUploadDate(Instant.now());
         mediaMetaData.setBucket(mediaBucket);
         mediaMetaData.setAbsoluteFilePath(mediaBucket + "/" + upload.objectName);
 
