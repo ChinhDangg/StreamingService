@@ -82,8 +82,8 @@ public class AlbumService extends MediaService {
                 if (offset >= size) {
                     return String.valueOf(size);
                 }
-            } else if (status.equals(MediaJobStatus.RUNNING.name())) {
-                return MediaJobStatus.RUNNING.name();
+            } else if (status.equals(MediaJobStatus.RUNNING.name()) || status.equals(MediaJobStatus.PROCESSING.name())) {
+                return MediaJobStatus.PROCESSING.name();
             }
         }
 
@@ -92,7 +92,8 @@ public class AlbumService extends MediaService {
         jobDescription.setBatch(batch);
         jobDescription.setAcceptHeader(request.getHeader("Accept"));
         addJobToQueue(ffmpegQueueKey, jobDescription);
-        return MediaJobStatus.RUNNING.name();
+        updateQueueJobStatus(albumJobId, MediaJobStatus.PROCESSING.name());
+        return MediaJobStatus.PROCESSING.name();
     }
 
     public String getAlbumVidCacheJobIdString(long albumId, int vidNum, Resolution resolution) {
