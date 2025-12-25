@@ -11,7 +11,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -103,8 +102,8 @@ public abstract class Worker implements Runnable {
     }
 
     public int getRetryCount(String workId) {
-        String value = (String) queueRedisTemplate.opsForHash().get("retry:"+workId, "count");
-        return value == null ? 0 : Integer.parseInt(value);
+        Object value = queueRedisTemplate.opsForHash().get("retry:"+workId, "count");
+        return value == null ? 0 : Integer.parseInt((String) value);
     }
 
     public void incrementRetry(String workId) {
