@@ -155,7 +155,7 @@ public class MinIOService {
                             .build()
             );
         } catch (MinioException | InvalidKeyException | IOException | NoSuchAlgorithmException e) {
-            System.err.println("Error creating bucket: " + e.getMessage());
+            throw new RuntimeException("Error creating bucket", e);
         }
     }
 
