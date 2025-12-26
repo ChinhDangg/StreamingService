@@ -94,7 +94,7 @@ public class OpenSearchService {
 
         Query rootQuery = Query.of(q -> q.bool(rootBool.build()));
 
-        return searchWithQuery(index, rootQuery, page, size, sortBy, sortOrder);
+        return searchWithQuery(index, rootQuery, page, size, sortBy, sortOrder, true);
     }
 
     private Query buildTermOrMatch(String field, Object value, boolean searchTerm) {
@@ -134,19 +134,11 @@ public class OpenSearchService {
                         .type(TextQueryType.BestFields)
                 )
         );
-        return searchWithQuery(index, multiMatch, page, size, sortBy, sortOrder);
-    }
-
-    public SearchResponse<Object> searchMatchAll(String index, int page, int size, SortBy sortBy, SortOrder sortOrder) throws IOException {
-        Query matchAll = Query.of(q -> q
-                .matchAll(m -> m)
-        );
-        return searchWithQuery(index, matchAll, page, size, sortBy, sortOrder);
+        return searchWithQuery(index, multiMatch, page, size, sortBy, sortOrder, true);
     }
 
     /**
      * Search exactly with given search strings by field.
-     * Does not work with fields that have text type. Use search match for that.
      */
     public SearchResponse<Object> searchTermByOneField(String index, String field, List<Object> text, boolean matchAll, int page, int size,
                                                SortBy sortBy, SortOrder sortOrder) throws IOException {
@@ -162,11 +154,18 @@ public class OpenSearchService {
             termBoolBuilder.minimumShouldMatch("1");
         }
         Query termBoolQuery = Query.of(q -> q.bool(termBoolBuilder.build()));
-        return searchWithQuery(index, termBoolQuery, page, size, sortBy, sortOrder);
+        return searchWithQuery(index, termBoolQuery, page, size, sortBy, sortOrder, true);
+    }
+
+    public SearchResponse<Object> searchMatchAll(String index, int page, int size, SortBy sortBy, SortOrder sortOrder) throws IOException {
+        Query matchAll = Query.of(q -> q
+                .matchAll(m -> m)
+        );
+        return searchWithQuery(index, matchAll, page, size, sortBy, sortOrder, false);
     }
 
     private SearchResponse<Object> searchWithQuery(String index, Query query, int page, int size, SortBy sortBy,
-                                                   SortOrder sortOrder) throws IOException {
+                                                   SortOrder sortOrder, boolean useScoreTieBreaker) throws IOException {
 
         String sortByField = switch (sortBy) {
             case SortBy.UPLOAD_DATE -> ContentMetaData.UPLOAD_DATE;
@@ -176,20 +175,38 @@ public class OpenSearchService {
             default -> null;
         };
 
+        SortOptions primarySort = SortOptions.of(o -> o.field(f -> f
+                .field(sortByField)
+                .order(sortOrder)
+        ));
+
+        SortOptions standardTieBreaker = SortOptions.of(o -> o.field(f -> f
+                .field("_id")
+                .order(SortOrder.Asc)
+        ));
+
         SortOptions scoreTieBreaker = SortOptions.of(o -> o.score(s -> s.order(sortOrder)));
 
-        SortOptions primarySort = (sortByField == null)
-                ? scoreTieBreaker
-                : SortOptions.of(o -> o.field(f -> f.field(sortByField).order(sortOrder)));
+        SortOptions sortTieBreaker = useScoreTieBreaker ? scoreTieBreaker : standardTieBreaker;
 
         SearchResponse<Object> response = client.search(s -> s
                 .index(index)
                 .from(page * size)
                 .size(size)
                 .query(query)
-                .sort(primarySort, scoreTieBreaker)
+                .sort(primarySort, sortTieBreaker)
                 .trackTotalHits(t -> t.count(1000)), Object.class
         );
+
+        response.hits().hits().forEach(h -> {
+            String source = h.source().toString();
+
+            int uploadDateIndex = source.indexOf(ContentMetaData.UPLOAD_DATE);
+            String uploadDateString = source.substring(uploadDateIndex + ContentMetaData.UPLOAD_DATE.length());
+            int commaIndex = uploadDateString.indexOf("],");
+            String uploadDate = uploadDateString.substring(0, commaIndex + 1);
+            System.out.println(uploadDate);
+        });
 
         return response;
     }
