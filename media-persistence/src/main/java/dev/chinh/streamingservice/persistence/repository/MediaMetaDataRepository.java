@@ -40,7 +40,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     // Removing the modifying annotation works for spring >= 3.2
     //@Modifying
     //@Transactional
-    @Query(value = "UPDATE media " +
+    @Query(value = "UPDATE media_metadata " +
                     "SET length = length + 1 " +
                     "WHERE id = :id " +
                     "RETURNING length",

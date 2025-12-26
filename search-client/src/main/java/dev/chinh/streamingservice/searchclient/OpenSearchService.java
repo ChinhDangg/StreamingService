@@ -198,15 +198,15 @@ public class OpenSearchService {
                 .trackTotalHits(t -> t.count(1000)), Object.class
         );
 
-        response.hits().hits().forEach(h -> {
-            String source = h.source().toString();
-
-            int uploadDateIndex = source.indexOf(ContentMetaData.UPLOAD_DATE);
-            String uploadDateString = source.substring(uploadDateIndex + ContentMetaData.UPLOAD_DATE.length());
-            int commaIndex = uploadDateString.indexOf("],");
-            String uploadDate = uploadDateString.substring(0, commaIndex + 1);
-            System.out.println(uploadDate);
-        });
+//        response.hits().hits().forEach(h -> {
+//            String source = h.source().toString();
+//
+//            int uploadDateIndex = source.indexOf(ContentMetaData.UPLOAD_DATE);
+//            String uploadDateString = source.substring(uploadDateIndex + ContentMetaData.UPLOAD_DATE.length());
+//            int commaIndex = uploadDateString.indexOf("],");
+//            String uploadDate = uploadDateString.substring(0, commaIndex + 1);
+//            System.out.println(uploadDate);
+//        });
 
         return response;
     }
