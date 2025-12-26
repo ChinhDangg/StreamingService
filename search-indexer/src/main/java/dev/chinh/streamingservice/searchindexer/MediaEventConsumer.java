@@ -138,23 +138,17 @@ public class MediaEventConsumer {
     @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_UPDATED_OPENSEARCH_TOPIC, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(MediaUpdateEvent event, Acknowledgment acknowledgment) {
         try {
-            if (event instanceof MediaUpdateEvent.LengthUpdated e) {
-                onUpdateLengthOpenSearch(e);
-            } else if (event instanceof MediaUpdateEvent.MediaCreated e) {
-                onCreateMediaIndexOpenSearch(e);
-            } else if (event instanceof MediaUpdateEvent.MediaNameEntityUpdated e) {
-                onUpdateMediaNameEntityOpenSearch(e);
-            } else if (event instanceof MediaUpdateEvent.MediaTitleUpdated e) {
-                onUpdateMediaTitleOpenSearch(e);
-            } else if (event instanceof MediaUpdateEvent.NameEntityCreated e) {
-                onCreateNameEntityOpenSearch(e);
-            } else if (event instanceof MediaUpdateEvent.NameEntityUpdated e) {
-                onUpdateNameEntityOpenSearch(e);
-            } else if (event instanceof MediaUpdateEvent.NameEntityDeleted e) {
-                onDeleteNameEntityOpenSearch(e);
-            } else {
-                // unknown event type → log and skip
-                System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+            switch (event) {
+                case MediaUpdateEvent.LengthUpdated e -> onUpdateLengthOpenSearch(e);
+                case MediaUpdateEvent.MediaCreated e -> onCreateMediaIndexOpenSearch(e);
+                case MediaUpdateEvent.MediaNameEntityUpdated e -> onUpdateMediaNameEntityOpenSearch(e);
+                case MediaUpdateEvent.MediaTitleUpdated e -> onUpdateMediaTitleOpenSearch(e);
+                case MediaUpdateEvent.NameEntityCreated e -> onCreateNameEntityOpenSearch(e);
+                case MediaUpdateEvent.NameEntityUpdated e -> onUpdateNameEntityOpenSearch(e);
+                case MediaUpdateEvent.NameEntityDeleted e -> onDeleteNameEntityOpenSearch(e);
+                default ->
+                    // unknown event type → log and skip
+                        System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
             }
             acknowledgment.acknowledge();
         } catch (Exception e) {
@@ -164,24 +158,34 @@ public class MediaEventConsumer {
     }
 
     // listen to DLQ and print out the event details for now - later log to a file or database or consume it
-    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_UPDATE_DLQ_TOPIC, groupId = "dlq-admin")
-    public void handleDlq(
-            Object message,
-            @Headers MessageHeaders headers,
-            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
-            @Header(KafkaHeaders.OFFSET) long offset
-    ) {
-        System.out.println("\n===== DLQ EVENT =====");
-        System.out.printf("Offset: %d, Partition: %d%n", offset, partition);
-        System.out.println("Payload:");
-        System.out.println(message);
+    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_UPDATE_DLQ_TOPIC, groupId = "media-dlq-group")
+    public void handleDlq(MediaUpdateEvent event,
+                          Acknowledgment ack,
+                          @Header(name = "x-exception-message", required = false) String errorMessage) {
+        System.out.println("======= DLQ EVENT DETECTED =======");
+        System.out.printf("Error Message: %s\n", errorMessage);
 
-        System.out.println("Headers:");
-        headers.forEach((k, v) -> {
-            Object val = v instanceof byte[] ? new String((byte[]) v) : v;
-            System.out.println(" - " + k + ": " + val);
-        });
-        System.out.println("=====================\n");
+        // Accessing the POJO data directly
+        switch (event) {
+            case MediaUpdateEvent.LengthUpdated(long mediaId, Integer newLength) ->
+                    System.out.println("Received update length event: " + mediaId + " newLength: " + newLength);
+            case MediaUpdateEvent.MediaCreated(long mediaId, boolean isGrouper) ->
+                    System.out.println("Received new index event: " + mediaId + " isGrouper: " + isGrouper);
+            case MediaUpdateEvent.MediaNameEntityUpdated(long mediaId, MediaNameEntityConstant nameEntityConstant) ->
+                    System.out.println("Received update media name entity event: " + mediaId + " nameEntityConstant: " + nameEntityConstant);
+            case MediaUpdateEvent.MediaTitleUpdated(long mediaId) ->
+                    System.out.println("Received update media title event: " + mediaId);
+            case MediaUpdateEvent.NameEntityCreated(MediaNameEntityConstant nameEntityConstant, long nameEntityId) ->
+                    System.out.println("Received create name entity: " + nameEntityConstant + " nameEntityId: " + nameEntityId);
+            case MediaUpdateEvent.NameEntityUpdated(MediaNameEntityConstant nameEntityConstant, long nameEntityId) ->
+                    System.out.println("Received update name entity: " + nameEntityConstant + " nameEntityId: " + nameEntityId);
+            case MediaUpdateEvent.NameEntityDeleted(MediaNameEntityConstant nameEntityConstant, long nameEntityId) ->
+                    System.out.println("Received delete name entity: " + nameEntityConstant + " nameEntityId: " + nameEntityId);
+            default -> System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+        }
+
+        // ack or it will be re-read from the DLQ on restart or rehandle it manually.
+        //ack.acknowledge();
     }
 
 
