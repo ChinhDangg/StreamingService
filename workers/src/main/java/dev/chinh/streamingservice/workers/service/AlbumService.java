@@ -58,12 +58,12 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             }
             switch (description.getJobType()) {
                 case "albumUrlList" -> {
-                    workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
                     var mediaUrlList = getAllMediaUrlInAnAlbum(description);
                     String mediaUrlListString = objectMapper.writeValueAsString(mediaUrlList);
                     workerRedisService.addResultToStatus(description.getWorkId(), "result", mediaUrlListString);
                     workerRedisService.addResultToStatus(description.getWorkId(), "offset",
                             objectMapper.writeValueAsString(List.of(description.getOffset() + description.getBatch(), mediaUrlList.size())));
+                    workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
                     workerRedisService.releaseToken(tokenKey);
                 }
                 case "checkResized" -> {
