@@ -73,6 +73,8 @@ public abstract class Worker implements Runnable {
 
         String jobJson = (String) fields.get(jobDescriptionKey);
 
+        System.out.println("JobJson: " + jobJson);
+
         MediaJobDescription mediaJobDescription;
         try {
             mediaJobDescription = objectMapper.readValue(jobJson, MediaJobDescription.class);
