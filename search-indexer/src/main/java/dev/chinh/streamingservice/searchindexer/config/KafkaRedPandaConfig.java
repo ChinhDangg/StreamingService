@@ -107,7 +107,7 @@ public class KafkaRedPandaConfig {
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, backOff);
 
         // Optionally tell it which exceptions should NOT be retried:
-        // errorHandler.addNotRetryableExceptions(IllegalArgumentException.class);
+        errorHandler.addNotRetryableExceptions(IllegalArgumentException.class);
 
         return errorHandler;
     }
