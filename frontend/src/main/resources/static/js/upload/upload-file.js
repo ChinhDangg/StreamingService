@@ -49,6 +49,9 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
     console.log('chunks:');
     console.log(chunks);
 
+    if (uploadingFiles)
+        uploadingFiles.set(file, { uploadId: uploadId, chunks: chunks, eTags: eTags, partNumber: chunks.partNumber ? chunks.partNumber : 0 });
+
     const initiateUpload = async () => {
         const response = await apiRequest('/api/upload/media/initiate', {
             method: 'POST',
@@ -75,7 +78,7 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
     console.log('uploadId: ' + uploadId);
 
     if (uploadingFiles)
-        uploadingFiles.set(file, { uploadId: uploadId, chunks: chunks, eTags: eTags, partNumber: chunks.partNumber ? chunks.partNumber : 0 });
+        uploadingFiles.get(file).uploadId = uploadId;
 
     const start = chunks.partNumber ? chunks.partNumber : 0;
 

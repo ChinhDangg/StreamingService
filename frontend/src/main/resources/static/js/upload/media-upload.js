@@ -261,8 +261,10 @@ submitBtn.addEventListener('click',async () => {
                 folderInput.value = '';
                 grouperInput.value = '';
                 uploadingFiles.clear();
+                currentFailTexts = [];
                 updateTitle('');
                 updateSavingPath('');
+                errorMessageContainer.classList.add('hidden');
                 alert('Upload successful! ' + responseText);
             }
         });
