@@ -39,7 +39,7 @@ export async function endUploadSession(body) {
 
 export async function uploadFile(sessionId, file, fileName, mediaType,
                                  uploadingFiles = null, currentFailTexts = null,
-                                 chunks = null, eTags = null) {
+                                 chunks = null, eTags = null, uploadId = null) {
 
     console.log('fileName: ' + fileName);
 
@@ -49,30 +49,38 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
     console.log('chunks:');
     console.log(chunks);
 
-    if (uploadingFiles)
-        uploadingFiles.set(file, { chunks: chunks, eTags: eTags, partNumber: chunks[0].partNumber });
-
-    const response = await apiRequest('/api/upload/media/initiate', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            sessionId: sessionId,
-            objectKey: fileName,
-            mediaType: mediaType
-        })
-    });
-    if (!response.ok) {
-        if (currentFailTexts)
-            currentFailTexts.push('Init: ' + await response.text());
-        return false;
+    const initiateUpload = async () => {
+        const response = await apiRequest('/api/upload/media/initiate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                sessionId: sessionId,
+                objectKey: fileName,
+                mediaType: mediaType
+            })
+        });
+        if (!response.ok) {
+            if (currentFailTexts)
+                currentFailTexts.push('Init: ' + await response.text());
+            return false;
+        }
+        return await response.text();
     }
 
-    const uploadId = await response.text();
+    uploadId = uploadId == null ? await initiateUpload() : uploadId;
+    if (!uploadId)
+        return false;
     console.log('uploadId: ' + uploadId);
 
-    for (const c of chunks) {
+    if (uploadingFiles)
+        uploadingFiles.set(file, { uploadId: uploadId, chunks: chunks, eTags: eTags, partNumber: chunks.partNumber ? chunks.partNumber : 0 });
+
+    const start = chunks.partNumber ? chunks.partNumber : 0;
+
+    for (let i = start; i < chunks.length; i++) {
+        const c = chunks[i];
         const urlResponse = await apiRequest('/api/upload/media/presign-part-url', {
             method: 'POST',
             headers: {
@@ -104,8 +112,11 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
             etag: res.headers.get('ETag').replace(/"/g, '')
         });
 
-        if (uploadingFiles)
+        if (uploadingFiles) {
             uploadingFiles.get(file).partNumber++;
+            console.log('uploadingFiles: ');
+            console.log(uploadingFiles.get(file).partNumber)
+        }
     }
 
     const completeResponse = await apiRequest('/api/upload/media/complete', {

@@ -197,8 +197,10 @@ submitBtn.addEventListener('click',async () => {
         }
 
         if (currentSavingPath !== savingPath) {
-            // if the current saving path is different when resubmitting, start a new session
+            // if the current saving path is different when resubmitting, start a new session with new uploading files
             currentSessionId = null;
+            uploadingFiles.clear();
+            currentFailTexts = [];
         }
         currentSavingPath = savingPath;
 
@@ -208,6 +210,7 @@ submitBtn.addEventListener('click',async () => {
             if (!sessionId) {
                 return;
             }
+            currentSessionId = sessionId;
         }
         console.log('sessionId: ' + sessionId);
 
@@ -216,7 +219,7 @@ submitBtn.addEventListener('click',async () => {
             if (uploadingFiles.has(currentFiles)) {
                 uploadingFiles.get(currentFiles).chunks.partNumber = uploadingFiles.get(currentFiles).partNumber;
                 const passed = await uploadFile(sessionId, currentFiles, savingPath, MediaTypes.VIDEO, uploadingFiles, currentFailTexts,
-                    uploadingFiles.get(currentFiles).chunks, uploadingFiles.get(currentFiles).eTags);
+                    uploadingFiles.get(currentFiles).chunks, uploadingFiles.get(currentFiles).eTags, uploadingFiles.get(currentFiles).uploadId);
                 if (!passed) fileNotUploaded++;
             } else {
                 const passed = await uploadFile(sessionId, currentFiles, savingPath, MediaTypes.VIDEO, uploadingFiles, currentFailTexts);
@@ -227,7 +230,7 @@ submitBtn.addEventListener('click',async () => {
                 for (const f of uploadingFiles.keys()) {
                     uploadingFiles.get(f).chunks.partNumber = uploadingFiles.get(f).partNumber;
                     const passed = await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM, uploadingFiles, currentFailTexts,
-                        uploadingFiles.get(f).chunks, uploadingFiles.get(f).eTags);
+                        uploadingFiles.get(f).chunks, uploadingFiles.get(f).eTags, uploadingFiles.get(f).uploadId);
                     if (!passed) fileNotUploaded++;
                 }
             } else {
