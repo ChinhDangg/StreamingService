@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
+import dev.chinh.streamingservice.common.event.MediaBackupEvent;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.mediaupload.MediaBasicInfo;
@@ -24,10 +25,13 @@ import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedUploadPartRequest;
 
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -261,6 +265,8 @@ public class MediaUploadService {
 
         eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMedia.getId(), updatedLength));
 
+        eventPublisher.publishEvent(new MediaBackupEvent.MediaCreated(mediaBucket, mediaMetaData.getPath(), upload.mediaType));
+
         mediaSearchCacheService.removeCachedMediaSearchItem(grouperMedia.getId());
         mediaDisplayService.removeCacheGroupOfMedia(grouperMedia.getId());
 
@@ -325,6 +331,8 @@ public class MediaUploadService {
         long savedId = saved.getId();
 
         eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, false));
+
+        eventPublisher.publishEvent(new MediaBackupEvent.MediaCreated(mediaBucket, mediaMetaData.getPath(), upload.mediaType));
 
         removeCacheMediaSessionRequest(sessionId);
         removeUploadSessionCacheLastAccess(sessionId);

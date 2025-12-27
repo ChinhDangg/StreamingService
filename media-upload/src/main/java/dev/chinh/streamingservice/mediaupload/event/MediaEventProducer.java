@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.mediaupload.event;
 
+import dev.chinh.streamingservice.common.event.MediaBackupEvent;
 import dev.chinh.streamingservice.mediaupload.event.config.KafkaRedPandaConfig;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import lombok.RequiredArgsConstructor;
@@ -49,5 +50,11 @@ public class MediaEventProducer {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publishDeleteNameEntityIndexOpenSearch(MediaUpdateEvent.NameEntityDeleted event) {
         kafkaTemplate.send(MEDIA_UPDATED_OPENSEARCH_TOPIC, event);
+    }
+
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void publishCreateMediaBackup(MediaBackupEvent.MediaCreated event) {
+        kafkaTemplate.send(KafkaRedPandaConfig.MEDIA_BACKUP_TOPIC, event);
     }
 }
