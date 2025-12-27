@@ -1,131 +1,17 @@
 ###
 # @no-log
-POST http://localhost/api/search/advance?
-    page=0&
-    sortBy=YEAR&
-    sortOrder=Desc
+POST http://localhost:8084/auth/login
 Content-Type: application/json
 
 {
-  "includeFields": [
-    {
-      "field": "universes",
-      "values": ["Genshin Impact"],
-      "mustAll": false
-    }
-  ],
-  "excludeFields": [
-    {
-      "field": "universes",
-      "values": ["Something"],
-      "mustAll": false
-    }
-  ],
-  "rangeFields": [
-    {
-      "field": "uploadDate",
-      "from": "2025-10-25"
-    }
-  ]
+  "username": "test@email.com",
+  "password": "SomePass123!"
 }
 
-###
-# @no-log
-POST http://localhost/api/search?
-    searchString=Genshin&
-    page=0&
-    sortBy=YEAR&
-    sortOrder=Desc
 
 ###
 # @no-log
-POST http://localhost/api/search/keyword?
-    page=0&
-    sortBy=YEAR&
-    sortOrder=Desc
-Content-Type: application/json
-
-{
-  "field": "universes",
-  "text": ["Genshin Impact"]
-}
-
-###
-# @no-log
-POST http://localhost/api/search/match-all?
-    page=0&
-    sortBy=YEAR&
-    sortOrder=Desc
-
-###
-# @no-log
-GET http://localhost/thumbnail-cache/p480/2_p480.jpg
-
-###
-# @no-log
-GET http://localhost/api/videos/preview/1
-
-###
-# @no-log
-GET http://localhost/api/videos/partial/1/p720
-
-###
-# @no-log
-GET http://localhost/api/videos/original/1
-
-###
-# @no-log
-GET http://localhost/api/album/2/p1080
-
-###
-# @no-log
-GET http://localhost/api/album/2/p1080/vid/0/p720
-
-###
-# @no-log
-POST http://localhost/api/album/2/p480/0/check-resized
-
-###
-# @no-log
-GET http://localhost/api/media/content/1
-
-###
-# @no-log
-GET http://localhost/api/media/content-page/2
-
-###
-# @no-log
-GET http://localhost/stream/2/p1080/1_1080.jpg
-
-
-
-###
-# @no-log
-GET http://localhost/api/search/suggestion/authors?s=au
-
-###
-# @no-log
-GET http://localhost/api/media/authors
-
-
-###
-# @no-log
-GET http://localhost:8081/page/frag/video-player
-
-###
-# @no-log
-GET http://localhost:8081/page/frag/album
-
-###
-# @no-log
-GET http://localhost:8081/page/frag/video
-
-
-
-###
-# @no-log
-GET http://localhost/api/media/modify/authors?name=author
-
+GET http://localhost/test-auth
 
 
 

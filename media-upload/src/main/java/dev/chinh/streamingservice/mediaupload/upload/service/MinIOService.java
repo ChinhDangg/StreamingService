@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.mediaupload.service;
+package dev.chinh.streamingservice.mediaupload.upload.service;
 
 import io.minio.*;
 import io.minio.errors.ErrorResponseException;

@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.mediaupload.service;
+package dev.chinh.streamingservice.mediaupload.upload.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

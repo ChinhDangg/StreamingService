@@ -1,13 +1,11 @@
-package dev.chinh.streamingservice.mediaupload.controller;
+package dev.chinh.streamingservice.mediaupload.upload.controller;
 
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.mediaupload.MediaBasicInfo;
-import dev.chinh.streamingservice.mediaupload.service.MediaUploadService;
-import jakarta.servlet.http.HttpServletRequest;
+import dev.chinh.streamingservice.mediaupload.upload.service.MediaUploadService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

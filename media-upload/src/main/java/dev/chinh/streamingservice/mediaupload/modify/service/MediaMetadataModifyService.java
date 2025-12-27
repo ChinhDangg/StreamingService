@@ -4,7 +4,7 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.common.exception.DuplicateEntryException;
-import dev.chinh.streamingservice.mediaupload.service.MediaSearchCacheService;
+import dev.chinh.streamingservice.mediaupload.upload.service.MediaSearchCacheService;
 import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
 import dev.chinh.streamingservice.persistence.repository.MediaMetaDataRepository;
 import lombok.RequiredArgsConstructor;

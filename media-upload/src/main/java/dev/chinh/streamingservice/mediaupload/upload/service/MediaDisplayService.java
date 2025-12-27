@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.mediaupload.service;
+package dev.chinh.streamingservice.mediaupload.upload.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.Cursor;
