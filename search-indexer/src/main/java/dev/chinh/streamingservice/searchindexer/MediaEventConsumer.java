@@ -52,7 +52,7 @@ public class MediaEventConsumer {
         }
         MediaSearchItem mediaSearchItem = mediaMapper.map(mediaMetaData.get());
         if (event.isGrouper()) {
-            mediaSearchItem.setMediaGroupInfo(new MediaGroupInfo(-1L));
+            mediaSearchItem.setMediaGroupInfo(new MediaGroupInfo(mediaMetaData.get().getGrouperId(), -1L));
         }
         try {
             openSearchService.indexDocument(OpenSearchService.MEDIA_INDEX_NAME, mediaMetaData.get().getId(), mediaSearchItem);
