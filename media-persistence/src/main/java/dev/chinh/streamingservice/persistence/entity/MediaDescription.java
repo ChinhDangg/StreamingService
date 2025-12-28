@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.persistence.entity;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -81,5 +82,12 @@ public abstract class MediaDescription implements MetaDataProvider {
 
     public boolean hasThumbnail() {
         return thumbnail != null && !thumbnail.isEmpty();
+    }
+
+    public MediaType getMediaType() {
+        if (isGrouper()) return MediaType.GROUPER;
+        if (hasKey()) return MediaType.VIDEO;
+        if (!hasKey() && parentPath != null && !parentPath.isBlank()) return MediaType.ALBUM;
+        return MediaType.OTHER;
     }
 }
