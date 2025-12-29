@@ -159,4 +159,61 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
         AND tm.tags_id = :tagId
     """, nativeQuery = true)
     int deleteTagFromMedia(Long mediaId, Long tagId);
+
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+        UPDATE authors
+        SET length = length - 1
+        WHERE id IN (
+            SELECT authors_id
+            FROM authors_media
+            WHERE media_id = :mediaId
+        )
+        AND length > 0
+    """, nativeQuery = true)
+    int decrementAuthorLengths(@Param("mediaId") long mediaId);
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+        UPDATE characters
+        SET length = length - 1
+        WHERE id IN (
+            SELECT characters_id
+            FROM characters_media
+            WHERE media_id = :mediaId
+        )
+        AND length > 0
+    """, nativeQuery = true)
+    int decrementCharacterLengths(@Param("mediaId") long mediaId);
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+        UPDATE universes
+        SET length = length - 1
+        WHERE id IN (
+            SELECT universes_id
+            FROM universes_media
+            WHERE media_id = :mediaId
+        )
+        AND length > 0
+    """, nativeQuery = true)
+    int decrementUniverseLengths(@Param("mediaId") long mediaId);
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+        UPDATE tags
+        SET length = length - 1
+        WHERE id IN (
+            SELECT tags_id
+            FROM tags_media
+            WHERE media_id = :mediaId
+        )
+        AND length > 0
+    """, nativeQuery = true)
+    int decrementTagLengths(@Param("mediaId") long mediaId);
 }
