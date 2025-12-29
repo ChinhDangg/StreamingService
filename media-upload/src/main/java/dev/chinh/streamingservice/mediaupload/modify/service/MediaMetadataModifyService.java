@@ -139,8 +139,13 @@ public class MediaMetadataModifyService {
             Optional<MediaGroupMetaData> grouperItems = mediaGroupMetaDataRepository.findFirstByGrouperMetaDataId(mediaMetaData.getGrouperId());
             if (grouperItems.isPresent())
                 throw new IllegalArgumentException("Non-empty Grouper media cannot be deleted: " + mediaMetaData.getId());
-
-            mediaMetaDataRepository.decrementLength(mediaMetaData.getId());
+        } else if (mediaMetaData.getGrouperId() != null) { // else if not a grouper
+            // media is part of a grouper - decrement grouper length
+            MediaGroupMetaData grouperMetaData = mediaGroupMetaDataRepository.findById(mediaMetaData.getGrouperId()).orElseThrow(
+                    () -> new IllegalArgumentException("Grouper media not found: " + mediaMetaData.getGrouperId())
+            );
+            Integer newLength = mediaMetaDataRepository.decrementLengthReturning(grouperMetaData.getMediaMetaDataId());
+            eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMetaData.getMediaMetaDataId(), newLength));
             mediaGroupMetaDataRepository.decrementNumInfo(mediaMetaData.getGrouperId());
         }
 
@@ -183,7 +188,7 @@ public class MediaMetadataModifyService {
                             } catch (Exception e) {
                                 throw new RuntimeException("Failed to delete media files in album: " + mediaMetaData.getPath(), e);
                             }
-                        } else if (mediaMetaData.getMediaType() == MediaType.GROUPER) {
+                        } else if (mediaMetaData.getMediaType() == MediaType.GROUPER || mediaMetaData.getGrouperId() != null) {
                             mediaDisplayService.removeCacheGroupOfMedia(mediaMetaData.getId());
                         }
                         mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
