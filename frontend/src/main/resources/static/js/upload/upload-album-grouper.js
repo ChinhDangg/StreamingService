@@ -165,6 +165,7 @@ submitBtn.addEventListener('click', async () => {
         displayFailTexts();
         return;
     }
+    folderInput.value = '';
     alert('Upload successful!');
 });
 
