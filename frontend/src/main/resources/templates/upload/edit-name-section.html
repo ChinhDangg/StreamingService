@@ -24,12 +24,21 @@
 
 <th:block th:fragment="edit-title-area-html">
     <th:block th:if="${modifyAllow}">
-        <div id="edit-title-area" class="hidden flex flex-col items-start gap-1">
+        <div id="edit-title-area" class="hidden flex flex-col items-start gap-1 w-full">
             <input type="text" value="Test Video 2" placeholder="New Title" autocomplete="off"
-                   class="edit-title-input px-4 py-2 w-64 bg-gray-800 text-gray-100 rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+                   class="edit-title-input px-4 py-2 w-full bg-gray-800 text-gray-100 rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
             <button class="save-edit-title-btn px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-medium transition duration-150">
                 Save
             </button>
+            <div class="flex items-center justify-between rounded-xl border w-full text-gray-100 border-red-200 bg-red-50 p-4">
+                <div>
+                    <p class="text-sm font-semibold text-red-900">Delete this media</p>
+                    <p class="text-xs text-red-700">This action can’t be undone.</p>
+                </div>
+                <div id="delete-media-btn" class="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 cursor-pointer select-none">
+                    Delete
+                </div>
+            </div>
         </div>
     </th:block>
 </th:block>

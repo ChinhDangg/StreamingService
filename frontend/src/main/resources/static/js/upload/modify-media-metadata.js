@@ -52,6 +52,22 @@ function initializeEditTitle() {
         mainTitle.textContent = await response.text();
         editTitleArea.classList.add('hidden');
     });
+
+    const deleteMediaBtn = editTitleArea.querySelector('#delete-media-btn');
+
+    deleteMediaBtn.addEventListener('click', async () => {
+        const confirmDelete = confirm(`Are you sure you want to delete this media?`);
+        if (!confirmDelete) return;
+        const response = await apiRequest(`/api/modify/media/${mediaId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            alert(`Failed to delete media: ${await response.text()}`);
+            return;
+        }
+        alert(`Successfully deleted media. Redirecting to home page...`);
+        window.location.href = '/';
+    })
 }
 
 
@@ -267,7 +283,7 @@ async function initializeEditAddingArea() {
     }
 
     const searchName = async (nameString) => {
-        const response = await apiRequest(`/api/modify/name/${currentNameEntity}?name=${nameString}`);
+        const response = await apiRequest(`/api/search/name/${currentNameEntity}?name=${nameString}`);
         if (!response.ok) {
             alert('Failed to fetch name info: ' + await response.text());
             return;
