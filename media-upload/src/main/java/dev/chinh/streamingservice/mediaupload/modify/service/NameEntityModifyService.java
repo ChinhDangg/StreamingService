@@ -89,7 +89,7 @@ public class NameEntityModifyService {
         String extension = request.getThumbnail().getOriginalFilename() == null ? ".jpg"
                 : request.getThumbnail().getOriginalFilename().substring(request.getThumbnail().getOriginalFilename().lastIndexOf("."));
 
-        String path = mediaNameEntityConstant.getName() + "/" + request.getName() + extension;
+        String path = mediaNameEntityConstant.getName() + "/" + request.getName() + "_" + UUID.randomUUID() + extension;
 
         try {
             // upload first to not start transaction first and hold the database connection
@@ -162,7 +162,7 @@ public class NameEntityModifyService {
                 String extension = request.getThumbnail().getOriginalFilename() == null ? ".jpg" :
                         request.getThumbnail().getOriginalFilename().substring(request.getThumbnail().getOriginalFilename().lastIndexOf("."));
 
-                newThumbnailPath = mediaNameEntityConstant.getName() + "/" + UUID.randomUUID() + extension;
+                newThumbnailPath = mediaNameEntityConstant.getName() + "/" + newName + "_" + UUID.randomUUID() + extension;
                 minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnailPath, request.getThumbnail());
             }
         } catch (Exception e) {
