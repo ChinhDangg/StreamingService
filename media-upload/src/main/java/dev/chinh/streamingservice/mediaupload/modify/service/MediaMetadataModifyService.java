@@ -166,19 +166,24 @@ public class MediaMetadataModifyService {
                             throw new RuntimeException("Failed to publish event delete opensearch index: " + mediaId, e);
                         }
 
-                        if (mediaMetaData.getMediaType() == MediaType.VIDEO) {
+                        MediaType mediaType = mediaMetaData.getMediaType();
+
+                        if (mediaType == MediaType.VIDEO || mediaType == MediaType.GROUPER) {
                             try {
                                 if (mediaMetaData.hasThumbnail())
                                     thumbnailService.deleteMediaThumbnail(mediaMetaData.getThumbnail());
                             } catch (Exception e) {
                                 throw new RuntimeException("Failed to delete thumbnail file: " + mediaMetaData.getThumbnail(), e);
                             }
+                        }
+
+                        if (mediaType == MediaType.VIDEO) {
                             try {
                                 minIOService.removeFile(mediaMetaData.getBucket(), mediaMetaData.getPath());
                             } catch (Exception e) {
                                 throw new RuntimeException("Failed to delete media file: " + mediaMetaData.getPath(), e);
                             }
-                        } else if (mediaMetaData.getMediaType() == MediaType.ALBUM) {
+                        } else if (mediaType == MediaType.ALBUM) {
                             try {
                                 Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaMetaData.getBucket(), mediaMetaData.getPath());
                                 for (Result<Item> result : results) {
@@ -188,7 +193,8 @@ public class MediaMetadataModifyService {
                             } catch (Exception e) {
                                 throw new RuntimeException("Failed to delete media files in album: " + mediaMetaData.getPath(), e);
                             }
-                        } else if (mediaMetaData.getMediaType() == MediaType.GROUPER || mediaMetaData.getGrouperId() != null) {
+                        }
+                        if (mediaType == MediaType.GROUPER || mediaMetaData.getGrouperId() != null) {
                             mediaDisplayService.removeCacheGroupOfMedia(mediaMetaData.getId());
                         }
                         mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
