@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.backend.config;
+package dev.chinh.streamingservice.mediaupload.config;
 
 import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import org.jetbrains.annotations.NotNull;
