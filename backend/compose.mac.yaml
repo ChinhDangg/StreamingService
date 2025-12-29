@@ -62,7 +62,7 @@ services:
       - ./opensearch-data:/usr/share/opensearch/data
 
   redis:
-    image: redis:8.2-alpine
+    image: redis:7.4.7-alpine
     container_name: redis
     ports:
       - "6379:6379"
