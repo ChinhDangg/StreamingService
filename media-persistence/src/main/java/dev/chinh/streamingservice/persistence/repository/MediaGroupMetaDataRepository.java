@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @Repository
 public interface MediaGroupMetaDataRepository extends JpaRepository<MediaGroupMetaData, Long> {
 
@@ -19,6 +21,9 @@ public interface MediaGroupMetaDataRepository extends JpaRepository<MediaGroupMe
         WHERE m.grouperMetaDataId = :grouperId
     """)
     Slice<Long> findMediaMetadataIdsByGrouperMetaDataId(@Param("grouperId") Long grouperId, Pageable pageable);
+
+    // Spring generates: SELECT * FROM media_group_meta_data WHERE grouper_id = ? LIMIT 1
+    Optional<MediaGroupMetaData> findFirstByGrouperMetaDataId(Long grouperId);
 
     @Modifying
     @Transactional
