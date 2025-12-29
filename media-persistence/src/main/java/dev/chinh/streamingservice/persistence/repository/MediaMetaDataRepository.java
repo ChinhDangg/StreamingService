@@ -40,13 +40,24 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     // Removing the modifying annotation works for spring >= 3.2
     //@Modifying
     //@Transactional
-    @Query(value = "UPDATE media_metadata " +
-                    "SET length = length + 1 " +
-                    "WHERE id = :id " +
-                    "RETURNING length",
-            nativeQuery = true
+    @Query(value = """
+        UPDATE media_metadata
+        SET length = length + 1
+        WHERE id = :id
+        RETURNING length
+    """, nativeQuery = true
     )
     Integer incrementLengthReturning(@Param("id") Long id);
+
+    @Modifying
+    @Transactional
+    @Query("""
+        UPDATE MediaMetaData m
+        SET m.length = m.length - 1
+        WHERE m.id = :id
+        AND m.length > 0
+    """)
+    void decrementLength(@Param("id") Long id);
 
 
     @Query("SELECT m.title FROM MediaMetaData m WHERE m.id = :id")
