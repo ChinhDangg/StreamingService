@@ -161,8 +161,11 @@ submitBtn.addEventListener('click', async () => {
             }
         }
     }
-    if (currentFailTexts.length)
+    if (currentFailTexts.length) {
         displayFailTexts();
+        return;
+    }
+    alert('Upload successful!');
 });
 
 function helperCloneAndUnHideNode(node) {
