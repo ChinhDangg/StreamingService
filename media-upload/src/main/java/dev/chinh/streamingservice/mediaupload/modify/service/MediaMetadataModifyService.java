@@ -37,8 +37,6 @@ public class MediaMetadataModifyService {
     private final MediaSearchCacheService mediaSearchCacheService;
     private final NameEntityModifyService nameEntityModifyService;
     private final MediaDisplayService mediaDisplayService;
-    private final ThumbnailService thumbnailService;
-    private final MinIOService minIOService;
 
     private final ApplicationEventPublisher eventPublisher;
 
@@ -161,40 +159,28 @@ public class MediaMetadataModifyService {
                     @Override
                     public void afterCommit() {
                         try {
+//                            if (mediaMetaData.getMediaType() == MediaType.GROUPER || mediaMetaData.getGrouperId() == null)
+//                                // if is a grouper or not part of a grouper, delete the search entry
+//                                // parts of a grouper are not individually searchable for now, only the grouper is.
+                            // just send delete event to opensearch - if non-exist - no error anyway
                             eventPublisher.publishEvent(new MediaUpdateEvent.MediaDeleted(mediaId));
                         } catch (Exception e) {
                             throw new RuntimeException("Failed to publish event delete opensearch index: " + mediaId, e);
                         }
 
-                        MediaType mediaType = mediaMetaData.getMediaType();
-
-                        if (mediaType == MediaType.VIDEO || mediaType == MediaType.GROUPER) {
-                            try {
-                                if (mediaMetaData.hasThumbnail())
-                                    thumbnailService.deleteMediaThumbnail(mediaMetaData.getThumbnail());
-                            } catch (Exception e) {
-                                throw new RuntimeException("Failed to delete thumbnail file: " + mediaMetaData.getThumbnail(), e);
-                            }
+                        try {
+                            eventPublisher.publishEvent(new MediaUpdateEvent.MediaObjectDeleted(
+                                    mediaMetaData.getBucket(),
+                                    mediaMetaData.getPath(),
+                                    mediaMetaData.hasThumbnail(),
+                                    mediaMetaData.getThumbnail(),
+                                    mediaMetaData.getMediaType()
+                            ));
+                        } catch (Exception e) {
+                            throw new RuntimeException("Failed to publish event delete media object: " + mediaMetaData.getAbsoluteFilePath(), e);
                         }
 
-                        if (mediaType == MediaType.VIDEO) {
-                            try {
-                                minIOService.removeFile(mediaMetaData.getBucket(), mediaMetaData.getPath());
-                            } catch (Exception e) {
-                                throw new RuntimeException("Failed to delete media file: " + mediaMetaData.getPath(), e);
-                            }
-                        } else if (mediaType == MediaType.ALBUM) {
-                            try {
-                                Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaMetaData.getBucket(), mediaMetaData.getPath());
-                                for (Result<Item> result : results) {
-                                    String objectName = result.get().objectName();
-                                    minIOService.removeFile(mediaMetaData.getBucket(), objectName);
-                                }
-                            } catch (Exception e) {
-                                throw new RuntimeException("Failed to delete media files in album: " + mediaMetaData.getPath(), e);
-                            }
-                        }
-                        if (mediaType == MediaType.GROUPER || mediaMetaData.getGrouperId() != null) {
+                        if (mediaMetaData.getMediaType() == MediaType.GROUPER || mediaMetaData.getGrouperId() != null) {
                             mediaDisplayService.removeCacheGroupOfMedia(mediaMetaData.getId());
                         }
                         mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);

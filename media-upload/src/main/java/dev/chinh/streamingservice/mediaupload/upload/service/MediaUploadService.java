@@ -335,10 +335,6 @@ public class MediaUploadService {
         return savedId;
     }
 
-    public void removeUploadObject(String object) throws Exception {
-        minIOService.removeFile(mediaBucket, object);
-    }
-
     public JsonNode probeMediaInfo(String bucket, String object) throws Exception {
         String containerSignUrl = minIOService.getSignedUrlForContainerNginx(bucket, object, (int) Duration.ofMinutes(15).toSeconds());
         ProcessBuilder pb = new ProcessBuilder(

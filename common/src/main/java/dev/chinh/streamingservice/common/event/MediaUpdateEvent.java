@@ -2,6 +2,7 @@ package dev.chinh.streamingservice.common.event;
 
 
 import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
+import dev.chinh.streamingservice.common.constant.MediaType;
 
 public interface MediaUpdateEvent {
 
@@ -43,4 +44,18 @@ public interface MediaUpdateEvent {
             MediaNameEntityConstant nameEntityConstant,
             long nameEntityId
     ) implements MediaUpdateEvent{}
+
+
+    record MediaObjectDeleted(
+            String bucket,
+            String path,
+            boolean hasThumbnail,
+            String thumbnail,
+            MediaType mediaType
+    ) implements MediaUpdateEvent {}
+
+
+    record ThumbnailObjectDeleted(
+            String path
+    ) implements MediaUpdateEvent {}
 }

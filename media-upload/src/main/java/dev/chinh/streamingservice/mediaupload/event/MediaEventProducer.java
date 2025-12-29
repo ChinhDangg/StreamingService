@@ -59,6 +59,18 @@ public class MediaEventProducer {
 
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void publishUpdateMediaObject(MediaUpdateEvent.MediaObjectDeleted event) {
+        kafkaTemplate.send(KafkaRedPandaConfig.MEDIA_UPDATED_OBJECT_TOPIC, event);
+    }
+
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void publishDeleteThumbnailObject(MediaUpdateEvent.ThumbnailObjectDeleted event) {
+        kafkaTemplate.send(KafkaRedPandaConfig.MEDIA_UPDATED_OBJECT_TOPIC, event);
+    }
+
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publishCreateMediaBackup(MediaBackupEvent.MediaCreated event) {
         kafkaTemplate.send(KafkaRedPandaConfig.MEDIA_BACKUP_TOPIC, event);
     }

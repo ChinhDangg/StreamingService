@@ -178,47 +178,27 @@ public class NameEntityModifyService {
 
             if (nameChanged || thumbnailChanged) repository.save(nameEntity);
 
-            String finalNewThumbnail = newThumbnailPath;
+            if (nameChanged) {
+                try {
+                    eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityUpdated(mediaNameEntityConstant, id));
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to publish event name entity updated for " + mediaNameEntityConstant.getName() + " " + id, e);
+                }
+            }
 
-            TransactionSynchronizationManager.registerSynchronization(
-                    new TransactionSynchronization() {
-                        @Override
-                        public void afterCommit() {
-                            if (nameChanged) {
-                                try {
-                                    eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityUpdated(mediaNameEntityConstant, id));
-                                } catch (Exception e) {
-                                    throw new RuntimeException("Failed to publish event name entity updated for " + mediaNameEntityConstant.getName() + " " + id, e);
-                                }
-                            }
-
-                            if (thumbnailChanged && oldThumbnailPath != null) {
-                                try {
-                                    minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, oldThumbnailPath);
-                                } catch (Exception e) {
-                                    throw new RuntimeException("WARN: Failed to clean up old thumbnail file: " + oldThumbnailPath, e);
-                                }
-                            }
-                        }
-
-                        @Override
-                        public void afterCompletion(int status) {
-                            if (status == STATUS_ROLLED_BACK && finalNewThumbnail != null) {
-                                try {
-                                    minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, finalNewThumbnail);
-                                } catch (Exception e) {
-                                    throw new RuntimeException("WARN: Failed to clean up newly uploaded thumbnail file: " + finalNewThumbnail, e);
-                                }
-                            }
-                        }
-                    }
-            );
+            if (thumbnailChanged && oldThumbnailPath != null) {
+                try {
+                    eventPublisher.publishEvent(new MediaUpdateEvent.ThumbnailObjectDeleted(oldThumbnailPath));
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to publish event clean up old thumbnail file: " + oldThumbnailPath, e);
+                }
+            }
         } catch (Exception e) {
             if (newThumbnailPath != null) {
                 try {
                     minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnailPath);
                 } catch (Exception deleteEx) {
-                    System.err.println("CRITICAL: Failed to clean up orphan file: " + newThumbnailPath);
+                    System.err.println("CRITICAL: Failed to clean up orphan new uploaded file: " + newThumbnailPath);
                 }
             }
         }
@@ -272,9 +252,9 @@ public class NameEntityModifyService {
                         }
                         try {
                             if (nameEntity.getThumbnail() != null)
-                                minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, thumbnailPath);
+                                eventPublisher.publishEvent(new MediaUpdateEvent.ThumbnailObjectDeleted(thumbnailPath));
                         } catch (Exception e) {
-                            throw new RuntimeException("Failed to delete thumbnail file: " + thumbnailPath, e);
+                            throw new RuntimeException("Failed to publish event delete thumbnail file: " + thumbnailPath, e);
                         }
                     }
                 });
