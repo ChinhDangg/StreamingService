@@ -24,6 +24,10 @@ public interface MediaUpdateEvent {
             long mediaId
     ) implements MediaUpdateEvent{}
 
+    record MediaDeleted(
+            long mediaId
+    ) implements MediaUpdateEvent{}
+
 
     record NameEntityCreated(
             MediaNameEntityConstant nameEntityConstant,
