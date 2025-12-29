@@ -2,6 +2,7 @@ package dev.chinh.streamingservice.backend.search.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.backend.MediaMapper;
+import dev.chinh.streamingservice.backend.content.service.MinIOService;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.backend.content.service.ThumbnailService;
@@ -16,6 +17,7 @@ import org.apache.coyote.BadRequestException;
 import org.opensearch.client.opensearch._types.SortOrder;
 import org.opensearch.client.opensearch.core.SearchResponse;
 import org.opensearch.client.opensearch.core.search.Hit;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -33,6 +35,10 @@ public class MediaSearchService {
     private final ThumbnailService thumbnailService;
 
     public static final String MEDIA_INDEX_NAME = "media";
+    private final MinIOService minIOService;
+
+    @Value("${always-show-original-resolution}")
+    private String alwaysShowOriginalResolution;
 
     record NameEntry(String name) {}
 
@@ -63,7 +69,7 @@ public class MediaSearchService {
     }
 
     public MediaSearchResult advanceSearch(MediaSearchRequest request, int page, int size,
-                                           SortBy sortBy, SortOrder sortOrder) throws IOException {
+                                           SortBy sortBy, SortOrder sortOrder) throws Exception {
 
         boolean hasAnyField = request.hasAny();
         if (!hasAnyField) {
@@ -85,7 +91,8 @@ public class MediaSearchService {
                 openSearchService.advanceSearch(MEDIA_INDEX_NAME, includes, excludes, request.getRangeFields(), page, size, sortBy, sortOrder),
                 page, size);
 
-        thumbnailService.processThumbnails(mapSearchResult.searchItems);
+        if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
+            thumbnailService.processThumbnails(mapSearchResult.searchItems);
         cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
@@ -108,7 +115,7 @@ public class MediaSearchService {
     }
 
     public MediaSearchResult search(String searchString, int page, int size, SortBy sortBy,
-                                    SortOrder sortOrder) throws IOException {
+                                    SortOrder sortOrder) throws Exception {
 
         if (!MediaSearchField.validateSearchString(searchString)) {
             throw new IllegalArgumentException("Invalid search string");
@@ -117,28 +124,34 @@ public class MediaSearchService {
                 openSearchService.search(MEDIA_INDEX_NAME, searchString, page, size, sortBy, sortOrder),
                 page, size);
 
-        thumbnailService.processThumbnails(mapSearchResult.searchItems);
+        if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
+            thumbnailService.processThumbnails(mapSearchResult.searchItems);
+
         cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 
     public MediaSearchResult searchByKeywords(String field, List<Object> keywords, boolean matchAll, int page, int size,
-                                              SortBy sortBy, SortOrder sortOrder) throws IOException {
+                                              SortBy sortBy, SortOrder sortOrder) throws Exception {
         ContentMetaData.validateSearchFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 openSearchService.searchTermByOneField(MEDIA_INDEX_NAME, field, keywords, matchAll, page, size, sortBy, sortOrder),
                 page, size);
 
-        thumbnailService.processThumbnails(mapSearchResult.searchItems);
+        if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
+            thumbnailService.processThumbnails(mapSearchResult.searchItems);
+
         cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 
-    public MediaSearchResult searchMatchAll(int page, int size, SortBy sortBy, SortOrder sortOrder) throws IOException {
+    public MediaSearchResult searchMatchAll(int page, int size, SortBy sortBy, SortOrder sortOrder) throws Exception {
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 openSearchService.searchMatchAll(MEDIA_INDEX_NAME, page, size, sortBy, sortOrder), page, size);
 
-        thumbnailService.processThumbnails(mapSearchResult.searchItems);
+        if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
+            thumbnailService.processThumbnails(mapSearchResult.searchItems);
+
         cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
@@ -148,15 +161,22 @@ public class MediaSearchService {
             Collection<MediaSearchItem> searchItems
     ) {}
 
-    private MapSearchResult mapResponseToMediaSearchResult(SearchResponse<Object> response, int page, int size) {
+    private MapSearchResult mapResponseToMediaSearchResult(SearchResponse<Object> response, int page, int size) throws Exception {
         List<MediaSearchItem> items = new ArrayList<>();
         List<MediaSearchItemResponse> itemResponses = new ArrayList<>();
         for (Hit<Object> hit : response.hits().hits()) {
             MediaSearchItem searchItem = mapper.convertValue(hit.source(), MediaSearchItem.class);
             items.add(searchItem);
             MediaSearchItemResponse itemResponse = mediaMapper.map(searchItem);
-            itemResponse.setThumbnail(searchItem.hasThumbnail() ? ThumbnailService.getThumbnailPath(
-                    searchItem.getId(), searchItem.getThumbnail()) : null);
+            if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
+                String thumbnailBucket = searchItem.getMediaType() == MediaType.ALBUM ? searchItem.getBucket() : ContentMetaData.THUMBNAIL_BUCKET;
+                itemResponse.setThumbnail(searchItem.hasThumbnail()
+                        ? minIOService.getSignedUrlForHostNginx(thumbnailBucket, searchItem.getThumbnail(), 60 * 60)
+                        : null);
+            } else {
+                itemResponse.setThumbnail(searchItem.hasThumbnail() ? ThumbnailService.getThumbnailPath(
+                        searchItem.getId(), searchItem.getThumbnail()) : null);
+            }
             itemResponse.setMediaType(searchItem.getMediaType());
             itemResponses.add(itemResponse);
         }

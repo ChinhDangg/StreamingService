@@ -25,7 +25,7 @@ public class SearchController {
     public ResponseEntity<MediaSearchResult> search(@RequestParam String searchString,
                                                     @RequestParam(required = false) int page,
                                                     @RequestParam(required = false) SortBy sortBy,
-                                                    @RequestParam(required = false) SortOrder sortOrder) throws IOException {
+                                                    @RequestParam(required = false) SortOrder sortOrder) throws Exception {
         return ResponseEntity.ok().body(mediaSearchService.search(searchString, page, pageSize, sortBy, sortOrder));
     }
 
@@ -33,7 +33,7 @@ public class SearchController {
     public ResponseEntity<MediaSearchResult> advanceSearch(@RequestBody MediaSearchRequest mediaSearchRequest,
                                                            @RequestParam(required = false) int page,
                                                            @RequestParam(required = false) SortBy sortBy,
-                                                           @RequestParam(required = false) SortOrder sortOrder) throws IOException {
+                                                           @RequestParam(required = false) SortOrder sortOrder) throws Exception {
         return ResponseEntity.ok().body(mediaSearchService.advanceSearch(mediaSearchRequest, page, pageSize, sortBy, sortOrder));
     }
 
@@ -43,7 +43,7 @@ public class SearchController {
                                                            @RequestParam(required = false, defaultValue = "true") boolean matchAll,
                                                            @RequestParam(required = false) int page,
                                                            @RequestParam(required = false) SortBy sortBy,
-                                                           @RequestParam(required = false) SortOrder sortOrder) throws IOException {
+                                                           @RequestParam(required = false) SortOrder sortOrder) throws Exception {
         return ResponseEntity.ok().body(
                 mediaSearchService.searchByKeywords(nameEntity.getName(), keywordList, matchAll, page, pageSize, sortBy, sortOrder));
     }
@@ -51,7 +51,7 @@ public class SearchController {
     @PostMapping("/match-all")
     public ResponseEntity<MediaSearchResult> matchAllSearch(@RequestParam(required = false) int page,
                                                          @RequestParam(required = false) SortBy sortBy,
-                                                         @RequestParam(required = false) SortOrder sortOrder) throws IOException {
+                                                         @RequestParam(required = false) SortOrder sortOrder) throws Exception {
         return ResponseEntity.ok().body(mediaSearchService.searchMatchAll(page, pageSize, sortBy, sortOrder));
     }
 

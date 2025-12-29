@@ -16,7 +16,7 @@ public class MediaDisplayController {
     private final MediaDisplayService mediaDisplayService;
 
     @GetMapping("/content/{id}")
-    public ResponseEntity<MediaDisplayContent> getMediaDisplayContent(@PathVariable long id) throws JsonProcessingException {
+    public ResponseEntity<MediaDisplayContent> getMediaDisplayContent(@PathVariable long id) throws Exception {
         return ResponseEntity.ok().body(mediaDisplayService.getMediaContentInfo(id));
     }
 

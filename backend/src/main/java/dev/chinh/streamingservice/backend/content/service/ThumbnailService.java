@@ -1,6 +1,5 @@
 package dev.chinh.streamingservice.backend.content.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.constant.Resolution;
@@ -29,7 +28,6 @@ public class ThumbnailService {
     public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, List<String> buckets, List<String> pathList) {}
 
     public void processThumbnails(List<MediaNameEntry> items) {
-
         long now = System.currentTimeMillis() + 60 * 60 * 1000;
         List<MediaNameEntry> newThumbnails = new ArrayList<>();
         for (MediaNameEntry item : items) {

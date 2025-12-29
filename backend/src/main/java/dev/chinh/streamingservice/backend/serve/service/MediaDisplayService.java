@@ -3,6 +3,7 @@ package dev.chinh.streamingservice.backend.serve.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.backend.MediaMapper;
+import dev.chinh.streamingservice.backend.content.service.MinIOService;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.backend.content.service.AlbumService;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
@@ -12,6 +13,7 @@ import dev.chinh.streamingservice.backend.serve.data.MediaDisplayContent;
 import dev.chinh.streamingservice.persistence.entity.MediaDescription;
 import dev.chinh.streamingservice.persistence.repository.MediaGroupMetaDataRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.*;
 import org.springframework.data.redis.core.*;
 import org.springframework.http.HttpHeaders;
@@ -29,12 +31,16 @@ public class MediaDisplayService {
 
     private final AlbumService albumService;
     private final ThumbnailService thumbnailService;
+    private final MinIOService minIOService;
     private final ObjectMapper objectMapper;
     private final MediaMapper mediaMapper;
     private final RedisTemplate<String, String> redisStringTemplate;
     private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
 
     private final int maxBatchSize = 20;
+
+    @Value("${always-show-original-resolution}")
+    private String alwaysShowOriginalResolution;
 
     public record GroupSlice(
             List<Long> content,
@@ -43,13 +49,18 @@ public class MediaDisplayService {
             boolean hasNext
     ){}
 
-    public MediaDisplayContent getMediaContentInfo(long mediaId) throws JsonProcessingException {
+    public MediaDisplayContent getMediaContentInfo(long mediaId) throws Exception {
         MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(mediaId);
 
         MediaDisplayContent mediaDisplayContent = mediaMapper.map(mediaItem);
         if (mediaItem.hasThumbnail()) {
-            mediaDisplayContent.setThumbnail(ThumbnailService.getThumbnailPath(mediaId, mediaItem.getThumbnail()));
-            thumbnailService.processThumbnails(List.of(mediaItem));
+            if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
+                String thumbnailBucket = mediaItem.getMediaType() == MediaType.ALBUM ? mediaItem.getBucket() : ContentMetaData.THUMBNAIL_BUCKET;
+                mediaDisplayContent.setThumbnail(minIOService.getSignedUrlForHostNginx(thumbnailBucket, mediaItem.getThumbnail(), 60 * 60));
+            } else {
+                mediaDisplayContent.setThumbnail(ThumbnailService.getThumbnailPath(mediaId, mediaItem.getThumbnail()));
+                thumbnailService.processThumbnails(List.of(mediaItem));
+            }
         }
 
         if (mediaItem.isGrouper()) {
