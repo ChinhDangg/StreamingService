@@ -3,6 +3,7 @@ package dev.chinh.streamingservice.mediaupload.event.config;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.TopicBuilder;
@@ -15,7 +16,8 @@ import java.util.Map;
 @Configuration
 public class KafkaRedPandaConfig {
 
-    private static final String BOOTSTRAP_SERVERS = "localhost:9092";
+    @Value("${kafka.bootstrap-servers}")
+    private String BOOTSTRAP_SERVERS;
 
     @Bean
     public ProducerFactory<String, Object> producerFactory() {
@@ -45,12 +47,19 @@ public class KafkaRedPandaConfig {
     }
 
     public static final String MEDIA_UPDATED_OPENSEARCH_TOPIC = "media-updated-opensearch-events";
+    public static final String MEDIA_UPDATED_OBJECT_TOPIC = "media-updated-object-events";
     public static final String MEDIA_BACKUP_TOPIC = "media-backup-events";
 
     @Bean
     public KafkaAdmin.NewTopics mediaTopics() {
         return new KafkaAdmin.NewTopics(
                 TopicBuilder.name(MEDIA_UPDATED_OPENSEARCH_TOPIC)
+                        .partitions(1)
+                        .replicas(1)
+                        .config("retention.ms", "604800000") // delete after 7 days // if use for replay then use longer day
+                        .config("segment.bytes", "100048576")
+                        .build(),
+                TopicBuilder.name(MEDIA_UPDATED_OBJECT_TOPIC)
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000") // delete after 7 days // if use for replay then use longer day
