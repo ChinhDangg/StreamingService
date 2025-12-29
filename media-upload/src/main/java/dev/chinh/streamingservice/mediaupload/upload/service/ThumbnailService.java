@@ -18,6 +18,7 @@ public class ThumbnailService {
 
     private final RedisTemplate<String, String> redisStringTemplate;
     private final ObjectMapper objectMapper;
+    private final MinIOService minIOService;
 
     public String generateThumbnailFromVideo(String bucket, String objectName) {
         String thumbnailObject = objectName.substring(0, objectName.lastIndexOf(".")) + "-thumb.jpg";
@@ -46,5 +47,9 @@ public class ThumbnailService {
                 StreamRecords.string(
                         Collections.singletonMap("job_description", objectMapper.writeValueAsString(mediaJobDescription))
                 ).withStreamKey(queueKey));
+    }
+
+    public void deleteMediaThumbnail(String objectName) throws Exception {
+        minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, objectName);
     }
 }

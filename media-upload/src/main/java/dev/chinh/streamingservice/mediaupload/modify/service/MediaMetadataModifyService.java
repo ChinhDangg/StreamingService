@@ -1,28 +1,44 @@
 package dev.chinh.streamingservice.mediaupload.modify.service;
 
+import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.common.exception.DuplicateEntryException;
+import dev.chinh.streamingservice.mediaupload.upload.service.MediaDisplayService;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaSearchCacheService;
+import dev.chinh.streamingservice.mediaupload.upload.service.MinIOService;
+import dev.chinh.streamingservice.mediaupload.upload.service.ThumbnailService;
+import dev.chinh.streamingservice.persistence.entity.MediaGroupMetaData;
+import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
 import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
+import dev.chinh.streamingservice.persistence.repository.MediaGroupMetaDataRepository;
 import dev.chinh.streamingservice.persistence.repository.MediaMetaDataRepository;
+import io.minio.Result;
+import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class MediaMetadataModifyService {
 
     private final MediaMetaDataRepository mediaMetaDataRepository;
+    private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
     private final MediaSearchCacheService mediaSearchCacheService;
     private final NameEntityModifyService nameEntityModifyService;
+    private final MediaDisplayService mediaDisplayService;
+    private final ThumbnailService thumbnailService;
+    private final MinIOService minIOService;
 
     private final ApplicationEventPublisher eventPublisher;
 
@@ -110,5 +126,65 @@ public class MediaMetadataModifyService {
         } catch (DataIntegrityViolationException e) {
             throw new DuplicateEntryException("Duplicate name entity in media: " + nameEntityId);
         }
+    }
+
+    @Transactional
+    public void deleteMedia(long mediaId) {
+        MediaMetaData mediaMetaData = mediaMetaDataRepository.findById(mediaId).orElseThrow(
+                () -> new IllegalArgumentException("Media not found: " + mediaId)
+        );
+
+        if (mediaMetaData.getMediaType() == MediaType.GROUPER) {
+            // for grouper of album - delete each album first - only delete grouper if it is empty
+            Optional<MediaGroupMetaData> grouperItems = mediaGroupMetaDataRepository.findFirstByGrouperMetaDataId(mediaMetaData.getId());
+            if (grouperItems.isPresent())
+                throw new IllegalArgumentException("Non-empty Grouper media cannot be deleted: " + mediaMetaData.getId());
+        }
+
+        mediaMetaDataRepository.decrementAuthorLengths(mediaMetaData.getId());
+        mediaMetaDataRepository.decrementCharacterLengths(mediaMetaData.getId());
+        mediaMetaDataRepository.decrementUniverseLengths(mediaMetaData.getId());
+        mediaMetaDataRepository.decrementTagLengths(mediaMetaData.getId());
+
+        mediaMetaDataRepository.deleteById(mediaMetaData.getId());
+
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            eventPublisher.publishEvent(new MediaUpdateEvent.MediaDeleted(mediaId));
+                        } catch (Exception e) {
+                            throw new RuntimeException("Failed to publish event delete opensearch index: " + mediaId, e);
+                        }
+
+                        if (mediaMetaData.getMediaType() == MediaType.VIDEO) {
+                            try {
+                                if (mediaMetaData.hasThumbnail())
+                                    thumbnailService.deleteMediaThumbnail(mediaMetaData.getThumbnail());
+                            } catch (Exception e) {
+                                throw new RuntimeException("Failed to delete thumbnail file: " + mediaMetaData.getThumbnail(), e);
+                            }
+                            try {
+                                minIOService.removeFile(mediaMetaData.getBucket(), mediaMetaData.getPath());
+                            } catch (Exception e) {
+                                throw new RuntimeException("Failed to delete media file: " + mediaMetaData.getPath(), e);
+                            }
+                        } else if (mediaMetaData.getMediaType() == MediaType.ALBUM) {
+                            try {
+                                Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaMetaData.getBucket(), mediaMetaData.getPath());
+                                for (Result<Item> result : results) {
+                                    String objectName = result.get().objectName();
+                                    minIOService.removeFile(mediaMetaData.getBucket(), objectName);
+                                }
+                            } catch (Exception e) {
+                                throw new RuntimeException("Failed to delete media files in album: " + mediaMetaData.getPath(), e);
+                            }
+                        } else if (mediaMetaData.getMediaType() == MediaType.GROUPER) {
+                            mediaDisplayService.removeCacheGroupOfMedia(mediaMetaData.getId());
+                        }
+                        mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
+                    }
+                });
     }
 }
