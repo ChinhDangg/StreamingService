@@ -57,7 +57,7 @@ public class MediaDisplayService {
             mediaDisplayContent.setChildMediaIds(mediaIds);
             mediaDisplayContent.setMediaType(MediaType.GROUPER);
         } else {
-            mediaDisplayContent.setMediaType(mediaItem.hasKey() ? MediaType.VIDEO : MediaType.ALBUM);
+            mediaDisplayContent.setMediaType(mediaItem.getMediaType());
         }
         return mediaDisplayContent;
     }
@@ -103,16 +103,12 @@ public class MediaDisplayService {
     public ResponseEntity<Void> getServePageTypeFromMedia(long mediaId) {
         MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(mediaId);
 
-        String mediaPage;
-        if (mediaItem.isGrouper()) {
-            mediaPage = "/page/album-grouper?grouperId=" + mediaId;
-        } else if (!mediaItem.hasKey()) {
-            mediaPage = "/page/album?mediaId=" + mediaId;
-        } else if (mediaItem.hasKey()) {
-            mediaPage = "/page/video?mediaId=" + mediaId;
-        } else {
-            throw new IllegalArgumentException("Unknown page type with mediaId: " + mediaId);
-        }
+        String mediaPage = switch (mediaItem.getMediaType()) {
+            case MediaType.GROUPER -> "/page/album-grouper?grouperId=" + mediaId;
+            case MediaType.ALBUM -> "/page/album?mediaId=" + mediaId;
+            case MediaType.VIDEO -> "/page/video?mediaId=" + mediaId;
+            default -> throw new IllegalArgumentException("Unknown page type with mediaId: " + mediaId);
+        };
 
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(URI.create(mediaPage));

@@ -95,7 +95,7 @@ public class ThumbnailService {
             if (!mediaDescription.hasThumbnail())
                 continue;
 
-            if (mediaDescription.hasKey()) // video
+            if (mediaDescription.getMediaType() == MediaType.VIDEO) // video
                 bucketList.add(ContentMetaData.THUMBNAIL_BUCKET);
             else
                 bucketList.add(mediaDescription.getBucket());

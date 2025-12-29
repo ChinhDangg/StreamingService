@@ -2,6 +2,7 @@ package dev.chinh.streamingservice.backend.content.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.backend.MediaMapper;
+import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.constant.Resolution;
 import dev.chinh.streamingservice.backend.search.service.MediaSearchCacheService;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
@@ -58,7 +59,7 @@ public class VideoService extends MediaService {
     @Override
     protected MediaDescription getMediaDescription(long videoId) {
         MediaDescription mediaDescription = super.getMediaDescription(videoId);
-        if (!mediaDescription.hasKey())
+        if (mediaDescription.getMediaType() != MediaType.VIDEO)
             throw new IllegalArgumentException("Requested video media does not has key with id: " + videoId);
         return mediaDescription;
     }

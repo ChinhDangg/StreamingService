@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.backend.MediaMapper;
 import dev.chinh.streamingservice.common.constant.MediaJobStatus;
+import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.constant.Resolution;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import dev.chinh.streamingservice.backend.search.service.MediaSearchCacheService;
@@ -115,7 +116,7 @@ public class AlbumService extends MediaService {
     @Override
     protected MediaDescription getMediaDescription(long albumId) {
         MediaDescription mediaDescription = super.getMediaDescription(albumId);
-        if (mediaDescription.hasKey())
+        if (mediaDescription.getMediaType() != MediaType.ALBUM)
             throw new IllegalArgumentException("Not an album, individual media found: " + albumId);
         return mediaDescription;
     }
