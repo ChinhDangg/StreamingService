@@ -33,4 +33,10 @@ public class MediaMetadataModifyController {
         return ResponseEntity.ok().body(mediaMetadataModifyService.updateNameEntityInMedia(updateList, id));
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteMedia(@PathVariable long id) {
+        mediaMetadataModifyService.deleteMedia(id);
+        return ResponseEntity.ok().build();
+    }
+
 }
