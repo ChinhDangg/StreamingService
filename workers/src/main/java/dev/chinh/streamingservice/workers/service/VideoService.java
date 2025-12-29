@@ -71,7 +71,6 @@ public class VideoService extends MediaService implements ResourceCleanable {
                 }
                 case "videoThumbnail" -> {
                     url = generateThumbnailFromVideo(mediaJobDescription);
-                    workerRedisService.updateStatus(mediaJobDescription.getWorkId(), MediaJobStatus.COMPLETED.name());
                     workerRedisService.releaseToken(tokenKey);
                     yield url;
                 }
