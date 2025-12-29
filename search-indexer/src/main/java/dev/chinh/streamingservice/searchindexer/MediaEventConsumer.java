@@ -61,6 +61,15 @@ public class MediaEventConsumer {
         }
     }
 
+    private void onDeleteMediaIndexOpenSearch(MediaUpdateEvent.MediaDeleted event) {
+        System.out.println("Received delete index event: " + event.mediaId());
+        try {
+            openSearchService.deleteDocument(OpenSearchService.MEDIA_INDEX_NAME, event.mediaId());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to delete media " + event.mediaId() + " from OpenSearch", e);
+        }
+    }
+
     private void onUpdateMediaNameEntityOpenSearch(MediaUpdateEvent.MediaNameEntityUpdated event) {
         System.out.println("Received update media name entity event: " + event.mediaId());
         List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(
@@ -141,6 +150,7 @@ public class MediaEventConsumer {
             switch (event) {
                 case MediaUpdateEvent.LengthUpdated e -> onUpdateLengthOpenSearch(e);
                 case MediaUpdateEvent.MediaCreated e -> onCreateMediaIndexOpenSearch(e);
+                case MediaUpdateEvent.MediaDeleted e -> onDeleteMediaIndexOpenSearch(e);
                 case MediaUpdateEvent.MediaNameEntityUpdated e -> onUpdateMediaNameEntityOpenSearch(e);
                 case MediaUpdateEvent.MediaTitleUpdated e -> onUpdateMediaTitleOpenSearch(e);
                 case MediaUpdateEvent.NameEntityCreated e -> onCreateNameEntityOpenSearch(e);
@@ -152,6 +162,7 @@ public class MediaEventConsumer {
             }
             acknowledgment.acknowledge();
         } catch (Exception e) {
+            System.err.println(e.getMessage());
             // throwing the exception lets DefaultErrorHandler apply retry + DLQ
             throw e;
         }
