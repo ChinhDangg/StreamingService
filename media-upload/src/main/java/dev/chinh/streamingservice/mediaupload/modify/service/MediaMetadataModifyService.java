@@ -136,9 +136,12 @@ public class MediaMetadataModifyService {
 
         if (mediaMetaData.getMediaType() == MediaType.GROUPER) {
             // for grouper of album - delete each album first - only delete grouper if it is empty
-            Optional<MediaGroupMetaData> grouperItems = mediaGroupMetaDataRepository.findFirstByGrouperMetaDataId(mediaMetaData.getId());
+            Optional<MediaGroupMetaData> grouperItems = mediaGroupMetaDataRepository.findFirstByGrouperMetaDataId(mediaMetaData.getGrouperId());
             if (grouperItems.isPresent())
                 throw new IllegalArgumentException("Non-empty Grouper media cannot be deleted: " + mediaMetaData.getId());
+
+            mediaMetaDataRepository.decrementLength(mediaMetaData.getId());
+            mediaGroupMetaDataRepository.decrementNumInfo(mediaMetaData.getGrouperId());
         }
 
         mediaMetaDataRepository.decrementAuthorLengths(mediaMetaData.getId());
