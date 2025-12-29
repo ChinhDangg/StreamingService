@@ -58,25 +58,23 @@ public class VideoService extends MediaService implements ResourceCleanable {
                 workerRedisService.releaseToken(tokenKey);
                 return;
             }
-            String url = switch (mediaJobDescription.getJobType()) {
+            switch (mediaJobDescription.getJobType()) {
                 case "preview" -> {
-                    url = getPreviewVideoUrl(tokenKey, mediaJobDescription);
+                    String url = getPreviewVideoUrl(tokenKey, mediaJobDescription);
                     workerRedisService.updateStatus(mediaJobDescription.getWorkId(), MediaJobStatus.RUNNING.name());
-                    yield url;
+                    workerRedisService.addResultToStatus(mediaJobDescription.getWorkId(), "result", url);
                 }
                 case "partial" -> {
-                    url = getPartialVideoUrl(tokenKey, mediaJobDescription, mediaJobDescription.getResolution());
+                    String url = getPartialVideoUrl(tokenKey, mediaJobDescription, mediaJobDescription.getResolution());
                     workerRedisService.updateStatus(mediaJobDescription.getWorkId(), MediaJobStatus.RUNNING.name());
-                    yield url;
+                    workerRedisService.addResultToStatus(mediaJobDescription.getWorkId(), "result", url);
                 }
                 case "videoThumbnail" -> {
-                    url = generateThumbnailFromVideo(mediaJobDescription);
+                    generateThumbnailFromVideo(mediaJobDescription);
                     workerRedisService.releaseToken(tokenKey);
-                    yield url;
                 }
                 case null, default -> throw new IllegalArgumentException("Unknown job type");
            };
-           workerRedisService.addResultToStatus(mediaJobDescription.getWorkId(), "result", url);
         } catch (Exception e) {
             // job is called to handle - acquired token for it
             // if failed, release the acquired token
