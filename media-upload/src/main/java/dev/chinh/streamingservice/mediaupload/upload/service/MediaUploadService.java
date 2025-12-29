@@ -16,6 +16,7 @@ import dev.chinh.streamingservice.persistence.repository.MediaMetaDataRepository
 import io.minio.Result;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,8 @@ public class MediaUploadService {
 
     private final String mediaBucket = ContentMetaData.MEDIA_BUCKET;
     public static final String defaultVidPath = "vid";
+    @Value("${backup.enabled}")
+    private String backupEnabled;
 
     public String initiateMediaUploadRequest(String objectName, MediaType mediaType) {
         String validatedObject = validateObject(objectName, mediaType);
@@ -260,7 +263,8 @@ public class MediaUploadService {
 
         eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMedia.getId(), updatedLength));
 
-        eventPublisher.publishEvent(new MediaBackupEvent.MediaCreated(mediaBucket, mediaMetaData.getPath(), upload.mediaType));
+        if (Boolean.parseBoolean(backupEnabled))
+            eventPublisher.publishEvent(new MediaBackupEvent.MediaCreated(mediaBucket, mediaMetaData.getPath(), upload.mediaType));
 
         mediaSearchCacheService.removeCachedMediaSearchItem(grouperMedia.getId());
         mediaDisplayService.removeCacheGroupOfMedia(grouperMedia.getId());
@@ -327,7 +331,8 @@ public class MediaUploadService {
 
         eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, false));
 
-        eventPublisher.publishEvent(new MediaBackupEvent.MediaCreated(mediaBucket, mediaMetaData.getPath(), upload.mediaType));
+        if (Boolean.parseBoolean(backupEnabled))
+            eventPublisher.publishEvent(new MediaBackupEvent.MediaCreated(mediaBucket, mediaMetaData.getPath(), upload.mediaType));
 
         removeCacheMediaSessionRequest(sessionId);
         removeUploadSessionCacheLastAccess(sessionId);
