@@ -28,6 +28,11 @@ public class MediaEventProducer {
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void publishDeleteMediaIndexOpenSearch(MediaUpdateEvent.MediaDeleted event) {
+        kafkaTemplate.send(MEDIA_UPDATED_OPENSEARCH_TOPIC, event);
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publishUpdateMediaNameEntityOpenSearch(MediaUpdateEvent.MediaNameEntityUpdated event) {
         kafkaTemplate.send(MEDIA_UPDATED_OPENSEARCH_TOPIC, event);
     }
