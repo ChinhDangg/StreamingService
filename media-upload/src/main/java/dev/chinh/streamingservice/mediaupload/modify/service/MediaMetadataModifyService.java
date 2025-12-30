@@ -132,6 +132,7 @@ public class MediaMetadataModifyService {
                 () -> new IllegalArgumentException("Media not found: " + mediaId)
         );
 
+        Long grouperMediaId = null;
         if (mediaMetaData.getMediaType() == MediaType.GROUPER) {
             // for grouper of album - delete each album first - only delete grouper if it is empty
             Optional<MediaGroupMetaData> grouperItems = mediaGroupMetaDataRepository.findFirstByGrouperMetaDataId(mediaMetaData.getGrouperId());
@@ -142,8 +143,9 @@ public class MediaMetadataModifyService {
             MediaGroupMetaData grouperMetaData = mediaGroupMetaDataRepository.findById(mediaMetaData.getGrouperId()).orElseThrow(
                     () -> new IllegalArgumentException("Grouper media not found: " + mediaMetaData.getGrouperId())
             );
-            Integer newLength = mediaMetaDataRepository.decrementLengthReturning(grouperMetaData.getMediaMetaDataId());
-            eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMetaData.getMediaMetaDataId(), newLength));
+            grouperMediaId = grouperMetaData.getMediaMetaDataId();
+            Integer newLength = mediaMetaDataRepository.decrementLengthReturning(grouperMediaId);
+            eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMediaId, newLength));
             mediaGroupMetaDataRepository.decrementNumInfo(mediaMetaData.getGrouperId());
         }
 
@@ -154,37 +156,33 @@ public class MediaMetadataModifyService {
 
         mediaMetaDataRepository.deleteById(mediaMetaData.getId());
 
-        TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        try {
-//                            if (mediaMetaData.getMediaType() == MediaType.GROUPER || mediaMetaData.getGrouperId() == null)
-//                                // if is a grouper or not part of a grouper, delete the search entry
-//                                // parts of a grouper are not individually searchable for now, only the grouper is.
-                            // just send delete event to opensearch - if non-exist - no error anyway
-                            eventPublisher.publishEvent(new MediaUpdateEvent.MediaDeleted(mediaId));
-                        } catch (Exception e) {
-                            throw new RuntimeException("Failed to publish event delete opensearch index: " + mediaId, e);
-                        }
+        try {
+//            if (mediaMetaData.getMediaType() == MediaType.GROUPER || mediaMetaData.getGrouperId() == null)
+//                // if is a grouper or not part of a grouper, delete the search entry
+//                // parts of a grouper are not individually searchable for now, only the grouper is.
+            // just send delete event to opensearch - if non-exist - no error anyway
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaDeleted(mediaId));
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to publish event delete opensearch index: " + mediaId, e);
+        }
 
-                        try {
-                            eventPublisher.publishEvent(new MediaUpdateEvent.MediaObjectDeleted(
-                                    mediaMetaData.getBucket(),
-                                    mediaMetaData.getPath(),
-                                    mediaMetaData.hasThumbnail(),
-                                    mediaMetaData.getThumbnail(),
-                                    mediaMetaData.getMediaType()
-                            ));
-                        } catch (Exception e) {
-                            throw new RuntimeException("Failed to publish event delete media object: " + mediaMetaData.getAbsoluteFilePath(), e);
-                        }
+        try {
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaObjectDeleted(
+                    mediaMetaData.getBucket(),
+                    mediaMetaData.getPath(),
+                    mediaMetaData.hasThumbnail(),
+                    mediaMetaData.getThumbnail(),
+                    mediaMetaData.getMediaType()
+            ));
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to publish event delete media object: " + mediaMetaData.getAbsoluteFilePath(), e);
+        }
 
-                        if (mediaMetaData.getMediaType() == MediaType.GROUPER || mediaMetaData.getGrouperId() != null) {
-                            mediaDisplayService.removeCacheGroupOfMedia(mediaMetaData.getId());
-                        }
-                        mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
-                    }
-                });
+        if (mediaMetaData.getMediaType() == MediaType.GROUPER) {
+            mediaDisplayService.removeCacheGroupOfMedia(mediaMetaData.getId());
+        } else if (mediaMetaData.getGrouperId() != null && grouperMediaId != null) {
+            mediaDisplayService.removeCacheGroupOfMedia(grouperMediaId);
+        }
+        mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
     }
 }
