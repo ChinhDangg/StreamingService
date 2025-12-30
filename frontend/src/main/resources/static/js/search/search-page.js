@@ -979,6 +979,23 @@ function initializeViewStepButtons() {
     rightNextBtn.addEventListener('click', viewNextMedia);
     leftPrevBtn.addEventListener('click', viewPreviousMedia);
     rightPrevBtn.addEventListener('click', viewPreviousMedia);
+
+    document.addEventListener('keyup', async function(e) {
+        if (quickViewOverlay.classList.contains('hidden')) return;
+
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                console.log('ArrowDown');
+                await viewPreviousMedia();
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                console.log('ArrowUp');
+                await viewNextMedia();
+                break;
+        }
+    });
 }
 
 let isRequestingVideoPreview = false;
