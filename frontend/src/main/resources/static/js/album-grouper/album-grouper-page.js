@@ -141,6 +141,7 @@ const showStepControls = (itemId) => {
     }
 };
 
+let viewInOverlayTimeout = null;
 const getMediaContentAndShowInOverlay = async (itemId) => {
     let mediaInfo;
     if (albumInfoContentMap.has(itemId)) {
@@ -158,7 +159,10 @@ const getMediaContentAndShowInOverlay = async (itemId) => {
         itemNum = itemNum + 1;
     quickViewTitle.querySelector('span').textContent = 'Item ' + itemNum;
     showStepControls(itemId);
-    await quickViewContentInOverlay(itemId, mediaInfo.mediaType, mediaInfo);
+    clearTimeout(viewInOverlayTimeout);
+    viewInOverlayTimeout = setTimeout(async () => {
+        await quickViewContentInOverlay(itemId, mediaInfo.mediaType, mediaInfo);
+    }, 300);
 };
 
 const addItem = (id) => {
