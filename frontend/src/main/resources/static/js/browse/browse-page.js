@@ -224,7 +224,7 @@ async function displayItem(nameItems) {
         }
         itemNode.querySelector('.name-title').textContent = capitalizeWords(item.name);
         itemNode.querySelector('.total-note').textContent = item.length;
-        itemNode.querySelector('.item-link').href = `/page/search?${NameEntry[currentNameEntry]}=${item.name}`;
+        itemNode.querySelector('.item-link').href = `/page/search/keyword?field=${NameEntry[currentNameEntry]}&keys=${item.name}`;
         nameContainer.appendChild(itemNode);
     }
     currentBrowseTabMap.set(currentNameEntry, nameItems);
