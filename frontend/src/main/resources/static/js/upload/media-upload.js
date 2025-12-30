@@ -143,6 +143,7 @@ function displayFailTexts() {
     errorMessageContainer.classList.remove('hidden');
 }
 
+let isSubmitting = false;
 submitBtn.addEventListener('click',async () => {
     submitBtn.textContent = 'Submit';
     const submitFileUpload = async () => {
@@ -270,9 +271,13 @@ submitBtn.addEventListener('click',async () => {
         });
     }
 
+    if (isSubmitting) return;
+
     submitBtn.disabled = true;
+    isSubmitting = true;
     submitFileUpload().then(() => {
         submitBtn.disabled = false
+        isSubmitting = false;
     });
 });
 
