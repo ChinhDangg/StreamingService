@@ -110,7 +110,10 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         List<String> pathList = getCacheAlbumPathList(mediaJobDescription.getId());
 
         if (pathList == null) {
-            Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaJobDescription.getBucket(), mediaJobDescription.getPath());
+            String prefix = mediaJobDescription.getPath();
+            if (!prefix.endsWith("/"))
+                prefix += "/";
+            Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaJobDescription.getBucket(), prefix);
             pathList = new ArrayList<>();
             for (Result<Item> result : results)
                 pathList.add(result.get().objectName());
@@ -142,7 +145,10 @@ public class AlbumService extends MediaService implements ResourceCleanable {
 
         if (albumPathList == null) {
             albumPathList = new ArrayList<>();
-            Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaJobDescription.getBucket(), mediaJobDescription.getPath());
+            String prefix = mediaJobDescription.getPath();
+            if (!prefix.endsWith("/"))
+                prefix += "/";
+            Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaJobDescription.getBucket(), prefix);
             for (Result<Item> result : results) {
                 albumPathList.add(result.get().objectName());
             }

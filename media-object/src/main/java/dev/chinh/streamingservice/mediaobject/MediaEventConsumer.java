@@ -7,6 +7,8 @@ import dev.chinh.streamingservice.mediaobject.config.KafkaRedPandaConfig;
 import io.minio.Result;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,8 @@ import org.springframework.stereotype.Service;
 public class MediaEventConsumer {
 
     private final MinIOService minIOService;
+
+    Logger logger = LoggerFactory.getLogger(MediaEventConsumer.class);
 
     private void onDeleteMediaObject(MediaUpdateEvent.MediaObjectDeleted event) throws Exception {
         System.out.println("Received media object delete event: " + event.mediaType() + " " + event.path());
@@ -40,9 +44,18 @@ public class MediaEventConsumer {
             }
         } else if (mediaType == MediaType.ALBUM) {
             try {
-                Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(event.bucket(), event.path());
+                String prefix = event.path();
+                // there is no filesystem in object storage, so we need to add the trailing slash to delete the exact path
+                if (!prefix.endsWith("/"))
+                    prefix += "/";
+                Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(event.bucket(), prefix);
                 for (Result<Item> result : results) {
                     String objectName = result.get().objectName();
+                    if (!objectName.startsWith(prefix)) {
+                        // this should not happen but for safeguard
+                        logger.warn("Skipping unsafe delete: {}", objectName);
+                        continue;
+                    }
                     minIOService.removeFile(event.bucket(), objectName);
                 }
             } catch (Exception e) {
