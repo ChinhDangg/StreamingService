@@ -106,6 +106,24 @@
                     Submit
                 </button>
 
+                <!-- Upload Progress Bar -->
+                <div id="upload-progress" class="hidden w-full max-w-md rounded-lg bg-slate-900 p-4 shadow-md">
+
+                    <div class="mb-2 flex items-center justify-between text-sm text-slate-300">
+                        <span>Upload Progress:</span>
+                        <span id="progress-percent">0%</span>
+                    </div>
+
+                    <div class="h-2 w-full overflow-hidden rounded-full bg-slate-700">
+                        <div id="progress-bar-fill"
+                             class="h-full w-0 rounded-full
+                bg-linear-to-r from-blue-500 to-blue-400
+                transition-[width] duration-150 ease-out">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File List -->
                 <div>
                     <h3 class="mb-2">Files will be added as album:</h3>
                     <div id="file-list-container"
@@ -123,15 +141,15 @@
                     <span>Error something</span>
                 </div>
             </div> <!-- End of Grouper Upload Container -->
-
-            <div class="flex gap-2">
-                <span>Sorted: </span>
-                <button id="sortOrderButton"
-                        class="hidden select-none mb-2 px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
-                    Descending
-                </button>
-            </div>
         </th:block>
+
+        <div class="flex gap-2">
+            <span>Sorted: </span>
+            <button id="sortOrderButton"
+                    class="hidden select-none mb-2 px-3 py-1.5 text-sm rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-indigo-700 hover:border-purple-400 hover:text-white transition flex items-center space-x-2">
+                Descending
+            </button>
+        </div>
 
         <!-- Scrollable list -->
         <div class="list-scroll-container max-h-96 overflow-y-auto pr-2 space-y-3">

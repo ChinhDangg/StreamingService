@@ -47,6 +47,7 @@ folderInput.addEventListener('change', () => {
     currentFailTexts = [];
     errorMessageContainer.innerHTML = '';
     errorMessageContainer.classList.add('hidden');
+    totalProgress = 0;
 
     if (!folderInput.files.length) return;
     for (const f of folderInput.files) {
@@ -59,6 +60,7 @@ folderInput.addEventListener('change', () => {
                 fileList.push(f);
                 parentPathMap.set(parentPath, { fileList: fileList });
             }
+            totalProgress += f.size;
         }
     }
     const fileListItemTem = fileListContainer.querySelector('.file-item');
@@ -102,12 +104,15 @@ async function uploadAlbum(files, savingPath, parentPath, sessionId = null, uplo
             const fileName = objectName + '/' + f.name;
             uploadingFiles.get(f).chunks.partNumber = uploadingFiles.get(f).partNumber;
             await uploadFile(sessionId, f, fileName, 'ALBUM', uploadingFiles, currentFailTexts,
-                uploadingFiles.get(f).chunks, uploadingFiles.get(f).eTags);
+                uploadingFiles.get(f).chunks, uploadingFiles.get(f).eTags, uploadingFiles.get(f).uploadId,
+                showProgress);
         }
     } else {
         for (const f of files) {
             const fileName = objectName + '/' + f.name;
-            await uploadFile(sessionId, f, fileName, 'ALBUM', uploadingFiles, currentFailTexts);
+            await uploadFile(sessionId, f, fileName, 'ALBUM', uploadingFiles, currentFailTexts,
+                null, null, null,
+                showProgress);
         }
     }
     if (uploadingFiles.size) {
@@ -135,39 +140,75 @@ async function uploadAlbum(files, savingPath, parentPath, sessionId = null, uplo
     return await response.text();
 }
 
+let isSubmitting = false;
 submitBtn.addEventListener('click', async () => {
-    errorMessageContainer.innerHTML = '';
-    if (!parentPathMap.size) {
-        alert('No files selected');
-        return;
-    }
-    if (!savingPathInput.value) {
-        alert('Saving path is empty');
-        return;
-    }
-    const savingPath = validateDirectory(savingPathInput.value);
-    if (!savingPath) return;
-    for (const [parentPath, object] of parentPathMap) {
-        if (uploadingAlbumFiles.has(parentPath)) {
-            const uploadingFiles = uploadingAlbumFiles.get(parentPath).uploadingFiles;
-            const sessionId = uploadingAlbumFiles.get(parentPath).sessionId;
-            await uploadAlbum(object.fileList, savingPath, parentPath, sessionId, uploadingFiles);
-        } else {
-            const passed = await uploadAlbum(object.fileList, savingPath, parentPath);
-            if (passed) {
-                parentPathMap.get(parentPath).fileListItem.remove();
-                parentPathMap.delete(parentPath);
-                addNewAlbumItem(passed);
+    const submitUpload = async () => {
+        errorMessageContainer.innerHTML = '';
+        if (!parentPathMap.size) {
+            alert('No files selected');
+            return;
+        }
+        if (!savingPathInput.value) {
+            alert('Saving path is empty');
+            return;
+        }
+        const savingPath = validateDirectory(savingPathInput.value);
+        if (!savingPath) return;
+        for (const [parentPath, object] of parentPathMap) {
+            if (uploadingAlbumFiles.has(parentPath)) {
+                const uploadingFiles = uploadingAlbumFiles.get(parentPath).uploadingFiles;
+                const sessionId = uploadingAlbumFiles.get(parentPath).sessionId;
+                await uploadAlbum(object.fileList, savingPath, parentPath, sessionId, uploadingFiles);
+            } else {
+                const passed = await uploadAlbum(object.fileList, savingPath, parentPath);
+                if (passed) {
+                    parentPathMap.get(parentPath).fileListItem.remove();
+                    parentPathMap.delete(parentPath);
+                    addNewAlbumItem(passed);
+                }
             }
         }
-    }
-    if (currentFailTexts.length) {
-        displayFailTexts();
+        if (currentFailTexts.length) {
+            displayFailTexts();
+            return;
+        }
+        progress = 0;
+        folderInput.value = '';
+        alert('Upload successful!');
+    };
+
+    if (isSubmitting) return;
+
+    submitBtn.disabled = true;
+    isSubmitting = true;
+    submitUpload().then(() => {
+        submitBtn.disabled = false;
+        isSubmitting = false;
+    });
+});
+
+const progressContainer = document.getElementById("upload-progress");
+const progressFill = document.getElementById("progress-bar-fill");
+const progressPercent = document.getElementById("progress-percent");
+let progress = 0;
+let totalProgress = 0;
+
+function showProgress(value) {
+    if (totalProgress === 0) {
+        console.log('No progress to show');
         return;
     }
-    folderInput.value = '';
-    alert('Upload successful!');
-});
+    progressContainer.classList.remove("hidden");
+
+    progress += value;
+    const percent = (progress / totalProgress) * 100;
+    console.log(`Progress: ${percent.toFixed(2)}%`);
+
+    requestAnimationFrame(() => {
+        progressFill.style.width = `${percent}%`;
+        progressPercent.textContent = `${percent.toFixed(1)}%`;
+    });
+}
 
 function helperCloneAndUnHideNode(node) {
     const clone = node.cloneNode(true);

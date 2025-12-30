@@ -89,6 +89,25 @@
         Submit
     </button>
 
+
+    <!-- Upload Progress Bar -->
+    <div id="upload-progress" class="hidden w-full max-w-md rounded-lg bg-slate-900 p-4 shadow-md">
+
+        <div class="mb-2 flex items-center justify-between text-sm text-slate-300">
+            <span>Upload Progress:</span>
+            <span id="progress-percent">0%</span>
+        </div>
+
+        <div class="h-2 w-full overflow-hidden rounded-full bg-slate-700">
+            <div id="progress-bar-fill"
+                 class="h-full w-0 rounded-full
+                bg-linear-to-r from-blue-500 to-blue-400
+                transition-[width] duration-150 ease-out">
+            </div>
+        </div>
+    </div>
+
+
     <!-- Error Message -->
     <div id="error-message-container"
          class="hidden flex flex-col bg-red-900 border border-red-700 text-red-300 p-3 rounded-lg">

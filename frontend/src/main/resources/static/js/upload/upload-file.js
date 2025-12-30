@@ -39,7 +39,8 @@ export async function endUploadSession(body) {
 
 export async function uploadFile(sessionId, file, fileName, mediaType,
                                  uploadingFiles = null, currentFailTexts = null,
-                                 chunks = null, eTags = null, uploadId = null) {
+                                 chunks = null, eTags = null, uploadId = null,
+                                 showProgressFn = null) {
 
     console.log('fileName: ' + fileName);
 
@@ -117,9 +118,10 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
 
         if (uploadingFiles) {
             uploadingFiles.get(file).partNumber++;
-            console.log('uploadingFiles: ');
-            console.log(uploadingFiles.get(file).partNumber)
         }
+
+        if (showProgressFn)
+            showProgressFn(c.size);
     }
 
     const completeResponse = await apiRequest('/api/upload/media/complete', {
@@ -173,6 +175,7 @@ function chunkFile(file) {
         chunks.push({
             partNumber,
             blob: file.slice(start, end),
+            size: end - start
         });
         partNumber++;
         start = end;

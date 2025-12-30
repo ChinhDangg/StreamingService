@@ -217,26 +217,36 @@ submitBtn.addEventListener('click',async () => {
 
         let fileNotUploaded = 0;
         if (currentMediaType === MediaTypes.VIDEO) {
+            totalProgress = currentFiles.size;
+
             if (uploadingFiles.has(currentFiles)) {
                 uploadingFiles.get(currentFiles).chunks.partNumber = uploadingFiles.get(currentFiles).partNumber;
                 const passed = await uploadFile(sessionId, currentFiles, savingPath, MediaTypes.VIDEO, uploadingFiles, currentFailTexts,
-                    uploadingFiles.get(currentFiles).chunks, uploadingFiles.get(currentFiles).eTags, uploadingFiles.get(currentFiles).uploadId);
+                    uploadingFiles.get(currentFiles).chunks, uploadingFiles.get(currentFiles).eTags, uploadingFiles.get(currentFiles).uploadId,
+                    showProgress);
                 if (!passed) fileNotUploaded++;
             } else {
-                const passed = await uploadFile(sessionId, currentFiles, savingPath, MediaTypes.VIDEO, uploadingFiles, currentFailTexts);
+                progress = 0;
+                const passed = await uploadFile(sessionId, currentFiles, savingPath, MediaTypes.VIDEO, uploadingFiles, currentFailTexts,
+                    null, null, null, showProgress);
                 if (!passed) fileNotUploaded++;
             }
         } else if (currentMediaType === MediaTypes.ALBUM) {
+            totalProgress = Array.from(currentFiles).reduce((acc, f) => acc + f.size, 0);
+
             if (uploadingFiles.size > 0) {
                 for (const f of uploadingFiles.keys()) {
                     uploadingFiles.get(f).chunks.partNumber = uploadingFiles.get(f).partNumber;
                     const passed = await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM, uploadingFiles, currentFailTexts,
-                        uploadingFiles.get(f).chunks, uploadingFiles.get(f).eTags, uploadingFiles.get(f).uploadId);
+                        uploadingFiles.get(f).chunks, uploadingFiles.get(f).eTags, uploadingFiles.get(f).uploadId,
+                        showProgress);
                     if (!passed) fileNotUploaded++;
                 }
             } else {
+                progress = 0;
                 for (const f of currentFiles) {
-                    const passed = await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM, uploadingFiles, currentFailTexts);
+                    const passed = await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM, uploadingFiles, currentFailTexts,
+                        null, null, null, showProgress);
                     if (!passed) fileNotUploaded++;
                 }
             }
@@ -280,6 +290,29 @@ submitBtn.addEventListener('click',async () => {
         isSubmitting = false;
     });
 });
+
+const progressContainer = document.getElementById("upload-progress");
+const progressFill = document.getElementById("progress-bar-fill");
+const progressPercent = document.getElementById("progress-percent");
+let progress = 0;
+let totalProgress = 0;
+
+function showProgress(value) {
+    if (totalProgress === 0) {
+        console.log('No progress to show');
+        return;
+    }
+    progressContainer.classList.remove("hidden");
+
+    progress += value;
+    const percent = (progress / totalProgress) * 100;
+    console.log(`Progress: ${percent.toFixed(2)}%`);
+
+    requestAnimationFrame(() => {
+        progressFill.style.width = `${percent}%`;
+        progressPercent.textContent = `${percent.toFixed(1)}%`;
+    });
+}
 
 function validateVideo(path) {
     const INVALID = /[<>:"|?*\x00-\x1F]/;
