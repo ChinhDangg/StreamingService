@@ -66,7 +66,7 @@ public abstract class MediaDescription implements MetaDataProvider {
         if (parentPath != null && !parentPath.isBlank() && hasKey())
             return parentPath + "/" + key;
         else if (parentPath != null && !parentPath.isBlank())
-            return parentPath;
+            return parentPath.endsWith("/") ? parentPath : parentPath + "/";
         else if (key != null && !key.isBlank())
             return key;
         throw new RuntimeException("path and key is null");
