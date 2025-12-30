@@ -5,7 +5,6 @@ import io.minio.errors.ErrorResponseException;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 
@@ -67,21 +66,6 @@ public class MinIOService {
         }
     }
 
-
-    public void uploadFile(String bucket, String object, MultipartFile file) throws Exception {
-        try (InputStream inputStream = file.getInputStream()) {
-            minioClient.putObject(
-                    PutObjectArgs.builder()
-                            .bucket(bucket)
-                            .object(object)
-                            .stream(inputStream, file.getSize(), -1)
-                            .contentType(file.getContentType())
-                            .build()
-            );
-        }
-        System.out.println("Uploaded object " + bucket + "/" + object);
-    }
-
     public void removeFile(String bucket, String object) throws Exception {
         minioClient.removeObject(
                 RemoveObjectArgs.builder()
@@ -90,15 +74,5 @@ public class MinIOService {
                         .build()
         );
         System.out.println("Removed object " + bucket + "/" + object);
-    }
-
-    public void moveFileToObject(String bucket, String object, String filePath) throws Exception {
-        minioClient.uploadObject(
-                UploadObjectArgs.builder()
-                        .bucket(bucket)
-                        .object(object)
-                        .filename(filePath)
-                        .build()
-        );
     }
 }
