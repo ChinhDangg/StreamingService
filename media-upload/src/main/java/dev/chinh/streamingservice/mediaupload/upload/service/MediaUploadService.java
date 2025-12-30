@@ -233,7 +233,7 @@ public class MediaUploadService {
         for (Result<Item> result : results) {
             count++;
             Item item = result.get();
-            if (MediaType.detectMediaType(result.get().objectName()) == MediaType.IMAGE) {
+            if (MediaType.detectMediaType(item.objectName()) == MediaType.IMAGE) {
                 if (firstImage == null)
                     firstImage = item.objectName();
                 totalSize += item.size();
@@ -311,7 +311,7 @@ public class MediaUploadService {
             for (Result<Item> result : results) {
                 count++;
                 Item item = result.get();
-                if (MediaType.detectMediaType(result.get().objectName()) == MediaType.IMAGE) {
+                if (MediaType.detectMediaType(item.objectName()) == MediaType.IMAGE) {
                     if (firstImage == null)
                         firstImage = item.objectName();
                     totalSize += item.size();
