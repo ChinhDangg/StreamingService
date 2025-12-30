@@ -1,42 +1,44 @@
 import {apiRequest} from "/static/js/common.js";
 
-export function setVideoUrl(videoContainerNode, playlistUrl, restart = true, startPlaying = false) {
+export function setVideoUrl(videoContainerNode, playlistUrl, restart = true, startPlaying = false, autoReplay = true) {
     const video = videoContainerNode.querySelector('video');
     const totalTime = videoContainerNode.querySelector('.total-time');
     const currentTime = video.currentTime;
     if (playlistUrl.endsWith(".m3u8")) {
-            const hls = new Hls();
-            hls.loadSource(playlistUrl + '?_=' + Date.now());
-            hls.attachMedia(video);
+        const hls = new Hls();
+        hls.loadSource(playlistUrl + '?_=' + Date.now());
+        hls.attachMedia(video);
 
-            const onManifestParsed = () => {
-                video.addEventListener("loadedmetadata", () => {
-                    if (restart) {
-                        video.currentTime = 0;
-                    } else {
-                        if (video.duration && video.duration >= currentTime) {
-                            video.currentTime = currentTime;
-                        }
-                    }
-                    hls.off(Hls.Events.MANIFEST_PARSED, onManifestParsed);
-                }, { once: true });
-            }
-            hls.on(Hls.Events.MANIFEST_PARSED, onManifestParsed);
-
-            if (totalTime) {
-                const onLevelLoaded = (event, data) => {
-                    const d = data.details;
-                    if (!d.live) {
-                        hls.off(Hls.Events.LEVEL_LOADED, onLevelLoaded);
-                        totalTime.textContent = formatTime(d.totalduration);
-                    } else {
-                        setTimeout(() => {
-                            totalTime.textContent = formatTime(d.totalduration);
-                        }, 100);
+        const onManifestParsed = () => {
+            video.addEventListener("loadedmetadata", () => {
+                if (restart) {
+                    video.currentTime = 0;
+                } else {
+                    if (video.duration && video.duration >= currentTime) {
+                        video.currentTime = currentTime;
                     }
                 }
-                hls.on(Hls.Events.LEVEL_LOADED, onLevelLoaded);
+                hls.off(Hls.Events.MANIFEST_PARSED, onManifestParsed);
+            }, { once: true });
+        }
+        hls.on(Hls.Events.MANIFEST_PARSED, onManifestParsed);
+
+        if (totalTime) {
+            const onLevelLoaded = (event, data) => {
+                const d = data.details;
+                if (!d.live) {
+                    hls.off(Hls.Events.LEVEL_LOADED, onLevelLoaded);
+                    totalTime.textContent = formatTime(d.totalduration);
+                } else {
+                    setTimeout(() => {
+                        totalTime.textContent = formatTime(d.totalduration);
+                    }, 100);
+                }
             }
+            hls.on(Hls.Events.LEVEL_LOADED, onLevelLoaded);
+        }
+
+
     } else {
         video.src = playlistUrl;
         if (!restart) {
@@ -47,6 +49,12 @@ export function setVideoUrl(videoContainerNode, playlistUrl, restart = true, sta
             }, { once: true });
         }
     }
+    video.addEventListener("ended", () => {
+        if (autoReplay) {
+            video.currentTime = 0;
+            video.play();
+        }
+    });
     if (startPlaying) {
         video.play();
     }
