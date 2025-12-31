@@ -77,6 +77,7 @@ export function setVideoResolution(videoContainerNode, videoBaseUrlRequest, orig
     mainResButton.textContent = RESOLUTION[defaultRes];
     const resMenu = videoContainerNode.querySelector('.res-menu');
     const resButtonTem = resMenu.querySelector('button');
+    if (resButtonTem) resMenu.replaceChildren(resButtonTem);
 
     const resolutions = new Map();
     resolutions.set('original', 'Original');
