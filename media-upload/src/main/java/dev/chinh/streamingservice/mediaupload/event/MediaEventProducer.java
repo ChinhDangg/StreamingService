@@ -1,6 +1,5 @@
 package dev.chinh.streamingservice.mediaupload.event;
 
-import dev.chinh.streamingservice.common.event.MediaBackupEvent;
 import dev.chinh.streamingservice.mediaupload.event.config.KafkaRedPandaConfig;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +14,7 @@ public class MediaEventProducer {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    private static final String MEDIA_UPDATED_OPENSEARCH_TOPIC = KafkaRedPandaConfig.MEDIA_UPDATED_OPENSEARCH_TOPIC;
+    private static final String MEDIA_UPDATED_OPENSEARCH_TOPIC = KafkaRedPandaConfig.MEDIA_SEARCH_TOPIC;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publishUpdateLengthOpenSearch(MediaUpdateEvent.LengthUpdated event) {
@@ -59,19 +58,18 @@ public class MediaEventProducer {
 
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void publishUpdateMediaObject(MediaUpdateEvent.MediaObjectDeleted event) {
-        kafkaTemplate.send(KafkaRedPandaConfig.MEDIA_UPDATED_OBJECT_TOPIC, event);
+    public void publishDeleteMediaObject(MediaUpdateEvent.MediaObjectDeleted event) {
+        kafkaTemplate.send(KafkaRedPandaConfig.MEDIA_OBJECT_TOPIC, event);
     }
-
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publishDeleteThumbnailObject(MediaUpdateEvent.ThumbnailObjectDeleted event) {
-        kafkaTemplate.send(KafkaRedPandaConfig.MEDIA_UPDATED_OBJECT_TOPIC, event);
+        kafkaTemplate.send(KafkaRedPandaConfig.MEDIA_OBJECT_TOPIC, event);
     }
 
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void publishCreateMediaBackup(MediaBackupEvent.MediaCreated event) {
+    public void publishCreateMediaBackup(MediaUpdateEvent.MediaBackupCreated event) {
         kafkaTemplate.send(KafkaRedPandaConfig.MEDIA_BACKUP_TOPIC, event);
     }
 }

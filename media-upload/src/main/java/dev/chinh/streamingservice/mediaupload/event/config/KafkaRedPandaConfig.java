@@ -46,20 +46,20 @@ public class KafkaRedPandaConfig {
         ));
     }
 
-    public static final String MEDIA_UPDATED_OPENSEARCH_TOPIC = "media-updated-opensearch-events";
-    public static final String MEDIA_UPDATED_OBJECT_TOPIC = "media-updated-object-events";
+    public static final String MEDIA_SEARCH_TOPIC = "media-search-events";
+    public static final String MEDIA_OBJECT_TOPIC = "media-object-events";
     public static final String MEDIA_BACKUP_TOPIC = "media-backup-events";
 
     @Bean
     public KafkaAdmin.NewTopics mediaTopics() {
         return new KafkaAdmin.NewTopics(
-                TopicBuilder.name(MEDIA_UPDATED_OPENSEARCH_TOPIC)
+                TopicBuilder.name(MEDIA_SEARCH_TOPIC)
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000") // delete after 7 days // if use for replay then use longer day
                         .config("segment.bytes", "100048576")
                         .build(),
-                TopicBuilder.name(MEDIA_UPDATED_OBJECT_TOPIC)
+                TopicBuilder.name(MEDIA_OBJECT_TOPIC)
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000") // delete after 7 days // if use for replay then use longer day
