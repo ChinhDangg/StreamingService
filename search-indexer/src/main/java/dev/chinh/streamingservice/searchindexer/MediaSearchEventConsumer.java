@@ -167,7 +167,11 @@ public class MediaSearchEventConsumer {
 
 
     // listen to DLQ and print out the event details for now
-    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_SEARCH_DLQ_TOPIC, groupId = "media-search-dlq-group")
+    @KafkaListener(
+            topics = KafkaRedPandaConfig.MEDIA_SEARCH_DLQ_TOPIC,
+            groupId = "media-search-dlq-group",
+            containerFactory = "dlqListenerContainerFactory"
+    )
     public void handleDlq(MediaUpdateEvent event,
                           Acknowledgment ack,
                           @Header(name = "x-exception-message", required = false) String errorMessage) {
@@ -190,7 +194,10 @@ public class MediaSearchEventConsumer {
                     System.out.println("Received update name entity: " + nameEntityConstant + " nameEntityId: " + nameEntityId);
             case MediaUpdateEvent.NameEntityDeleted(MediaNameEntityConstant nameEntityConstant, long nameEntityId) ->
                     System.out.println("Received delete name entity: " + nameEntityConstant + " nameEntityId: " + nameEntityId);
-            default -> System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+            default -> {
+                System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+                ack.acknowledge(); // ack on poison event to skip it
+            }
         }
 
         // ack or it will be re-read from the DLQ on restart or rehandle it manually.

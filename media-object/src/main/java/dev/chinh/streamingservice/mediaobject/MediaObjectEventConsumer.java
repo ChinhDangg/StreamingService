@@ -78,12 +78,15 @@ public class MediaObjectEventConsumer {
 
 
     @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_OBJECT_TOPIC, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
-    public void handle(MediaUpdateEvent event, Acknowledgment acknowledgment) throws Exception {
+    public void handle(Object event, Acknowledgment acknowledgment) throws Exception {
         try {
             if (event instanceof MediaUpdateEvent.MediaObjectDeleted e) {
                 onDeleteMediaObject(e);
             } else if (event instanceof MediaUpdateEvent.ThumbnailObjectDeleted e) {
                 onDeleteThumbnailObject(e);
+            } else {
+                // unknown event type → log and skip
+                System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
             }
             acknowledgment.acknowledge();
         } catch (Exception e) {
@@ -95,8 +98,12 @@ public class MediaObjectEventConsumer {
 
 
     // listen to DLQ and print out the event details for now
-    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_OBJECT_DLQ_TOPIC, groupId = "media-object-dlq-group")
-    public void handleDlq(MediaUpdateEvent event,
+    @KafkaListener(
+            topics = KafkaRedPandaConfig.MEDIA_OBJECT_DLQ_TOPIC,
+            groupId = "media-object-dlq-group",
+            containerFactory = "dlqListenerContainerFactory"
+    )
+    public void handleDlq(Object event,
                           Acknowledgment ack,
                           @Header(name = "x-exception-message", required = false) String errorMessage) {
         System.out.println("======= DLQ EVENT DETECTED =======");
@@ -108,7 +115,10 @@ public class MediaObjectEventConsumer {
                     System.out.println("Received media object delete event: " + e.mediaType() + " " + e.path());
             case MediaUpdateEvent.ThumbnailObjectDeleted e ->
                     System.out.println("Received thumbnail object delete event: " + e.path());
-            default -> System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+            default -> {
+                System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+                ack.acknowledge(); // ack on poison event to skip it
+            }
         }
 
         // ack or it will be re-read from the DLQ on restart or rehandle it manually.

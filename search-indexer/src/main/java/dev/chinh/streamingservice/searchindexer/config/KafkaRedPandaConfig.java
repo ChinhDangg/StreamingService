@@ -15,6 +15,8 @@ import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.mapping.DefaultJackson2JavaTypeMapper;
+import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 import org.springframework.util.backoff.FixedBackOff;
@@ -38,17 +40,20 @@ public class KafkaRedPandaConfig {
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, MEDIA_GROUP_ID);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        props.put(JsonDeserializer.TRUSTED_PACKAGES, "dev.chinh.streamingservice.common.event");
-        props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, "true");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
 
-        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, MediaUpdateEvent.class.getName());
-        props.put(JsonDeserializer.KEY_DEFAULT_TYPE, String.class.getName());
+        JsonDeserializer<Object> jsonDeserializer = new JsonDeserializer<>(Object.class);
+        jsonDeserializer.addTrustedPackages("dev.chinh.streamingservice.common.event");
+        jsonDeserializer.setTypeMapper(new DefaultJackson2JavaTypeMapper());
+        jsonDeserializer.setUseTypeHeaders(false);
+
+        ErrorHandlingDeserializer<Object> valueDeserializer = new ErrorHandlingDeserializer<>(jsonDeserializer);
+        ErrorHandlingDeserializer<String> keyDeserializer = new ErrorHandlingDeserializer<>(new StringDeserializer());
 
         return new DefaultKafkaConsumerFactory<>(
                 props,
-                new StringDeserializer(),
-                new JsonDeserializer<>(Object.class)
+                keyDeserializer,
+                valueDeserializer
         );
     }
 
@@ -69,6 +74,19 @@ public class KafkaRedPandaConfig {
     }
 
     // for dlq only - not media events
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, Object> dlqListenerContainerFactory(
+            ConsumerFactory<String, Object> consumerFactory
+    ) {
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory);
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+
+        // No Recoverer here: just log the error and stop retrying
+        factory.setCommonErrorHandler(new DefaultErrorHandler(new FixedBackOff(0L, 0)));
+        return factory;
+    }
+
     @Bean
     public ProducerFactory<String, Object> dlqProducerFactory() {
         Map<String, Object> props = new HashMap<>();
@@ -101,7 +119,7 @@ public class KafkaRedPandaConfig {
                 new DeadLetterPublishingRecoverer(dlqKafkaTemplate,
                         (record, ex) -> new org.apache.kafka.common.TopicPartition(
                                 MEDIA_SEARCH_DLQ_TOPIC,
-                                record.partition()
+                                -1
                         ));
 
         // retry every 2s, up to 5 times

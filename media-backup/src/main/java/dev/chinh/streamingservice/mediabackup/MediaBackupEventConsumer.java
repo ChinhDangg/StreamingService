@@ -77,6 +77,9 @@ public class MediaBackupEventConsumer {
         try {
             if (event instanceof MediaUpdateEvent.MediaBackupCreated e) {
                 onMediaCreateBackup(e);
+            } else {
+                // unknown event type → log and skip
+                System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
             }
             acknowledgment.acknowledge();
         } catch (Exception e) {
@@ -87,8 +90,12 @@ public class MediaBackupEventConsumer {
 
 
     // listen to DLQ and print out the event details for now
-    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_BACKUP_DLQ_TOPIC, groupId = "media-backup-dlq-group")
-    public void handleDlq(MediaUpdateEvent event,
+    @KafkaListener(
+            topics = KafkaRedPandaConfig.MEDIA_BACKUP_DLQ_TOPIC,
+            groupId = "media-backup-dlq-group",
+            containerFactory = "dlqListenerContainerFactory"
+    )
+    public void handleDlq(Object event,
                           Acknowledgment ack,
                           @Header(name = "x-exception-message", required = false) String errorMessage) {
         System.out.println("======= DLQ EVENT DETECTED =======");
@@ -98,7 +105,10 @@ public class MediaBackupEventConsumer {
         switch (event) {
             case MediaUpdateEvent.MediaBackupCreated e ->
                     System.out.println("Received media create backup event: " + e.path());
-            default -> System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+            default -> {
+                System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+                ack.acknowledge(); // ack on poison event to skip it
+            }
         }
 
         // ack or it will be re-read from the DLQ on restart or rehandle it manually.
