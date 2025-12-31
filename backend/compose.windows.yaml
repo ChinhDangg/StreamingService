@@ -12,6 +12,17 @@ services:
       - ./minio-data:/data
     command: server /data --console-address ":9001"
 
+  minio-init:
+    image: minio/mc
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - ./minio/minio-init.sh:/minio-init.sh:ro
+    entrypoint: [ "/bin/sh", "/minio-init.sh" ]
+
   nginx:
     build:
       context: ./nginx
