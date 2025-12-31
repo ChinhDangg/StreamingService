@@ -6,6 +6,7 @@ import dev.chinh.streamingservice.common.constant.MediaType;
 
 public interface MediaUpdateEvent {
 
+    // for search
     record LengthUpdated(
             long mediaId,
             Integer newLength
@@ -46,6 +47,7 @@ public interface MediaUpdateEvent {
     ) implements MediaUpdateEvent{}
 
 
+    // for object
     record MediaObjectDeleted(
             String bucket,
             String path,
@@ -54,8 +56,15 @@ public interface MediaUpdateEvent {
             MediaType mediaType
     ) implements MediaUpdateEvent {}
 
-
     record ThumbnailObjectDeleted(
             String path
+    ) implements MediaUpdateEvent {}
+
+
+    // for backup
+    record MediaBackupCreated(
+            String bucket,
+            String path,
+            MediaType mediaType
     ) implements MediaUpdateEvent {}
 }

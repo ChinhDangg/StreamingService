@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
-import dev.chinh.streamingservice.common.event.MediaBackupEvent;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.mediaupload.MediaBasicInfo;
@@ -264,7 +263,7 @@ public class MediaUploadService {
         eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMedia.getId(), updatedLength));
 
         if (Boolean.parseBoolean(backupEnabled))
-            eventPublisher.publishEvent(new MediaBackupEvent.MediaCreated(mediaBucket, mediaMetaData.getPath(), upload.mediaType));
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaBackupCreated(mediaBucket, mediaMetaData.getPath(), upload.mediaType));
 
         mediaSearchCacheService.removeCachedMediaSearchItem(grouperMedia.getId());
         mediaDisplayService.removeCacheGroupOfMedia(grouperMedia.getId());
@@ -332,7 +331,7 @@ public class MediaUploadService {
         eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, false));
 
         if (Boolean.parseBoolean(backupEnabled))
-            eventPublisher.publishEvent(new MediaBackupEvent.MediaCreated(mediaBucket, mediaMetaData.getPath(), upload.mediaType));
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaBackupCreated(mediaBucket, mediaMetaData.getPath(), upload.mediaType));
 
         removeCacheMediaSessionRequest(sessionId);
         removeUploadSessionCacheLastAccess(sessionId);
