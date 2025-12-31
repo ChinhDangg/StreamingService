@@ -182,6 +182,7 @@ public class MediaMetadataModifyService {
             mediaDisplayService.removeCacheGroupOfMedia(mediaMetaData.getId());
         } else if (mediaMetaData.getGrouperId() != null && grouperMediaId != null) {
             mediaDisplayService.removeCacheGroupOfMedia(grouperMediaId);
+            mediaSearchCacheService.removeCachedMediaSearchItem(grouperMediaId);
         }
         mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
     }
