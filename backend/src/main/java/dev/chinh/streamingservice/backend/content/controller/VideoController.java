@@ -18,8 +18,11 @@ public class VideoController {
     private String alwaysShowOriginalResolution;
 
     @GetMapping("/original/{id}")
-    public ResponseEntity<String> getVideoUrl(@PathVariable Long id) throws Exception {
-        return ResponseEntity.ok(videoService.getOriginalVideoUrl(id));
+    public ResponseEntity<Void> getVideoUrl(@PathVariable Long id) {
+        return ResponseEntity.ok()
+                .header("X-Accel-Redirect", videoService.getOriginalVideoUrl(id))
+                .header("Content-Type", "video/mp4")
+                .build();
     }
 
     @GetMapping("/preview/{id}")
@@ -28,12 +31,21 @@ public class VideoController {
     }
 
     @GetMapping("/partial/{id}/{resolution}")
-    public ResponseEntity<String> getVideoAtDifferentResolutionUrl(@PathVariable Long id,
+    public ResponseEntity<?> getVideoAtDifferentResolutionUrl(@PathVariable Long id,
                                                     @PathVariable Resolution resolution) throws Exception {
         if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
-            return ResponseEntity.ok(videoService.getOriginalVideoUrl(id));
+            return getVideoUrl(id);
         }
-        return ResponseEntity.ok(videoService.getPartialVideoUrl(id, resolution));
+
+        String url = videoService.getPartialVideoUrl(id, resolution);
+        if (url.startsWith("/stream/redirect/object/")) {
+            return ResponseEntity.ok()
+                    .header("X-Accel-Redirect", url)
+                    .header("Content-Type", "video/mp4")
+                    .build();
+        }
+
+        return ResponseEntity.ok(url);
     }
 
 }
