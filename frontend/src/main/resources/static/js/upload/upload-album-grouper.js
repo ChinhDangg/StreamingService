@@ -48,6 +48,7 @@ folderInput.addEventListener('change', () => {
     errorMessageContainer.innerHTML = '';
     errorMessageContainer.classList.add('hidden');
     totalProgress = 0;
+    clearProgress();
 
     if (!folderInput.files.length) return;
     for (const f of folderInput.files) {
@@ -172,7 +173,7 @@ submitBtn.addEventListener('click', async () => {
             displayFailTexts();
             return;
         }
-        progress = 0;
+        clearProgress();
         folderInput.value = '';
         alert('Upload successful!');
     };
@@ -208,6 +209,12 @@ function showProgress(value) {
         progressFill.style.width = `${percent}%`;
         progressPercent.textContent = `${percent.toFixed(1)}%`;
     });
+}
+
+function clearProgress() {
+    progress = 0;
+    progressFill.style.width = `${progress}%`;
+    progressPercent.textContent = `${progress.toFixed(1)}%`;
 }
 
 function helperCloneAndUnHideNode(node) {

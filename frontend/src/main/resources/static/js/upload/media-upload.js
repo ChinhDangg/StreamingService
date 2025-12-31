@@ -18,7 +18,7 @@ const submitBtn = document.getElementById('submit-btn');
 
 let currentSavingPath = null;
 let currentFiles = null;
-const uploadingFiles = new Map();
+const uploadingFiles = new Map(); // to track files that are uploading - present means failed to upload
 let currentSessionId = null;
 let currentFailTexts = [];
 
@@ -63,6 +63,7 @@ uploadTypeSelect.addEventListener('change', () => {
 
 singleFileInput.addEventListener('change', () => {
     clearUploadedFile();
+    clearProgress();
     if (!singleFileInput.files.length) {
         updateSavingPath('');
         return;
@@ -80,6 +81,7 @@ const ALLOWED = ["video/", "image/png", "image/jpeg", "image/gif", "image/webp"]
 
 folderInput.addEventListener('change', () => {
     clearUploadedFile();
+    clearProgress();
     if (!folderInput.files.length) {
         updateSavingPath('');
         return;
@@ -110,6 +112,7 @@ folderInput.addEventListener('change', () => {
 
 grouperInput.addEventListener('change', () => {
     clearUploadedFile();
+    clearProgress();
     if (!grouperInput.files.length) {
         return;
     }
@@ -129,6 +132,7 @@ function updateTitle(title) {
 function clearUploadedFile() {
     uploadingFiles.clear();
     currentSessionId = null;
+    titleInput.value = '';
 }
 
 const errorMessageContainer = document.getElementById('error-message-container');
@@ -181,6 +185,8 @@ submitBtn.addEventListener('click',async () => {
                 alert('Failed to create grouper: ' + await response.text());
                 return;
             }
+            totalProgress = 1;
+            showProgress(1);
             alert('Grouper created successfully! ' + await response.text());
             grouperInput.value = '';
             return;
@@ -243,7 +249,7 @@ submitBtn.addEventListener('click',async () => {
                     if (!passed) fileNotUploaded++;
                 }
             } else {
-                progress = 0;
+                clearProgress();
                 for (const f of currentFiles) {
                     const passed = await uploadFile(sessionId, f, savingPath + '/' + f.name, MediaTypes.ALBUM, uploadingFiles, currentFailTexts,
                         null, null, null, showProgress);
@@ -312,6 +318,12 @@ function showProgress(value) {
         progressFill.style.width = `${percent}%`;
         progressPercent.textContent = `${percent.toFixed(1)}%`;
     });
+}
+
+function clearProgress() {
+    progress = 0;
+    progressFill.style.width = `${progress}%`;
+    progressPercent.textContent = `${progress.toFixed(1)}%`;
 }
 
 function validateVideo(path) {
