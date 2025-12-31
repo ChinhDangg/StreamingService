@@ -1,16 +1,22 @@
 package dev.chinh.streamingservice.mediabackup.config;
 
-import dev.chinh.streamingservice.common.event.MediaBackupEvent;
+import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.kafka.support.serializer.JsonSerializer;
 import org.springframework.util.backoff.FixedBackOff;
 
 import java.nio.file.FileAlreadyExistsException;
@@ -23,7 +29,7 @@ public class KafkaRedPandaConfig {
     @Value("${kafka.bootstrap-servers}")
     private String BOOTSTRAP_SERVERS;
 
-    public static final String MEDIA_GROUP_ID = "media-service";
+    public static final String MEDIA_GROUP_ID = "media-backup-service";
 
     public static final String MEDIA_BACKUP_TOPIC = "media-backup-events";
 
@@ -37,7 +43,7 @@ public class KafkaRedPandaConfig {
         props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, "true");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
 
-        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, MediaBackupEvent.class.getName());
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, MediaUpdateEvent.class.getName());
         props.put(JsonDeserializer.KEY_DEFAULT_TYPE, String.class.getName());
 
         return new DefaultKafkaConsumerFactory<>(
@@ -57,24 +63,54 @@ public class KafkaRedPandaConfig {
         // IMPORTANT: require manual ack
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
 
-        // retry only
+        // retry + dlq handler
         factory.setCommonErrorHandler(errorHandler);
 
         return factory;
     }
 
+    // for dlq only
     @Bean
-    public DefaultErrorHandler errorHandler() {
+    public ProducerFactory<String, Object> dlqProducerFactory() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        props.put(ProducerConfig.ACKS_CONFIG, "all");
+        props.put(ProducerConfig.RETRIES_CONFIG, 3);
+
+        return new DefaultKafkaProducerFactory<>(props, new StringSerializer(), new JsonSerializer<>());
+    }
+
+    @Bean
+    public KafkaTemplate<String, Object> dlqKafkaTemplate() {
+        return new KafkaTemplate<>(dlqProducerFactory());
+    }
+
+    public static final String MEDIA_BACKUP_DLQ_TOPIC = "media-backup-dlq";
+
+    @Bean
+    public NewTopic mediaUpdateDlqTopic() {
+        return TopicBuilder.name(MEDIA_BACKUP_DLQ_TOPIC)
+                .partitions(1)
+                .replicas(1)
+                .config("retention.ms", "604800000") // keep dlq messages for 7 days
+                .build();
+    }
+
+    @Bean
+    public DefaultErrorHandler kafkaErrorHandler(KafkaTemplate<String, Object> dlqKafkaTemplate) {
+        DeadLetterPublishingRecoverer recoverer =
+                new DeadLetterPublishingRecoverer(
+                        dlqKafkaTemplate,
+                        (record, ex) -> new org.apache.kafka.common.TopicPartition(
+                                MEDIA_BACKUP_DLQ_TOPIC,
+                                record.partition()
+                        ));
+
         FixedBackOff fixedBackOff = new FixedBackOff(2000L, 3);
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, fixedBackOff);
 
-        DefaultErrorHandler handler = new DefaultErrorHandler((record, exception) -> {
-            // This logic runs AFTER all retries fail (Recovery Logic)
-            System.err.println("Failed to process record: " + record.key() + " after 3 attempts");
-        }, fixedBackOff);
+        errorHandler.addNotRetryableExceptions(FileAlreadyExistsException.class);
 
-        // List exceptions DON'T want to retry
-        handler.addNotRetryableExceptions(FileAlreadyExistsException.class);
-
-        return handler;
+        return errorHandler;
     }
 }

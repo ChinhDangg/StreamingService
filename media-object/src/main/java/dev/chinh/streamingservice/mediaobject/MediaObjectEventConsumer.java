@@ -11,15 +11,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class MediaEventConsumer {
+public class MediaObjectEventConsumer {
 
     private final MinIOService minIOService;
 
-    Logger logger = LoggerFactory.getLogger(MediaEventConsumer.class);
+    Logger logger = LoggerFactory.getLogger(MediaObjectEventConsumer.class);
 
     private void onDeleteMediaObject(MediaUpdateEvent.MediaObjectDeleted event) throws Exception {
         System.out.println("Received media object delete event: " + event.mediaType() + " " + event.path());
@@ -76,7 +77,7 @@ public class MediaEventConsumer {
     }
 
 
-    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_UPDATED_OBJECT_TOPIC, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
+    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_OBJECT_TOPIC, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(MediaUpdateEvent event, Acknowledgment acknowledgment) throws Exception {
         try {
             if (event instanceof MediaUpdateEvent.MediaObjectDeleted e) {
@@ -87,8 +88,31 @@ public class MediaEventConsumer {
             acknowledgment.acknowledge();
         } catch (Exception e) {
             System.err.println(e.getMessage());
-            // throwing the exception lets DefaultErrorHandler apply retry + DLQ
+            // throwing the exception lets DefaultErrorHandler apply retry
             throw e;
         }
     }
+
+
+    // listen to DLQ and print out the event details for now
+    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_OBJECT_DLQ_TOPIC, groupId = "media-object-dlq-group")
+    public void handleDlq(MediaUpdateEvent event,
+                          Acknowledgment ack,
+                          @Header(name = "x-exception-message", required = false) String errorMessage) {
+        System.out.println("======= DLQ EVENT DETECTED =======");
+        System.out.printf("Error Message: %s\n", errorMessage);
+
+        // Accessing the POJO data directly
+        switch (event) {
+            case MediaUpdateEvent.MediaObjectDeleted e ->
+                    System.out.println("Received media object delete event: " + e.mediaType() + " " + e.path());
+            case MediaUpdateEvent.ThumbnailObjectDeleted e ->
+                    System.out.println("Received thumbnail object delete event: " + e.path());
+            default -> System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+        }
+
+        // ack or it will be re-read from the DLQ on restart or rehandle it manually.
+        //ack.acknowledge();
+    }
+
 }

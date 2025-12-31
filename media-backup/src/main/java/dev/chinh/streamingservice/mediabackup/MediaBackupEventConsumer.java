@@ -2,7 +2,7 @@ package dev.chinh.streamingservice.mediabackup;
 
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
-import dev.chinh.streamingservice.common.event.MediaBackupEvent;
+import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.mediabackup.config.KafkaRedPandaConfig;
 import io.minio.Result;
 import io.minio.errors.*;
@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
@@ -27,7 +28,7 @@ public class MediaBackupEventConsumer {
     @Value( "${media.backup.path}")
     private String MEDIA_BACKUP_PATH;
 
-    private void onMediaCreateBackup(MediaBackupEvent.MediaCreated event) throws Exception {
+    private void onMediaCreateBackup(MediaUpdateEvent.MediaBackupCreated event) throws Exception {
         System.out.println("Received media create backup event: " + event.path());
 
             if (event.mediaType() == MediaType.VIDEO) {
@@ -72,9 +73,9 @@ public class MediaBackupEventConsumer {
     }
 
     @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_BACKUP_TOPIC, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
-    public void handle(MediaBackupEvent event, Acknowledgment acknowledgment) throws Exception {
+    public void handle(MediaUpdateEvent event, Acknowledgment acknowledgment) throws Exception {
         try {
-            if (event instanceof MediaBackupEvent.MediaCreated e) {
+            if (event instanceof MediaUpdateEvent.MediaBackupCreated e) {
                 onMediaCreateBackup(e);
             }
             acknowledgment.acknowledge();
@@ -85,4 +86,22 @@ public class MediaBackupEventConsumer {
     }
 
 
+    // listen to DLQ and print out the event details for now
+    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_BACKUP_DLQ_TOPIC, groupId = "media-backup-dlq-group")
+    public void handleDlq(MediaUpdateEvent event,
+                          Acknowledgment ack,
+                          @Header(name = "x-exception-message", required = false) String errorMessage) {
+        System.out.println("======= DLQ EVENT DETECTED =======");
+        System.out.printf("Error Message: %s\n", errorMessage);
+
+        // Accessing the POJO data directly
+        switch (event) {
+            case MediaUpdateEvent.MediaBackupCreated e ->
+                    System.out.println("Received media create backup event: " + e.path());
+            default -> System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+        }
+
+        // ack or it will be re-read from the DLQ on restart or rehandle it manually.
+        //ack.acknowledge();
+    }
 }

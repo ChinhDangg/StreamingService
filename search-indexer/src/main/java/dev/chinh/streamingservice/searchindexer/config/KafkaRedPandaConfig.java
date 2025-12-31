@@ -28,9 +28,9 @@ public class KafkaRedPandaConfig {
     @Value("${kafka.bootstrap-servers}")
     private String BOOTSTRAP_SERVERS;
 
-    public static final String MEDIA_GROUP_ID = "media-service";
+    public static final String MEDIA_GROUP_ID = "media-search-indexer-service";
 
-    public static final String MEDIA_UPDATED_OPENSEARCH_TOPIC = "media-updated-opensearch-events";
+    public static final String MEDIA_SEARCH_TOPIC = "media-search-events";
 
     @Bean
     public ConsumerFactory<String, Object> consumerFactory() {
@@ -62,7 +62,7 @@ public class KafkaRedPandaConfig {
         // IMPORTANT: require manual ack
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
 
-        // retry + DQL handler
+        // retry + DLQ handler
         factory.setCommonErrorHandler(errorHandler);
 
         return factory;
@@ -84,11 +84,11 @@ public class KafkaRedPandaConfig {
         return new KafkaTemplate<>(dlqProducerFactory());
     }
 
-    public static final String MEDIA_UPDATE_DLQ_TOPIC = "media-update-opensearch-dlq";
+    public static final String MEDIA_SEARCH_DLQ_TOPIC = "media-search-dlq";
 
     @Bean
     public NewTopic mediaUpdateDlqTopic() {
-        return TopicBuilder.name(MEDIA_UPDATE_DLQ_TOPIC)
+        return TopicBuilder.name(MEDIA_SEARCH_DLQ_TOPIC)
                 .partitions(1)
                 .replicas(1)
                 .config("retention.ms", "604800000") // keep dlq messages for 7 days
@@ -100,15 +100,15 @@ public class KafkaRedPandaConfig {
         DeadLetterPublishingRecoverer recoverer =
                 new DeadLetterPublishingRecoverer(dlqKafkaTemplate,
                         (record, ex) -> new org.apache.kafka.common.TopicPartition(
-                                MEDIA_UPDATE_DLQ_TOPIC,
+                                MEDIA_SEARCH_DLQ_TOPIC,
                                 record.partition()
                         ));
 
-        // retry every 1s, up to 5 times
-        FixedBackOff backOff = new FixedBackOff(1000, 5);
+        // retry every 2s, up to 5 times
+        FixedBackOff backOff = new FixedBackOff(2000, 5);
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, backOff);
 
-        // Optionally tell it which exceptions should NOT be retried:
+        // exceptions should NOT be retried:
         errorHandler.addNotRetryableExceptions(IllegalArgumentException.class);
 
         return errorHandler;

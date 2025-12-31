@@ -12,10 +12,7 @@ import dev.chinh.streamingservice.searchindexer.config.KafkaRedPandaConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
-import org.springframework.kafka.support.KafkaHeaders;
-import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.handler.annotation.Header;
-import org.springframework.messaging.handler.annotation.Headers;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -25,7 +22,7 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-public class MediaEventConsumer {
+public class MediaSearchEventConsumer {
 
     private final MediaMetaDataRepository mediaMetaDataRepository;
     private final MediaAuthorRepository mediaAuthorRepository;
@@ -144,7 +141,7 @@ public class MediaEventConsumer {
         };
     }
 
-    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_UPDATED_OPENSEARCH_TOPIC, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
+    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_SEARCH_TOPIC, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(MediaUpdateEvent event, Acknowledgment acknowledgment) {
         try {
             switch (event) {
@@ -168,8 +165,9 @@ public class MediaEventConsumer {
         }
     }
 
-    // listen to DLQ and print out the event details for now - later log to a file or database or consume it
-    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_UPDATE_DLQ_TOPIC, groupId = "media-dlq-group")
+
+    // listen to DLQ and print out the event details for now
+    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_SEARCH_DLQ_TOPIC, groupId = "media-search-dlq-group")
     public void handleDlq(MediaUpdateEvent event,
                           Acknowledgment ack,
                           @Header(name = "x-exception-message", required = false) String errorMessage) {
@@ -198,17 +196,4 @@ public class MediaEventConsumer {
         // ack or it will be re-read from the DLQ on restart or rehandle it manually.
         //ack.acknowledge();
     }
-
-
 }
-
-
-
-
-
-
-
-
-
-
-
