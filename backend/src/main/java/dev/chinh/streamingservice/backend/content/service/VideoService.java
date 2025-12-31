@@ -25,11 +25,9 @@ public class VideoService extends MediaService {
         super(redisStringTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaSearchCacheService);
     }
 
-    public String getOriginalVideoUrl(long videoId) throws Exception {
+    public String getOriginalVideoUrl(long videoId) {
         MediaDescription mediaDescription = getMediaDescription(videoId);
-        int extraExpirySeconds = 30 * 60;
-        return minIOService.getSignedUrlForHostNginx(mediaDescription.getBucket(), mediaDescription.getPath(),
-                mediaDescription.getLength() + extraExpirySeconds); // video duration + 30 minutes extra
+        return minIOService.getRedirectObjectUrl(mediaDescription.getBucket(), mediaDescription.getPath());
     }
 
     public String getPreviewVideoUrl(long videoId) throws Exception {

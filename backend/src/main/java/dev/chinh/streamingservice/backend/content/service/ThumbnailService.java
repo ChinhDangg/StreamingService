@@ -160,7 +160,7 @@ public class ThumbnailService {
                 String output = albumUrlInfo.mediaUrlList.get(i).url;
 
                 String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(i);
-                String input = minIOService.getSignedUrlForContainerNginx(bucket, albumUrlInfo.pathList.get(i), 5 * 60);
+                String input = minIOService.getObjectUrlForContainer(bucket, albumUrlInfo.pathList.get(i));
 
                 String ffmpegCmd = String.format(
                         "ffmpeg -n -hide_banner -loglevel info " +

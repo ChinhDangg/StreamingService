@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.regex.Matcher;
@@ -46,7 +45,6 @@ public class VideoService extends MediaService implements ResourceCleanable {
         memoryManager.registerResourceCleanable(this);
     }
 
-    private final int extraExpirySeconds = 30 * 60; // 30 minutes
     private static final String diskDir = "disk";
 
     @Override
@@ -91,9 +89,8 @@ public class VideoService extends MediaService implements ResourceCleanable {
         return super.isJobWithinHandleWindow(tokenKey, mediaJobDescription);
     }
 
-    private String getOriginalVideoUrl(MediaJobDescription mediaJobDescription) throws Exception {
-        return minIOService.getSignedUrlForHostNginx(mediaJobDescription.getBucket(), mediaJobDescription.getPath(),
-                mediaJobDescription.getLength() + extraExpirySeconds); // video duration + 30 minutes extra
+    private String getOriginalVideoUrl(MediaJobDescription mediaJobDescription) {
+        return minIOService.getRedirectObjectUrl(mediaJobDescription.getBucket(), mediaJobDescription.getPath());
     }
 
     private String getPreviewVideoUrl(String tokenKey, MediaJobDescription mediaJobDescription) throws Exception {
@@ -165,8 +162,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
         )); // scale=-2:%d[v]
         String filterComplex = fc.toString();
 
-        String nginxUrl = minIOService.getSignedUrlForContainerNginx(
-                mediaJobDescription.getBucket(), mediaJobDescription.getPath(), mediaJobDescription.getLength() + extraExpirySeconds);
+        String nginxUrl = minIOService.getObjectUrlForContainer(mediaJobDescription.getBucket(), mediaJobDescription.getPath());
 
         int segmentDuration = 4;
         String partialVideoJobId = UUID.randomUUID().toString();
@@ -243,10 +239,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
         OSUtil.createTempDir(videoDir);
 
-        // 2. Get a presigned URL with container Nginx so ffmpeg can access in container
-        // 3. Rewrite URL to go through Nginx proxy instead of direct MinIO
-        String nginxUrl = minIOService.getSignedUrlForContainerNginx(mediaJobDescription.getBucket(),
-                mediaJobDescription.getPath(), mediaJobDescription.getLength() + extraExpirySeconds);
+        String nginxUrl = minIOService.getObjectUrlForContainer(mediaJobDescription.getBucket(), mediaJobDescription.getPath());
 
         String scale = getFfmpegScaleString(
                 mediaJobDescription.getWidth(), mediaJobDescription.getHeight(), res.getResolution());
@@ -313,7 +306,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
         String thumbnailObject = objectName.substring(0, objectName.lastIndexOf(".")) + "-thumb.jpg";
         String thumbnailOutput = OSUtil.normalizePath(diskDir, thumbnailObject);
         Files.createDirectories(Path.of(thumbnailOutput.substring(0, thumbnailOutput.lastIndexOf("/"))));
-        String videoInput = minIOService.getSignedUrlForContainerNginx(bucket, objectName, (int) Duration.ofMinutes(15).toSeconds());
+        String videoInput = minIOService.getObjectUrlForContainer(bucket, objectName);
 
 
         List<String> command = Arrays.asList(

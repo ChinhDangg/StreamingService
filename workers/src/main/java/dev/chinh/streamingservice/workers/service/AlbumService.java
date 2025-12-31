@@ -40,8 +40,6 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         this.videoService = videoService;
     }
 
-    private final int expirySeconds = 60 * 60; // 1 hour
-
     public record MediaUrl(MediaType type, String url) {}
     public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, List<String> buckets, List<String> pathList) {}
     public record AlbumUrlInfoWithSizeAndDimensions(AlbumUrlInfo albumUrlInfo, SizeAndDimensions sizeAndDimensions) {}
@@ -122,8 +120,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         List<MediaUrl> albumUrls = new ArrayList<>();
         for (String path : pathList) {
             MediaType mediaType = MediaType.detectMediaType(path);
-            String originalVideoUrl = minIOService.getSignedUrlForHostNginx(mediaJobDescription.getBucket(),
-                    path, expirySeconds);
+            String originalVideoUrl = minIOService.getObjectUrl(mediaJobDescription.getBucket(), path);
             albumUrls.add(new MediaUrl(mediaType, originalVideoUrl));
         }
         return new AlbumUrlInfo(albumUrls, new ArrayList<>(List.of(mediaJobDescription.getBucket())), pathList);
@@ -264,7 +261,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                 String output = albumUrlInfo.mediaUrlList.get(i).url;
 
                 String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(i);
-                String input = minIOService.getSignedUrlForContainerNginx(bucket, albumUrlInfo.pathList.get(i), expirySeconds);
+                String input = minIOService.getObjectUrlForContainer(bucket, albumUrlInfo.pathList.get(i));
 
                 String ffmpegCmd = String.format(
                         "ffmpeg -n -hide_banner -loglevel info " +
@@ -317,7 +314,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         String bucket = albumUrlInfo.buckets.getFirst();
 
         if (res == Resolution.original) {
-            return minIOService.getSignedUrlForHostNginx(bucket, videoPath, expirySeconds);
+            return minIOService.getObjectUrl(bucket, videoPath);
         }
 
         List<String> streamUrlPaths = List.of(
@@ -341,7 +338,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         long objectSize = minIOService.getObjectSize(bucket, videoPath);
         boolean enoughSpace = memoryManager.freeMemoryForSize(objectSize);
         if (!enoughSpace)
-            return minIOService.getSignedUrlForHostNginx(bucket, videoPath, expirySeconds);
+            return minIOService.getObjectUrl(bucket, videoPath);
 
         final String videoDir = albumVidCacheJobId.replace(":", "/");
         OSUtil.createTempDir(videoDir);
@@ -350,7 +347,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         String outPath = containerDir + masterFileName;
 
         String scale = getFfmpegScaleString(res, false);
-        String input = minIOService.getSignedUrlForContainerNginx(bucket, videoPath, expirySeconds);
+        String input = minIOService.getObjectUrlForContainer(bucket, videoPath);
         String partialVideoJobId = videoService.createPartialVideo(tokenKey, input, scale, videoDir, outPath, prevJobStopped, albumVidCacheJobId);
 
         videoService.addCacheVideoJobStatus(albumVidCacheJobId, partialVideoJobId, objectSize, MediaJobStatus.RUNNING);

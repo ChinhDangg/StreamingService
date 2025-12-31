@@ -171,7 +171,7 @@ public class MediaSearchService {
             if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
                 String thumbnailBucket = searchItem.getMediaType() == MediaType.ALBUM ? searchItem.getBucket() : ContentMetaData.THUMBNAIL_BUCKET;
                 itemResponse.setThumbnail(searchItem.hasThumbnail()
-                        ? minIOService.getSignedUrlForHostNginx(thumbnailBucket, searchItem.getThumbnail(), 60 * 60)
+                        ? minIOService.getObjectUrl(thumbnailBucket, searchItem.getThumbnail())
                         : null);
             } else {
                 itemResponse.setThumbnail(searchItem.hasThumbnail() ? ThumbnailService.getThumbnailPath(

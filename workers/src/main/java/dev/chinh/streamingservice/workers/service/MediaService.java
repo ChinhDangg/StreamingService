@@ -82,7 +82,7 @@ public abstract class MediaService {
     }
 
     protected String getNginxVideoStreamUrl(String videoDir) {
-        return "/stream/" + videoDir + masterFileName;
+        return "/stream/chunks/" + videoDir + masterFileName;
     }
 
     protected boolean checkSrcSmallerThanTarget(int width, int height, int target) {
