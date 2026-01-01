@@ -1,5 +1,7 @@
 package dev.chinh.streamingservice.mediaupload.upload.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.common.OSUtil;
@@ -42,7 +44,7 @@ public class MediaUploadService {
     private final S3Presigner s3Presigner;
     private final RedisTemplate<String, String> redisStringTemplate;
 
-    private final ObjectMapper mapper;
+    private final ObjectMapper objectMapper;
     private final MinIOService minIOService;
     private final ThumbnailService thumbnailService;
     private final MediaDisplayService mediaDisplayService;
@@ -96,7 +98,7 @@ public class MediaUploadService {
 
         CreateMultipartUploadResponse response = s3Client.createMultipartUpload(multipartUploadRequest);
         String uploadId = response.uploadId();
-        cacheFileUploadRequest(sessionId, uploadId, object);
+        addCacheFileUploadRequest(sessionId, uploadId, validatedObject);
         return uploadId;
     }
 
@@ -124,7 +126,7 @@ public class MediaUploadService {
 
     public record UploadedPart(int partNumber, String etag) {}
 
-    public void completeMultipartUpload(String sessionId, String uploadId, String object, List<UploadedPart> uploadedParts) {
+    public void completeMultipartUpload(String sessionId, String uploadId, String object, List<UploadedPart> uploadedParts) throws JsonProcessingException {
         MediaType mediaType = getCachedFileUploadRequest(sessionId, uploadId);
         if (mediaType == null) {
             throw new IllegalArgumentException("Upload ID not found: " + uploadId);
@@ -132,27 +134,7 @@ public class MediaUploadService {
         String validatedObject = validateObject(object, mediaType);
         validateObjectWithMediaType(validatedObject, mediaType);
 
-        List<CompletedPart> completedParts = uploadedParts.stream()
-                .map(p -> CompletedPart.builder()
-                        .partNumber(p.partNumber)
-                        .eTag(p.etag)
-                        .build()
-                )
-                .toList();
-
-        CompletedMultipartUpload upload = CompletedMultipartUpload.builder()
-                .parts(completedParts)
-                .build();
-
-        CompleteMultipartUploadRequest completeRequest = CompleteMultipartUploadRequest.builder()
-                .bucket(mediaBucket)
-                .key(validatedObject)
-                .uploadId(uploadId)
-                .multipartUpload(upload)
-                .build();
-
-        s3Client.completeMultipartUpload(completeRequest);
-        removeCacheFileUploadRequest(sessionId, uploadId);
+        addCacheFileUploadParts(sessionId, uploadId, uploadedParts);
     }
 
 
@@ -219,6 +201,9 @@ public class MediaUploadService {
         if (!grouperMedia.isGrouper()) {
             throw new IllegalArgumentException("Media is not a grouper media: " + grouperMediaId);
         }
+
+        completeUpload(sessionId);
+
         MediaGroupMetaData grouperGroupInfo = grouperMedia.getGroupInfo();
 
         MediaMetaData mediaMetaData = new MediaMetaData();
@@ -284,6 +269,8 @@ public class MediaUploadService {
             throw new IllegalArgumentException("Invalid session ID: " + sessionId);
         }
 
+        completeUpload(sessionId);
+
         MediaMetaData mediaMetaData = new MediaMetaData();
         mediaMetaData.setTitle(basicInfo.getTitle());
         mediaMetaData.setYear(basicInfo.getYear());
@@ -343,8 +330,47 @@ public class MediaUploadService {
         return savedId;
     }
 
+    private void completeUpload(String sessionId) throws JsonProcessingException {
+        Map<Object, Object> uploadedParts = redisStringTemplate.opsForHash().entries("upload::" + sessionId);
+        for (Map.Entry<Object, Object> entry : uploadedParts.entrySet()) {
+            String uploadIdPart = (String) entry.getKey();
+            if (!uploadIdPart.startsWith("parts:"))
+                continue;
+
+            String uploadId = uploadIdPart.substring("parts:".length());
+            //System.out.println("Upload ID: " + uploadId);
+            String objectName = redisStringTemplate.opsForHash().get("upload::" + sessionId, uploadId).toString();
+            //System.out.println("Object name: " + objectName);
+
+            List<UploadedPart> parts = objectMapper.readValue(entry.getValue().toString(), new TypeReference<>() {});
+            //System.out.println("Parts: " + parts);
+
+            List<CompletedPart> completedParts = parts.stream()
+                    .map(p -> CompletedPart.builder()
+                            .partNumber(p.partNumber)
+                            .eTag(p.etag)
+                            .build()
+                    )
+                    .toList();
+
+            CompletedMultipartUpload multipartUploadUpload = CompletedMultipartUpload.builder()
+                    .parts(completedParts)
+                    .build();
+
+            CompleteMultipartUploadRequest completeRequest = CompleteMultipartUploadRequest.builder()
+                    .bucket(mediaBucket)
+                    .key(objectName)
+                    .uploadId(uploadId)
+                    .multipartUpload(multipartUploadUpload)
+                    .build();
+
+            s3Client.completeMultipartUpload(completeRequest);
+            removeCacheFileUploadRequest(sessionId, uploadId);
+        }
+    }
+
     public JsonNode probeMediaInfo(String bucket, String object) throws Exception {
-        String containerSignUrl = minIOService.getSignedUrlForContainerNginx(bucket, object, (int) Duration.ofMinutes(15).toSeconds());
+        String containerSignUrl = minIOService.getObjectUrlForContainer(bucket, object);
         ProcessBuilder pb = new ProcessBuilder(
                 "docker", "exec", "ffmpeg",
                 "ffprobe",
@@ -370,7 +396,7 @@ public class MediaUploadService {
             throw new RuntimeException("ffprobe failed — exit=" + exitCode + " output: " + output);
         }
 
-        JsonNode jsonNode = mapper.readTree(output);
+        JsonNode jsonNode = objectMapper.readTree(output);
         JsonNode streams = jsonNode.get("streams");
         if (streams == null || !streams.isArray()) {
             throw new RuntimeException("No stream data found in video");
@@ -486,7 +512,13 @@ public class MediaUploadService {
     }
 
 
-    private void cacheFileUploadRequest(String sessionId, String uploadId, String object) {
+    private void addCacheFileUploadParts(String sessionId, String uploadId, List<UploadedPart> parts) throws JsonProcessingException {
+        String key = "upload::" + sessionId;
+        String json = objectMapper.writeValueAsString(parts);
+        redisStringTemplate.opsForHash().put(key, "parts:" + uploadId, json);
+    }
+
+    private void addCacheFileUploadRequest(String sessionId, String uploadId, String object) {
         redisStringTemplate.opsForHash().put("upload::" + sessionId, uploadId, object);
     }
 

@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.mediaupload.upload.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.mediaupload.MediaBasicInfo;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaUploadService;
@@ -47,7 +48,7 @@ public class MediaUploadController {
             List<MediaUploadService.UploadedPart> uploadedParts) {}
 
     @PostMapping("/complete")
-    public void completeUpload(@RequestBody CompleteMultipartUploadRequest request) {
+    public void completeUpload(@RequestBody CompleteMultipartUploadRequest request) throws JsonProcessingException {
         mediaUploadService.completeMultipartUpload(request.sessionId, request.uploadId, request.objectKey, request.uploadedParts);
     }
 
