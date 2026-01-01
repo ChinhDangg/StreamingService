@@ -6,6 +6,7 @@ import io.minio.errors.MinioException;
 import io.minio.http.Method;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -20,31 +21,11 @@ public class MinIOService {
 
     private final MinioClient minioClient;
 
-    private String getSignedUrl(String bucket, String object, int expirySeconds) throws Exception {
-        return minioClient.getPresignedObjectUrl(
-                GetPresignedObjectUrlArgs.builder()
-                        .method(Method.GET)
-                        .bucket(bucket)
-                        .object(object)
-                        .expiry(expirySeconds)
-                        .build()
-        );
-    }
+    @Value("${minio.container.url}")
+    private String minioContainerUrl;
 
-    /**
-     * Get signed URL and replace the MinIO signed base URL with Nginx URL.
-    */
-    public String getSignedUrlForHostNginx(String bucket, String object, int expirySeconds) throws Exception {
-        String signedUrl = getSignedUrl(bucket, object, expirySeconds);
-        return signedUrl.replace("http://localhost:9000", "http://localhost/stream/minio");
-    }
-
-    /**
-     * Get signed URL and replace the MinIO signed base URL with Nginx container URL.
-     */
-    public String getSignedUrlForContainerNginx(String bucket, String object, int expirySeconds) throws Exception {
-        String signedUrl = getSignedUrl(bucket, object, expirySeconds);
-        return signedUrl.replace("http://localhost:9000", "http://nginx/stream/minio");
+    public String getObjectUrlForContainer(String bucket, String object) {
+        return minioContainerUrl + "/" + bucket + "/" + object;
     }
 
     public Iterable<Result<Item>> getAllItemsInBucketWithPrefix(String bucketName, String prefix) {
