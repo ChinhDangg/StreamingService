@@ -3,30 +3,27 @@ package dev.chinh.streamingservice.workers;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.workers.service.AlbumService;
-import dev.chinh.streamingservice.workers.service.MediaUploadService;
 import dev.chinh.streamingservice.workers.service.ThumbnailService;
 import dev.chinh.streamingservice.workers.service.VideoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.util.HashSet;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
 @Service
-//@EnableScheduling
+@EnableScheduling
 @RequiredArgsConstructor
 public class ScheduleService {
 
     private final VideoService videoService;
     private final AlbumService albumService;
     private final ThumbnailService thumbnailService;
-    private final MediaUploadService mediaUploadService;
 
     private final RedisTemplate<String, String> queueRedisTemplate;
 
@@ -43,7 +40,6 @@ public class ScheduleService {
     @Scheduled(fixedDelay = 15 * 60 * 1000) // 15 mins
     public void scheduled15mins() {
         removeAlbumCreationInfo();
-        removeExpiredUploadSession();
         cleanThumbnails();
 
         trimJobStreams();
@@ -124,35 +120,6 @@ public class ScheduleService {
             String path = ThumbnailService.getThumbnailParentPath() + "/" + thumbnailFileName;
             OSUtil.deleteForceMemoryDirectory(path);
             thumbnailService.removeThumbnailLastAccess(thumbnailFileName);
-        }
-    }
-
-    private void removeExpiredUploadSession() {
-        long now = System.currentTimeMillis();
-        Set<ZSetOperations.TypedTuple<String>> lastAccessSessions = mediaUploadService.getAllUploadSessionCacheLastAccess(now);
-        for (ZSetOperations.TypedTuple<String> session : lastAccessSessions) {
-            if (now - session.getScore() < 60_000) {
-                break;
-            }
-
-            String sessionId = Objects.requireNonNull(session.getValue());
-            Map<Object, Object> objectMap = mediaUploadService.getUploadSessionObjects(sessionId);
-            if (objectMap.isEmpty()) continue;
-
-            mediaUploadService.removeCacheMediaSessionRequest(sessionId);
-            mediaUploadService.removeUploadSessionCacheLastAccess(sessionId);
-
-            Set<String> seen = new HashSet<>();
-            for (Object value : objectMap.values()) {
-                String objectName = value.toString();
-                if (seen.add(objectName)) {
-                    try {
-                        mediaUploadService.removeUploadObject(objectName);
-                    } catch (Exception e) {
-                        System.out.println("Failed to remove object: " + objectName);
-                    }
-                }
-            }
         }
     }
 }

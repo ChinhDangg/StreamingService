@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -28,6 +29,8 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedUploadPartReq
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -51,6 +54,7 @@ public class MediaUploadService {
     private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
 
     private final String mediaBucket = ContentMetaData.MEDIA_BUCKET;
+
     public static final String defaultVidPath = "vid";
     @Value("${backup.enabled}")
     private String backupEnabled;
@@ -469,6 +473,18 @@ public class MediaUploadService {
     }
 
 
+    public Map<Object, Object> getUploadSessionObjects(String sessionId) {
+        var map = redisStringTemplate.opsForHash().entries("upload::" + sessionId);
+        if (map.isEmpty()) return Map.of();
+        map.remove("objectName");
+        map.remove("mediaType");
+        return map;
+    }
+
+    public void removeUploadObject(String object) throws Exception {
+        minIOService.removeFile(ContentMetaData.MEDIA_BUCKET, object);
+    }
+
 
     private void cacheFileUploadRequest(String sessionId, String uploadId, String object) {
         redisStringTemplate.opsForHash().put("upload::" + sessionId, uploadId, object);
@@ -523,6 +539,10 @@ public class MediaUploadService {
 
     public void removeUploadSessionCacheLastAccess(String sessionId) {
         redisStringTemplate.opsForZSet().remove("upload::lastAccess", sessionId);
+    }
+
+    public Set<ZSetOperations.TypedTuple<String>> getAllUploadSessionCacheLastAccess(long max) {
+        return redisStringTemplate.opsForZSet().rangeByScoreWithScores("upload::lastAccess", 0, max, 0, 50);
     }
 
 

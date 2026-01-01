@@ -46,6 +46,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
     }
 
     private static final String diskDir = "disk";
+    public static final String defaultVidPath = "vid";
 
     @Override
     public void handleJob(String tokenKey, MediaJobDescription mediaJobDescription) {
@@ -345,9 +346,9 @@ public class VideoService extends MediaService implements ResourceCleanable {
             throw new RuntimeException("Failed to generate thumbnail from video");
         }
 
-        thumbnailObject = thumbnailObject.startsWith(MediaUploadService.defaultVidPath)
+        thumbnailObject = thumbnailObject.startsWith(defaultVidPath)
                 ? thumbnailObject
-                : OSUtil.normalizePath(MediaUploadService.defaultVidPath, thumbnailObject);
+                : OSUtil.normalizePath(defaultVidPath, thumbnailObject);
         minIOService.moveFileToObject(ContentMetaData.THUMBNAIL_BUCKET, thumbnailObject, thumbnailOutput);
         Files.delete(thumbnailPath);
 
