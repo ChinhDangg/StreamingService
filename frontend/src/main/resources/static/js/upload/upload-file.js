@@ -109,6 +109,11 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
             method: 'PUT',
             body: c.blob
         });
+        if (!res.ok) {
+            if (currentFailTexts)
+                currentFailTexts.push('Upload: ' + await res.text());
+            return false;
+        }
         console.log('blob upload result: ' + res);
 
         eTags.push({
