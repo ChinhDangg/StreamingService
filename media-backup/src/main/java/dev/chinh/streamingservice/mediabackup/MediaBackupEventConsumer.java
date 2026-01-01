@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
@@ -73,7 +74,7 @@ public class MediaBackupEventConsumer {
     }
 
     @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_BACKUP_TOPIC, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
-    public void handle(MediaUpdateEvent event, Acknowledgment acknowledgment) throws Exception {
+    public void handle(@Payload MediaUpdateEvent event, Acknowledgment acknowledgment) throws Exception {
         try {
             if (event instanceof MediaUpdateEvent.MediaBackupCreated e) {
                 onMediaCreateBackup(e);

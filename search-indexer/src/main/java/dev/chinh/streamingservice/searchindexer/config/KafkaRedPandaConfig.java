@@ -35,19 +35,18 @@ public class KafkaRedPandaConfig {
     public static final String MEDIA_SEARCH_TOPIC = "media-search-events";
 
     @Bean
-    public ConsumerFactory<String, Object> consumerFactory() {
+    public DefaultKafkaConsumerFactory<String, MediaUpdateEvent> consumerFactory() {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, MEDIA_GROUP_ID);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
 
-        JsonDeserializer<Object> jsonDeserializer = new JsonDeserializer<>(Object.class);
+        JsonDeserializer<MediaUpdateEvent> jsonDeserializer = new JsonDeserializer<>(MediaUpdateEvent.class);
         jsonDeserializer.addTrustedPackages("dev.chinh.streamingservice.common.event");
-        jsonDeserializer.setTypeMapper(new DefaultJackson2JavaTypeMapper());
-        jsonDeserializer.setUseTypeHeaders(false);
+        jsonDeserializer.setUseTypeHeaders(true);
 
-        ErrorHandlingDeserializer<Object> valueDeserializer = new ErrorHandlingDeserializer<>(jsonDeserializer);
+        ErrorHandlingDeserializer<MediaUpdateEvent> valueDeserializer = new ErrorHandlingDeserializer<>(jsonDeserializer);
         ErrorHandlingDeserializer<String> keyDeserializer = new ErrorHandlingDeserializer<>(new StringDeserializer());
 
         return new DefaultKafkaConsumerFactory<>(
@@ -58,11 +57,11 @@ public class KafkaRedPandaConfig {
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory(
-            ConsumerFactory<String, Object> consumerFactory,
+    public ConcurrentKafkaListenerContainerFactory<String, MediaUpdateEvent> kafkaListenerContainerFactory(
+            ConsumerFactory<String, MediaUpdateEvent> consumerFactory,
             DefaultErrorHandler errorHandler
     ) {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        ConcurrentKafkaListenerContainerFactory<String, MediaUpdateEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
         // IMPORTANT: require manual ack
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
@@ -75,10 +74,10 @@ public class KafkaRedPandaConfig {
 
     // for dlq only - not media events
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, Object> dlqListenerContainerFactory(
-            ConsumerFactory<String, Object> consumerFactory
+    public ConcurrentKafkaListenerContainerFactory<String, MediaUpdateEvent> dlqListenerContainerFactory(
+            ConsumerFactory<String, MediaUpdateEvent> consumerFactory
     ) {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        ConcurrentKafkaListenerContainerFactory<String, MediaUpdateEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
 

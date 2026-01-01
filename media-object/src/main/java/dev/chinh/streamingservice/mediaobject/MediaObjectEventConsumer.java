@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -78,7 +79,7 @@ public class MediaObjectEventConsumer {
 
 
     @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_OBJECT_TOPIC, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
-    public void handle(Object event, Acknowledgment acknowledgment) throws Exception {
+    public void handle(@Payload MediaUpdateEvent event, Acknowledgment acknowledgment) throws Exception {
         try {
             if (event instanceof MediaUpdateEvent.MediaObjectDeleted e) {
                 onDeleteMediaObject(e);

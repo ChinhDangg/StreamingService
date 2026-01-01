@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -142,7 +143,7 @@ public class MediaSearchEventConsumer {
     }
 
     @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_SEARCH_TOPIC, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
-    public void handle(MediaUpdateEvent event, Acknowledgment acknowledgment) {
+    public void handle(@Payload MediaUpdateEvent event, Acknowledgment acknowledgment) {
         try {
             switch (event) {
                 case MediaUpdateEvent.LengthUpdated e -> onUpdateLengthOpenSearch(e);
@@ -172,7 +173,7 @@ public class MediaSearchEventConsumer {
             groupId = "media-search-dlq-group",
             containerFactory = "dlqListenerContainerFactory"
     )
-    public void handleDlq(MediaUpdateEvent event,
+    public void handleDlq(Object event,
                           Acknowledgment ack,
                           @Header(name = "x-exception-message", required = false) String errorMessage) {
         System.out.println("======= DLQ EVENT DETECTED =======");
