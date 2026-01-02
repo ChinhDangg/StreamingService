@@ -19,6 +19,7 @@ public class WorkersApplication {
     CommandLineRunner startWorkers(ApplicationContext ctx) {
         return _ -> {
             OSUtil._init();
+            OSUtil._initializeRAMInfo();
 
             WorkerRedisService workerRedisService = ctx.getBean(WorkerRedisService.class);
             workerRedisService.initializeTokens(VideoWorker.TOKEN_KEY, 2);

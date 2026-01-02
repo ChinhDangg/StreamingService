@@ -24,10 +24,9 @@ public class OSUtil {
     public static long MEMORY_TOTAL = 0;
     public static AtomicLong MEMORY_USABLE;
 
-    public static void _init() throws Exception {
+    public static void _init() {
         currentOS = _detectOS();
         RAMDISK = _getRAMDISKName();
-        _initializeRAMInfo();
     }
 
     private static OS _detectOS() {
@@ -92,7 +91,7 @@ public class OSUtil {
         System.out.println("RAMDisk creation finished");
     }
 
-    private static void _initializeRAMInfo() throws IOException, InterruptedException {
+    public static void _initializeRAMInfo() throws IOException, InterruptedException {
         MEMORY_TOTAL = getMemoryTotalSpace();
         MEMORY_USABLE = new AtomicLong(getActualMemoryUsableSpace());
     }
