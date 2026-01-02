@@ -60,7 +60,7 @@ services:
     environment:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
-      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+      - OPENSEARCH_JAVA_OPTS=-Xms${OPENSEARCH_HEAP_GB}g -Xmx${OPENSEARCH_HEAP_GB}g
       - plugins.security.disabled=true
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD={OPENSEARCH_INITIAL_ADMIN_PASSWORD}
     ulimits:
@@ -136,7 +136,7 @@ volumes:
     driver_opts:
       type: tmpfs
       device: tmpfs
-      o: size=1g   # 1GB RAM disk
+      o: size=${RAM_VOLUME_BYTES}
 
 #  logstash:
 #    image: docker.elastic.co/logstash/logstash:8.17.10

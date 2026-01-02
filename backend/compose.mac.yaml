@@ -61,7 +61,7 @@ services:
     environment:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
-      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+      - OPENSEARCH_JAVA_OPTS=-Xms${OPENSEARCH_HEAP_GB}g -Xmx${OPENSEARCH_HEAP_GB}g
       - plugins.security.disabled=true
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD= ${OPENSEARCH_INITIAL_ADMIN_PASSWORD}
     ulimits:
