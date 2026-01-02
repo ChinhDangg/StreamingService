@@ -8,6 +8,8 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+      MINIO_API_STALE_UPLOADS_EXPIRY: 1h
+      MINIO_API_STALE_UPLOADS_CLEANUP_INTERVAL: 1h  # check hourly
     volumes:
       - ./minio-data:/data
     command: server /data --console-address ":9001"
