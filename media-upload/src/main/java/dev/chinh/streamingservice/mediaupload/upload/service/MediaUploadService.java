@@ -350,7 +350,7 @@ public class MediaUploadService {
         ProcessBuilder pb = new ProcessBuilder(
                 "docker", "exec", "ffmpeg",
                 "ffprobe",
-                "-v", "quiet",
+                "-v", "error",
                 "-print_format", "json",
                 "-show_format",
                 "-show_streams",
