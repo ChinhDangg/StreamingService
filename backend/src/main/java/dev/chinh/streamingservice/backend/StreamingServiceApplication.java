@@ -19,7 +19,8 @@ public class StreamingServiceApplication {
                 ramBytes = 536_870_912L;
             }
 
-            OSUtil._init(ramBytes);
+            OSUtil._init();
+            OSUtil._createRamDisk(ramBytes);
             OSUtil.startDockerCompose();
         } catch (Exception e) {
             throw new RuntimeException("Failed to start init OSUtil", e);

@@ -24,10 +24,9 @@ public class OSUtil {
     public static long MEMORY_TOTAL = 0;
     public static AtomicLong MEMORY_USABLE;
 
-    public static void _init(long ramBytes) throws Exception {
+    public static void _init() throws Exception {
         currentOS = _detectOS();
         RAMDISK = _getRAMDISKName();
-        _createRamDisk(ramBytes);
         _initializeRAMInfo();
     }
 
@@ -55,7 +54,7 @@ public class OSUtil {
         throw new RuntimeException("Unsupported OS: " + currentOS);
     }
 
-    private static void _createRamDisk(long ramBytes) throws Exception {
+    public static void _createRamDisk(long ramBytes) throws Exception {
         if (Files.exists(Paths.get(RAMDISK))) {
             System.out.println("Ramdisk already exists");
             return;
