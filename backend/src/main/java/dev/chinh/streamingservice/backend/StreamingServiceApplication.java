@@ -11,7 +11,15 @@ public class StreamingServiceApplication {
 
     static {
         try {
-            OSUtil._init();
+            String ramBytesStr = System.getenv("RAM_VOLUME_BYTES");
+            long ramBytes;
+            try {
+                ramBytes = Math.max(536_870_912L, Long.parseLong(ramBytesStr));
+            } catch (Exception _) {
+                ramBytes = 536_870_912L;
+            }
+
+            OSUtil._init(ramBytes);
             OSUtil.startDockerCompose();
         } catch (Exception e) {
             throw new RuntimeException("Failed to start init OSUtil", e);

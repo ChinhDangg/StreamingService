@@ -24,10 +24,10 @@ public class OSUtil {
     public static long MEMORY_TOTAL = 0;
     public static AtomicLong MEMORY_USABLE;
 
-    public static void _init() throws Exception {
+    public static void _init(long ramBytes) throws Exception {
         currentOS = _detectOS();
         RAMDISK = _getRAMDISKName();
-        _createRamDisk();
+        _createRamDisk(ramBytes);
         _initializeRAMInfo();
     }
 
@@ -55,7 +55,7 @@ public class OSUtil {
         throw new RuntimeException("Unsupported OS: " + currentOS);
     }
 
-    private static void _createRamDisk() throws Exception {
+    private static void _createRamDisk(long ramBytes) throws Exception {
         if (Files.exists(Paths.get(RAMDISK))) {
             System.out.println("Ramdisk already exists");
             return;
@@ -68,9 +68,11 @@ public class OSUtil {
 
         String[] command = switch (currentOS) {
             case OS.MAC -> new String[]{"/bin/bash", "-c",
-                    "diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://1048576`"};
+//                    "diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://1048576`"};
+                    "diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://" + (ramBytes / 512) + "`"};
             case OS.LINUX -> new String[]{"/bin/bash", "-c",
-                    "mkdir -p /mnt/ramdisk && mount -t tmpfs -o size=512m tmpfs /mnt/ramdisk"};
+//                    "mkdir -p /mnt/ramdisk && mount -t tmpfs -o size=512m tmpfs /mnt/ramdisk"};
+                    "mkdir -p /mnt/ramdisk && mount -t tmpfs -o size=" + ramBytes + " tmpfs /mnt/ramdisk"};
             case OS.WINDOWS -> new String[]{
                     "OSFMount.com",
                     "-a",          // add new disk
