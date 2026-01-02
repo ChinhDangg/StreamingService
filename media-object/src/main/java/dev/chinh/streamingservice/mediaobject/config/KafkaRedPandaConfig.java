@@ -124,7 +124,7 @@ public class KafkaRedPandaConfig {
                                 -1
                         ));
 
-        FixedBackOff fixedBackOff = new FixedBackOff(2000L, 3);
+        FixedBackOff fixedBackOff = new FixedBackOff(5000L, 5);
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, fixedBackOff);
 
         errorHandler.addNotRetryableExceptions(IllegalArgumentException.class);
