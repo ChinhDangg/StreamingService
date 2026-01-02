@@ -379,7 +379,7 @@ public class OSUtil {
             throw new IOException("Failed to write to container file: " + targetPath);
         }
 
-        System.out.println("✅ Wrote text directly to " + targetPath + " in " + CONTAINER);
+        System.out.println("Wrote text directly to " + targetPath + " in " + CONTAINER);
         return true;
     }
 
