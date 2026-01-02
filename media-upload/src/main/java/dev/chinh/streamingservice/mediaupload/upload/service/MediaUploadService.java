@@ -45,6 +45,7 @@ public class MediaUploadService {
     private final RedisTemplate<String, String> redisStringTemplate;
 
     private final ObjectMapper objectMapper;
+    private final ObjectUploadService objectUploadService;
     private final MinIOService minIOService;
     private final ThumbnailService thumbnailService;
     private final MediaDisplayService mediaDisplayService;
@@ -56,8 +57,9 @@ public class MediaUploadService {
     private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
 
     private final String mediaBucket = ContentMetaData.MEDIA_BUCKET;
-
     public static final String defaultVidPath = "vid";
+    private final Duration uploadSessionTimeout = Duration.ofHours(1);
+
     @Value("${backup.enabled}")
     private String backupEnabled;
 
@@ -91,13 +93,7 @@ public class MediaUploadService {
             throw new IllegalArgumentException("Object already exists: " + validatedObject);
         }
 
-        CreateMultipartUploadRequest multipartUploadRequest = CreateMultipartUploadRequest.builder()
-                .bucket(mediaBucket)
-                .key(validatedObject)
-                .build();
-
-        CreateMultipartUploadResponse response = s3Client.createMultipartUpload(multipartUploadRequest);
-        String uploadId = response.uploadId();
+        String uploadId = objectUploadService.getMultipartUploadId(mediaBucket, validatedObject);
         addCacheFileUploadRequest(sessionId, uploadId, validatedObject);
         return uploadId;
     }
@@ -110,23 +106,14 @@ public class MediaUploadService {
         String validatedObject = validateObject(object, mediaType);
         validateObjectWithMediaType(validatedObject, mediaType);
 
-        UploadPartRequest uploadPartRequest = UploadPartRequest.builder()
-                .bucket(mediaBucket)
-                .key(validatedObject)
-                .uploadId(uploadId)
-                .partNumber(partNumber)
-                .build();
+        addUploadSessionCacheLastAccess(sessionId, uploadSessionTimeout);
 
-        PresignedUploadPartRequest presigned = s3Presigner.presignUploadPart(builder -> builder
-                .signatureDuration(Duration.ofHours(1))
-                .uploadPartRequest(uploadPartRequest)
-        );
-        return presigned.url().toString();
+        return objectUploadService.getPresignedPartUrl(mediaBucket, validatedObject, uploadId, partNumber, uploadSessionTimeout);
     }
 
     public record UploadedPart(int partNumber, String etag) {}
 
-    public void completeMultipartUpload(String sessionId, String uploadId, String object, List<UploadedPart> uploadedParts) throws JsonProcessingException {
+    public void markCompletingMultipartUpload(String sessionId, String uploadId, String object, List<UploadedPart> uploadedParts) throws JsonProcessingException {
         MediaType mediaType = getCachedFileUploadRequest(sessionId, uploadId);
         if (mediaType == null) {
             throw new IllegalArgumentException("Upload ID not found: " + uploadId);
@@ -135,6 +122,7 @@ public class MediaUploadService {
         validateObjectWithMediaType(validatedObject, mediaType);
 
         addCacheFileUploadParts(sessionId, uploadId, uploadedParts);
+        addUploadSessionCacheLastAccess(sessionId, uploadSessionTimeout);
     }
 
 
@@ -258,7 +246,7 @@ public class MediaUploadService {
         mediaDisplayService.removeCacheGroupOfMedia(grouperMedia.getId());
 
         removeCacheMediaSessionRequest(sessionId);
-        removeUploadSessionCacheLastAccess(sessionId);
+        //removeUploadSessionCacheLastAccess(sessionId);
         return savedId;
     }
 
@@ -325,7 +313,7 @@ public class MediaUploadService {
             eventPublisher.publishEvent(new MediaUpdateEvent.MediaBackupCreated(mediaBucket, mediaMetaData.getPath(), upload.mediaType));
 
         removeCacheMediaSessionRequest(sessionId);
-        removeUploadSessionCacheLastAccess(sessionId);
+        //removeUploadSessionCacheLastAccess(sessionId);
 
         return savedId;
     }
@@ -353,19 +341,7 @@ public class MediaUploadService {
                     )
                     .toList();
 
-            CompletedMultipartUpload multipartUploadUpload = CompletedMultipartUpload.builder()
-                    .parts(completedParts)
-                    .build();
-
-            CompleteMultipartUploadRequest completeRequest = CompleteMultipartUploadRequest.builder()
-                    .bucket(mediaBucket)
-                    .key(objectName)
-                    .uploadId(uploadId)
-                    .multipartUpload(multipartUploadUpload)
-                    .build();
-
-            s3Client.completeMultipartUpload(completeRequest);
-            removeCacheFileUploadRequest(sessionId, uploadId);
+            objectUploadService.completeMultipartUpload(mediaBucket, objectName, uploadId, completedParts);
         }
     }
 
@@ -531,11 +507,6 @@ public class MediaUploadService {
         return MediaType.valueOf((String) redisStringTemplate.opsForHash().get(key, "mediaType"));
     }
 
-    private void removeCacheFileUploadRequest(String sessionId, String uploadId) {
-        String key = "upload::" + sessionId;
-        redisStringTemplate.opsForHash().delete(key, uploadId);
-    }
-
     public record MediaUploadRequest(String objectName, MediaType mediaType) {}
 
     private String addCacheMediaUploadRequest(MediaType mediaType, String objectName) {
@@ -544,7 +515,7 @@ public class MediaUploadService {
 
         redisStringTemplate.opsForHash().put(redisKey, "objectName", objectName);
         redisStringTemplate.opsForHash().put(redisKey, "mediaType", mediaType.name());
-        addUploadSessionCacheLastAccess(id);
+        addUploadSessionCacheLastAccess(id, uploadSessionTimeout);
         return id;
     }
 
@@ -565,16 +536,9 @@ public class MediaUploadService {
         redisStringTemplate.delete(key);
     }
 
-    private void addUploadSessionCacheLastAccess(String sessionId) {
-        redisStringTemplate.opsForZSet().add("upload::lastAccess", sessionId, Instant.now().toEpochMilli());
-    }
-
-    public void removeUploadSessionCacheLastAccess(String sessionId) {
-        redisStringTemplate.opsForZSet().remove("upload::lastAccess", sessionId);
-    }
-
-    public Set<ZSetOperations.TypedTuple<String>> getAllUploadSessionCacheLastAccess(long max) {
-        return redisStringTemplate.opsForZSet().rangeByScoreWithScores("upload::lastAccess", 0, max, 0, 50);
+    private void addUploadSessionCacheLastAccess(String sessionId, Duration duration) {
+        String key = "upload::" + sessionId;
+        redisStringTemplate.expire(key, duration);
     }
 
 
