@@ -28,12 +28,16 @@ import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedUploadPartRequest;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 @RequiredArgsConstructor
@@ -346,7 +350,7 @@ public class MediaUploadService {
     }
 
     public JsonNode probeMediaInfo(String bucket, String object) throws Exception {
-        String containerSignUrl = minIOService.getObjectUrlForContainer(bucket, object);
+        String inputUrl = minIOService.getObjectUrlForContainer(bucket, object);
         ProcessBuilder pb = new ProcessBuilder(
                 "docker", "exec", "ffmpeg",
                 "ffprobe",
@@ -354,10 +358,13 @@ public class MediaUploadService {
                 "-print_format", "json",
                 "-show_format",
                 "-show_streams",
-                containerSignUrl
+                inputUrl
         );
         pb.redirectErrorStream(true);
         Process process = pb.start();
+
+        // Read all bytes asynchronously so the buffer doesn't clog
+        byte[] outBytes = process.getInputStream().readAllBytes();
 
         boolean finished = process.waitFor(15, TimeUnit.SECONDS);
         if (!finished) {
@@ -365,7 +372,7 @@ public class MediaUploadService {
             throw new RuntimeException("ffprobe timeout");
         }
 
-        String output = new String(process.getInputStream().readAllBytes());
+        String output = new String(outBytes);
 
         int exitCode = process.exitValue();
         if (exitCode != 0) {
