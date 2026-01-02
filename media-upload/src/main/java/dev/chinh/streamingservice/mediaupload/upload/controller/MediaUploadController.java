@@ -49,7 +49,7 @@ public class MediaUploadController {
 
     @PostMapping("/complete")
     public void completeUpload(@RequestBody CompleteMultipartUploadRequest request) throws JsonProcessingException {
-        mediaUploadService.completeMultipartUpload(request.sessionId, request.uploadId, request.objectKey, request.uploadedParts);
+        mediaUploadService.markCompletingMultipartUpload(request.sessionId, request.uploadId, request.objectKey, request.uploadedParts);
     }
 
     public record EndSessionRequest(String sessionId, MediaBasicInfo basicInfo) {}
