@@ -1,9 +1,13 @@
 # StreamingService
 
 **StreamingService** is a modular, self-hosted media streaming platform built with **Spring Boot**.  
-It supports authenticated media upload, on-demand and cached HLS streaming, background transcoding, full-text search, and a server-rendered web UI.
+It supports authenticated media upload, on-demand and cached HLS streaming, background transcoding, full-text search, and both server-rendered and single-page web UIs.
 
-The system is designed around **clear service responsibilities**, **event-driven workflows**, and **high-performance media delivery** using RAM-backed storage and an nginx/OpenResty edge.
+The platform is designed to serve **media assets (videos and images) at multiple resolutions**.  
+When a requested resolution does not already exist, the system performs **live transcoding** from the original stored media, generating **HLS chunks in real time**, storing them **in memory (RAM)**, and **streaming them immediately to the user** without writing intermediate data to disk.
+
+The system is built around **clear service responsibilities**, **event-driven workflows**, and **high-performance media delivery** using RAM-backed storage and an **nginx/OpenResty edge** for secure, low-latency streaming.
+
 
 ---
 
