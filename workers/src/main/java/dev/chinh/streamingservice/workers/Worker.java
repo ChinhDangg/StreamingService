@@ -109,8 +109,14 @@ public abstract class Worker implements Runnable {
     }
 
     public void incrementRetry(String workId) {
-        queueRedisTemplate.opsForHash().increment("retry:"+workId, "count", 1);
+        Object value = queueRedisTemplate.opsForHash().get("retry:" + workId, "count");
+
+        int currentCount = (value == null) ? 0 : Integer.parseInt((String) value);
+        currentCount++;
+
+        queueRedisTemplate.opsForHash().put("retry:" + workId, "count", String.valueOf(currentCount));
     }
+
 
     public void clearRetry(String workId) {
         queueRedisTemplate.delete("retry:"+workId);
