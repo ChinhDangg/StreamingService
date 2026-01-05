@@ -2,7 +2,7 @@ FROM openresty/openresty:1.27.1.2-0-bookworm-fat
 
 # Copy Lua scripts
 # manual copy: docker cp nginx/lua/auth.lua nginx:/usr/local/openresty/nginx/lua
-COPY lua /usr/local/openresty/nginx/lua/
+COPY lua/auth.lua /usr/local/openresty/nginx/lua/
 
 RUN apt-get update && apt-get install -y \
         luarocks \
