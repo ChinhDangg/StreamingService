@@ -68,9 +68,14 @@ public class OSUtil {
             case OS.MAC -> new String[]{"/bin/bash", "-c",
 //                    "diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://1048576`"};
                     "diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://" + (ramBytes / 512) + "`"};
-            case OS.LINUX -> new String[]{"/bin/bash", "-c",
-//                    "mkdir -p /mnt/ramdisk && mount -t tmpfs -o size=512m tmpfs /mnt/ramdisk"};
-                    "mkdir -p /mnt/ramdisk && mount -t tmpfs -o size=" + ramBytes + " tmpfs /mnt/ramdisk"};
+            case OS.LINUX -> new String[]{
+                    // chinh ALL=(root) NOPASSWD: /bin/mkdir, /bin/mount, /bin/umount
+                    // "mkdir -p /mnt/ramdisk && mount -t tmpfs -o size=512m tmpfs /mnt/ramdisk"};
+                    "/bin/bash", "-c",
+                    """
+                    sudo mkdir -p /mnt/ramdisk && sudo mount -t tmpfs -o size=%d tmpfs /mnt/ramdisk
+                    """.formatted(ramBytes)
+            };
             case OS.WINDOWS -> new String[]{
                     "OSFMount.com",
                     "-a",          // add new disk
