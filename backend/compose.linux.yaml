@@ -89,6 +89,7 @@ services:
 
   postgres:
     image: postgres:18
+    user: "999:999"
     container_name: postgres
     environment:
       POSTGRES_USER: ${DB_USERNAME}

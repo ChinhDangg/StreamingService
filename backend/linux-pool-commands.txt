@@ -19,6 +19,7 @@ sudo sgdisk --zap-all /dev/nvme3n1
 
 Verify pool status: zpool status
 zfs list
+zpool list
 
 Creating media_pool:
 sudo zpool create media_pool \
@@ -54,6 +55,9 @@ sudo zfs create file_pool/opensearch
 
 Setting mount points for file_pool datasets:
 sudo zfs set mountpoint=/srv/file_pool file_pool
+sudo zfs set mountpoint=/srv/file_pool/files file_pool/files
+sudo zfs set mountpoint=/srv/file_pool/postgres file_pool/postgres
+sudo zfs set mountpoint=/srv/file_pool/opensearch file_pool/opensearch
 
 Set the individual datasets’ mount points:
 sudo zfs set mountpoint=/srv/file_pool/files file_pool/files
@@ -91,3 +95,13 @@ Add your user to the docker group (This is required to run Docker without sudo):
 sudo usermod -aG docker $USER
 
 
+Set ownership problem:
+Set file_pool to root:
+sudo chmod 755 /srv/file_pool
+sudo chown root:root /srv/file_pool
+
+Set each direct path to correct user id. (1000 is $USER chinh):
+chown root:root /srv/file_pool
+chown 1000:1000 /srv/file_pool/files
+chown 999:999 /srv/file_pool/postgres
+chown 1000:1000 /srv/file_pool/opensearch
