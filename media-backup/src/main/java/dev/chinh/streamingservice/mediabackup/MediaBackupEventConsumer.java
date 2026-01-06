@@ -85,6 +85,7 @@ public class MediaBackupEventConsumer {
             acknowledgment.acknowledge();
         } catch (Exception e) {
             System.err.println("Failed to handle media backup event: " + event + " " + e.getMessage());
+            e.printStackTrace();
             throw e;
         }
     }
@@ -96,7 +97,7 @@ public class MediaBackupEventConsumer {
             groupId = "media-backup-dlq-group",
             containerFactory = "dlqListenerContainerFactory"
     )
-    public void handleDlq(Object event,
+    public void handleDlq(@Payload MediaUpdateEvent event,
                           Acknowledgment ack,
                           @Header(name = "x-exception-message", required = false) String errorMessage) {
         System.out.println("======= DLQ EVENT DETECTED =======");

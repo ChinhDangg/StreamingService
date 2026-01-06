@@ -173,7 +173,7 @@ public class MediaSearchEventConsumer {
             groupId = "media-search-dlq-group",
             containerFactory = "dlqListenerContainerFactory"
     )
-    public void handleDlq(Object event,
+    public void handleDlq(@Payload MediaUpdateEvent event,
                           Acknowledgment ack,
                           @Header(name = "x-exception-message", required = false) String errorMessage) {
         System.out.println("======= DLQ EVENT DETECTED =======");
