@@ -1,0 +1,93 @@
+
+Enable universe (Ubuntu only):
+sudo add-apt-repository universe
+sudo apt update
+
+Install ZFS:
+sudo apt install -y zfsutils-linux
+
+Check drives:
+lsblk
+lsblk -o NAME,SIZE,TYPE,MOUNTPOINT
+
+
+Clearing drives: sudo wipefs -a /dev/nvme2n1
+sudo wipefs -a /dev/nvme3n1
+
+sudo sgdisk --zap-all /dev/nvme2n1
+sudo sgdisk --zap-all /dev/nvme3n1
+
+Verify pool status: zpool status
+zfs list
+
+Creating media_pool:
+sudo zpool create media_pool \
+  /dev/nvme2n1 \
+  /dev/nvme3n1
+
+Set the mountpoint:
+sudo zfs set mountpoint=/media/media_pool media_pool
+
+Set ownership (for Docker / services):
+sudo chown -R chinh:chinh /media/media_pool
+
+ZFS tuning for media workloads:
+sudo zfs set recordsize=1M media_pool
+sudo zfs set compression=lz4 media_pool
+sudo zfs set atime=off media_pool
+sudo zfs set primarycache=metadata media_pool
+sudo zfs set xattr=sa media_pool/data
+sudo zfs set acltype=posixacl media_pool/data
+sudo zfs set aclinherit=passthrough media_pool/data
+
+
+
+Creating file_pool:
+sudo zpool create file_pool \
+  /dev/nvme4n1 \
+  /dev/nvme0n1
+
+Creating ZFS datasets for file_pool:
+sudo zfs create file_pool/files
+sudo zfs create file_pool/postgres
+sudo zfs create file_pool/opensearch
+
+Setting mount points for file_pool datasets:
+sudo zfs set mountpoint=/srv/file_pool file_pool
+
+Set the individual datasets’ mount points:
+sudo zfs set mountpoint=/srv/file_pool/files file_pool/files
+sudo zfs set mountpoint=/srv/file_pool/postgres file_pool/postgres
+sudo zfs set mountpoint=/srv/file_pool/opensearch file_pool/opensearch
+
+PostgreSQL dataset tuning:
+sudo zfs set recordsize=16K file_pool/postgres
+sudo zfs set compression=lz4 file_pool/postgres
+sudo zfs set atime=off file_pool/postgres
+sudo zfs set logbias=latency file_pool/postgres
+
+OpenSearch dataset tuning:
+sudo zfs set recordsize=128K file_pool/opensearch
+sudo zfs set compression=lz4 file_pool/opensearch
+sudo zfs set atime=off file_pool/opensearch
+sudo zfs set primarycache=metadata file_pool/opensearch
+
+Files dataset tuning:
+sudo zfs set recordsize=1M file_pool/files
+sudo zfs set compression=lz4 file_pool/files
+sudo zfs set atime=off file_pool/files
+
+
+Installing Docker:
+sudo apt update
+sudo apt install -y docker.io
+
+Enable Docker to start at boot:
+sudo systemctl enable docker
+sudo systemctl start docker
+Add your user to the docker group
+
+Add your user to the docker group (This is required to run Docker without sudo):
+sudo usermod -aG docker $USER
+
+
