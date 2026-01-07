@@ -65,6 +65,7 @@ public interface MediaUpdateEvent {
     record MediaBackupCreated(
             String bucket,
             String path,
+            String absolutePath,
             MediaType mediaType
     ) implements MediaUpdateEvent {}
 

@@ -244,7 +244,7 @@ public class MediaUploadService {
         eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMedia.getId(), updatedLength));
 
         if (Boolean.parseBoolean(backupEnabled))
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaBackupCreated(mediaBucket, mediaMetaData.getPath(), upload.mediaType));
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaBackupCreated(mediaBucket, mediaMetaData.getPath(), mediaMetaData.getAbsoluteFilePath(), upload.mediaType));
 
         mediaSearchCacheService.removeCachedMediaSearchItem(grouperMedia.getId());
         mediaDisplayService.removeCacheGroupOfMedia(grouperMedia.getId());
@@ -314,7 +314,7 @@ public class MediaUploadService {
         eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, false));
 
         if (Boolean.parseBoolean(backupEnabled))
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaBackupCreated(mediaBucket, mediaMetaData.getPath(), upload.mediaType));
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaBackupCreated(mediaBucket, mediaMetaData.getPath(), mediaMetaData.getAbsoluteFilePath(), upload.mediaType));
 
         removeCacheMediaSessionRequest(sessionId);
         //removeUploadSessionCacheLastAccess(sessionId);

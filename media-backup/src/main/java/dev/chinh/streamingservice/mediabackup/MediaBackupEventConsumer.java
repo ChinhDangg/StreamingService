@@ -32,11 +32,11 @@ public class MediaBackupEventConsumer {
     private String MEDIA_BACKUP_PATH;
 
     private void onMediaCreateBackup(MediaUpdateEvent.MediaBackupCreated event) throws Exception {
-        System.out.println("Received media create backup event: " + event.path());
+        System.out.println("Received media create backup event: " + event.absolutePath());
 
             if (event.mediaType() == MediaType.VIDEO) {
                 try (InputStream inputStream = minIOService.getFile(event.bucket(), event.path())) {
-                    String target = OSUtil.normalizePath(MEDIA_BACKUP_PATH, event.path());
+                    String target = OSUtil.normalizePath(MEDIA_BACKUP_PATH, event.absolutePath());
                     Path targetPath = Paths.get(target);
 
                     Path parentPath = targetPath.getParent();
@@ -51,7 +51,7 @@ public class MediaBackupEventConsumer {
             }
             else if (event.mediaType() == MediaType.ALBUM) {
                 try {
-                    backupAlbum(event.bucket(), event.path());
+                    backupAlbum(event.bucket(), event.path(), event.absolutePath());
                 } catch (Exception e) {
                     System.err.println("Failed to backup album: " + event.path());
                     throw e;
@@ -59,12 +59,12 @@ public class MediaBackupEventConsumer {
             }
     }
 
-    private void backupAlbum(String bucket, String albumPath) throws Exception {
+    private void backupAlbum(String bucket, String albumPath, String absolutePath) throws Exception {
         Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(bucket, albumPath);
         for (Result<Item> result : results) {
             String objectName = result.get().objectName();
             try (InputStream inputStream = minIOService.getFile(bucket, objectName)) {
-                Path targetPath = Paths.get(OSUtil.normalizePath(MEDIA_BACKUP_PATH, objectName));
+                Path targetPath = Paths.get(OSUtil.normalizePath(MEDIA_BACKUP_PATH, mergePaths(absolutePath, objectName)));
                 Path parentPath = targetPath.getParent();
 
                 if (parentPath != null && !Files.exists(parentPath))
@@ -73,6 +73,32 @@ public class MediaBackupEventConsumer {
                 Files.copy(inputStream, targetPath);
             }
         }
+    }
+
+    public static String mergePaths(String absolute, String object) {
+        Path absPath = Paths.get(absolute);
+        Path objPath = Paths.get(object);
+
+        int objParts = objPath.getNameCount();
+
+        // We look for the longest sequence from the START of objPath
+        // that matches the END of absPath.
+        for (int i = objParts; i > 0; i--) {
+            // Get a sub-sequence from the start of the object path:
+            // e.g., "something1/something2", then "something1"
+            Path sub = objPath.subpath(0, i);
+
+            if (absPath.endsWith(sub)) {
+                // If it matches, we take the absolute path and
+                // append only the REMAINING part of the object path.
+                Path remaining = objPath.subpath(i, objParts);
+                return absPath.resolve(remaining).toString().replace("\\", "/");
+            }
+        }
+
+        // If no overlap is found, you might want to join them directly
+        // or handle it as a specific case.
+        return absPath.resolve(objPath).toString().replace("\\", "/");
     }
 
     private void onMediaDeleteBackup(MediaUpdateEvent.MediaBackupDeleted event) throws Exception {
