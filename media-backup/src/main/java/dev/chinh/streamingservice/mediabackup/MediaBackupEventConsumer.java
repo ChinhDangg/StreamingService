@@ -8,6 +8,7 @@ import io.minio.Result;
 import io.minio.errors.*;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
@@ -15,6 +16,7 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -73,11 +75,26 @@ public class MediaBackupEventConsumer {
         }
     }
 
+    private void onMediaDeleteBackup(MediaUpdateEvent.MediaBackupDeleted event) throws Exception {
+        System.out.println("Received media delete backup event: " + event.absolutePath());
+        Path path = Paths.get(MEDIA_BACKUP_PATH, event.absolutePath());
+        if (event.mediaType() == MediaType.VIDEO) {
+            Files.deleteIfExists(path);
+        } else if (event.mediaType() == MediaType.ALBUM) {
+            File directory = new File(path.toString());
+            FileUtils.deleteDirectory(directory);
+        } else {
+            System.err.println("Unknown media type: " + event.mediaType());
+        }
+    }
+
     @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_BACKUP_TOPIC, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment acknowledgment) throws Exception {
         try {
             if (event instanceof MediaUpdateEvent.MediaBackupCreated e) {
                 onMediaCreateBackup(e);
+            } else if (event instanceof MediaUpdateEvent.MediaBackupDeleted e) {
+                onMediaDeleteBackup(e);
             } else {
                 // unknown event type → log and skip
                 System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
@@ -107,6 +124,8 @@ public class MediaBackupEventConsumer {
         switch (event) {
             case MediaUpdateEvent.MediaBackupCreated e ->
                     System.out.println("Received media create backup event: " + e.path());
+            case MediaUpdateEvent.MediaBackupDeleted e ->
+                    System.out.println("Received media delete backup event: " + e.absolutePath());
             default -> {
                 System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
                 ack.acknowledge(); // ack on poison event to skip it
