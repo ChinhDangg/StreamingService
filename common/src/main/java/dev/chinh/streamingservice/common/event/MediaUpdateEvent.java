@@ -67,4 +67,9 @@ public interface MediaUpdateEvent {
             String path,
             MediaType mediaType
     ) implements MediaUpdateEvent {}
+
+    record MediaBackupDeleted(
+            String absolutePath,
+            MediaType mediaType
+    ) implements MediaUpdateEvent {}
 }
