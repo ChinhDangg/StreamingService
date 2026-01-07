@@ -58,6 +58,12 @@
         </dependency>
 
         <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.21.0</version>
+        </dependency>
+
+        <dependency>
             <groupId>dev.chinh.streamingservice</groupId>
             <artifactId>common</artifactId>
             <version>0.0.1-SNAPSHOT</version>
