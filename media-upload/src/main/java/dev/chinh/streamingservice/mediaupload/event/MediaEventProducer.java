@@ -72,4 +72,9 @@ public class MediaEventProducer {
     public void publishCreateMediaBackup(MediaUpdateEvent.MediaBackupCreated event) {
         kafkaTemplate.send(KafkaRedPandaConfig.MEDIA_BACKUP_TOPIC, event);
     }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void publishDeleteMediaBackup(MediaUpdateEvent.MediaBackupDeleted event) {
+        kafkaTemplate.send(KafkaRedPandaConfig.MEDIA_BACKUP_TOPIC, event);
+    }
 }

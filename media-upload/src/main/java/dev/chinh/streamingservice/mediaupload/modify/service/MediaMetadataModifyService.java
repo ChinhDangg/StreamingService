@@ -167,6 +167,13 @@ public class MediaMetadataModifyService {
         }
 
         try {
+            if (mediaMetaData.getMediaType() != MediaType.GROUPER)
+                eventPublisher.publishEvent(new MediaUpdateEvent.MediaBackupDeleted(mediaMetaData.getAbsoluteFilePath(), mediaMetaData.getMediaType()));
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to publish event delete backup file: " + mediaMetaData.getAbsoluteFilePath(), e);
+        }
+
+        try {
             eventPublisher.publishEvent(new MediaUpdateEvent.MediaObjectDeleted(
                     mediaMetaData.getBucket(),
                     mediaMetaData.getPath(),
