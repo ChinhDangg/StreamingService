@@ -13,6 +13,9 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,10 +35,14 @@ public class AuthController {
     public void authenticate(@RequestBody AuthenticationRequest authRequest, HttpServletRequest request, HttpServletResponse response) {
         String isValid = authRequest.isValid();
         if (isValid != null) {
+            System.out.println("Invalid login request: " + isValid);
             logout(response);
             throw new BadCredentialsException(isValid);
         }
-        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(authRequest.username(), authRequest.password());
+
+        String username = new String(Base64.getDecoder().decode(authRequest.username()), StandardCharsets.UTF_8);
+        String password = new String(Base64.getDecoder().decode(authRequest.password()), StandardCharsets.UTF_8);
+        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(username, password);
         Authentication authentication = authenticationManager.authenticate(authToken);
 
         CsrfToken csrfToken = addCsrfCookie(request, response);

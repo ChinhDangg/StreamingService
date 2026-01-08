@@ -1,5 +1,7 @@
 package dev.chinh.streamingservice.authservice.service;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.regex.Pattern;
 
 public record AuthenticationRequest(
@@ -23,6 +25,10 @@ public record AuthenticationRequest(
         if (password == null || password.isBlank()) {
             return "Password cannot be empty";
         }
+
+        String username = new String(Base64.getDecoder().decode(this.username), StandardCharsets.UTF_8);
+        String password = new String(Base64.getDecoder().decode(this.password), StandardCharsets.UTF_8);
+
         if (username.length() < 5) {
             return "Username must be at least 5 characters";
         }
