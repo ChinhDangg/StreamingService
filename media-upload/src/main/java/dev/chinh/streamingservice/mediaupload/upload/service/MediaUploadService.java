@@ -250,7 +250,7 @@ public class MediaUploadService {
         mediaDisplayService.removeCacheGroupOfMedia(grouperMedia.getId());
 
         removeCacheMediaSessionRequest(sessionId);
-        //removeUploadSessionCacheLastAccess(sessionId);
+
         return savedId;
     }
 
@@ -317,7 +317,6 @@ public class MediaUploadService {
             eventPublisher.publishEvent(new MediaUpdateEvent.MediaBackupCreated(mediaBucket, mediaMetaData.getPath(), mediaMetaData.getAbsoluteFilePath(), upload.mediaType));
 
         removeCacheMediaSessionRequest(sessionId);
-        //removeUploadSessionCacheLastAccess(sessionId);
 
         return savedId;
     }
@@ -477,21 +476,8 @@ public class MediaUploadService {
             return (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, fps));
 
         } catch (NumberFormatException e) {
-            return 0; // or throw exception if you prefer strict behavior
+            return 0; // or throw exception
         }
-    }
-
-
-    public Map<Object, Object> getUploadSessionObjects(String sessionId) {
-        var map = redisStringTemplate.opsForHash().entries("upload::" + sessionId);
-        if (map.isEmpty()) return Map.of();
-        map.remove("objectName");
-        map.remove("mediaType");
-        return map;
-    }
-
-    public void removeUploadObject(String object) throws Exception {
-        minIOService.removeFile(ContentMetaData.MEDIA_BUCKET, object);
     }
 
 
