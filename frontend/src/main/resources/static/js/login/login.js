@@ -2,8 +2,8 @@ document.getElementById('login-form').addEventListener('submit', async function 
     e.preventDefault();
     const username = document.getElementById('email').value;
     const login = {
-        username: username,
-        password: document.getElementById('password').value,
+        username: btoa(username),
+        password: btoa(document.getElementById('password').value),
     }
     const response = await fetch('/auth/login', {
         method: 'POST',
