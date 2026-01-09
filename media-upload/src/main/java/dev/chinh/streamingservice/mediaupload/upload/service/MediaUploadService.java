@@ -2,7 +2,6 @@ package dev.chinh.streamingservice.mediaupload.upload.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaJobStatus;
@@ -16,31 +15,24 @@ import dev.chinh.streamingservice.persistence.entity.MediaGroupMetaData;
 import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
 import dev.chinh.streamingservice.persistence.repository.MediaGroupMetaDataRepository;
 import dev.chinh.streamingservice.persistence.repository.MediaMetaDataRepository;
-import io.minio.Result;
-import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 @RequiredArgsConstructor
 @Service
 public class MediaUploadService {
 
-    private final S3Client s3Client;
-    private final S3Presigner s3Presigner;
     private final RedisTemplate<String, String> redisStringTemplate;
 
     private final ObjectMapper objectMapper;
