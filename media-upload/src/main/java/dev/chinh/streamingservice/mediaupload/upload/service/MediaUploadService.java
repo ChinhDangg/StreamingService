@@ -5,11 +5,13 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.common.OSUtil;
+import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.mediaupload.MediaBasicInfo;
+import dev.chinh.streamingservice.mediaupload.event.config.KafkaRedPandaConfig;
 import dev.chinh.streamingservice.persistence.entity.MediaGroupMetaData;
 import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
 import dev.chinh.streamingservice.persistence.repository.MediaGroupMetaDataRepository;
@@ -20,24 +22,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
-import software.amazon.awssdk.services.s3.presigner.model.PresignedUploadPartRequest;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 @RequiredArgsConstructor
@@ -153,17 +148,19 @@ public class MediaUploadService {
 
         try {
             minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, path, basicInfo.getThumbnail());
-            ImageMetadata imageMetadata = parseMediaMetadata(probeMediaInfo(ContentMetaData.THUMBNAIL_BUCKET, path), ImageMetadata.class);
             mediaMetaData.setThumbnail(path);
-            mediaMetaData.setSize(imageMetadata.size);
-            mediaMetaData.setWidth(imageMetadata.width);
-            mediaMetaData.setHeight(imageMetadata.height);
-            mediaMetaData.setFormat(imageMetadata.format);
+            mediaMetaData.setSize(-1L);
+            mediaMetaData.setWidth(-1);
+            mediaMetaData.setHeight(-1);
+            mediaMetaData.setFormat(MediaJobStatus.PROCESSING.name());
 
             MediaMetaData saved = mediaRepository.save(mediaMetaData);
             long savedId = saved.getId();
 
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, true));
+            MediaUpdateEvent.MediaCreated mediaCreatedEvent = new MediaUpdateEvent.MediaCreated(savedId, true);
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaUpdateEnrichment(savedId, MediaType.GROUPER, KafkaRedPandaConfig.MEDIA_SEARCH_TOPIC, mediaCreatedEvent));
+
+            eventPublisher.publishEvent(mediaCreatedEvent);
 
             return savedId;
         } catch (Exception e) {
@@ -206,26 +203,12 @@ public class MediaUploadService {
         mediaMetaData.setAbsoluteFilePath(mediaBucket + "/" + upload.objectName);
         mediaMetaData.setParentPath(upload.objectName);
 
-        var results = minIOService.getAllItemsInBucketWithPrefix(mediaBucket, upload.objectName);
-        int count = 0;
-        long totalSize = 0;
-        String firstImage = null;
-        for (Result<Item> result : results) {
-            count++;
-            Item item = result.get();
-            if (MediaType.detectMediaType(item.objectName()) == MediaType.IMAGE) {
-                if (firstImage == null)
-                    firstImage = item.objectName();
-                totalSize += item.size();
-            }
-        }
-        mediaMetaData.setSize(totalSize);
-        mediaMetaData.setLength(count);
-        mediaMetaData.setThumbnail(firstImage);
-        ImageMetadata imageMetadata = parseMediaMetadata(probeMediaInfo(mediaBucket, firstImage), ImageMetadata.class);
-        mediaMetaData.setWidth(imageMetadata.width);
-        mediaMetaData.setHeight(imageMetadata.height);
-        mediaMetaData.setFormat(imageMetadata.format);
+        mediaMetaData.setSize(-1L);
+        mediaMetaData.setLength(-1);
+        mediaMetaData.setThumbnail(MediaJobStatus.PROCESSING.name());
+        mediaMetaData.setWidth(-1);
+        mediaMetaData.setHeight(-1);
+        mediaMetaData.setFormat(MediaJobStatus.PROCESSING.name());
 
 //        mediaRepository.incrementLength(grouperMedia.getId());
 //        mediaGroupMetaDataRepository.incrementNumInfo(grouperGroupInfo.getId());
@@ -240,6 +223,8 @@ public class MediaUploadService {
         mediaMetaData.setGroupInfo(mediaGroupInfo);
 
         Long savedId = mediaRepository.save(mediaMetaData).getId();
+
+        eventPublisher.publishEvent(new MediaUpdateEvent.MediaUpdateEnrichment(savedId, MediaType.ALBUM, null, null));
 
         eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMedia.getId(), updatedLength));
 
@@ -274,44 +259,33 @@ public class MediaUploadService {
             int index = upload.objectName.lastIndexOf("/");
             mediaMetaData.setParentPath(upload.objectName.substring(0, index));
             mediaMetaData.setKey(upload.objectName.substring(index + 1));
-            VideoMetadata videoMetadata = parseMediaMetadata(probeMediaInfo(mediaBucket, mediaMetaData.getPath()), VideoMetadata.class);
-            mediaMetaData.setFrameRate(videoMetadata.frameRate);
-            mediaMetaData.setFormat(videoMetadata.format);
-            mediaMetaData.setSize(videoMetadata.size);
-            mediaMetaData.setWidth(videoMetadata.width);
-            mediaMetaData.setHeight(videoMetadata.height);
-            mediaMetaData.setLength((int) videoMetadata.durationSeconds);
+
+            mediaMetaData.setFrameRate((short) -1);
+            mediaMetaData.setFormat(MediaJobStatus.PROCESSING.name());
+            mediaMetaData.setSize(-1L);
+            mediaMetaData.setWidth(-1);
+            mediaMetaData.setHeight(-1);
+            mediaMetaData.setLength(-1);
 
             mediaMetaData.setThumbnail(thumbnailService.generateThumbnailFromVideo(mediaBucket, upload.objectName));
 
         } else if (upload.mediaType == MediaType.ALBUM) {
             mediaMetaData.setParentPath(upload.objectName);
-            var results = minIOService.getAllItemsInBucketWithPrefix(mediaBucket, upload.objectName);
-            int count = 0;
-            long totalSize = 0;
-            String firstImage = null;
-            for (Result<Item> result : results) {
-                count++;
-                Item item = result.get();
-                if (MediaType.detectMediaType(item.objectName()) == MediaType.IMAGE) {
-                    if (firstImage == null)
-                        firstImage = item.objectName();
-                    totalSize += item.size();
-                }
-            }
-            mediaMetaData.setSize(totalSize);
-            mediaMetaData.setLength(count);
-            mediaMetaData.setThumbnail(firstImage);
-            ImageMetadata imageMetadata = parseMediaMetadata(probeMediaInfo(mediaBucket, firstImage), ImageMetadata.class);
-            mediaMetaData.setWidth(imageMetadata.width);
-            mediaMetaData.setHeight(imageMetadata.height);
-            mediaMetaData.setFormat(imageMetadata.format);
+            mediaMetaData.setSize(-1L);
+            mediaMetaData.setLength(-1);
+            mediaMetaData.setThumbnail(MediaJobStatus.PROCESSING.name());
+            mediaMetaData.setWidth(-1);
+            mediaMetaData.setHeight(-1);
+            mediaMetaData.setFormat(MediaJobStatus.PROCESSING.name());
         }
 
         MediaMetaData saved = mediaRepository.save(mediaMetaData);
         long savedId = saved.getId();
 
-        eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, false));
+        MediaUpdateEvent.MediaCreated mediaCreatedEvent = new MediaUpdateEvent.MediaCreated(savedId, false);
+        eventPublisher.publishEvent(new MediaUpdateEvent.MediaUpdateEnrichment(savedId, upload.mediaType, KafkaRedPandaConfig.MEDIA_SEARCH_TOPIC, mediaCreatedEvent));
+
+        eventPublisher.publishEvent(mediaCreatedEvent);
 
         if (Boolean.parseBoolean(backupEnabled))
             eventPublisher.publishEvent(new MediaUpdateEvent.MediaBackupCreated(mediaBucket, mediaMetaData.getPath(), mediaMetaData.getAbsoluteFilePath(), upload.mediaType));
@@ -345,138 +319,6 @@ public class MediaUploadService {
                     .toList();
 
             objectUploadService.completeMultipartUpload(mediaBucket, objectName, uploadId, completedParts);
-        }
-    }
-
-    public JsonNode probeMediaInfo(String bucket, String object) throws Exception {
-        String inputUrl = minIOService.getObjectUrlForContainer(bucket, object);
-        ProcessBuilder pb = new ProcessBuilder(
-                "docker", "exec", "ffmpeg",
-                "ffprobe",
-                "-v", "error",
-                "-print_format", "json",
-                "-show_format",
-                "-show_streams",
-                inputUrl
-        );
-        pb.redirectErrorStream(true);
-        Process process = pb.start();
-
-        // Read all bytes asynchronously so the buffer doesn't clog
-        byte[] outBytes = process.getInputStream().readAllBytes();
-
-        boolean finished = process.waitFor(15, TimeUnit.SECONDS);
-        if (!finished) {
-            process.destroyForcibly();
-            throw new RuntimeException("ffprobe timeout");
-        }
-
-        String output = new String(outBytes);
-
-        int exitCode = process.exitValue();
-        if (exitCode != 0) {
-            throw new RuntimeException("ffprobe failed — exit=" + exitCode + " output: " + output);
-        }
-
-        JsonNode jsonNode = objectMapper.readTree(output);
-        JsonNode streams = jsonNode.get("streams");
-        if (streams == null || !streams.isArray()) {
-            throw new RuntimeException("No stream data found in video");
-        }
-
-        return jsonNode;
-    }
-
-    public record VideoMetadata(
-            short frameRate,
-            String format,
-            long size,
-            int width,
-            int height,
-            double durationSeconds
-    ) {}
-
-    public record ImageMetadata(
-            int width,
-            int height,
-            long size,
-            String format
-    ) {}
-
-    public <T> T parseMediaMetadata(JsonNode jsonNode, Class<T> targetClass) {
-        JsonNode streams = jsonNode.get("streams");
-        JsonNode format = jsonNode.get("format");
-
-        if (streams == null || streams.isEmpty() || format == null) {
-            throw new IllegalArgumentException("Invalid ffprobe metadata");
-        }
-
-        // find any video stream (images are single-frame "video")
-        JsonNode videoStream = null;
-        for (JsonNode stream : streams) {
-            if ("video".equals(stream.get("codec_type").asText())) {
-                videoStream = stream;
-                break;
-            }
-        }
-
-        if (videoStream == null) {
-            throw new IllegalArgumentException("No visual stream found.");
-        }
-
-        int width = videoStream.get("width").asInt();
-        int height = videoStream.get("height").asInt();
-        long size = format.get("size").asLong();
-        String fmt = format.get("format_name").asText();
-
-        // ---------- Returning Image ----------
-        if (targetClass.equals(ImageMetadata.class)) {
-            return targetClass.cast(
-                    new ImageMetadata(width, height, size, fmt)
-            );
-        }
-
-        // ---------- Returning Video ----------
-        if (targetClass.equals(VideoMetadata.class)) {
-            String frameRateStr = videoStream.get("avg_frame_rate").asText();
-            short frameRate = parseRate(frameRateStr);
-            double duration = format.get("duration").asDouble();
-
-            return targetClass.cast(
-                    new VideoMetadata(
-                            frameRate,
-                            fmt,
-                            size,
-                            width,
-                            height,
-                            duration
-                    )
-            );
-        }
-
-        throw new IllegalArgumentException("Unsupported metadata type: " + targetClass.getName());
-    }
-
-    private short parseRate(String rate) {
-        if (rate == null || rate.isBlank() || "0/0".equals(rate)) return 0;
-
-        String[] parts = rate.split("/");
-        try {
-            if (parts.length == 2) {
-                double num = Double.parseDouble(parts[0]);
-                double den = Double.parseDouble(parts[1]);
-                if (den == 0) return 0;
-
-                int fps = (int) Math.round(num / den);
-                return (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, fps));
-            }
-
-            // fallback for plain numeric values
-            int fps = (int) Math.round(Double.parseDouble(rate));
-            return (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, fps));
-
-        } catch (NumberFormatException e) {
-            return 0; // or throw exception
         }
     }
 
