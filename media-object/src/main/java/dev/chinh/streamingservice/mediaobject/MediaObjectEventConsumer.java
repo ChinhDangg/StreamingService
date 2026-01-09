@@ -1,25 +1,36 @@
 package dev.chinh.streamingservice.mediaobject;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.mediaobject.config.KafkaRedPandaConfig;
+import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
+import dev.chinh.streamingservice.persistence.repository.MediaMetaDataRepository;
 import io.minio.Result;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
 public class MediaObjectEventConsumer {
 
     private final MinIOService minIOService;
+    private final ObjectMapper objectMapper;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final MediaMetaDataRepository mediaMetaDataRepository;
 
     Logger logger = LoggerFactory.getLogger(MediaObjectEventConsumer.class);
 
@@ -32,7 +43,7 @@ public class MediaObjectEventConsumer {
                 if (event.hasThumbnail())
                     minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, event.thumbnail());
             } catch (Exception e) {
-                System.out.println("Failed to delete thumbnail file: " + event.thumbnail());
+                System.err.println("Failed to delete thumbnail file: " + event.thumbnail());
                 throw e;
             }
         }
@@ -41,7 +52,7 @@ public class MediaObjectEventConsumer {
             try {
                 minIOService.removeFile(event.bucket(), event.path());
             } catch (Exception e) {
-                System.out.println("Failed to delete media file: " + event.path());
+                System.err.println("Failed to delete media file: " + event.path());
                 throw e;
             }
         } else if (mediaType == MediaType.ALBUM) {
@@ -61,7 +72,7 @@ public class MediaObjectEventConsumer {
                     minIOService.removeFile(event.bucket(), objectName);
                 }
             } catch (Exception e) {
-                System.out.println("Failed to delete media files in album: " + event.path());
+                System.err.println("Failed to delete media files in album: " + event.path());
                 throw e;
             }
         }
@@ -72,8 +83,194 @@ public class MediaObjectEventConsumer {
         try {
             minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, event.path());
         } catch (Exception e) {
-            System.out.println("Failed to delete thumbnail file: " + event.path());
+            System.err.println("Failed to delete thumbnail file: " + event.path());
             throw e;
+        }
+    }
+
+    public void onUpdateMediaEnrichment(MediaUpdateEvent.MediaUpdateEnrichment event) throws Exception {
+        System.out.println("Received media enrichment update event: " + event.mediaId());
+        try {
+            MediaMetaData mediaMetaData = mediaMetaDataRepository.findByIdWithAllInfo(event.mediaId()).orElseThrow(
+                    () -> new IllegalArgumentException("Media not found: " + event.mediaId())
+            );
+            if (event.mediaType() == MediaType.VIDEO) {
+                VideoMetadata videoMetadata = parseMediaMetadata(probeMediaInfo(mediaMetaData.getBucket(), mediaMetaData.getPath()), VideoMetadata.class);
+                mediaMetaData.setFrameRate(videoMetadata.frameRate);
+                mediaMetaData.setFormat(videoMetadata.format);
+                mediaMetaData.setSize(videoMetadata.size);
+                mediaMetaData.setWidth(videoMetadata.width);
+                mediaMetaData.setHeight(videoMetadata.height);
+                mediaMetaData.setLength((int) videoMetadata.durationSeconds);
+            } else if (event.mediaType() == MediaType.ALBUM) {
+                var results = minIOService.getAllItemsInBucketWithPrefix(mediaMetaData.getBucket(), mediaMetaData.getPath());
+                int count = 0;
+                long totalSize = 0;
+                String firstImage = null;
+                for (Result<Item> result : results) {
+                    count++;
+                    Item item = result.get();
+                    if (MediaType.detectMediaType(item.objectName()) == MediaType.IMAGE) {
+                        if (firstImage == null)
+                            firstImage = item.objectName();
+                        totalSize += item.size();
+                    }
+                }
+                mediaMetaData.setSize(totalSize);
+                mediaMetaData.setLength(count);
+                mediaMetaData.setThumbnail(firstImage);
+                ImageMetadata imageMetadata = parseMediaMetadata(probeMediaInfo(mediaMetaData.getBucket(), firstImage), ImageMetadata.class);
+                mediaMetaData.setWidth(imageMetadata.width);
+                mediaMetaData.setHeight(imageMetadata.height);
+                mediaMetaData.setFormat(imageMetadata.format);
+            } else if (event.mediaType() == MediaType.GROUPER) {
+                ImageMetadata imageMetadata = parseMediaMetadata(probeMediaInfo(ContentMetaData.THUMBNAIL_BUCKET, mediaMetaData.getThumbnail()), ImageMetadata.class);
+                mediaMetaData.setSize(imageMetadata.size);
+                mediaMetaData.setWidth(imageMetadata.width);
+                mediaMetaData.setHeight(imageMetadata.height);
+                mediaMetaData.setFormat(imageMetadata.format);
+            }
+            mediaMetaDataRepository.save(mediaMetaData);
+
+            // send event to update the media search index again with new metadata
+            if (event.mediaSearchTopic() != null && event.mediaCreatedEvent() != null) {
+                kafkaTemplate.send(event.mediaSearchTopic(), event.mediaCreatedEvent());
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to update media enrichment: " + event.mediaId());
+            throw e;
+        }
+    }
+
+    public JsonNode probeMediaInfo(String bucket, String object) throws Exception {
+        String inputUrl = minIOService.getObjectUrlForContainer(bucket, object);
+        ProcessBuilder pb = new ProcessBuilder(
+                "docker", "exec", "ffmpeg",
+                "ffprobe",
+                "-v", "error",
+                "-print_format", "json",
+                "-show_format",
+                "-show_streams",
+                inputUrl
+        );
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
+
+        // Read all bytes asynchronously so the buffer doesn't clog
+        byte[] outBytes = process.getInputStream().readAllBytes();
+
+        boolean finished = process.waitFor(15, TimeUnit.SECONDS);
+        if (!finished) {
+            process.destroyForcibly();
+            throw new RuntimeException("ffprobe timeout");
+        }
+
+        String output = new String(outBytes);
+
+        int exitCode = process.exitValue();
+        if (exitCode != 0) {
+            throw new RuntimeException("ffprobe failed — exit=" + exitCode + " output: " + output);
+        }
+
+        JsonNode jsonNode = objectMapper.readTree(output);
+        JsonNode streams = jsonNode.get("streams");
+        if (streams == null || !streams.isArray()) {
+            throw new RuntimeException("No stream data found in video");
+        }
+
+        return jsonNode;
+    }
+
+    public record VideoMetadata(
+            short frameRate,
+            String format,
+            long size,
+            int width,
+            int height,
+            double durationSeconds
+    ) {}
+
+    public record ImageMetadata(
+            int width,
+            int height,
+            long size,
+            String format
+    ) {}
+
+    public <T> T parseMediaMetadata(JsonNode jsonNode, Class<T> targetClass) {
+        JsonNode streams = jsonNode.get("streams");
+        JsonNode format = jsonNode.get("format");
+
+        if (streams == null || streams.isEmpty() || format == null) {
+            throw new IllegalArgumentException("Invalid ffprobe metadata");
+        }
+
+        // find any video stream (images are single-frame "video")
+        JsonNode videoStream = null;
+        for (JsonNode stream : streams) {
+            if ("video".equals(stream.get("codec_type").asText())) {
+                videoStream = stream;
+                break;
+            }
+        }
+
+        if (videoStream == null) {
+            throw new IllegalArgumentException("No visual stream found.");
+        }
+
+        int width = videoStream.get("width").asInt();
+        int height = videoStream.get("height").asInt();
+        long size = format.get("size").asLong();
+        String fmt = format.get("format_name").asText();
+
+        // ---------- Returning Image ----------
+        if (targetClass.equals(ImageMetadata.class)) {
+            return targetClass.cast(
+                    new ImageMetadata(width, height, size, fmt)
+            );
+        }
+
+        // ---------- Returning Video ----------
+        if (targetClass.equals(VideoMetadata.class)) {
+            String frameRateStr = videoStream.get("avg_frame_rate").asText();
+            short frameRate = parseRate(frameRateStr);
+            double duration = format.get("duration").asDouble();
+
+            return targetClass.cast(
+                    new VideoMetadata(
+                            frameRate,
+                            fmt,
+                            size,
+                            width,
+                            height,
+                            duration
+                    )
+            );
+        }
+
+        throw new IllegalArgumentException("Unsupported metadata type: " + targetClass.getName());
+    }
+
+    private short parseRate(String rate) {
+        if (rate == null || rate.isBlank() || "0/0".equals(rate)) return 0;
+
+        String[] parts = rate.split("/");
+        try {
+            if (parts.length == 2) {
+                double num = Double.parseDouble(parts[0]);
+                double den = Double.parseDouble(parts[1]);
+                if (den == 0) return 0;
+
+                int fps = (int) Math.round(num / den);
+                return (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, fps));
+            }
+
+            // fallback for plain numeric values
+            int fps = (int) Math.round(Double.parseDouble(rate));
+            return (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, fps));
+
+        } catch (NumberFormatException e) {
+            return 0; // or throw exception
         }
     }
 
@@ -85,6 +282,8 @@ public class MediaObjectEventConsumer {
                 onDeleteMediaObject(e);
             } else if (event instanceof MediaUpdateEvent.ThumbnailObjectDeleted e) {
                 onDeleteThumbnailObject(e);
+            } else if (event instanceof MediaUpdateEvent.MediaUpdateEnrichment e) {
+                onUpdateMediaEnrichment(e);
             } else {
                 // unknown event type → log and skip
                 System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
@@ -116,6 +315,8 @@ public class MediaObjectEventConsumer {
                     System.out.println("Received media object delete event: " + e.mediaType() + " " + e.path());
             case MediaUpdateEvent.ThumbnailObjectDeleted e ->
                     System.out.println("Received thumbnail object delete event: " + e.path());
+            case MediaUpdateEvent.MediaUpdateEnrichment e ->
+                    System.out.println("Received media enrichment update event: " + e.mediaId());
             default -> {
                 System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
                 ack.acknowledge(); // ack on poison event to skip it
