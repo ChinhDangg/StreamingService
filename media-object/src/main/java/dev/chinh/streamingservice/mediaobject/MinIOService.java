@@ -4,6 +4,7 @@ import io.minio.*;
 import io.minio.errors.ErrorResponseException;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
@@ -13,6 +14,13 @@ import java.io.InputStream;
 public class MinIOService {
 
     private final MinioClient minioClient;
+
+    @Value("${minio.container.url}")
+    private String minioContainerUrl;
+
+    public String getObjectUrlForContainer(String bucket, String object) {
+        return minioContainerUrl + "/" + bucket + "/" + object;
+    }
 
     public Iterable<Result<Item>> getAllItemsInBucketWithPrefix(String bucketName, String prefix) {
         return minioClient.listObjects(
