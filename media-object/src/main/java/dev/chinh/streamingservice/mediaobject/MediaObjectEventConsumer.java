@@ -88,6 +88,7 @@ public class MediaObjectEventConsumer {
         }
     }
 
+    @Transactional
     public void onUpdateMediaEnrichment(MediaUpdateEvent.MediaUpdateEnrichment event) throws Exception {
         System.out.println("Received media enrichment update event: " + event.mediaId());
         try {
@@ -130,7 +131,6 @@ public class MediaObjectEventConsumer {
                 mediaMetaData.setHeight(imageMetadata.height);
                 mediaMetaData.setFormat(imageMetadata.format);
             }
-            mediaMetaDataRepository.save(mediaMetaData);
 
             // send event to update the media search index again with new metadata
             if (event.mediaSearchTopic() != null && event.mediaCreatedEvent() != null) {
@@ -275,6 +275,7 @@ public class MediaObjectEventConsumer {
     }
 
 
+    @Transactional
     @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_OBJECT_TOPIC, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment acknowledgment) throws Exception {
         try {
