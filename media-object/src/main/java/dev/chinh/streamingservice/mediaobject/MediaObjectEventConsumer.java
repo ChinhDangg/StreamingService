@@ -13,6 +13,8 @@ import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.Acknowledgment;
@@ -29,7 +31,7 @@ public class MediaObjectEventConsumer {
 
     private final MinIOService minIOService;
     private final ObjectMapper objectMapper;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final ApplicationEventPublisher eventPublisher;
     private final MediaMetaDataRepository mediaMetaDataRepository;
 
     Logger logger = LoggerFactory.getLogger(MediaObjectEventConsumer.class);
@@ -134,7 +136,7 @@ public class MediaObjectEventConsumer {
 
             // send event to update the media search index again with new metadata
             if (event.mediaSearchTopic() != null && event.mediaCreatedEvent() != null) {
-                kafkaTemplate.send(event.mediaSearchTopic(), event.mediaCreatedEvent());
+                eventPublisher.publishEvent(event);
             }
         } catch (Exception e) {
             System.err.println("Failed to update media enrichment: " + event.mediaId());
