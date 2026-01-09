@@ -60,6 +60,12 @@ public interface MediaUpdateEvent {
             String path
     ) implements MediaUpdateEvent {}
 
+    record MediaUpdateEnrichment(
+            long mediaId,
+            MediaType mediaType,
+            String mediaSearchTopic,
+            MediaCreated mediaCreatedEvent
+    ) implements MediaUpdateEvent {}
 
     // for backup
     record MediaBackupCreated(
