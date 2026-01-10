@@ -45,23 +45,6 @@ public class ContentMetaData {
     // Redis stream key
     public static final String FFMPEG_VIDEO_QUEUE_KEY = "ffmpeg_video_stream";
 
-    public static void validateFieldName(String fieldNameCheck) throws IllegalAccessException {
-        ContentMetaData contentMetaData = new ContentMetaData();
-
-        boolean found = false;
-        Field[] fields = ContentMetaData.class.getDeclaredFields();
-        for (Field field : fields) {
-            field.setAccessible(true);
-            String fieldValue = field.get(contentMetaData).toString();
-            if (fieldNameCheck.equals(fieldValue)) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            throw new IllegalArgumentException("Unknown field name: " + fieldNameCheck);
-        }
-    }
 
     public static void validateSearchFieldName(String fieldNameCheck) {
         if (!(fieldNameCheck.equals(TITLE) || fieldNameCheck.equals(UNIVERSES) || fieldNameCheck.equals(CHARACTERS) ||
@@ -85,79 +68,5 @@ public class ContentMetaData {
         if (text.length() > 100) {
             throw new IllegalArgumentException("Text must be at most 100 chars");
         }
-    }
-
-    public static void main(String[] args) throws IOException {
-        walkAndStopIfHasFile(new File("E:\\Readonly\\3D"));
-    }
-
-    public static File[] getMainFolders(String folderPath) {
-        File folder = new File(folderPath);
-
-        if (folder.exists() && folder.isDirectory()) {
-            // List only directories
-            File[] subFolders = folder.listFiles(File::isDirectory);
-
-            if (subFolders != null) {
-                // Sort by name
-                Arrays.sort(subFolders, (f1, f2) -> f1.getName().compareToIgnoreCase(f2.getName()));
-                return subFolders;
-            } else {
-                System.out.println("No subfolders found.");
-            }
-        } else {
-            System.out.println("The specified path is not a folder or does not exist.");
-        }
-        return new File[]{};
-    }
-
-    public static int count = 0;
-    public static void walkAndGetDirThatContainsFile(File mainFolder) throws IOException {
-        Files.walkFileTree(mainFolder.toPath(), new SimpleFileVisitor<>() {
-
-            @NotNull @Override
-            public FileVisitResult preVisitDirectory(@NotNull Path dir, @NotNull BasicFileAttributes attrs) throws IOException {
-                try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
-                    boolean hasFile = false;
-                    for (Path entry : stream) {
-                        if (Files.isRegularFile(entry)) {
-                            hasFile = true;
-                            break;
-                        }
-                    }
-                    if (hasFile) {
-                        System.out.println(count + ": " + dir); // print directory path once
-                        count++;
-                    }
-                }
-                return FileVisitResult.CONTINUE; // keep going inside
-            }
-        });
-    }
-
-    public static void walkAndStopIfHasFile(File mainFolder) throws IOException {
-        Files.walkFileTree(mainFolder.toPath(), new SimpleFileVisitor<>() {
-            @Override @NotNull
-            public FileVisitResult preVisitDirectory(@NotNull Path dir, @NotNull BasicFileAttributes attrs) throws IOException {
-                try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
-                    boolean hasFile = false;
-                    for (Path entry : stream) {
-                        if (Files.isRegularFile(entry)) {
-                            hasFile = true;
-                            System.out.println(entry.getFileName());
-                        }
-                    }
-
-                    if (hasFile) {
-                        System.out.println(count + ": " + dir); // print directory path once
-                        count++;
-                        // Directory has a file → don't go inside subfolders
-                        return FileVisitResult.SKIP_SUBTREE;
-                    }
-                }
-                // Directory has no files → keep going inside
-                return FileVisitResult.CONTINUE;
-            }
-        });
     }
 }
