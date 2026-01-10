@@ -21,7 +21,7 @@ public abstract class MediaDescription implements MetaDataProvider {
     protected Long id;
 
     @JsonProperty(ContentMetaData.TITLE)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     protected String title;
 
     @JsonProperty(ContentMetaData.BUCKET)
@@ -29,13 +29,15 @@ public abstract class MediaDescription implements MetaDataProvider {
     protected String bucket;
 
     @JsonProperty(ContentMetaData.PARENT_PATH)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     protected String parentPath;
 
     @JsonProperty(ContentMetaData.KEY)
+    @Column(columnDefinition = "TEXT")
     protected String key;  // if key exist then is an individual content item, otherwise use parentPath for grouping
 
     @JsonProperty(ContentMetaData.THUMBNAIL)
+    @Column(columnDefinition = "TEXT")
     protected String thumbnail;
 
     @JsonProperty(ContentMetaData.LENGTH)
