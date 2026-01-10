@@ -19,7 +19,7 @@ public class MediaMetaData extends MediaDescription {
 
     // Classification (will also be stored in search for fast information display)
     @JsonProperty(ContentMetaData.TAGS)
-    @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE }, fetch = FetchType.LAZY)
+    @ManyToMany(cascade = { CascadeType.MERGE }, fetch = FetchType.LAZY)
     @JoinTable(
             name = "tags_media",
             joinColumns = @JoinColumn(name = "media_id"),
@@ -29,7 +29,7 @@ public class MediaMetaData extends MediaDescription {
     private Set<MediaTag> tags;
 
     @JsonProperty(ContentMetaData.CHARACTERS)
-    @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE }, fetch = FetchType.LAZY)
+    @ManyToMany(cascade = { CascadeType.MERGE }, fetch = FetchType.LAZY)
     @JoinTable(
             name = "characters_media",
             joinColumns = @JoinColumn(name = "media_id"),
@@ -39,7 +39,7 @@ public class MediaMetaData extends MediaDescription {
     private Set<MediaCharacter> characters;
 
     @JsonProperty(ContentMetaData.UNIVERSES)
-    @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE }, fetch = FetchType.LAZY)
+    @ManyToMany(cascade = { CascadeType.MERGE }, fetch = FetchType.LAZY)
     @JoinTable(
             name = "universes_media",
             joinColumns = @JoinColumn(name = "media_id"),
@@ -49,7 +49,7 @@ public class MediaMetaData extends MediaDescription {
     private Set<MediaUniverse> universes;
 
     @JsonProperty(ContentMetaData.AUTHORS)
-    @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE }, fetch = FetchType.LAZY)
+    @ManyToMany(cascade = { CascadeType.MERGE }, fetch = FetchType.LAZY)
     @JoinTable(
             name = "authors_media",
             joinColumns = @JoinColumn(name = "media_id"),
@@ -81,7 +81,7 @@ public class MediaMetaData extends MediaDescription {
     @Column(nullable = false)
     private String format;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String absoluteFilePath;
 
     @Override
