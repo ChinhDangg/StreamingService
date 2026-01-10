@@ -200,6 +200,7 @@ public class MediaSearchEventConsumer {
                 ack.acknowledge(); // ack on poison event to skip it
             }
         }
+        System.out.println("======= =======");
 
         // ack or it will be re-read from the DLQ on restart or rehandle it manually.
         //ack.acknowledge();

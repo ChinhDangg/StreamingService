@@ -15,13 +15,11 @@ import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
-import org.springframework.kafka.support.mapping.DefaultJackson2JavaTypeMapper;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 import org.springframework.util.backoff.FixedBackOff;
 
-import java.nio.file.FileAlreadyExistsException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -84,7 +82,12 @@ public class KafkaRedPandaConfig {
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
 
         // No Recoverer here: just log the error and stop retrying
-        factory.setCommonErrorHandler(new DefaultErrorHandler(new FixedBackOff(0L, 0)));
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(new FixedBackOff(0L, 0));
+
+        // THIS LINE PREVENTS AUTO-COMMIT ON FAILURE
+        errorHandler.setAckAfterHandle(false);
+
+        factory.setCommonErrorHandler(errorHandler);
         return factory;
     }
 

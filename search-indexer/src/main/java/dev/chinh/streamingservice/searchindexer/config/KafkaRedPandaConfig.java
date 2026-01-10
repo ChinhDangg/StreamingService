@@ -82,7 +82,12 @@ public class KafkaRedPandaConfig {
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
 
         // No Recoverer here: just log the error and stop retrying
-        factory.setCommonErrorHandler(new DefaultErrorHandler(new FixedBackOff(0L, 0)));
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(new FixedBackOff(0L, 0));
+
+        // THIS LINE PREVENTS AUTO-COMMIT ON FAILURE
+        errorHandler.setAckAfterHandle(false);
+
+        factory.setCommonErrorHandler(errorHandler);
         return factory;
     }
 

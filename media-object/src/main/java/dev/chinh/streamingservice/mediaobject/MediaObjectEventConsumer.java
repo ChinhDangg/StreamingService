@@ -308,6 +308,7 @@ public class MediaObjectEventConsumer {
             acknowledgment.acknowledge();
         } catch (Exception e) {
             System.err.println(e.getMessage());
+            e.printStackTrace();
             // throwing the exception lets DefaultErrorHandler apply retry
             throw e;
         }
@@ -339,7 +340,7 @@ public class MediaObjectEventConsumer {
                 ack.acknowledge(); // ack on poison event to skip it
             }
         }
-
+        System.out.println("======= =======");
         // ack or it will be re-read from the DLQ on restart or rehandle it manually.
         //ack.acknowledge();
     }
