@@ -11,10 +11,8 @@ import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.mediaupload.MediaBasicInfo;
 import dev.chinh.streamingservice.mediaupload.event.config.KafkaRedPandaConfig;
-import dev.chinh.streamingservice.persistence.entity.MediaGroupMetaData;
-import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
-import dev.chinh.streamingservice.persistence.repository.MediaGroupMetaDataRepository;
-import dev.chinh.streamingservice.persistence.repository.MediaMetaDataRepository;
+import dev.chinh.streamingservice.persistence.entity.*;
+import dev.chinh.streamingservice.persistence.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -25,9 +23,7 @@ import software.amazon.awssdk.services.s3.model.*;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @RequiredArgsConstructor
 @Service
@@ -38,7 +34,6 @@ public class MediaUploadService {
     private final ObjectMapper objectMapper;
     private final ObjectUploadService objectUploadService;
     private final MinIOService minIOService;
-    private final ThumbnailService thumbnailService;
     private final MediaDisplayService mediaDisplayService;
     private final MediaSearchCacheService mediaSearchCacheService;
 
@@ -246,29 +241,21 @@ public class MediaUploadService {
         mediaMetaData.setUploadDate(Instant.now());
         mediaMetaData.setBucket(mediaBucket);
         mediaMetaData.setAbsoluteFilePath(mediaBucket + "/" + upload.objectName);
+        mediaMetaData.setThumbnail(MediaJobStatus.PROCESSING.name());
+
+        mediaMetaData.setFormat(MediaJobStatus.PROCESSING.name());
+        mediaMetaData.setSize(-1L);
+        mediaMetaData.setWidth(-1);
+        mediaMetaData.setHeight(-1);
+        mediaMetaData.setLength(-1);
 
         if (upload.mediaType == MediaType.VIDEO) {
             int index = upload.objectName.lastIndexOf("/");
             mediaMetaData.setParentPath(upload.objectName.substring(0, index));
             mediaMetaData.setKey(upload.objectName.substring(index + 1));
-
             mediaMetaData.setFrameRate((short) -1);
-            mediaMetaData.setFormat(MediaJobStatus.PROCESSING.name());
-            mediaMetaData.setSize(-1L);
-            mediaMetaData.setWidth(-1);
-            mediaMetaData.setHeight(-1);
-            mediaMetaData.setLength(-1);
-
-            mediaMetaData.setThumbnail(thumbnailService.generateThumbnailFromVideo(mediaBucket, upload.objectName));
-
         } else if (upload.mediaType == MediaType.ALBUM) {
             mediaMetaData.setParentPath(upload.objectName);
-            mediaMetaData.setSize(-1L);
-            mediaMetaData.setLength(-1);
-            mediaMetaData.setThumbnail(MediaJobStatus.PROCESSING.name());
-            mediaMetaData.setWidth(-1);
-            mediaMetaData.setHeight(-1);
-            mediaMetaData.setFormat(MediaJobStatus.PROCESSING.name());
         }
 
         MediaMetaData saved = mediaRepository.save(mediaMetaData);
