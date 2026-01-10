@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @NoRepositoryBean
 public interface MediaNameEntityRepository<T extends MediaNameEntity, ID> extends JpaRepository<T, ID> {
@@ -21,6 +22,9 @@ public interface MediaNameEntityRepository<T extends MediaNameEntity, ID> extend
 
     @Query("SELECT new dev.chinh.streamingservice.persistence.projection.MediaNameEntry(e.name, e.length) FROM #{#entityName} e")
     Page<MediaNameEntry> findAllNames(Pageable pageable);
+
+    @Query("SELECT e FROM #{#entityName} e WHERE LOWER(e.name) LIKE :name")
+    Optional<MediaNameEntity> findByName(String name);
 
     @Modifying
     @Transactional
