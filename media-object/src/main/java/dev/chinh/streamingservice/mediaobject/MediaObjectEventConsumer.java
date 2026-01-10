@@ -13,10 +13,8 @@ import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -31,8 +29,10 @@ public class MediaObjectEventConsumer {
 
     private final MinIOService minIOService;
     private final ObjectMapper objectMapper;
-    private final ApplicationEventPublisher eventPublisher;
+    private final ThumbnailService thumbnailService;
     private final MediaMetaDataRepository mediaMetaDataRepository;
+
+    private final ApplicationEventPublisher eventPublisher;
 
     Logger logger = LoggerFactory.getLogger(MediaObjectEventConsumer.class);
 
@@ -105,11 +105,13 @@ public class MediaObjectEventConsumer {
                 mediaMetaData.setWidth(videoMetadata.width);
                 mediaMetaData.setHeight(videoMetadata.height);
                 mediaMetaData.setLength((int) videoMetadata.durationSeconds);
+                mediaMetaData.setThumbnail(thumbnailService.generateThumbnailFromVideo(mediaMetaData.getBucket(), mediaMetaData.getPath()));
             } else if (event.mediaType() == MediaType.ALBUM) {
                 var results = minIOService.getAllItemsInBucketWithPrefix(mediaMetaData.getBucket(), mediaMetaData.getPath());
                 int count = 0;
                 long totalSize = 0;
                 String firstImage = null;
+                String firstVideo = null;
                 for (Result<Item> result : results) {
                     count++;
                     Item item = result.get();
@@ -118,14 +120,26 @@ public class MediaObjectEventConsumer {
                             firstImage = item.objectName();
                         totalSize += item.size();
                     }
+                    if (firstImage == null && firstVideo == null && MediaType.detectMediaType(item.objectName()) == MediaType.VIDEO) {
+                        firstVideo = item.objectName();
+                    }
                 }
                 mediaMetaData.setSize(totalSize);
                 mediaMetaData.setLength(count);
-                mediaMetaData.setThumbnail(firstImage);
-                ImageMetadata imageMetadata = parseMediaMetadata(probeMediaInfo(mediaMetaData.getBucket(), firstImage), ImageMetadata.class);
-                mediaMetaData.setWidth(imageMetadata.width);
-                mediaMetaData.setHeight(imageMetadata.height);
-                mediaMetaData.setFormat(imageMetadata.format);
+                if (firstImage != null) {
+                    ImageMetadata imageMetadata = parseMediaMetadata(probeMediaInfo(mediaMetaData.getBucket(), firstImage), ImageMetadata.class);
+                    mediaMetaData.setWidth(imageMetadata.width);
+                    mediaMetaData.setHeight(imageMetadata.height);
+                    mediaMetaData.setFormat(imageMetadata.format);
+                    mediaMetaData.setThumbnail(firstImage);
+                } else if (firstVideo != null) {
+                    VideoMetadata videoMetadata = parseMediaMetadata(probeMediaInfo(mediaMetaData.getBucket(), firstVideo), VideoMetadata.class);
+                    mediaMetaData.setWidth(videoMetadata.width);
+                    mediaMetaData.setHeight(videoMetadata.height);
+                    mediaMetaData.setFormat(videoMetadata.format);
+                    mediaMetaData.setFrameRate(videoMetadata.frameRate);
+                    mediaMetaData.setThumbnail(thumbnailService.generateThumbnailFromVideo(mediaMetaData.getBucket(), firstVideo));
+                }
             } else if (event.mediaType() == MediaType.GROUPER) {
                 ImageMetadata imageMetadata = parseMediaMetadata(probeMediaInfo(ContentMetaData.THUMBNAIL_BUCKET, mediaMetaData.getThumbnail()), ImageMetadata.class);
                 mediaMetaData.setSize(imageMetadata.size);
