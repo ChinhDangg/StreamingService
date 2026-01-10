@@ -2,7 +2,6 @@ package dev.chinh.streamingservice.mediaobject;
 
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
-import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
