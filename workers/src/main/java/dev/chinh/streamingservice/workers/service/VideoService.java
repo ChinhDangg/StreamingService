@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.constant.Resolution;
-import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import dev.chinh.streamingservice.workers.VideoWorker;
 import jakarta.annotation.PostConstruct;
@@ -14,8 +13,6 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.regex.Matcher;
@@ -45,8 +42,6 @@ public class VideoService extends MediaService implements ResourceCleanable {
         memoryManager.registerResourceCleanable(this);
     }
 
-    private static final String diskDir = "disk";
-    public static final String defaultVidPath = "vid";
 
     @Override
     public void handleJob(String tokenKey, MediaJobDescription mediaJobDescription) {
@@ -68,10 +63,6 @@ public class VideoService extends MediaService implements ResourceCleanable {
                     workerRedisService.updateStatus(mediaJobDescription.getWorkId(), MediaJobStatus.RUNNING.name());
                     workerRedisService.addResultToStatus(mediaJobDescription.getWorkId(), "result", url);
                 }
-//                case "videoThumbnail" -> {
-//                    generateThumbnailFromVideo(mediaJobDescription);
-//                    workerRedisService.releaseToken(tokenKey);
-//                }
                 case null, default -> throw new IllegalArgumentException("Unknown job type");
            };
         } catch (Exception e) {
@@ -299,61 +290,6 @@ public class VideoService extends MediaService implements ResourceCleanable {
         runAndLogAsync(tokenKey, command.toArray(new String[0]), cacheJobId, outPath);
         return partialVideoJobId;
     }
-
-//    public String generateThumbnailFromVideo(MediaJobDescription mediaJobDescription) throws Exception {
-//        String bucket = mediaJobDescription.getBucket();
-//        String objectName = mediaJobDescription.getPath();
-//
-//        String thumbnailObject = objectName.substring(0, objectName.lastIndexOf(".")) + "-thumb.jpg";
-//        String thumbnailOutput = OSUtil.normalizePath(diskDir, thumbnailObject);
-//        Files.createDirectories(Path.of(thumbnailOutput.substring(0, thumbnailOutput.lastIndexOf("/"))));
-//        String videoInput = minIOService.getObjectUrlForContainer(bucket, objectName);
-//
-//
-//        List<String> command = Arrays.asList(
-//                "docker", "exec", "ffmpeg",
-//                "ffmpeg",
-//                "-v", "error",                 // only show errors, no logs
-//                "-skip_frame", "nokey",        // skip NON-keyframes → decode only I-frames - fast operation
-//                "-ss", "2",                    // FAST SEEK: jump to keyframe nearest the 1-second mark
-//                "-i", videoInput,              // input video
-//                "-frames:v", "1",              // output exactly one frame
-//                "-vsync", "vfr",               // variable frame rate; ensures correct frame extraction
-//                "-q:v", "2",                   // high JPEG quality (2 = very high, 1 = max)
-//                // select only keyframes (only I-frames). Escaped for Java.
-//                "-vf", "select='eq(pict_type\\,I)'",
-//                thumbnailOutput                // output thumbnail (original resolution)
-//        );
-//
-//        ProcessBuilder pb = new ProcessBuilder(command);
-//        pb.redirectErrorStream(true); // merge STDOUT + STDERR
-//
-//        Process process = pb.start();
-//
-//        List<String> logs = getLogsFromInputStream(process.getInputStream());
-//        Path thumbnailPath = Path.of(thumbnailOutput);
-//
-//        int exitCode = process.waitFor();
-//        System.out.println("ffmpeg generate thumbnail from video exited with code " + exitCode);
-//        if (exitCode != 0) {
-//            logs.forEach(System.out::println);
-//            try {
-//                Files.deleteIfExists(thumbnailPath);
-//            } catch (IOException e) {
-//                System.out.println("Failed to clean up thumbnail file: ");
-//                System.out.println(e.getMessage());
-//            }
-//            throw new RuntimeException("Failed to generate thumbnail from video");
-//        }
-//
-//        thumbnailObject = thumbnailObject.startsWith(defaultVidPath)
-//                ? thumbnailObject
-//                : OSUtil.normalizePath(defaultVidPath, thumbnailObject);
-//        minIOService.moveFileToObject(ContentMetaData.THUMBNAIL_BUCKET, thumbnailObject, thumbnailOutput);
-//        Files.delete(thumbnailPath);
-//
-//        return thumbnailObject;
-//    }
 
     private String getFfmpegScaleString(int width, int height, int target) {
         return (width >= height) ? "scale=-2:" + target : "scale=" + target + ":-2";
