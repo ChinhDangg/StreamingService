@@ -22,7 +22,8 @@ public class ThumbnailService {
     private final MinIOService minIOService;
 
     private static final String diskDir = "disk";
-    public static final String defaultVidPath = "vid";
+    private static final String defaultVidPath = "vid";
+    private static final String defaultAlbumPath = "album";
 
     public String generateThumbnailFromVideo(String bucket, String objectName) throws Exception {
 
@@ -89,7 +90,11 @@ public class ThumbnailService {
         return logs;
     }
 
-    public void copyObjectToThumbnailBucket(String sourceBucket, String sourceObject, String destinationObject) throws Exception {
-        minIOService.copyObjectToAnotherBucket(sourceBucket, sourceObject, ContentMetaData.THUMBNAIL_BUCKET, destinationObject);
+    public String copyAlbumObjectToThumbnailBucket(String sourceBucket, String sourceObject) throws Exception {
+        String thumbnailObject = sourceObject.startsWith(defaultAlbumPath)
+                ? sourceObject
+                : OSUtil.normalizePath(defaultAlbumPath, sourceObject);
+        minIOService.copyObjectToAnotherBucket(sourceBucket, sourceObject, ContentMetaData.THUMBNAIL_BUCKET, thumbnailObject);
+        return thumbnailObject;
     }
 }

@@ -40,14 +40,12 @@ public class MediaObjectEventConsumer {
         System.out.println("Received media object delete event: " + event.mediaType() + " " + event.path());
         MediaType mediaType = event.mediaType();
 
-        if (mediaType == MediaType.VIDEO || mediaType == MediaType.GROUPER) {
-            try {
-                if (event.hasThumbnail())
-                    minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, event.thumbnail());
-            } catch (Exception e) {
-                System.err.println("Failed to delete thumbnail file: " + event.thumbnail());
-                throw e;
-            }
+        try {
+            if (event.hasThumbnail())
+                minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, event.thumbnail());
+        } catch (Exception e) {
+            System.err.println("Failed to delete thumbnail file: " + event.thumbnail());
+            throw e;
         }
 
         if (mediaType == MediaType.VIDEO) {
@@ -131,8 +129,7 @@ public class MediaObjectEventConsumer {
                     mediaMetaData.setWidth(imageMetadata.width);
                     mediaMetaData.setHeight(imageMetadata.height);
                     mediaMetaData.setFormat(imageMetadata.format);
-                    mediaMetaData.setThumbnail(firstImage);
-                    thumbnailService.copyObjectToThumbnailBucket(mediaMetaData.getBucket(), mediaMetaData.getThumbnail(), mediaMetaData.getThumbnail());
+                    mediaMetaData.setThumbnail(thumbnailService.copyAlbumObjectToThumbnailBucket(mediaMetaData.getBucket(), firstImage));
                 } else if (firstVideo != null) {
                     VideoMetadata videoMetadata = parseMediaMetadata(probeMediaInfo(mediaMetaData.getBucket(), firstVideo), VideoMetadata.class);
                     mediaMetaData.setWidth(videoMetadata.width);
