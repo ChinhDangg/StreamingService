@@ -10,6 +10,9 @@ Check drives:
 lsblk
 lsblk -o NAME,SIZE,TYPE,MOUNTPOINT
 
+# Check which filesystem backs
+df -h /media/file_pool
+df -h /media/media_pool
 
 Clearing drives: sudo wipefs -a /dev/nvme2n1
 sudo wipefs -a /dev/nvme3n1
@@ -17,22 +20,22 @@ sudo wipefs -a /dev/nvme3n1
 sudo sgdisk --zap-all /dev/nvme2n1
 sudo sgdisk --zap-all /dev/nvme3n1
 
-Verify pool status: zpool status
+# Verify pool status: zpool status
 zfs list
 zpool list
 
-Creating media_pool:
+# Creating media_pool:
 sudo zpool create media_pool \
   /dev/nvme2n1 \
   /dev/nvme3n1
 
-Set the mountpoint:
+# Set the mountpoint:
 sudo zfs set mountpoint=/media/media_pool media_pool
 
-Set ownership (for Docker / services):
+# Set ownership (for Docker / services):
 sudo chown -R chinh:chinh /media/media_pool
 
-ZFS tuning for media workloads:
+# ZFS tuning for media workloads:
 sudo zfs set recordsize=1M media_pool
 sudo zfs set compression=lz4 media_pool
 sudo zfs set atime=off media_pool
@@ -43,65 +46,87 @@ sudo zfs set aclinherit=passthrough media_pool/data
 
 
 
-Creating file_pool:
+# Creating file_pool:
 sudo zpool create file_pool \
   /dev/nvme4n1 \
   /dev/nvme0n1
 
-Creating ZFS datasets for file_pool:
+# Creating ZFS datasets for file_pool:
 sudo zfs create file_pool/files
 sudo zfs create file_pool/postgres
 sudo zfs create file_pool/opensearch
 
-Setting mount points for file_pool datasets:
-sudo zfs set mountpoint=/srv/file_pool file_pool
-sudo zfs set mountpoint=/srv/file_pool/files file_pool/files
-sudo zfs set mountpoint=/srv/file_pool/postgres file_pool/postgres
-sudo zfs set mountpoint=/srv/file_pool/opensearch file_pool/opensearch
+# Set the parent mount point
+sudo zfs set mountpoint=/media/file_pool file_pool
 
-Set the individual datasets’ mount points:
-sudo zfs set mountpoint=/srv/file_pool/files file_pool/files
-sudo zfs set mountpoint=/srv/file_pool/postgres file_pool/postgres
-sudo zfs set mountpoint=/srv/file_pool/opensearch file_pool/opensearch
+# Set the individual datasets’ mount points explicitly
+sudo zfs set mountpoint=/media/file_pool/files file_pool/files
+sudo zfs set mountpoint=/media/file_pool/postgres file_pool/postgres
+sudo zfs set mountpoint=/media/file_pool/opensearch file_pool/opensearch
 
-PostgreSQL dataset tuning:
+# PostgreSQL dataset tuning:
 sudo zfs set recordsize=16K file_pool/postgres
 sudo zfs set compression=lz4 file_pool/postgres
 sudo zfs set atime=off file_pool/postgres
 sudo zfs set logbias=latency file_pool/postgres
 
-OpenSearch dataset tuning:
+# OpenSearch dataset tuning:
 sudo zfs set recordsize=128K file_pool/opensearch
 sudo zfs set compression=lz4 file_pool/opensearch
 sudo zfs set atime=off file_pool/opensearch
 sudo zfs set primarycache=metadata file_pool/opensearch
 
-Files dataset tuning:
+# Files dataset tuning:
 sudo zfs set recordsize=1M file_pool/files
 sudo zfs set compression=lz4 file_pool/files
 sudo zfs set atime=off file_pool/files
 
 
-Installing Docker:
+# Installing Docker:
 sudo apt update
 sudo apt install -y docker.io
 
-Enable Docker to start at boot:
+# Enable Docker to start at boot:
 sudo systemctl enable docker
 sudo systemctl start docker
 Add your user to the docker group
 
-Add your user to the docker group (This is required to run Docker without sudo):
+# Add your user to the docker group (This is required to run Docker without sudo):
 sudo usermod -aG docker $USER
 
 
-Set ownership problem:
-Set file_pool to root:
-sudo chmod 755 /srv/file_pool
-sudo chown root:root /srv/file_pool
+# Set ownership problem:
+# Set file_pool to root:
+sudo chmod 755 /media/file_pool
+sudo chown root:root /media/file_pool
 
-Set each direct path to correct user id. (1000 is $USER chinh):
-chown root:root /srv/file_pool
-chown 1000:1000 /srv/file_pool/files
-chown 999:999 /srv/file_pool/postgres
-chown 1000:1000 /srv/file_pool/opensearch
+# Set each direct path to correct user id. (1000 is $USER chinh):
+sudo chown root:root /media/file_pool
+
+sudo chown -R chinh:chinh /media/file_pool/files
+sudo chmod -R 755 /media/file_pool/files
+
+sudo chown -R chinh:chinh /media/file_pool/opensearch
+sudo chmod -R 755 /media/file_pool/opensearch
+
+sudo chown -R 999:999 /media/file_pool/postgres
+sudo chmod -R 700 /media/file_pool/postgres
+
+# For remounting:
+# Unmounting the children first
+sudo zfs unmount file_pool/files
+sudo zfs unmount file_pool/postgres
+sudo zfs unmount file_pool/opensearch
+
+# Unmounting the parent second
+sudo zfs unmount file_pool
+# Set the new mounting point
+sudo zfs set mountpoint=/media/file_pool file_pool
+
+# Tell the child datasets to "inherit" the new mountpoint from their parent
+sudo zfs inherit mountpoint file_pool/files
+sudo zfs inherit mountpoint file_pool/postgres
+sudo zfs inherit mountpoint file_pool/opensearch
+
+# Remount everything
+sudo zfs mount -a
