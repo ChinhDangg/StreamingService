@@ -167,11 +167,13 @@ public class MediaObjectEventConsumer {
                 "-show_streams",
                 inputUrl
         );
-        pb.redirectErrorStream(true);
+        //pb.redirectErrorStream(true);
         Process process = pb.start();
 
-        // Read all bytes asynchronously so the buffer doesn't clog
+        // Read all bytes asynchronously so the buffer doesn't clog. Read only standard output
         byte[] outBytes = process.getInputStream().readAllBytes();
+        // Read error streaming separately
+        byte[] errBytes = process.getErrorStream().readAllBytes();
 
         boolean finished = process.waitFor(15, TimeUnit.SECONDS);
         if (!finished) {
@@ -183,7 +185,8 @@ public class MediaObjectEventConsumer {
 
         int exitCode = process.exitValue();
         if (exitCode != 0) {
-            throw new RuntimeException("ffprobe failed — exit=" + exitCode + " output: " + output);
+            String errorOutput = new String(errBytes);
+            throw new RuntimeException("ffprobe failed — exit=" + exitCode + " output: " + errorOutput);
         }
 
         JsonNode jsonNode = objectMapper.readTree(output);
