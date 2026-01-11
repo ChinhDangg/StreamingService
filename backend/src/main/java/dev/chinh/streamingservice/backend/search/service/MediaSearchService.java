@@ -169,9 +169,8 @@ public class MediaSearchService {
             items.add(searchItem);
             MediaSearchItemResponse itemResponse = mediaMapper.map(searchItem);
             if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
-                String thumbnailBucket = searchItem.getMediaType() == MediaType.ALBUM ? searchItem.getBucket() : ContentMetaData.THUMBNAIL_BUCKET;
                 itemResponse.setThumbnail(searchItem.hasThumbnail()
-                        ? minIOService.getObjectUrl(thumbnailBucket, searchItem.getThumbnail())
+                        ? minIOService.getObjectUrl(ContentMetaData.THUMBNAIL_BUCKET, searchItem.getThumbnail())
                         : null);
             } else {
                 itemResponse.setThumbnail(searchItem.hasThumbnail() ? ThumbnailService.getThumbnailPath(

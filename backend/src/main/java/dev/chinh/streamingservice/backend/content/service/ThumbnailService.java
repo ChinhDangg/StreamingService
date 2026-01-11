@@ -44,7 +44,7 @@ public class ThumbnailService {
         try {
             if (albumUrlInfo.mediaUrlList().isEmpty())
                 return;
-            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), true);
+            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), false);
             if (exitCode != 0) {
                 throw new RuntimeException("Failed to resize thumbnails");
             }
@@ -88,21 +88,22 @@ public class ThumbnailService {
     private AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList) {
         List<String> pathList = new ArrayList<>();
         List<MediaUrl> albumUrlList = new ArrayList<>();
-        List<String> bucketList = new ArrayList<>();
+//        List<String> bucketList = new ArrayList<>();
         for (MediaDescription mediaDescription : mediaDescriptionList) {
             if (!mediaDescription.hasThumbnail())
                 continue;
 
-            if (mediaDescription.getMediaType() == MediaType.VIDEO || mediaDescription.getMediaType() == MediaType.GROUPER)
-                bucketList.add(ContentMetaData.THUMBNAIL_BUCKET);
-            else
-                bucketList.add(mediaDescription.getBucket());
-            pathList.add(mediaDescription.getThumbnail());
+//            if (mediaDescription.getMediaType() == MediaType.VIDEO || mediaDescription.getMediaType() == MediaType.GROUPER)
+//                bucketList.add(ContentMetaData.THUMBNAIL_BUCKET);
+//            else
+//                bucketList.add(mediaDescription.getBucket());
+//            pathList.add(mediaDescription.getThumbnail());
 
             String pathString = "/chunks" + getThumbnailPath(mediaDescription.getId(), mediaDescription.getThumbnail());
             albumUrlList.add(new MediaUrl(MediaType.IMAGE, pathString));
         }
-        return new AlbumUrlInfo(albumUrlList, bucketList, pathList);
+//        return new AlbumUrlInfo(albumUrlList, bucketList, pathList);
+        return new AlbumUrlInfo(albumUrlList, List.of(ContentMetaData.THUMBNAIL_BUCKET), pathList);
     }
 
     private AlbumUrlInfo getThumbnailImagesAsAlbumUrls(List<MediaNameEntry> mediaNameEntryList) {
