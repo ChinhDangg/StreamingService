@@ -44,6 +44,9 @@ sudo zfs set xattr=sa media_pool/data
 sudo zfs set acltype=posixacl media_pool/data
 sudo zfs set aclinherit=passthrough media_pool/data
 
+# See drive settings
+zfs get recordsize,compression,atime,logbias,primarycache,xattr media_pool/data
+
 
 
 # Creating file_pool:
@@ -69,17 +72,23 @@ sudo zfs set recordsize=16K file_pool/postgres
 sudo zfs set compression=lz4 file_pool/postgres
 sudo zfs set atime=off file_pool/postgres
 sudo zfs set logbias=latency file_pool/postgres
+sudo zfs set xattr=sa file_pool/postgres
 
 # OpenSearch dataset tuning:
 sudo zfs set recordsize=128K file_pool/opensearch
 sudo zfs set compression=lz4 file_pool/opensearch
 sudo zfs set atime=off file_pool/opensearch
 sudo zfs set primarycache=metadata file_pool/opensearch
+sudo zfs set xattr=sa file_pool/opensearch
 
 # Files dataset tuning:
 sudo zfs set recordsize=1M file_pool/files
 sudo zfs set compression=lz4 file_pool/files
 sudo zfs set atime=off file_pool/files
+sudo zfs set xattr=sa file_pool/files
+
+# See drive settings:
+zfs get recordsize,compression,atime,logbias,primarycache,xattr file_pool/files file_pool/postgres file_pool/opensearch
 
 
 # Installing Docker:
@@ -130,3 +139,11 @@ sudo zfs inherit mountpoint file_pool/opensearch
 
 # Remount everything
 sudo zfs mount -a
+
+zfs settings:
+recordsize - The Block Size (16K is good for postgres, 1M to read large files)
+compression - Compression Type (lz4 is extremely fast - CPU can compress data faster than nvme writing, also skip already compressed files)
+atime - Access Time (off turn off linux record access time of a file - avoid tiny write for every read)
+logbias - Write setting (latency - for postgres to prioritize speed of individual writes as database needs to know a write is safe before writing)
+primarycache - Enable caching (all - both file and metadata; metadata - keep the index of files in RAM but not the actual file - for OpenSearch and MinIO as they already have their own caching system - avoid double caching
+xattr - Extra info (sa - handle extra infos like permission, browsing more efficiently by storing them in the file header instead of separate file location; ZFS creates a hidden internal directory for every single file that has extra metadata (like permissions or SELinux labels)
