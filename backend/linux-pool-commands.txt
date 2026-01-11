@@ -24,6 +24,13 @@ sudo sgdisk --zap-all /dev/nvme3n1
 zfs list
 zpool list
 
+# Checking pending pool to be imported:
+sudo zpool import
+
+# Importing the pool:
+sudo zpool import -f media_pool
+
+
 # Creating media_pool:
 sudo zpool create media_pool \
   /dev/nvme2n1 \
