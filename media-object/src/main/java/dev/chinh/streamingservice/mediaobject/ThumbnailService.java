@@ -88,4 +88,8 @@ public class ThumbnailService {
         }
         return logs;
     }
+
+    public void copyObjectToThumbnailBucket(String sourceBucket, String sourceObject, String destinationObject) throws Exception {
+        minIOService.copyObjectToAnotherBucket(sourceBucket, sourceObject, ContentMetaData.THUMBNAIL_BUCKET, destinationObject);
+    }
 }

@@ -132,6 +132,7 @@ public class MediaObjectEventConsumer {
                     mediaMetaData.setHeight(imageMetadata.height);
                     mediaMetaData.setFormat(imageMetadata.format);
                     mediaMetaData.setThumbnail(firstImage);
+                    thumbnailService.copyObjectToThumbnailBucket(mediaMetaData.getBucket(), mediaMetaData.getThumbnail(), mediaMetaData.getThumbnail());
                 } else if (firstVideo != null) {
                     VideoMetadata videoMetadata = parseMediaMetadata(probeMediaInfo(mediaMetaData.getBucket(), firstVideo), VideoMetadata.class);
                     mediaMetaData.setWidth(videoMetadata.width);
