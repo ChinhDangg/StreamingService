@@ -124,10 +124,13 @@ public class KafkaRedPandaConfig {
         DeadLetterPublishingRecoverer recoverer =
                 new DeadLetterPublishingRecoverer(
                         dlqKafkaTemplate,
-                        (record, ex) -> new org.apache.kafka.common.TopicPartition(
-                                MEDIA_BACKUP_DLQ_TOPIC,
-                                -1
-                        ));
+                        (record, ex) -> {
+                            // Check if the exception (or its cause) is FileAlreadyExistsException
+                            if (ex instanceof FileAlreadyExistsException || ex.getCause() instanceof FileAlreadyExistsException) {
+                                return null; // Returning null skips the DLQ publication
+                            }
+                            return new org.apache.kafka.common.TopicPartition(MEDIA_BACKUP_DLQ_TOPIC, -1);
+                        });
 
         FixedBackOff fixedBackOff = new FixedBackOff(2000L, 3);
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, fixedBackOff);
