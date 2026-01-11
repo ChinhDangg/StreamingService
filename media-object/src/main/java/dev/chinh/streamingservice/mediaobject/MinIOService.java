@@ -1,7 +1,7 @@
 package dev.chinh.streamingservice.mediaobject;
 
 import io.minio.*;
-import io.minio.errors.ErrorResponseException;
+import io.minio.errors.*;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -90,6 +90,22 @@ public class MinIOService {
                         .bucket(bucket)
                         .object(object)
                         .filename(filePath)
+                        .build()
+        );
+    }
+
+    public void copyObjectToAnotherBucket(String sourceBucket, String sourceObject,
+                                          String destinationBucket, String destinationObject) throws Exception {
+        CopySource source = CopySource.builder()
+                .bucket(sourceBucket)
+                .object(sourceObject)
+                .build();
+
+        minioClient.copyObject(
+                CopyObjectArgs.builder()
+                        .bucket(destinationBucket)
+                        .object(destinationObject)
+                        .source(source) // renaming object name here
                         .build()
         );
     }
