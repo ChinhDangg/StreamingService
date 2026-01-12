@@ -834,7 +834,7 @@ function displaySearchItems(searchItems) {
         const itemContainer = (item.width >= item.height) ? helperCloneAndUnHideNode(horizontalItemTem)
                                         : helperCloneAndUnHideNode(verticalItemTem);
         if (item.thumbnail)
-            itemContainer.querySelector('.thumbnail-image').src = sanitizeRelativeSrc(item.thumbnail);
+            itemContainer.querySelector('.thumbnail-image').src = item.thumbnail;
         itemContainer.querySelector('.resolution-note').textContent = (item.width && item.height) ? `${item.width}x${item.height}` : '';
         itemContainer.querySelector('.media-title').textContent = item.title;
         itemContainer.querySelector('.date-note').textContent = item.uploadDate;
