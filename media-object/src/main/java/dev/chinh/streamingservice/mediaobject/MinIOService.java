@@ -20,14 +20,16 @@ public class MinIOService {
     @Value("${minio.container.url}")
     private String minioContainerUrl;
 
+    private String encodeUriPathSegment(String str) {
+        return UriUtils.encodePathSegment(str, StandardCharsets.UTF_8);
+    }
+
+    private String encodeUriPath(String str) {
+        return UriUtils.encodePath(str, StandardCharsets.UTF_8); // preserve '/'
+    }
+
     public String getObjectUrlForContainer(String bucket, String object) {
-        // Encode the bucket name
-        String encodedBucket = UriUtils.encodePathSegment(bucket, StandardCharsets.UTF_8);
-
-        // Encode the object path (preserves '/' but encodes '#' and '[]')
-        String encodedObject = UriUtils.encodePath(object, StandardCharsets.UTF_8);
-
-        return minioContainerUrl + "/" + encodedBucket + "/" + encodedObject;
+        return minioContainerUrl + "/" + encodeUriPathSegment(bucket) + "/" + encodeUriPath(object);
     }
 
     public Iterable<Result<Item>> getAllItemsInBucketWithPrefix(String bucketName, String prefix) {
