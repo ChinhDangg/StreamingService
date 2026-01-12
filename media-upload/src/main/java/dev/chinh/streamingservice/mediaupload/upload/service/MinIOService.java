@@ -3,15 +3,16 @@ package dev.chinh.streamingservice.mediaupload.upload.service;
 import io.minio.*;
 import io.minio.errors.ErrorResponseException;
 import io.minio.errors.MinioException;
-import io.minio.http.Method;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 
@@ -25,7 +26,13 @@ public class MinIOService {
     private String minioContainerUrl;
 
     public String getObjectUrlForContainer(String bucket, String object) {
-        return minioContainerUrl + "/" + bucket + "/" + object;
+        // Encode the bucket name
+        String encodedBucket = UriUtils.encodePathSegment(bucket, StandardCharsets.UTF_8);
+
+        // Encode the object path (preserves '/' but encodes '#' and '[]')
+        String encodedObject = UriUtils.encodePath(object, StandardCharsets.UTF_8);
+
+        return minioContainerUrl + "/" + encodedBucket + "/" + encodedObject;
     }
 
     public Iterable<Result<Item>> getAllItemsInBucketWithPrefix(String bucketName, String prefix) {

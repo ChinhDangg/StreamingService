@@ -6,8 +6,10 @@ import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.UriUtils;
 
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 @Service
 @RequiredArgsConstructor
@@ -19,7 +21,13 @@ public class MinIOService {
     private String minioContainerUrl;
 
     public String getObjectUrlForContainer(String bucket, String object) {
-        return minioContainerUrl + "/" + bucket + "/" + object;
+        // Encode the bucket name
+        String encodedBucket = UriUtils.encodePathSegment(bucket, StandardCharsets.UTF_8);
+
+        // Encode the object path (preserves '/' but encodes '#' and '[]')
+        String encodedObject = UriUtils.encodePath(object, StandardCharsets.UTF_8);
+
+        return minioContainerUrl + "/" + encodedBucket + "/" + encodedObject;
     }
 
     public Iterable<Result<Item>> getAllItemsInBucketWithPrefix(String bucketName, String prefix) {
