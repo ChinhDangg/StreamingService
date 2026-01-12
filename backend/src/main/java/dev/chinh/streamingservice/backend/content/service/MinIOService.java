@@ -46,6 +46,6 @@ public class MinIOService {
     }
 
     public String getObjectUrl(String bucket, String object) {
-        return "/stream/object/" + bucket + "/" + object;
+        return "/stream/object/" + encodeUriPathSegment(bucket) + "/" + encodeUriPath(object);
     }
 }
