@@ -209,12 +209,12 @@ export function validateDirectory(path) {
         errors.push("Directory path must not end with a slash.");
     }
 
-    // Cannot look like a file (should have no extension)
-    const parts = trimmed.split(/[/\\]/).filter(Boolean);
-    const last = parts.at(-1);
-    if (/\.[^./\\]+$/i.test(last)) {
-        errors.push("This looks like a file, not a directory.");
-    }
+    // // Cannot look like a file (should have no extension)
+    // const parts = trimmed.split(/[/\\]/).filter(Boolean);
+    // const last = parts.at(-1);
+    // if (/\.[^./\\]+$/i.test(last)) {
+    //     errors.push("This looks like a file, not a directory.");
+    // }
 
     // Must contain at least ONE letter (any language)
     // \p{L} covers all alphabets: Chinese, Vietnamese, Arabic, etc.

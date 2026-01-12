@@ -440,9 +440,9 @@ public class MediaUploadService {
         // Split into segments
         String[] segments = path.split("/");
 
-        // Regex: allow unicode letters, digits, underscores, hyphens, spaces
-        // NO filesystem-reserved characters
-        String allowed = "^[\\p{L}\\p{N}_\\- ]+$";
+//        // Regex: allow unicode letters, digits, underscores, hyphens, spaces
+//        // NO filesystem-reserved characters
+//        String allowed = "^[\\p{L}\\p{N}_\\- ]+$";
 
         for (String segment : segments) {
             // Empty segments = invalid ("dir1//dir2")
@@ -450,10 +450,10 @@ public class MediaUploadService {
                 return false;
             }
 
-            // Validate each directory name
-            if (!segment.matches(allowed)) {
-                return false;
-            }
+//            // Validate each directory name
+//            if (!segment.matches(allowed)) {
+//                return false;
+//            }
         }
 
         return true;
