@@ -834,7 +834,7 @@ function displaySearchItems(searchItems) {
         const itemContainer = (item.width >= item.height) ? helperCloneAndUnHideNode(horizontalItemTem)
                                         : helperCloneAndUnHideNode(verticalItemTem);
         if (item.thumbnail)
-            itemContainer.querySelector('.thumbnail-image').src = item.thumbnail;
+            itemContainer.querySelector('.thumbnail-image').src = sanitizeRelativeSrc(item.thumbnail);
         itemContainer.querySelector('.resolution-note').textContent = (item.width && item.height) ? `${item.width}x${item.height}` : '';
         itemContainer.querySelector('.media-title').textContent = item.title;
         itemContainer.querySelector('.date-note').textContent = item.uploadDate;
@@ -890,6 +890,26 @@ function displaySearchItems(searchItems) {
 
         mainItemContainer.appendChild(itemContainer);
     });
+}
+
+function sanitizeRelativeSrc(rawPath) {
+    try {
+        const url = new URL(rawPath, window.location.origin);
+
+        // Combine the path and the hash (the part after #)
+        // If rawPath is "/media/file#2.mp4",
+        // url.pathname is "/media/file" and url.hash is "#2.mp4"
+        url.pathname = url.pathname + url.hash;
+
+        // 4. Clear the hash so the browser doesn't append a literal # at the end
+        url.hash = "";
+
+        // 5. Return just the path + search (keeping it relative)
+        return url.pathname + url.search;
+    } catch (e) {
+        console.error("Path sanitization failed", e);
+        return rawPath;
+    }
 }
 
 const quickViewOverlay = document.getElementById('quickViewOverlay');
