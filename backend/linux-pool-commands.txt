@@ -24,6 +24,9 @@ sudo sgdisk --zap-all /dev/nvme3n1
 zfs list
 zpool list
 
+# Check zpool detailed stats
+zpool iostat -v media_pool
+
 # Checking pending pool to be imported:
 sudo zpool import
 
