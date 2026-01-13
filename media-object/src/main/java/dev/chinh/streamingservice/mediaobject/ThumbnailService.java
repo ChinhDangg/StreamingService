@@ -25,14 +25,14 @@ public class ThumbnailService {
     private static final String defaultVidPath = "vid";
     private static final String defaultAlbumPath = "album";
 
-    public String generateThumbnailFromVideo(String bucket, String objectName, int videoLength) throws Exception {
+    public String generateThumbnailFromVideo(String bucket, String objectName, double videoLength) throws Exception {
 
         String thumbnailObject = objectName.substring(0, objectName.lastIndexOf(".")) + "-thumb.jpg";
         String thumbnailOutput = OSUtil.normalizePath(diskDir, thumbnailObject);
         Files.createDirectories(Path.of(thumbnailOutput.substring(0, thumbnailOutput.lastIndexOf("/"))));
         String videoInput = minIOService.getObjectUrlForContainer(bucket, objectName);
 
-        videoLength = videoLength >= 2 ? videoLength : 0;
+        videoLength = videoLength > 2 ? 2 : 0.5;
 
         List<String> command = Arrays.asList(
                 "docker", "exec", "ffmpeg",
@@ -60,6 +60,7 @@ public class ThumbnailService {
 
         int exitCode = process.waitFor();
         System.out.println("ffmpeg generate thumbnail from video exited with code " + exitCode);
+        logs.forEach(System.out::println);
         if (exitCode != 0) {
             logs.forEach(System.out::println);
             try {
@@ -75,7 +76,7 @@ public class ThumbnailService {
                 ? thumbnailObject
                 : OSUtil.normalizePath(defaultVidPath, thumbnailObject);
         minIOService.moveFileToObject(ContentMetaData.THUMBNAIL_BUCKET, thumbnailObject, thumbnailOutput);
-        Files.delete(thumbnailPath);
+        //Files.delete(thumbnailPath);
 
         return thumbnailObject;
     }
