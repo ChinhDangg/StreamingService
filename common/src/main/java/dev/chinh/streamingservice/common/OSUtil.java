@@ -54,7 +54,7 @@ public class OSUtil {
     }
 
     public static void _createRamDisk(long ramBytes) throws Exception {
-        if (Files.exists(Paths.get(RAMDISK))) {
+        if (currentOS != OS.LINUX && Files.exists(Paths.get(RAMDISK))) {
             System.out.println("Ramdisk already exists");
             return;
         }
