@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -25,29 +26,27 @@ public class ThumbnailService {
     private static final String defaultVidPath = "vid";
     private static final String defaultAlbumPath = "album";
 
-    public String generateThumbnailFromVideo(String bucket, String objectName, double videoLength) throws Exception {
+    public String generateThumbnailFromVideo(long mediaId, String bucket, String objectName, double videoLength) throws Exception {
 
-        String thumbnailObject = objectName.substring(0, objectName.lastIndexOf(".")) + "-thumb.jpg";
+        String thumbnailObject = defaultVidPath + "/" + objectName.substring(0, objectName.lastIndexOf("/"))
+                + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb.jpg";
         String thumbnailOutput = OSUtil.normalizePath(diskDir, thumbnailObject);
         Files.createDirectories(Path.of(thumbnailOutput.substring(0, thumbnailOutput.lastIndexOf("/"))));
         String videoInput = minIOService.getObjectUrlForContainer(bucket, objectName);
-
         videoLength = videoLength > 2 ? 2 : 0.5;
 
         List<String> command = Arrays.asList(
                 "docker", "exec", "ffmpeg",
                 "ffmpeg",
-                "-v", "error",                 // only show errors, no logs
-                "-ss", String.valueOf(videoLength), // FAST SEEK: jump to keyframe nearest the 1-second mark
-                "-skip_frame", "nokey",        // skip NON-keyframes → decode only I-frames - fast operation
-                "-i", videoInput,              // input video
-                "-frames:v", "1",              // output exactly one frame
-                "-vsync", "vfr",               // variable frame rate; ensures correct frame extraction
-                "-q:v", "2",                   // high JPEG quality (2 = very high, 1 = max)
-                "-strict", "unofficial",       // Allows non-standard YUV range for MJPEG
-                // select only keyframes (only I-frames). Escaped for Java.
-                "-vf", "select='eq(pict_type\\,I)'",
-                thumbnailOutput                // output thumbnail (original resolution)
+                "-v", "error",                 // Reduce noise to see real issues
+                "-ss", String.valueOf(videoLength), // Seek before input (Fast Seek)
+                "-i", videoInput,
+                "-frames:v", "1",              // Stop after 1 frame
+                "-q:v", "2",
+                "-strict", "unofficial",
+                "-f", "image2",                // Force output format
+                "-update", "1",                // Ensure it writes a single file
+                thumbnailOutput
         );
 
         ProcessBuilder pb = new ProcessBuilder(command);
@@ -72,11 +71,8 @@ public class ThumbnailService {
             throw new RuntimeException("Failed to generate thumbnail from video");
         }
 
-        thumbnailObject = thumbnailObject.startsWith(defaultVidPath)
-                ? thumbnailObject
-                : OSUtil.normalizePath(defaultVidPath, thumbnailObject);
         minIOService.moveFileToObject(ContentMetaData.THUMBNAIL_BUCKET, thumbnailObject, thumbnailOutput);
-        //Files.delete(thumbnailPath);
+        Files.delete(thumbnailPath);
 
         return thumbnailObject;
     }

@@ -103,7 +103,7 @@ public class MediaObjectEventConsumer {
                 mediaMetaData.setWidth(videoMetadata.width);
                 mediaMetaData.setHeight(videoMetadata.height);
                 mediaMetaData.setLength((int) videoMetadata.durationSeconds);
-                mediaMetaData.setThumbnail(thumbnailService.generateThumbnailFromVideo(mediaMetaData.getBucket(), mediaMetaData.getPath(), mediaMetaData.getLength()));
+                mediaMetaData.setThumbnail(thumbnailService.generateThumbnailFromVideo(mediaMetaData.getId(), mediaMetaData.getBucket(), mediaMetaData.getPath(), mediaMetaData.getLength()));
             } else if (event.mediaType() == MediaType.ALBUM) {
                 var results = minIOService.getAllItemsInBucketWithPrefix(mediaMetaData.getBucket(), mediaMetaData.getPath());
                 int count = 0;
@@ -136,7 +136,7 @@ public class MediaObjectEventConsumer {
                     mediaMetaData.setHeight(videoMetadata.height);
                     mediaMetaData.setFormat(videoMetadata.format);
                     mediaMetaData.setFrameRate(videoMetadata.frameRate);
-                    mediaMetaData.setThumbnail(thumbnailService.generateThumbnailFromVideo(mediaMetaData.getBucket(), firstVideo, (int) videoMetadata.durationSeconds));
+                    mediaMetaData.setThumbnail(thumbnailService.generateThumbnailFromVideo(mediaMetaData.getId(), mediaMetaData.getBucket(), firstVideo, (int) videoMetadata.durationSeconds));
                 }
             } else if (event.mediaType() == MediaType.GROUPER) {
                 ImageMetadata imageMetadata = parseMediaMetadata(probeMediaInfo(ContentMetaData.THUMBNAIL_BUCKET, mediaMetaData.getThumbnail()), ImageMetadata.class);
