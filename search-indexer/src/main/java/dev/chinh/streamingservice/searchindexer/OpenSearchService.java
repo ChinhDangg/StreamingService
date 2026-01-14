@@ -9,6 +9,7 @@ import org.opensearch.client.json.JsonpMapper;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.opensearch._types.BuiltinScriptLanguage;
 import org.opensearch.client.opensearch._types.OpType;
+import org.opensearch.client.opensearch._types.Refresh;
 import org.opensearch.client.opensearch._types.Script;
 import org.opensearch.client.opensearch._types.analysis.*;
 import org.opensearch.client.opensearch._types.mapping.Property;
@@ -44,7 +45,7 @@ public class OpenSearchService {
             try {
                 if (!indexExists(MEDIA_INDEX_NAME)) {
                     String version1 = MEDIA_INDEX_NAME + "_v1";
-                    createIndexWithMapping(version1, "/mapping/media-mapping.json");
+                    createIndexWithSettingAndMapping(version1, "/mapping/media-mapping.json");
                     addAliasToIndex(version1, MEDIA_INDEX_NAME);
                 }
                 for (MediaNameEntityConstant constant : MediaNameEntityConstant.values()) {
@@ -276,6 +277,50 @@ public class OpenSearchService {
         );
         IndexResponse response = client.index(request);
         System.out.println("Indexed class doc with id: " + response.id());
+    }
+
+    public void updateAllNestedFieldNameWithIdInIndex(String indexName,
+                                                      String fieldName,
+                                                      long nestedId,
+                                                      String nestFieldName,
+                                                      String newName) throws IOException {
+        String painlessScript =
+        "if (ctx._source." + fieldName + " != null) { " +
+        "   for (def item : ctx._source." + fieldName + ") { " +
+        "       if (item.id == params.nestedId) { " +
+        "           item." + nestFieldName + " = params.newName; " +
+        "       } " +
+        "   } " +
+        "}";
+
+        UpdateByQueryRequest request = new UpdateByQueryRequest.Builder()
+                .index(indexName)
+                .query(q -> q
+                        .nested(n -> n
+                                .path(fieldName)
+                                .query(nq -> nq
+                                        .term(t -> t
+                                                .field(fieldName + ".id")
+                                                .value(v -> v.longValue(nestedId))
+                                        )
+                                )
+                        )
+                )
+                .script(s -> s
+                        .inline(i -> i
+                                .lang(l -> l.builtin(BuiltinScriptLanguage.Painless))
+                                .source(painlessScript)
+                                .params(Map.of(
+                                        "nestedId", JsonData.of(nestedId),
+                                        "newName", JsonData.of(newName)
+                                ))
+                        )
+                )
+                .refresh(Refresh.True)
+                .build();
+
+        UpdateByQueryResponse response = client.updateByQuery(request);
+        System.out.println("Updated " + response.updated() + " documents with new name");
     }
 
     /**
