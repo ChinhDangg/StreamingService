@@ -24,9 +24,6 @@
   },
   "mappings": {
     "properties": {
-      "id": {
-        "type": "long"
-      },
       "name": {
         "type": "text",
         "analyzer": "autocomplete",
