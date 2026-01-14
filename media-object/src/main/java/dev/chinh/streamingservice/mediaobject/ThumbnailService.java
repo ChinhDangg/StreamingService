@@ -33,7 +33,7 @@ public class ThumbnailService {
         String thumbnailOutput = OSUtil.normalizePath(diskDir, thumbnailObject);
         Files.createDirectories(Path.of(thumbnailOutput.substring(0, thumbnailOutput.lastIndexOf("/"))));
         String videoInput = minIOService.getObjectUrlForContainer(bucket, objectName);
-        videoLength = videoLength > 2 ? 2 : 0.5;
+        videoLength = videoLength < 0.5 ? 0 : videoLength > 2 ? 2 : 0.5;
 
         List<String> command = Arrays.asList(
                 "docker", "exec", "ffmpeg",
@@ -89,10 +89,9 @@ public class ThumbnailService {
         return logs;
     }
 
-    public String copyAlbumObjectToThumbnailBucket(String sourceBucket, String sourceObject) throws Exception {
-        String thumbnailObject = sourceObject.startsWith(defaultAlbumPath)
-                ? sourceObject
-                : OSUtil.normalizePath(defaultAlbumPath, sourceObject);
+    public String copyAlbumObjectToThumbnailBucket(long mediaId, String sourceBucket, String sourceObject) throws Exception {
+        String thumbnailObject = defaultAlbumPath + "/" + sourceObject.substring(0, sourceObject.lastIndexOf("/"))
+                + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb.jpg";
         minIOService.copyObjectToAnotherBucket(sourceBucket, sourceObject, ContentMetaData.THUMBNAIL_BUCKET, thumbnailObject);
         return thumbnailObject;
     }
