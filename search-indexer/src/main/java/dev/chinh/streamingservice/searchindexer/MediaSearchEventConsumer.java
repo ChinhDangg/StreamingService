@@ -108,6 +108,13 @@ public class MediaSearchEventConsumer {
         if (name != null) {
             try {
                 openSearchService.partialUpdateDocument(event.nameEntityConstant().getName(), event.nameEntityId(), Map.of(ContentMetaData.NAME, name));
+                openSearchService.updateAllNestedFieldNameWithIdInIndex(
+                        OpenSearchService.MEDIA_INDEX_NAME,
+                        event.nameEntityConstant().getName(),
+                        event.nameEntityId(),
+                        ContentMetaData.NAME,
+                        name
+                );
             } catch (IOException e) {
                 throw new RuntimeException("Failed to update OpenSearch index field for name entity " + event.nameEntityId(), e);
             }
