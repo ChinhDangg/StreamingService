@@ -37,7 +37,12 @@
           "name": {
             "type": "text",
             "analyzer": "autocomplete",
-            "search_analyzer": "autocomplete_search"
+            "search_analyzer": "autocomplete_search",
+            "fields": {
+              "raw": {
+                "type": "keyword"
+              }
+            }
           }
         }
       },
@@ -50,7 +55,12 @@
           "name": {
             "type": "text",
             "analyzer": "autocomplete",
-            "search_analyzer": "autocomplete_search"
+            "search_analyzer": "autocomplete_search",
+            "fields": {
+              "raw": {
+                "type": "keyword"
+              }
+            }
           }
         }
       },
@@ -63,7 +73,12 @@
           "name": {
             "type": "text",
             "analyzer": "autocomplete",
-            "search_analyzer": "autocomplete_search"
+            "search_analyzer": "autocomplete_search",
+            "fields": {
+              "raw": {
+                "type": "keyword"
+              }
+            }
           }
         }
       },
@@ -76,7 +91,12 @@
           "name": {
             "type": "text",
             "analyzer": "autocomplete",
-            "search_analyzer": "autocomplete_search"
+            "search_analyzer": "autocomplete_search",
+            "fields": {
+              "raw": {
+                "type": "keyword"
+              }
+            }
           }
         }
       },
