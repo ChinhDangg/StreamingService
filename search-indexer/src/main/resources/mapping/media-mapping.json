@@ -1,52 +1,131 @@
 {
-  "properties": {
-    "title":       { "type": "text" },
-
-    "tags": {
-      "type": "keyword",
-      "fields": {
-        "search": { "type": "text", "analyzer": "standard" }
+  "settings": {
+    "analysis": {
+      "tokenizer": {
+        "autocomplete_tokenizer": {
+          "type": "edge_ngram",
+          "min_gram": 2,
+          "max_gram": 20
+        }
+      },
+      "analyzer": {
+        "autocomplete": {
+          "type": "custom",
+          "tokenizer": "autocomplete_tokenizer",
+          "filter": ["lowercase"]
+        },
+        "autocomplete_search": {
+          "type": "custom",
+          "tokenizer": "lowercase"
+        }
       }
-    },
+    }
+  },
+  "mappings": {
+    "properties": {
+      "title": {
+        "type": "text"
+      },
 
-    "characters": {
-      "type": "keyword",
-      "fields": {
-        "search": { "type": "text", "analyzer": "standard" }
-      }
-    },
+      "tags": {
+        "type": "nested",
+        "properties": {
+          "id": {
+            "type": "long"
+          },
+          "name": {
+            "type": "text",
+            "analyzer": "autocomplete",
+            "search_analyzer": "autocomplete_search"
+          }
+        }
+      },
+      "characters": {
+        "type": "nested",
+        "properties": {
+          "id": {
+            "type": "long"
+          },
+          "name": {
+            "type": "text",
+            "analyzer": "autocomplete",
+            "search_analyzer": "autocomplete_search"
+          }
+        }
+      },
+      "universes": {
+        "type": "nested",
+        "properties": {
+          "id": {
+            "type": "long"
+          },
+          "name": {
+            "type": "text",
+            "analyzer": "autocomplete",
+            "search_analyzer": "autocomplete_search"
+          }
+        }
+      },
+      "authors": {
+        "type": "nested",
+        "properties": {
+          "id": {
+            "type": "long"
+          },
+          "name": {
+            "type": "text",
+            "analyzer": "autocomplete",
+            "search_analyzer": "autocomplete_search"
+          }
+        }
+      },
 
-    "universes": {
-      "type": "keyword",
-      "fields": {
-        "search": { "type": "text", "analyzer": "standard" }
-      }
-    },
-
-    "authors": {
-      "type": "keyword",
-      "fields": {
-        "search": { "type": "text", "analyzer": "standard" }
-      }
-    },
-
-    "uploadDate": { "type": "date", "format": "strict_date_optional_time_nanos" },
-    "year":       { "type": "integer" },
-    "width":      { "type": "integer" },
-    "height":     { "type": "integer" },
-
-    "id":         { "type": "long" },
-    "bucket":     { "type": "text" },
-    "parentPath": { "type": "text" },
-    "key":        { "type": "text" },
-    "thumbnail":  { "type": "text" },
-    "length":     { "type": "integer" },
-    "size":       { "type": "long" },
-    "groupInfo":  {
-      "properties": {
-        "id": { "type": "long" },
-        "grouperId": { "type": "long" },
-        "numInfo": { "type": "integer" }
+      "uploadDate": {
+        "type": "date",
+        "format": "strict_date_optional_time_nanos"
+      },
+      "year": {
+        "type": "integer"
+      },
+      "width": {
+        "type": "integer"
+      },
+      "height": {
+        "type": "integer"
+      },
+      "id": {
+        "type": "long"
+      },
+      "bucket": {
+        "type": "text"
+      },
+      "parentPath": {
+        "type": "text"
+      },
+      "key": {
+        "type": "text"
+      },
+      "thumbnail": {
+        "type": "text"
+      },
+      "length": {
+        "type": "integer"
+      },
+      "size": {
+        "type": "long"
+      },
+      "groupInfo": {
+        "properties": {
+          "id": {
+            "type": "long"
+          },
+          "grouperId": {
+            "type": "long"
+          },
+          "numInfo": {
+            "type": "integer"
+          }
+        }
       }
     }
   }

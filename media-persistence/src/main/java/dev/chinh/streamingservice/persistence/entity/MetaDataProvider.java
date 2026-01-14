@@ -1,16 +1,18 @@
 package dev.chinh.streamingservice.persistence.entity;
 
+import dev.chinh.streamingservice.persistence.projection.MediaNameSearchItem;
+
 import java.util.List;
 
 public interface MetaDataProvider {
 
-    List<String> getTags();
+    List<MediaNameSearchItem> getTags();
 
-    List<String> getCharacters();
+    List<MediaNameSearchItem> getCharacters();
 
-    List<String> getUniverses();
+    List<MediaNameSearchItem> getUniverses();
 
-    List<String> getAuthors();
+    List<MediaNameSearchItem> getAuthors();
 
     boolean isGrouper();
 

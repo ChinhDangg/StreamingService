@@ -2,11 +2,13 @@ package dev.chinh.streamingservice.persistence.entity;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
+import dev.chinh.streamingservice.persistence.projection.MediaNameSearchItem;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -85,22 +87,31 @@ public class MediaMetaData extends MediaDescription {
     private String absoluteFilePath;
 
     @Override
-    public List<String> getTags() {
-        return tags == null ? null : tags.stream().map(MediaTag::getName).toList();
+    public List<MediaNameSearchItem> getTags() {
+        return tags == null ? null
+                : tags.stream().map(n -> new MediaNameSearchItem(n.getId(), n.getName())).toList();
     }
 
     @Override
-    public List<String> getCharacters() {
-        return characters == null ? null : characters.stream().map(MediaCharacter::getName).toList();
+    public List<MediaNameSearchItem> getCharacters() {
+        return characters == null ? null
+                : characters.stream().map(n -> new MediaNameSearchItem(n.getId(), n.getName())).toList();
     }
 
     @Override
-    public List<String> getUniverses() {
-        return universes == null ? null : universes.stream().map(MediaUniverse::getName).toList();
+    public List<MediaNameSearchItem> getUniverses() {
+        return universes == null ? null
+                : universes.stream().map(n -> new MediaNameSearchItem(n.getId(), n.getName())).toList();
     }
 
     @Override
-    public List<String> getAuthors() {
-        return authors == null ? null : authors.stream().map(MediaAuthor::getName).toList();
+    public List<MediaNameSearchItem> getAuthors() {
+        return authors == null ? null
+                : authors.stream().map(n -> new MediaNameSearchItem(n.getId(), n.getName())).toList();
+    }
+
+    public void addUniverses(MediaUniverse universe) {
+        universes = universes == null ? new HashSet<>() : universes;
+        universes.add(universe);
     }
 }

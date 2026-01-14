@@ -17,13 +17,13 @@ import java.util.List;
 public class MediaSearchItem extends MediaDescription {
 
     @JsonProperty(ContentMetaData.TAGS)
-    private List<String> tags;
+    private List<MediaNameSearchItem> tags;
     @JsonProperty(ContentMetaData.CHARACTERS)
-    private List<String> characters;
+    private List<MediaNameSearchItem> characters;
     @JsonProperty(ContentMetaData.UNIVERSES)
-    private List<String> universes;
+    private List<MediaNameSearchItem> universes;
     @JsonProperty(ContentMetaData.AUTHORS)
-    private List<String> authors;
+    private List<MediaNameSearchItem> authors;
 
     @JsonProperty(ContentMetaData.GROUP_INFO)
     private MediaGroupInfo mediaGroupInfo;
