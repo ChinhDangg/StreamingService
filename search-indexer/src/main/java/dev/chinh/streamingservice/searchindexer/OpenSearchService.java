@@ -246,6 +246,15 @@ public class OpenSearchService {
         }
     }
 
+    public void refreshExistingData(String indexName) throws IOException {
+        UpdateByQueryRequest request = UpdateByQueryRequest.of(u -> u
+                .index(indexName)
+                .refresh(Refresh.True)
+        );
+        client.updateByQuery(request);
+        System.out.println("Refreshed existing data in index: " + indexName);
+    }
+
     public void deleteDocument(String indexName, long id) throws IOException {
         DeleteResponse response = client.delete(d -> d
                 .index(indexName)
