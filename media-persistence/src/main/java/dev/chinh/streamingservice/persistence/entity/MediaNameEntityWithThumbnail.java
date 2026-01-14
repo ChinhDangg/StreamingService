@@ -6,9 +6,11 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import jakarta.persistence.MappedSuperclass;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 
 @Getter
 @Setter
+@ToString(callSuper = true)
 @MappedSuperclass
 public abstract class MediaNameEntityWithThumbnail extends MediaNameEntity {
 
