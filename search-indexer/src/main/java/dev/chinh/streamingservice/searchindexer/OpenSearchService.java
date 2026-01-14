@@ -180,6 +180,22 @@ public class OpenSearchService {
      *     "description", Property.of(m -> m.text(t -> t.analyzer("english"))),
      *     "sku",         Property.of(m -> m.keyword(k -> k))
      * );
+     * Property nameProperty = Property.of(p -> p
+     *                     .text(t -> t
+     *                             .analyzer("autocomplete")
+     *                             .searchAnalyzer("autocomplete_search")
+     *                             .fields("raw", f -> f.keyword(k -> k))
+     *                     )
+     *             );
+     *
+     *             Property idProperty = Property.of(p -> p.long_(l -> l));
+     *
+     *             Property tagsProperty = Property.of(p -> p
+     *                     .nested(n -> n
+     *                             .properties("id", idProperty)
+     *                             .properties("name", nameProperty)
+     *                     )
+     *             );
      */
     public void updateIndexMapping(String indexName, Map<String, Property> properties) throws IOException {
         PutMappingResponse response = client.indices().putMapping(p -> p
