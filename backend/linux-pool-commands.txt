@@ -15,10 +15,10 @@ df -h /media/file_pool
 df -h /media/media_pool
 
 Clearing drives: sudo wipefs -a /dev/nvme2n1
-sudo wipefs -a /dev/nvme3n1
+sudo wipefs -a /dev/nvme3n1 -- use carefully
 
-sudo sgdisk --zap-all /dev/nvme2n1
-sudo sgdisk --zap-all /dev/nvme3n1
+sudo sgdisk --zap-all /dev/nvme2n1 -- use carefully
+sudo sgdisk --zap-all /dev/nvme3n1 -- use carefully
 
 # Verify pool status: zpool status
 zfs list
