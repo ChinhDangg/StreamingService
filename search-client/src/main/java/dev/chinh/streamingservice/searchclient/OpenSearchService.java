@@ -8,13 +8,11 @@ import lombok.RequiredArgsConstructor;
 import org.opensearch.client.json.JsonData;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.opensearch._types.*;
-import org.opensearch.client.opensearch._types.analysis.*;
 import org.opensearch.client.opensearch._types.query_dsl.BoolQuery;
 import org.opensearch.client.opensearch._types.query_dsl.Query;
 import org.opensearch.client.opensearch._types.query_dsl.RangeQuery;
 import org.opensearch.client.opensearch._types.query_dsl.TextQueryType;
 import org.opensearch.client.opensearch.core.*;
-import org.opensearch.client.opensearch.indices.*;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -97,24 +95,25 @@ public class OpenSearchService {
         return searchWithQuery(index, rootQuery, page, size, sortBy, sortOrder, true);
     }
 
-    private Query buildTermOrMatch(String field, Object value, boolean searchTerm) {
-        if (searchTerm) {
-            // Term Query
+    private Query buildTermOrMatch(String field, Object value, boolean isTermQuery) {
+        Query leafQuery = Query.of(q -> {
+            if (isTermQuery) {
+                return q.term(t -> t.field(field).value(FieldValue.of(value.toString())));
+            } else {
+                return q.match(m -> m.field(field).query(FieldValue.of(value.toString())));
+            }
+        });
+        // if field contains a dot (nameEntity.name), wrap it in a nested query
+        if (field.contains(".")) {
+            String path = field.split("\\.")[0];
             return Query.of(q -> q
-                    .term(t -> t
-                            .field(field)
-                            .value(FieldValue.of(value.toString()))
-                    )
-            );
-        } else {
-            // Match Query
-            return Query.of(q -> q
-                    .match(m -> m
-                            .field(field)
-                            .query(FieldValue.of(value.toString()))
+                    .nested(n -> n
+                            .path(path)
+                            .query(leafQuery)
                     )
             );
         }
+        return leafQuery;
     }
 
     public SearchResponse<Object> search(String index, Object text, int page, int size, SortBy sortBy,
