@@ -107,7 +107,7 @@ public class MediaSearchService {
                 ));
             } else {
                 searchFieldGroups.add(new SearchFieldGroup(
-                        includeField.getField(), includeField.getValues(), includeField.isMatchAll(), true
+                        includeField.getField() + "." + ContentMetaData.NAME + ".raw", includeField.getValues(), includeField.isMatchAll(), true
                 ));
             }
         }
@@ -135,7 +135,7 @@ public class MediaSearchService {
                                               SortBy sortBy, SortOrder sortOrder) throws Exception {
         ContentMetaData.validateSearchFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.searchTermByOneField(MEDIA_INDEX_NAME, field, keywords, matchAll, page, size, sortBy, sortOrder),
+                openSearchService.searchTermByOneField(MEDIA_INDEX_NAME, field + "." + ContentMetaData.NAME + ".raw", keywords, matchAll, page, size, sortBy, sortOrder),
                 page, size);
 
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
