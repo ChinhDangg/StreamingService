@@ -2,6 +2,7 @@ package dev.chinh.streamingservice.persistence.repository;
 
 import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
 import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -25,6 +26,17 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
         WHERE m.id = :id
     """)
     Optional<MediaMetaData> findByIdWithAllInfo(@Param("id") Long id);
+
+
+    @Query("""
+        SELECT DISTINCT m FROM MediaMetaData m
+        LEFT JOIN FETCH m.tags
+        LEFT JOIN FETCH m.characters
+        LEFT JOIN FETCH m.universes
+        LEFT JOIN FETCH m.authors
+        LEFT JOIN FETCH m.groupInfo
+    """)
+    List<MediaMetaData> findAllWithAllInfo(Pageable page);
 
 
     @Query("SELECT m.length FROM MediaMetaData m WHERE m.id = :id")

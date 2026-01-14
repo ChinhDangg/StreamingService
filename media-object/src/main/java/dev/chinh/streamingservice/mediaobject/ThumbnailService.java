@@ -59,7 +59,6 @@ public class ThumbnailService {
 
         int exitCode = process.waitFor();
         System.out.println("ffmpeg generate thumbnail from video exited with code " + exitCode);
-        logs.forEach(System.out::println);
         if (exitCode != 0) {
             logs.forEach(System.out::println);
             try {
