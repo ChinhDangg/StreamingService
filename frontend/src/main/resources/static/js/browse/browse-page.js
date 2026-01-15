@@ -11,7 +11,6 @@ const NameEntry = Object.freeze({
 
 const SortBy = Object.freeze({
     Name: 'NAME',
-    Upload: 'UPLOAD_DATE',
     Total: 'LENGTH',
 });
 
@@ -142,12 +141,14 @@ async function fetchNameItems(nameEntry, p, by, order, pushtoHistory = true, nam
     // const nameItems = {
     //     "content": [
     //         {
-    //             "name": "Kafka",
+    //             "id": 1,
+    //             "name": "Jane",
     //             "length": 60,
     //             "uploadDate": "2025-11-04",
     //             "thumbnail": "https://placehold.co/1080x1920"
     //         },
     //         {
+    //             "id": 2
     //             "name": "Kafka",
     //             "length": 60,
     //             "uploadDate": "2025-11-04",
@@ -210,7 +211,8 @@ async function displayItem(nameItems) {
         let itemNode;
         if (hasThumbnail) {
             const loadedImage = document.createElement('img');
-            await loadImage(loadedImage, item.thumbnail);
+            if (item.thumbnail && !item.thumbnail.endsWith('null'))
+                await loadImage(loadedImage, item.thumbnail);
 
             const horizontal = loadedImage.naturalWidth >= loadedImage.naturalHeight;
             const itemNodeTem = horizontal ? browseContainer.querySelector('.horizontal-item') : browseContainer.querySelector('.vertical-item');
@@ -224,7 +226,7 @@ async function displayItem(nameItems) {
         }
         itemNode.querySelector('.name-title').textContent = capitalizeWords(item.name);
         itemNode.querySelector('.total-note').textContent = item.length;
-        itemNode.querySelector('.item-link').href = `/page/search/keyword?field=${NameEntry[currentNameEntry]}&keys=${item.name}`;
+        itemNode.querySelector('.item-link').href = `/page/search/keyword?field=${NameEntry[currentNameEntry]}&keys=${item.id}`;
         nameContainer.appendChild(itemNode);
     }
     currentBrowseTabMap.set(currentNameEntry, nameItems);
