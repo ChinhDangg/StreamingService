@@ -22,40 +22,54 @@ export function displayPagination(page, totalPages, getPageUrl, pageClickHandler
 
     // --- prev / first ---
     if (page > 0) {
-        const prevControl = leftControl.querySelector('.page-prev-control');
-        prevControl.classList.remove('hidden');
         const prevIndex = page - 1;
+        const prevClick = async (e) => {
+            await pageClickHandler(e, prevIndex);
+            goLastControl.classList.remove('invisible');
+        };
+        const prevControl = leftControl.querySelector('.page-prev-control');
+        prevControl.classList.remove('invisible');
         prevControl.href = getPageUrl(prevIndex);
-        prevControl.onclick = async (e) => await pageClickHandler(e, prevIndex);
+        prevControl.onclick = async (e) => prevClick(e);
 
         const prevControlDup = helperCloneAndUnHideNode(prevControl);
-        prevControlDup.onclick = async (e) => await pageClickHandler(e, prevIndex);
+        prevControlDup.onclick = async (e) => prevClick(e);
         rightControl.appendChild(prevControlDup);
 
         goFirstControl.href = getPageUrl(0);
-        goFirstControl.onclick = async (e) => await pageClickHandler(e, 0);
+        goFirstControl.onclick = async (e) => {
+            await pageClickHandler(e, 0);
+            goLastControl.classList.remove('invisible');
+        };
     } else {
-        leftControl.querySelector('.page-prev-control').classList.add('hidden');
-        goFirstControl.classList.add('hidden');
+        leftControl.querySelector('.page-prev-control').classList.add('invisible');
+        goFirstControl.classList.add('invisible');
     }
 
     // --- next / last ---
     if (page < totalPages - 1) {
-        const nextControl = leftControl.querySelector('.page-next-control');
-        nextControl.classList.remove('hidden');
         const nextIndex = page + 1;
+        const nextClick = async (e) => {
+            await pageClickHandler(e, nextIndex)
+            goFirstControl.classList.remove('invisible');
+        };
+        const nextControl = leftControl.querySelector('.page-next-control');
+        nextControl.classList.remove('invisible');
         nextControl.href = getPageUrl(nextIndex);
-        nextControl.onclick = async (e) => await pageClickHandler(e, nextIndex);
+        nextControl.onclick = async (e) => nextClick(e);
 
         const nextControlDup = helperCloneAndUnHideNode(nextControl);
-        nextControlDup.onclick = async (e) => await pageClickHandler(e, nextIndex);
+        nextControlDup.onclick = async (e) => nextClick(e);
         rightControl.appendChild(nextControlDup);
 
         goLastControl.href = getPageUrl(totalPages - 1);
-        goLastControl.onclick = async (e) => await pageClickHandler(e, totalPages - 1);
+        goLastControl.onclick = async (e) => {
+            await pageClickHandler(e, totalPages - 1);
+            goFirstControl.classList.remove('invisible');
+        };
     } else {
-        leftControl.querySelector('.page-next-control').classList.add('hidden');
-        goLastControl.classList.add('hidden');
+        leftControl.querySelector('.page-next-control').classList.add('invisible');
+        goLastControl.classList.add('invisible');
     }
 
     // --- numbered pages ---
