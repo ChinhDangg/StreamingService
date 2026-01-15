@@ -11,8 +11,8 @@ export function displayContentInfo(mediaInfo, mainContainer) {
         const authorNodeTem = authorContainer.querySelector('.author-info');
         mediaInfo.authors.forEach(author => {
             const authorNode = helperCloneAndUnHideNode(authorNodeTem);
-            authorNode.href = `/page/search/keyword?field=authors&keys=${author}`;
-            authorNode.textContent = capitalizeWords(author);
+            authorNode.href = `/page/search/keyword?field=authors&keys=${author.id}`;
+            authorNode.textContent = capitalizeWords(author.name);
             authorContainer.appendChild(authorNode);
         });
     }
@@ -25,8 +25,8 @@ export function displayContentInfo(mediaInfo, mainContainer) {
         const universeNodeTem = universeContainer.querySelector('.universe-info');
         mediaInfo.universes.forEach(universe => {
             const universeNode = helperCloneAndUnHideNode(universeNodeTem);
-            universeNode.href = `/page/search/keyword?field=universes&keys=${universe}`;
-            universeNode.textContent = capitalizeWords(universe);
+            universeNode.href = `/page/search/keyword?field=universes&keys=${universe.id}`;
+            universeNode.textContent = capitalizeWords(universe.name);
             universeContainer.appendChild(universeNode);
         });
     }
@@ -39,8 +39,8 @@ export function displayContentInfo(mediaInfo, mainContainer) {
         const characterNodeTem = characterContainer.querySelector('.character-info');
         mediaInfo.characters.forEach(character => {
             const characterNode = helperCloneAndUnHideNode(characterNodeTem);
-            characterNode.href = `/page/search/keyword?field=characters&keys=${character}`;
-            characterNode.textContent = capitalizeWords(character);
+            characterNode.href = `/page/search/keyword?field=characters&keys=${character.id}`;
+            characterNode.textContent = capitalizeWords(character.name);
             characterContainer.appendChild(characterNode);
         });
     }
@@ -53,8 +53,8 @@ export function displayContentInfo(mediaInfo, mainContainer) {
         const tagNodeTem = tagContainer.querySelector('.tag-info');
         mediaInfo.tags.forEach(tag => {
             const tagNode = helperCloneAndUnHideNode(tagNodeTem);
-            tagNode.href = `/page/search/keyword?field=tags&keys=${tag}`;
-            tagNode.textContent = tag;
+            tagNode.href = `/page/search/keyword?field=tags&keys=${tag.id}`;
+            tagNode.textContent = tag.name;
             tagContainer.appendChild(tagNode);
         });
     }

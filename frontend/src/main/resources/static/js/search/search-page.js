@@ -291,13 +291,13 @@ function initializeKeywordSearchArea() {
     if (keywordSearchAreaInitialized) return;
     keywordSearchAreaInitialized = true;
     const fnKeywordSearch = async (pathVariable, value) => {
-        const response = await apiRequest(`/api/search/suggestion/${pathVariable}?s=${value}`);
+        const response = await apiRequest(`/api/search/name/${pathVariable}?s=${value}`);
         if (!response.ok) {
             setAlertStatus('Search Suggestion Failed', await response.text());
             return [];
         }
         return await response.json();
-        //return ['Author 1', 'Author 2', 'Author 3'];
+        //return [{id: 1, name:'Author 1'}, {id: 2, name: 'Author 2'}, {id: 3, name: 'Author 3'}];
     };
     const makeSearchFn = (path) => async (value) => fnKeywordSearch(path, value);
 
@@ -337,16 +337,16 @@ function addEventKeywordSearchArea(fnKeywordSearch, keywordSearchMap, searchLabe
 
     const addSelectedItem = (item, clickAtFirst = false) => {
         const selectedDropDownLi = helperCloneAndUnHideNode(selectedDropDownLiTem);
-        selectedDropDownLi.querySelector('span').textContent = item;
+        selectedDropDownLi.querySelector('span').textContent = item.name;
         selectedDropDownLi.classList.remove('hover:bg-gray-700');
-        addedMap.set(item, { included: true, selectedDropDownLi: selectedDropDownLi });
+        addedMap.set(item.id, { included: true, selectedDropDownLi: selectedDropDownLi });
         selectedDropDownUl.appendChild(selectedDropDownLi);
 
         const inclusionBtn = selectedDropDownLi.querySelector('.inclusion-btn');
         inclusionBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            addedMap.get(item).included = !addedMap.get(item).included;
-            const included = addedMap.get(item).included;
+            addedMap.get(item.id).included = !addedMap.get(item.id).included;
+            const included = addedMap.get(item.id).included;
             inclusionBtn.textContent = included ? 'Included' : 'Excluded';
             const includedClass = ['bg-green-600', 'hover:bg-green-700'];
             const excludedClass = ['bg-red-600', 'hover:bg-red-700'];
@@ -369,8 +369,8 @@ function addEventKeywordSearchArea(fnKeywordSearch, keywordSearchMap, searchLabe
         }
         selectedDropDownLi.querySelector('.remove-btn').addEventListener('click', (e) => {
             e.preventDefault();
-            addedMap.get(item).selectedDropDownLi.remove();
-            addedMap.delete(item);
+            addedMap.get(item.id).selectedDropDownLi.remove();
+            addedMap.delete(item.id);
             selectedCount.textContent = addedMap.size;
             if (addedMap.size === 0) {
                 selectedToggleBtn.classList.add('hidden');
@@ -381,14 +381,14 @@ function addEventKeywordSearchArea(fnKeywordSearch, keywordSearchMap, searchLabe
 
     const addSearchedItem = (item) => {
         const searchDropDownLi = helperCloneAndUnHideNode(searchDropDownLiTem);
-        searchDropDownLi.textContent = item;
-        const style = addedMap.has(item) ? 'bg-indigo-700' : 'hover:bg-gray-700';
+        searchDropDownLi.textContent = item.name;
+        const style = addedMap.has(item.id) ? 'bg-indigo-700' : 'hover:bg-gray-700';
         searchDropDownLi.classList.add(style);
         searchDropDownUl.appendChild(searchDropDownLi);
         searchDropDownLi.addEventListener('click', () => {
-            if (addedMap.has(item)) {
-                addedMap.get(item).selectedDropDownLi.remove();
-                addedMap.delete(item);
+            if (addedMap.has(item.id)) {
+                addedMap.get(item.id).selectedDropDownLi.remove();
+                addedMap.delete(item.id);
                 if (addedMap.size === 0) {
                     selectedToggleBtn.classList.add('hidden');
                     selectedDropDownUl.classList.add('hidden');
