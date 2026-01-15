@@ -1,7 +1,7 @@
 package dev.chinh.streamingservice.persistence.repository;
 
 import dev.chinh.streamingservice.persistence.entity.MediaNameEntity;
-import dev.chinh.streamingservice.persistence.projection.MediaNameEntry;
+import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,8 +20,8 @@ public interface MediaNameEntityRepository<T extends MediaNameEntity, ID> extend
     @Query("SELECT e.name FROM #{#entityName} e WHERE LOWER(e.name) LIKE LOWER(CONCAT('%', :name, '%'))")
     List<String> findNamesContaining(@Param("name") String name);
 
-    @Query("SELECT new dev.chinh.streamingservice.persistence.projection.MediaNameEntry(e.name, e.length) FROM #{#entityName} e")
-    Page<MediaNameEntry> findAllNames(Pageable pageable);
+    @Query("SELECT new dev.chinh.streamingservice.persistence.projection.NameEntityDTO(e.id, e.name, e.length) FROM #{#entityName} e")
+    Page<NameEntityDTO> findAllNames(Pageable pageable);
 
     @Query("SELECT e FROM #{#entityName} e WHERE LOWER(e.name) LIKE :name")
     Optional<MediaNameEntity> findByName(String name);

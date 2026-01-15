@@ -21,8 +21,17 @@ public class NameEntityDTO {
     @JsonProperty(ContentMetaData.NAME)
     private String name;
 
+    @JsonProperty(ContentMetaData.LENGTH)
+    private int length;
+
     @JsonProperty(ContentMetaData.THUMBNAIL)
     private String thumbnail;
+
+    public NameEntityDTO(long id, String name, int length) {
+        this.id = id;
+        this.name = name;
+        this.length = length;
+    }
 
     public NameEntityDTO(long id, String name) {
         this.id = id;

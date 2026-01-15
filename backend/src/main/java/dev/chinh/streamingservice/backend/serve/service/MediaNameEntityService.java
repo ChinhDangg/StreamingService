@@ -2,9 +2,8 @@ package dev.chinh.streamingservice.backend.serve.service;
 
 import dev.chinh.streamingservice.backend.content.service.MinIOService;
 import dev.chinh.streamingservice.backend.content.service.ThumbnailService;
-import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
-import dev.chinh.streamingservice.persistence.projection.MediaNameEntry;
+import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
 import dev.chinh.streamingservice.persistence.repository.MediaAuthorRepository;
 import dev.chinh.streamingservice.persistence.repository.MediaCharacterRepository;
 import dev.chinh.streamingservice.persistence.repository.MediaTagRepository;
@@ -31,24 +30,24 @@ public class MediaNameEntityService {
     @Value("${always-show-original-resolution}")
     private String alwaysShowOriginalResolution;
 
-    public Page<MediaNameEntry> findAllAuthors(int offset, SortBy sortBy, Sort.Direction sortOrder) {
+    public Page<NameEntityDTO> findAllAuthors(int offset, SortBy sortBy, Sort.Direction sortOrder) {
         return mapInfo(mediaAuthorRepository.findAllNames(getPageable(offset, sortBy, sortOrder)), false);
     }
 
-    public Page<MediaNameEntry> findAllCharacters(int offset, SortBy sortBy, Sort.Direction sortOrder) {
+    public Page<NameEntityDTO> findAllCharacters(int offset, SortBy sortBy, Sort.Direction sortOrder) {
         return mapInfo(mediaCharacterRepository.findAllNames(getPageable(offset, sortBy, sortOrder)), true);
     }
 
-    public Page<MediaNameEntry> findAllUniverses(int offset, SortBy sortBy, Sort.Direction sortOrder) {
+    public Page<NameEntityDTO> findAllUniverses(int offset, SortBy sortBy, Sort.Direction sortOrder) {
         return mapInfo(mediaUniverseRepository.findAllNames(getPageable(offset, sortBy, sortOrder)), true);
     }
 
-    public Page<MediaNameEntry> findAllTags(int offset, SortBy sortBy, Sort.Direction sortOrder) {
+    public Page<NameEntityDTO> findAllTags(int offset, SortBy sortBy, Sort.Direction sortOrder) {
         return mapInfo(mediaTagRepository.findAllNames(getPageable(offset, sortBy, sortOrder)), false);
     }
 
-    private Page<MediaNameEntry> mapInfo(Page<MediaNameEntry> entry, boolean hasThumbnail) {
-        List<MediaNameEntry> nameEntries = entry.getContent();
+    private Page<NameEntityDTO> mapInfo(Page<NameEntityDTO> entry, boolean hasThumbnail) {
+        List<NameEntityDTO> nameEntries = entry.getContent();
         if (hasThumbnail) {
             if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
                 nameEntries.forEach(nameEntry -> {

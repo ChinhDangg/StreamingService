@@ -5,7 +5,7 @@ import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.constant.Resolution;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.persistence.entity.MediaDescription;
-import dev.chinh.streamingservice.persistence.projection.MediaNameEntry;
+import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -27,10 +27,10 @@ public class ThumbnailService {
     public record MediaUrl(MediaType type, String url) {}
     public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, List<String> buckets, List<String> pathList) {}
 
-    public void processThumbnails(List<MediaNameEntry> items) {
+    public void processThumbnails(List<NameEntityDTO> items) {
         long now = System.currentTimeMillis() + 60 * 60 * 1000;
-        List<MediaNameEntry> newThumbnails = new ArrayList<>();
-        for (MediaNameEntry item : items) {
+        List<NameEntityDTO> newThumbnails = new ArrayList<>();
+        for (NameEntityDTO item : items) {
             if (item.getThumbnail() == null)
                 continue;
             String thumbnailFileName = Paths.get(getThumbnailPath(item.getName(), item.getThumbnail())).getFileName().toString();
@@ -48,7 +48,7 @@ public class ThumbnailService {
             if (exitCode != 0) {
                 throw new RuntimeException("Failed to resize thumbnails");
             }
-            for (MediaNameEntry item : newThumbnails) {
+            for (NameEntityDTO item : newThumbnails) {
                 addCacheThumbnails(Paths.get(getThumbnailPath(item.getName(), item.getThumbnail())).getFileName().toString(), now);
             }
         } catch (InterruptedException | IOException e) {
@@ -106,10 +106,10 @@ public class ThumbnailService {
         return new AlbumUrlInfo(albumUrlList, List.of(ContentMetaData.THUMBNAIL_BUCKET), pathList);
     }
 
-    private AlbumUrlInfo getThumbnailImagesAsAlbumUrls(List<MediaNameEntry> mediaNameEntryList) {
+    private AlbumUrlInfo getThumbnailImagesAsAlbumUrls(List<NameEntityDTO> mediaNameEntryList) {
         List<String> pathList = new ArrayList<>();
         List<MediaUrl> albumUrlList = new ArrayList<>();
-        for (MediaNameEntry mediaNameEntry : mediaNameEntryList) {
+        for (NameEntityDTO mediaNameEntry : mediaNameEntryList) {
             if (mediaNameEntry.getThumbnail() == null)
                 continue;
 
