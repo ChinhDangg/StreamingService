@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.common;
 
+import jakarta.annotation.PostConstruct;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
@@ -21,8 +22,8 @@ public class OSUtil {
     private static final String BASE_DIR = "/chunks";
     private static final String CONTAINER = "nginx";
 
-    private static OS currentOS;
-    private static String RAMDISK = "nuLL";
+    private static OS currentOS = null;
+    private static String RAMDISK = null;
     public static long MEMORY_TOTAL = 0;
     public static AtomicLong MEMORY_USABLE;
 
@@ -196,6 +197,33 @@ public class OSUtil {
         MEMORY_USABLE.set(getActualMemoryUsableSpace());
     }
 
+
+    public static String createDirInRAMDiskElseDisk(String otherDisk, String dir) throws IOException {
+        if (currentOS == null)
+            currentOS = _detectOS();
+        if (RAMDISK == null)
+            RAMDISK = _getRAMDISKName();
+        if (currentOS == OS.WINDOWS) {
+            String path = OSUtil.normalizePath(otherDisk, dir);
+            Files.createDirectories(Path.of(path));
+            return path;
+        } else if (currentOS == OS.LINUX || currentOS == OS.MAC) {
+            String path = OSUtil.normalizePath(RAMDISK, dir);
+            Files.createDirectories(Path.of(path));
+            return path;
+        }
+        throw new IllegalStateException("Unsupported OS");
+    }
+
+    public static String replaceHostRAMDiskWithContainer(String path) {
+        if (RAMDISK == null)
+            RAMDISK = _getRAMDISKName();
+        if (path.startsWith(RAMDISK))
+            return path.replace(RAMDISK, BASE_DIR);
+        return path;
+    }
+
+
     public static boolean deleteForceMemoryDirectory(String dir) throws IOException {
         if (currentOS == OS.WINDOWS) {
             return deleteForceDirectoryInContainer(dir);
@@ -267,7 +295,6 @@ public class OSUtil {
             return false;
         }
     }
-
 
 
     public static String readPlayListFromTempDir(String videoDir) throws IOException, InterruptedException {

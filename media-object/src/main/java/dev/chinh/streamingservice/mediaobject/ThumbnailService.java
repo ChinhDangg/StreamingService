@@ -27,18 +27,22 @@ public class ThumbnailService {
     private static final String defaultAlbumPath = "album";
 
     public String generateThumbnailFromVideo(long mediaId, String bucket, String objectName, double videoLength) throws Exception {
+        String thumbnailObjectBasePath = (objectName.startsWith(defaultVidPath) ? "" : (defaultVidPath + "/")) +
+                objectName.substring(0, objectName.lastIndexOf("/"));
+        String thumbnailName = mediaId + "_" + UUID.randomUUID() + "_thumb.jpg";
+        String thumbnailObject = OSUtil.normalizePath(thumbnailObjectBasePath, thumbnailName);
 
-        String thumbnailObject = defaultVidPath + "/" + objectName.substring(0, objectName.lastIndexOf("/"))
-                + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb.jpg";
-        String thumbnailOutput = OSUtil.normalizePath(diskDir, thumbnailObject);
-        Files.createDirectories(Path.of(thumbnailOutput.substring(0, thumbnailOutput.lastIndexOf("/"))));
+        String thumbnailOutput = OSUtil.normalizePath(
+                OSUtil.createDirInRAMDiskElseDisk(diskDir, OSUtil.normalizePath("thumbnail", thumbnailObjectBasePath)),
+                thumbnailName);
+
         String videoInput = minIOService.getObjectUrlForContainer(bucket, objectName);
         videoLength = videoLength < 0.5 ? 0 : videoLength > 2 ? 2 : 0.5;
 
         List<String> command = Arrays.asList(
                 "docker", "exec", "ffmpeg",
                 "ffmpeg",
-                "-v", "error",                 // Reduce noise to see real issues
+                "-v", "error",
                 "-ss", String.valueOf(videoLength), // Seek before input (Fast Seek)
                 "-i", videoInput,
                 "-frames:v", "1",              // Stop after 1 frame
@@ -46,7 +50,7 @@ public class ThumbnailService {
                 "-strict", "unofficial",
                 "-f", "image2",                // Force output format
                 "-update", "1",                // Ensure it writes a single file
-                thumbnailOutput
+                OSUtil.replaceHostRAMDiskWithContainer(thumbnailOutput)
         );
 
         ProcessBuilder pb = new ProcessBuilder(command);
