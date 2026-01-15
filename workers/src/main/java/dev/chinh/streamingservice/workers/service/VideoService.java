@@ -449,10 +449,15 @@ public class VideoService extends MediaService implements ResourceCleanable {
             System.out.println("Removing: " + mediaJobId);
 
             long estimatedSize = Long.parseLong((String) getVideoJobStatusInfo(mediaJobId).get("size"));
-            removingSpace = removingSpace - estimatedSize;
 
             String mediaMemoryPath = mediaJobId.replace(":", "/");
-            OSUtil.deleteForceMemoryDirectory(mediaMemoryPath);
+            try {
+                boolean deleted = OSUtil.deleteForceMemoryDirectory(mediaMemoryPath);
+                if (deleted)
+                    removingSpace = removingSpace - estimatedSize;
+            } catch (IOException e) {
+                System.err.println("Failed to delete memory path: " + mediaMemoryPath);
+            }
 
             removeCacheVideoLastAccess(mediaJobId);
             removeCacheVideoJobStatus(mediaJobId);

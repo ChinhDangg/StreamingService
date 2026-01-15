@@ -547,14 +547,18 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                 assert sizeAndDimensions != null;
                 long estimatedSize = Resolution.getEstimatedSize(
                         sizeAndDimensions.size, sizeAndDimensions.width, sizeAndDimensions.height, resolution) / sizeAndDimensions.length;
-                removingSpace -= estimatedSize;
                 System.out.println("Estimated size: " + estimatedSize);
+
+                String mediaMemoryPath = mediaJobId.replace(":", "/");
+                boolean deleted = OSUtil.deleteForceMemoryDirectory(mediaMemoryPath);
+                if (deleted)
+                    removingSpace -= estimatedSize;
+            } catch (IOException e) {
+                System.err.println("Failed to delete memory path: " + mediaJobId.replace(":", "/"));
             } catch (Exception e) {
                 System.out.println("Failed to get estimated size to estimate removing space");
             }
 
-            String mediaMemoryPath = mediaJobId.replace(":", "/");
-            OSUtil.deleteForceMemoryDirectory(mediaMemoryPath);
             removeCacheAlbumJobInfo(albumId, mediaJobId);
             removeCacheAlbumCreatedUrl(albumId, mediaJobId);
             removeAlbumCacheLastAccess(mediaJobId);

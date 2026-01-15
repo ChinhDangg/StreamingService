@@ -1,9 +1,11 @@
 package dev.chinh.streamingservice.common;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
@@ -191,45 +193,76 @@ public class OSUtil {
         MEMORY_USABLE.set(getActualMemoryUsableSpace());
     }
 
-    public static void deleteForceMemoryDirectory(String dir) {
+    public static boolean deleteForceMemoryDirectory(String dir) throws IOException {
         if (currentOS == OS.WINDOWS) {
-            deleteForceDirectoryInContainer(dir);
-            return;
+            return deleteForceDirectoryInContainer(dir);
         } else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
-            deleteForceDirectoryForRAMDisk(dir);
-            return;
+            return deleteForceDirectoryForRAMDisk(dir);
         }
         throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
     }
 
-    private static void deleteForceDirectoryForRAMDisk(String dir) {
-        dir = normalizePath(RAMDISK, dir);
-        if (!Files.exists(Paths.get(dir))) {
-            System.out.println("RAM disk does not exist to delete: " + dir);
-            return;
+    private static boolean deleteForceDirectoryForRAMDisk(String pathString) throws IOException {
+        pathString = normalizePath(RAMDISK, pathString);
+        Path path = Paths.get(pathString);
+
+        // 1. Check if it exists at all
+        if (!Files.exists(path)) {
+            return false;
         }
 
-        String[] cmd = new String[]{"rm", "-rf", dir};
+        // 2. Perform the deletion
+        if (Files.isDirectory(path)) {
+            Files.walkFileTree(path, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(@NonNull Path file, @NonNull BasicFileAttributes attrs) throws IOException {
+                    Files.delete(file);
+                    return FileVisitResult.CONTINUE;
+                }
 
-        try {
-            runCommandAndLog(cmd, null);
-        } catch (Exception e) {
-            System.err.println("Deletion failed for " + dir);
+                @Override
+                public FileVisitResult postVisitDirectory(@NonNull Path dir, IOException exc) throws IOException {
+                    Files.delete(dir);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } else {
+            Files.delete(path);
         }
 
-        System.out.println("RAM disk successfully deleted: " + dir);
+        return true; // Something was deleted
     }
 
-    private static void deleteForceDirectoryInContainer(String path) {
+    private static boolean deleteForceDirectoryInContainer(String path) {
         path = normalizePath(BASE_DIR, path);
-        String[] cmd = {"docker", "exec", CONTAINER, "rm", "-rf", path};
+
+        // This shell script runs INSIDE the container:
+        // 1. Check if path exists (-e)
+        // 2. If yes, delete it recursively (-rf) and print 'deleted'
+        // 3. If no, print 'not_found'
+        String shellCommand = String.format(
+                "if [ -e \"%s\" ]; then rm -rf \"%s\" && echo \"deleted\"; else echo \"not_found\"; fi",
+                path, path
+        );
+
+        // wrap it in a shell (sh -c) for complex command like if else
+        String[] cmd = {"docker", "exec", CONTAINER, "sh", "-c", shellCommand};
 
         try {
-            runCommandAndLog(cmd, null);
+            // Assuming runCommandAndLog returns or logs the output stream
+            String result = runCommandAndLog(cmd, null);
+
+            if ("deleted".equals(result.trim())) {
+                System.out.println("Success: Found and deleted " + path);
+                return true;
+            } else {
+                System.out.println("Nothing to delete: " + path + " did not exist.");
+                return false;
+            }
         } catch (Exception e) {
-            System.err.println("Failed to delete in container: ");
+            System.err.println("Error: Failed to execute delete command in container.");
+            return false;
         }
-        System.out.println("Deleted " + path + " in container");
     }
 
 
@@ -298,7 +331,7 @@ public class OSUtil {
 
         String[] commands = {
                 "docker", "exec", CONTAINER,
-                "test", "-f", targetPath
+                "test", "-e", targetPath
         };
 
         try {
@@ -435,21 +468,16 @@ public class OSUtil {
         return baseDir + "/" + relativePath; // e.g. "dir1" → "/chunks/dir1"
     }
 
-    public static void runCommandAndLog(String[] cmd, List<Integer> acceptableCode) throws Exception {
+    public static String runCommandAndLog(String[] cmd, List<Integer> acceptableCode) throws Exception {
         Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
-//        String line;
-//        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-//            while ((line = br.readLine()) != null) {
-//                //System.out.println("[ffmpeg] " + line);
-//            }
-//        }
+        String out = new String(process.getInputStream().readAllBytes());
         int exit = process.waitFor();
         System.out.println("Command exited with code " + exit);
         if (exit != 0) {
             if (acceptableCode != null && acceptableCode.contains(exit))
-                return;
-            String out = new String(process.getInputStream().readAllBytes());
+                return out;
             throw new RuntimeException("Command failed with code " + exit + ": " + out);
         }
+        return out;
     }
 }
