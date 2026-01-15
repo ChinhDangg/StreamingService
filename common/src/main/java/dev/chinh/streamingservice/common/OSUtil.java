@@ -75,7 +75,10 @@ public class OSUtil {
                     // "mkdir -p /mnt/ramdisk && mount -t tmpfs -o size=512m tmpfs /mnt/ramdisk"};
                     "/bin/bash", "-c",
                     """
-                    sudo mkdir -p /mnt/ramdisk && sudo mount -t tmpfs -o size=%d tmpfs /mnt/ramdisk
+                    if ! findmnt -n -o FSTYPE /mnt/ramdisk | grep -q 'tmpfs'; then
+                        sudo mkdir -p /mnt/ramdisk && \
+                        sudo mount -t tmpfs -o size=%d tmpfs /mnt/ramdisk;
+                    fi
                     """.formatted(ramBytes)
             };
             case OS.WINDOWS -> new String[]{
