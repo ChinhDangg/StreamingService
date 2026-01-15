@@ -3,10 +3,10 @@ package dev.chinh.streamingservice.backend.search.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.backend.MediaMapper;
 import dev.chinh.streamingservice.backend.content.service.MinIOService;
-import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.backend.content.service.ThumbnailService;
 import dev.chinh.streamingservice.persistence.projection.MediaSearchItem;
+import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
 import dev.chinh.streamingservice.searchclient.OpenSearchService;
 import dev.chinh.streamingservice.backend.search.data.*;
 import dev.chinh.streamingservice.searchclient.constant.SortBy;
@@ -40,12 +40,9 @@ public class MediaSearchService {
     @Value("${always-show-original-resolution}")
     private String alwaysShowOriginalResolution;
 
-    record NameEntry(String name) {}
-
-    public List<String> searchContaining(String index, String text) throws IOException {
+    public List<NameEntityDTO> searchContaining(String index, String text) throws IOException {
         ContentMetaData.validateSearchText(text);
-        SearchResponse<NameEntry> response = searchContaining(
-                index, ContentMetaData.NAME, text, NameEntry.class);
+        SearchResponse<NameEntityDTO> response = searchContaining(index, ContentMetaData.NAME, text, NameEntityDTO.class);
         return mapSearchReponseNameEntryToList(response);
     }
 
@@ -53,11 +50,14 @@ public class MediaSearchService {
         return openSearchService.searchContaining(index, field, text, clazz);
     }
 
-    private List<String> mapSearchReponseNameEntryToList(SearchResponse<NameEntry> response) {
+    private List<NameEntityDTO> mapSearchReponseNameEntryToList(SearchResponse<NameEntityDTO> response) {
         return response.hits().hits().stream()
                 .map(h -> {
-                    assert h.source() != null;
-                    return h.source().name;
+                    NameEntityDTO dto = h.source();
+                    assert dto != null;
+                    assert h.id() != null;
+                    dto.setId(Long.parseLong(h.id()));
+                    return dto;
                 })
                 .toList();
     }
@@ -107,7 +107,7 @@ public class MediaSearchService {
                 ));
             } else {
                 searchFieldGroups.add(new SearchFieldGroup(
-                        includeField.getField() + "." + ContentMetaData.NAME + ".raw", includeField.getValues(), includeField.isMatchAll(), true
+                        includeField.getField() + "." + ContentMetaData.ID, includeField.getValues(), includeField.isMatchAll(), true
                 ));
             }
         }
@@ -135,7 +135,7 @@ public class MediaSearchService {
                                               SortBy sortBy, SortOrder sortOrder) throws Exception {
         ContentMetaData.validateSearchFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.searchTermByOneField(MEDIA_INDEX_NAME, field + "." + ContentMetaData.NAME + ".raw", keywords, matchAll, page, size, sortBy, sortOrder),
+                openSearchService.searchTermByOneField(MEDIA_INDEX_NAME, field + "." + ContentMetaData.ID, keywords, matchAll, page, size, sortBy, sortOrder),
                 page, size);
 
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
