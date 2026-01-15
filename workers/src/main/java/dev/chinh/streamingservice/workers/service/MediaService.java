@@ -43,6 +43,11 @@ public abstract class MediaService {
 
     protected final String masterFileName = "/master.m3u8";
 
+    protected void addCacheLastAccess(String key, String mediaWorkId, Long expiry) {
+        expiry = expiry == null ? System.currentTimeMillis() : expiry;
+        redisTemplate.opsForZSet().add(key, mediaWorkId, expiry);
+    }
+
     protected Double getCacheLastAccess(String key, String mediaWorkId) {
         return redisTemplate.opsForZSet().score(key, mediaWorkId);
     }

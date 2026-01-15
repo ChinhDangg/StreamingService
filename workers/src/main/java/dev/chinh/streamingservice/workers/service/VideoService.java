@@ -192,6 +192,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
         ));
         runAndLogAsync(tokenKey, command.toArray(new String[0]), cacheJobId, outPath);
 
+        addCacheVideoLastAccess(cacheJobId, null);
         addCacheVideoJobStatus(cacheJobId, null, estimatedSize, MediaJobStatus.RUNNING);
         addCacheRunningJob(cacheJobId);
 
@@ -240,6 +241,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
         String outPath = containerDir + masterFileName;
         String partialVideoJobId = createPartialVideo(tokenKey, nginxUrl, scale, videoDir, outPath, prevJobStopped, cacheJobId);
 
+        addCacheVideoLastAccess(cacheJobId, null);
         addCacheVideoJobStatus(cacheJobId, partialVideoJobId, estimatedSize, MediaJobStatus.RUNNING);
         addCacheRunningJob(cacheJobId);
 
@@ -365,11 +367,16 @@ public class VideoService extends MediaService implements ResourceCleanable {
         return getAllCacheLastAccess(videoLastAccessKey, max);
     }
 
+    public void addCacheVideoLastAccess(String videoId, Long expiry) {
+        String videoLastAccessKey = "cache:lastAccess:video";
+        addCacheLastAccess(videoLastAccessKey, videoId, expiry);
+    }
+
     public Double getCacheVideoLastAccess(String videoWorkId) {
         return getCacheLastAccess(videoLastAccessKey, videoWorkId);
     }
 
-    private void removeCacheVideoLastAccess(String videoId) {
+    public void removeCacheVideoLastAccess(String videoId) {
         removeCacheLastAccess(videoLastAccessKey, videoId);
     }
 

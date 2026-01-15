@@ -13,6 +13,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.util.Objects;
 import java.util.Set;
 
@@ -67,8 +68,8 @@ public class ScheduleService {
         for (String runningVideoJob : runningVideoJobs) {
 
             String videoJobId = runningVideoJob;
-            double lastAccess = videoService.getCacheVideoLastAccess(videoJobId);
-            long millisPassed = (long) (System.currentTimeMillis() - lastAccess);
+            Double lastAccess = videoService.getCacheVideoLastAccess(videoJobId);
+            long millisPassed = (lastAccess == null) ? 70_000 : (long) (System.currentTimeMillis() - lastAccess);
             if (millisPassed < 60_000) {
                 break; // sorted so any after is the same
             }
@@ -77,6 +78,7 @@ public class ScheduleService {
             if (!cachedJobStatus.get("status").toString().equals(MediaJobStatus.RUNNING.name())) {
                 // running job probably completed or removed for space - remove running cache
                 videoService.removeCacheRunningJob(videoJobId);
+                videoService.removeCacheVideoLastAccess(videoJobId);
                 continue;
             }
             String jobId = cachedJobStatus.get("jobId").toString(); // UUID
@@ -118,7 +120,11 @@ public class ScheduleService {
 
             System.out.println("Removing: " + thumbnailFileName);
             String path = ThumbnailService.getThumbnailParentPath() + "/" + thumbnailFileName;
-            OSUtil.deleteForceMemoryDirectory(path);
+            try {
+                OSUtil.deleteForceMemoryDirectory(path);
+            } catch (IOException e) {
+                System.err.println("Failed to delete memory path: " + path);
+            }
             thumbnailService.removeThumbnailLastAccess(thumbnailFileName);
         }
     }
