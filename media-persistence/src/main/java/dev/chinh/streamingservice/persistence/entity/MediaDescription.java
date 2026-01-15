@@ -40,6 +40,10 @@ public abstract class MediaDescription implements MetaDataProvider {
     @Column(columnDefinition = "TEXT")
     protected String thumbnail;
 
+    @JsonProperty(ContentMetaData.PREVIEW)
+    @Column(columnDefinition = "TEXT")
+    protected String preview;
+
     @JsonProperty(ContentMetaData.LENGTH)
     @Column(nullable = false)
     protected Integer length;
