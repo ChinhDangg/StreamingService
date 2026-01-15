@@ -55,9 +55,9 @@ public class SearchController {
         return ResponseEntity.ok().body(mediaSearchService.searchMatchAll(page, pageSize, sortBy, sortOrder));
     }
 
-    @GetMapping("/suggestion/{nameEntity}")
-    public List<String> searchNameEntity(@PathVariable MediaNameEntityConstant nameEntity,
-                                         @RequestParam(name = "s") String authorSearchString) throws IOException {
+    @GetMapping("/name/{nameEntity}")
+    public List<?> searchNameEntity(@PathVariable MediaNameEntityConstant nameEntity,
+                                    @RequestParam(name = "s") String authorSearchString) throws IOException {
         return mediaSearchService.searchContaining(nameEntity.getName(), authorSearchString);
     }
 }
