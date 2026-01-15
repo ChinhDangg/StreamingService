@@ -53,7 +53,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     //@Modifying
     //@Transactional
     @Query(value = """
-        UPDATE media_metadata
+        UPDATE media.media_metadata
         SET length = length + 1
         WHERE id = :id
         RETURNING length
@@ -64,7 +64,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
 //    @Modifying
 //    @Transactional
     @Query(value = """
-        UPDATE media_metadata
+        UPDATE media.media_metadata
         SET length = length - 1
         WHERE id = :id
         AND length > 0
@@ -118,7 +118,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Modifying
     @Transactional
     @Query(value = """
-        INSERT INTO authors_media (media_id, authors_id)
+        INSERT INTO media.authors_media (media_id, authors_id)
         VALUES (:mediaId, :authorId)
     """, nativeQuery = true)
     int addAuthorToMedia(Long mediaId, Long authorId);
@@ -126,7 +126,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Modifying
     @Transactional
     @Query(value = """
-        INSERT INTO characters_media (media_id, characters_id)
+        INSERT INTO media.characters_media (media_id, characters_id)
         VALUES (:mediaId, :characterId)
     """, nativeQuery = true)
     int addCharacterToMedia(Long mediaId, Long characterId);
@@ -134,7 +134,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Modifying
     @Transactional
     @Query(value = """
-        INSERT INTO universes_media (media_id, universes_id)
+        INSERT INTO media.universes_media (media_id, universes_id)
         VALUES (:mediaId, :universeId)
     """, nativeQuery = true)
     int addUniverseToMedia(Long mediaId, Long universeId);
@@ -142,7 +142,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Modifying
     @Transactional
     @Query(value = """
-        INSERT INTO tags_media (media_id, tags_id)
+        INSERT INTO media.tags_media (media_id, tags_id)
         VALUES (:mediaId, :tagId)
     """, nativeQuery = true)
     int addTagToMedia(Long mediaId, Long tagId);
@@ -151,7 +151,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Modifying
     @Transactional
     @Query(value = """
-        DELETE FROM authors_media am
+        DELETE FROM media.authors_media am
         WHERE am.media_id = :mediaId
         AND am.authors_id = :authorId
     """, nativeQuery = true)
@@ -160,7 +160,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Modifying
     @Transactional
     @Query(value = """
-        DELETE FROM characters_media cm
+        DELETE FROM media.characters_media cm
         WHERE cm.media_id = :mediaId
         AND cm.characters_id = :characterId
     """, nativeQuery = true)
@@ -169,7 +169,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Modifying
     @Transactional
     @Query(value = """
-        DELETE FROM universes_media um
+        DELETE FROM media.universes_media um
         WHERE um.media_id = :mediaId
         AND um.universes_id = :universeId
     """, nativeQuery = true)
@@ -178,7 +178,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Modifying
     @Transactional
     @Query(value = """
-        DELETE FROM tags_media tm
+        DELETE FROM media.tags_media tm
         WHERE tm.media_id = :mediaId
         AND tm.tags_id = :tagId
     """, nativeQuery = true)
@@ -188,11 +188,11 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Modifying
     @Transactional
     @Query(value = """
-        UPDATE authors
+        UPDATE media.authors
         SET length = length - 1
         WHERE id IN (
             SELECT authors_id
-            FROM authors_media
+            FROM media.authors_media
             WHERE media_id = :mediaId
         )
         AND length > 0
@@ -202,11 +202,11 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Modifying
     @Transactional
     @Query(value = """
-        UPDATE characters
+        UPDATE media.characters
         SET length = length - 1
         WHERE id IN (
             SELECT characters_id
-            FROM characters_media
+            FROM media.characters_media
             WHERE media_id = :mediaId
         )
         AND length > 0
@@ -216,11 +216,11 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Modifying
     @Transactional
     @Query(value = """
-        UPDATE universes
+        UPDATE media.universes
         SET length = length - 1
         WHERE id IN (
             SELECT universes_id
-            FROM universes_media
+            FROM media.universes_media
             WHERE media_id = :mediaId
         )
         AND length > 0
@@ -230,11 +230,11 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Modifying
     @Transactional
     @Query(value = """
-        UPDATE tags
+        UPDATE media.tags
         SET length = length - 1
         WHERE id IN (
             SELECT tags_id
-            FROM tags_media
+            FROM media.tags_media
             WHERE media_id = :mediaId
         )
         AND length > 0

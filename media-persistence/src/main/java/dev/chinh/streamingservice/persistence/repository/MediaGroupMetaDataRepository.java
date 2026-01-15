@@ -31,7 +31,7 @@ public interface MediaGroupMetaDataRepository extends JpaRepository<MediaGroupMe
     void incrementNumInfo(@Param("mediaId") long mediaId);
 
     @Query(value = """
-        UPDATE media_groups
+        UPDATE media.media_groups
         SET num_info = num_info + 1
         WHERE id = :id
         RETURNING num_info
