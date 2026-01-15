@@ -46,6 +46,11 @@ public class AlbumController {
                                                    @PathVariable int vidNum,
                                                    @PathVariable Resolution vidRes,
                                                    HttpServletRequest request) throws Exception {
+        if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
+            // if always show original - intercept the resolution parameter
+            albumRes = Resolution.original;
+            vidRes = Resolution.original;
+        }
         return ResponseEntity.ok().body(albumService.getAlbumPartialVideoUrl(albumId, albumRes, vidNum, vidRes, request));
     }
 }

@@ -163,13 +163,6 @@ export function pollPlaylistUrl(fetchUrl, maxWaitMs = 5000, intervalMs = 500) {
                 return;
             }
 
-            if (response.headers.get('X-Media-State')) {
-                clearInterval(previewInterval);
-                clearTimeout(previewTimeout);
-                resolve(fetchUrl);
-                return;
-            }
-
             const playlistUrl = await response.text();
             if (playlistUrl !== 'PROCESSING') {
                 clearInterval(previewInterval);
