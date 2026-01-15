@@ -4,13 +4,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.backend.serve.service.MediaDisplayService;
+import dev.chinh.streamingservice.persistence.projection.MediaNameSearchItem;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Getter
@@ -29,16 +29,16 @@ public class MediaDisplayContent {
     private String thumbnail;
 
     @JsonProperty(ContentMetaData.TAGS)
-    private List<String> tags;
+    private List<MediaNameSearchItem> tags;
 
     @JsonProperty(ContentMetaData.CHARACTERS)
-    private List<String> characters;
+    private List<MediaNameSearchItem> characters;
 
     @JsonProperty(ContentMetaData.UNIVERSES)
-    private List<String> universes;
+    private List<MediaNameSearchItem> universes;
 
     @JsonProperty(ContentMetaData.AUTHORS)
-    private List<String> authors;
+    private List<MediaNameSearchItem> authors;
 
     @JsonProperty(ContentMetaData.LENGTH)
     private Integer length;
