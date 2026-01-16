@@ -69,8 +69,8 @@ public class ScheduleService {
 
             String videoJobId = runningVideoJob;
             Double lastAccess = videoService.getCacheVideoLastAccess(videoJobId);
-            long millisPassed = (lastAccess == null) ? 70_000 : (long) (System.currentTimeMillis() - lastAccess);
-            if (millisPassed < 60_000) {
+            long millisPassed = (lastAccess == null) ? 130_000 : (long) (System.currentTimeMillis() - lastAccess);
+            if (millisPassed < 120_000) {
                 break; // sorted so any after is the same
             }
 
