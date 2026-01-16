@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.mediaupload.modify;
+package dev.chinh.streamingservice.mediaupload.modify.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
