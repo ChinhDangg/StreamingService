@@ -45,7 +45,14 @@ services:
     # docker exec -it nginx nginx -V #check for config being applied or not - --config-path=
 
   ffmpeg:
-    image: linuxserver/ffmpeg:amd64-version-8.0-cli
+    build:
+      context: ./ffmpeg
+      dockerfile: Dockerfile
+      args:
+        USER_NAME: ${USER}
+        USER_ID: ${USER_ID}
+        GROUP_ID: ${GROUP_ID}
+    image: my-ffmpeg/linuxserver/ffmpeg:amd64-version-8.0-cli
     container_name: ffmpeg
     depends_on:
       - minio
