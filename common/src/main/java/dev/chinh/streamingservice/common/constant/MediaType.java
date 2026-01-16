@@ -16,7 +16,7 @@ public enum MediaType {
 
         String ext = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
 
-        Set<String> imageExts = Set.of("jpg", "jpeg", "png", "gif", "bmp", "webp", "tiff", "svg", "heic");
+        Set<String> imageExts = Set.of("jpg", "jpeg", "png", "gif", "webp");
         Set<String> videoExts = Set.of("mp4", "mkv", "mov", "avi", "flv", "wmv", "webm", "m4v", "3gp");
 
         if (imageExts.contains(ext)) return MediaType.IMAGE;
