@@ -4,22 +4,30 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.constant.Resolution;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import dev.chinh.streamingservice.workers.VideoWorker;
 import jakarta.annotation.PostConstruct;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
 public class VideoService extends MediaService implements ResourceCleanable {
+
+    private static final Logger log = LogManager.getLogger(VideoService.class);
 
     @Qualifier("ffmpegExecutor")
     private final ExecutorService ffmpegExecutor;
@@ -190,10 +198,10 @@ public class VideoService extends MediaService implements ResourceCleanable {
                 "-hls_flags", "append_list+omit_endlist",
                 outPath
         ));
-        runAndLogAsync(tokenKey, command.toArray(new String[0]), cacheJobId, outPath);
+        runAndLogAsync(tokenKey, command.toArray(new String[0]), cacheJobId, outPath, this::saveVideoPreviewToObjectStorage, mediaJobDescription);
 
         addCacheVideoLastAccess(cacheJobId, null);
-        addCacheVideoJobStatus(cacheJobId, null, estimatedSize, MediaJobStatus.RUNNING);
+        addCacheVideoJobStatus(cacheJobId, partialVideoJobId, estimatedSize, MediaJobStatus.RUNNING);
         addCacheRunningJob(cacheJobId);
 
         checkPlaylistCreated(videoDir + masterFileName);
@@ -252,6 +260,37 @@ public class VideoService extends MediaService implements ResourceCleanable {
         return getNginxVideoStreamUrl(videoDir);
     }
 
+    private void saveVideoPreviewToObjectStorage(MediaJobDescription jobDescription) {
+        long videoId = jobDescription.getId();
+        String videoDir = videoId + "/preview";
+        String containerDir = "/chunks/" + videoDir;
+        String inputPath = containerDir + masterFileName;
+
+        try {
+            String output = OSUtil.createDirInRAMDiskElseDisk("disk", "preview-generated") +
+                    "/" + videoId + "_preview_full_output.mp4";
+
+            List<String> commands = List.of(
+                    "docker", "exec", "ffmpeg",
+                    "ffmpeg",
+                    "-v", "error",
+                    "-i", inputPath,
+                    "-c", "copy",
+                    "-bsf:a:m:codec:aac", "aac_adtstoasc",
+                    OSUtil.replaceHostRAMDiskWithContainer(output)
+            );
+
+            OSUtil.runCommandAndLog(commands.toArray(new String[0]), null);
+
+            String previewObject = jobDescription.getPreview();
+            minIOService.moveFileToObject(ContentMetaData.PREVIEW_BUCKET, previewObject, output);
+            Files.deleteIfExists(Path.of(output));
+        } catch (Exception e) {
+            log.error("e: ", e);
+            throw new RuntimeException(e);
+        }
+    }
+
     public String createPartialVideo(String tokenKey, String inputUrl, String scale, String videoDir, String outPath,
                                      boolean prevJobStopped, String cacheJobId) throws Exception {
         final int segmentDuration = 4;
@@ -289,7 +328,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
                 outPath                       // output playlist path: /chunks/<videoId>/<resolution>/partial/master.m3u8)
         ));
 
-        runAndLogAsync(tokenKey, command.toArray(new String[0]), cacheJobId, outPath);
+        runAndLogAsync(tokenKey, command.toArray(new String[0]), cacheJobId, outPath, null , null);
         return partialVideoJobId;
     }
 
@@ -297,7 +336,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
         return (width >= height) ? "scale=-2:" + target : "scale=" + target + ":-2";
     }
 
-    public void checkPlaylistCreated(String playlist) throws IOException, InterruptedException {
+    public void checkPlaylistCreated(String playlist) throws InterruptedException {
         int retries = 100;
         while (!OSUtil.checkTempFileExists(playlist) && retries-- > 0) {
             Thread.sleep(100);
@@ -320,7 +359,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
         return lastIndex;
     }
 
-    private void runAndLogAsync(String tokenKey, String[] cmd, String videoJobId, String videoMasterFilePath) throws Exception {
+    private <T> void runAndLogAsync(String tokenKey, String[] cmd, String videoJobId, String videoMasterFilePath, Consumer<T> action, T data) throws Exception {
         Process process = new ProcessBuilder(cmd)
                 .redirectErrorStream(true)
                 .start();
@@ -332,10 +371,15 @@ public class VideoService extends MediaService implements ResourceCleanable {
                 int exit = process.waitFor();
                 System.out.println("ffmpeg video " + videoMasterFilePath + " exited with code " + exit);
                 // mark as completed
-                if (videoJobId != null && exit == 0)
+                if (exit == 0) {
+                    System.out.println("here");
+                    boolean wrote = OSUtil.writeTextToTempFile(videoMasterFilePath.replaceFirst("/chunks/", ""), List.of("#EXT-X-ENDLIST"), false);
+                    System.out.println(wrote);
+                }
+                if (videoJobId != null && exit == 0) {
+                    action.accept(data);
                     addCacheVideoJobStatus(videoJobId, null, null, MediaJobStatus.COMPLETED);
-                if (exit == 0)
-                    OSUtil.writeTextToTempFile(videoMasterFilePath.replaceFirst("/chunks/", ""), List.of("#EXT-X-ENDLIST"), false);
+                }
                 else {
                     addCacheVideoJobStatus(videoJobId, null, null, MediaJobStatus.FAILED);
                     logs.forEach(System.out::println);
@@ -343,6 +387,8 @@ public class VideoService extends MediaService implements ResourceCleanable {
                 workerRedisService.updateStatus(videoJobId, MediaJobStatus.COMPLETED.name());
                 workerRedisService.releaseToken(tokenKey);
             } catch (Exception e) {
+                System.err.println(e.getMessage());
+                e.printStackTrace();
                 throw new RuntimeException(e);
             }
         });

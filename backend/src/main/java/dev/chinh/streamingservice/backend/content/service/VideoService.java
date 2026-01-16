@@ -2,14 +2,21 @@ package dev.chinh.streamingservice.backend.content.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.backend.MediaMapper;
+import dev.chinh.streamingservice.common.OSUtil;
+import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.constant.Resolution;
 import dev.chinh.streamingservice.backend.search.service.MediaSearchCacheService;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
+import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import dev.chinh.streamingservice.persistence.entity.MediaDescription;
 import dev.chinh.streamingservice.persistence.repository.MediaMetaDataRepository;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Arrays;
+import java.util.UUID;
 
 @Service
 public class VideoService extends MediaService {
@@ -30,10 +37,22 @@ public class VideoService extends MediaService {
         return minIOService.getRedirectObjectUrl(mediaDescription.getBucket(), mediaDescription.getPath());
     }
 
+    @Transactional
     public String getPreviewVideoUrl(long videoId) throws Exception {
+        MediaDescription mediaDescription = getMediaDescription(videoId);
+        if (mediaDescription.getPreview() != null) {
+            return minIOService.getObjectUrl(ContentMetaData.PREVIEW, mediaDescription.getPreview());
+        }
         String cacheJobId = getCachePreviewJobId(videoId);
         addCacheVideoLastAccess(cacheJobId, null);
-        return addJobToFfmpegQueue(ffmpegQueueKey, cacheJobId, getMediaJobDescription(videoId, cacheJobId, null, "preview"));
+        String previewName = OSUtil.normalizePath(mediaDescription.getParentPath(), (mediaDescription.getId() + "_" + UUID.randomUUID() + "_preview.mp4"));
+        MediaJobDescription jobDescription = getMediaJobDescription(videoId, cacheJobId, null, "preview");
+        jobDescription.setPreview(previewName);
+        String status = addJobToFfmpegQueue(ffmpegQueueKey, cacheJobId, jobDescription);
+        if (Arrays.stream(MediaJobStatus.values()).noneMatch(s -> s.name().equals(status))) {
+            mediaRepository.updateMediaPreview(mediaDescription.getId(), previewName);
+        }
+        return status;
     }
 
     public String getPartialVideoUrl(long videoId, Resolution res) throws Exception {

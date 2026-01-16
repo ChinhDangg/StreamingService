@@ -25,7 +25,7 @@ public abstract class MediaService {
     private final RedisTemplate<String, String> redisStringTemplate;
     protected final ObjectMapper objectMapper;
     protected final MediaMapper mediaMapper;
-    private final MediaMetaDataRepository mediaRepository;
+    protected final MediaMetaDataRepository mediaRepository;
     protected final MinIOService minIOService;
     protected final MediaSearchCacheService mediaSearchCacheService;
 

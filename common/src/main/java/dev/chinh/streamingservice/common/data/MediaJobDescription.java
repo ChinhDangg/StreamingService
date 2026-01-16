@@ -34,5 +34,7 @@ public class MediaJobDescription {
     private int height;
     @JsonProperty(ContentMetaData.SIZE)
     private long size;
+    @JsonProperty(ContentMetaData.PREVIEW)
+    private String preview;
 }
 

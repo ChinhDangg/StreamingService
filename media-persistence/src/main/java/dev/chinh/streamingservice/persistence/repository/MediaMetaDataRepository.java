@@ -115,6 +115,12 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     List<NameEntityDTO> findTagsByMediaId(long mediaId);
 
 
+    @Transactional
+    @Modifying
+    @Query("UPDATE MediaMetaData m SET m.preview = :preview WHERE m.id = :mediaId")
+    int updateMediaPreview(long mediaId, String preview);
+
+
     @Modifying
     @Transactional
     @Query(value = """
