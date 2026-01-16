@@ -129,6 +129,9 @@
       "thumbnail": {
         "type": "text"
       },
+      "preview": {
+        "type": "text"
+      },
       "length": {
         "type": "integer"
       },
