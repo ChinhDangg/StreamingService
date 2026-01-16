@@ -19,5 +19,7 @@ public class AppStartRunner implements ApplicationRunner {
             minIOService.createBucket(ContentMetaData.MEDIA_BUCKET);
         if (!minIOService.bucketExists(ContentMetaData.THUMBNAIL_BUCKET))
             minIOService.createBucket(ContentMetaData.THUMBNAIL_BUCKET);
+        if (!minIOService.bucketExists(ContentMetaData.PREVIEW_BUCKET))
+            minIOService.createBucket(ContentMetaData.PREVIEW_BUCKET);
     }
 }

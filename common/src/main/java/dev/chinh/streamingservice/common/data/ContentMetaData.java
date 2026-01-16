@@ -40,8 +40,9 @@ public class ContentMetaData {
     public static final String NAME = "name";
 
     // Buckets
-    public static final String THUMBNAIL_BUCKET = "thumbnails";
     public static final String MEDIA_BUCKET = "media";
+    public static final String THUMBNAIL_BUCKET = "thumbnails";
+    public static final String PREVIEW_BUCKET = "preview";
 
     // Redis stream key
     public static final String FFMPEG_VIDEO_QUEUE_KEY = "ffmpeg_video_stream";
