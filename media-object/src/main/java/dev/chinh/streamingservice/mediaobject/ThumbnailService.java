@@ -26,7 +26,7 @@ public class ThumbnailService {
     private static final String defaultVidPath = "vid";
     private static final String defaultAlbumPath = "album";
 
-    public String generateThumbnailFromVideo(long mediaId, String bucket, String objectName, double videoLength) throws Exception {
+    public String generateThumbnailFromVideo(long mediaId, String bucket, String objectName, double videoLength, Double timeInSeconds) throws Exception {
         String thumbnailObjectBasePath = (objectName.startsWith(defaultVidPath) ? "" : (defaultVidPath + "/")) +
                 objectName.substring(0, objectName.lastIndexOf("/"));
         String thumbnailName = mediaId + "_" + UUID.randomUUID() + "_thumb.jpg";
@@ -37,13 +37,16 @@ public class ThumbnailService {
                 thumbnailName);
 
         String videoInput = minIOService.getObjectUrlForContainer(bucket, objectName);
-        videoLength = videoLength < 0.5 ? 0 : videoLength > 2 ? 2 : 0.5;
+        timeInSeconds = timeInSeconds == null ? (videoLength < 0.5 ? 0 : videoLength > 2 ? 2 : 0.5) : timeInSeconds;
+        if (timeInSeconds >= videoLength) {
+            timeInSeconds = videoLength - 1;
+        }
 
         List<String> command = Arrays.asList(
                 "docker", "exec", "ffmpeg",
                 "ffmpeg",
                 "-v", "error",
-                "-ss", String.valueOf(videoLength), // Seek before input (Fast Seek)
+                "-ss", String.valueOf(timeInSeconds), // Seek before input (Fast Seek)
                 "-i", videoInput,
                 "-frames:v", "1",              // Stop after 1 frame
                 "-q:v", "2",
