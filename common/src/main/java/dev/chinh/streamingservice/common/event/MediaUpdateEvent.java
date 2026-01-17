@@ -67,6 +67,12 @@ public interface MediaUpdateEvent {
             MediaCreated mediaCreatedEvent
     ) implements MediaUpdateEvent {}
 
+    record MediaThumbnailUpdated(
+            long mediaId,
+            MediaType mediaType,
+            int num
+    ) implements MediaUpdateEvent {}
+
     // for backup
     record MediaBackupCreated(
             String bucket,

@@ -1,9 +1,12 @@
 package dev.chinh.streamingservice.mediaupload.modify.controller;
 
+import dev.chinh.streamingservice.mediaupload.modify.dto.MediaUpdateThumbnailRequest;
 import dev.chinh.streamingservice.mediaupload.modify.service.MediaMetadataModifyService;
 import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -36,6 +39,13 @@ public class MediaMetadataModifyController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteMedia(@PathVariable long id) {
         mediaMetadataModifyService.deleteMedia(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping(value = "/thumbnail/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Void> updateMediaThumbnail(@PathVariable long id,
+                                                     @Valid @ModelAttribute MediaUpdateThumbnailRequest request) throws Exception {
+        mediaMetadataModifyService.updateMediaThumbnail(id, request.getNum(), request.getThumbnail());
         return ResponseEntity.ok().build();
     }
 

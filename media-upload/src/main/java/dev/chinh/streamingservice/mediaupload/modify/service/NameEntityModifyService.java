@@ -3,7 +3,7 @@ package dev.chinh.streamingservice.mediaupload.modify.service;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
-import dev.chinh.streamingservice.mediaupload.modify.NameAndThumbnailPostRequest;
+import dev.chinh.streamingservice.mediaupload.modify.dto.NameAndThumbnailPostRequest;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.mediaupload.upload.service.MinIOService;
 import dev.chinh.streamingservice.persistence.entity.*;

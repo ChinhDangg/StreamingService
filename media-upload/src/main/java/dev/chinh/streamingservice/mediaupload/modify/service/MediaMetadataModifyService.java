@@ -7,6 +7,7 @@ import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.common.exception.DuplicateEntryException;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaDisplayService;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaSearchCacheService;
+import dev.chinh.streamingservice.mediaupload.upload.service.MinIOService;
 import dev.chinh.streamingservice.persistence.entity.MediaGroupMetaData;
 import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
 import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
@@ -17,6 +18,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +33,7 @@ public class MediaMetadataModifyService {
     private final MediaSearchCacheService mediaSearchCacheService;
     private final NameEntityModifyService nameEntityModifyService;
     private final MediaDisplayService mediaDisplayService;
+    private final MinIOService minIOService;
 
     private final ApplicationEventPublisher eventPublisher;
 
@@ -186,5 +189,28 @@ public class MediaMetadataModifyService {
             mediaSearchCacheService.removeCachedMediaSearchItem(grouperMediaId);
         }
         mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
+    }
+
+    private MediaMetaData getMediaMetaData(long mediaId) {
+        return mediaMetaDataRepository.findById(mediaId).orElseThrow(
+                () -> new IllegalArgumentException("Media not found: " + mediaId)
+        );
+    }
+
+    public void updateMediaThumbnail(long mediaId, Integer num, MultipartFile multipartFile) throws Exception {
+        boolean hasFile = multipartFile != null && multipartFile.getSize() > 0;
+        if (!hasFile && num == null) {
+            throw new IllegalArgumentException("Thumbnail file is empty and no thumbnail number provided");
+        }
+        MediaMetaData mediaMetaData = getMediaMetaData(mediaId);
+        MediaType mediaType = mediaMetaData.getMediaType();
+        if (hasFile) {
+            minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, mediaMetaData.getThumbnail(), multipartFile);
+        } else if (mediaType == MediaType.VIDEO || mediaType == MediaType.ALBUM) {
+            if (num < 0 || num >= mediaMetaData.getLength()) {
+                throw new IllegalArgumentException("Invalid thumbnail number: " + num);
+            }
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaThumbnailUpdated(mediaMetaData.getId(), mediaType, num));
+        }
     }
 }

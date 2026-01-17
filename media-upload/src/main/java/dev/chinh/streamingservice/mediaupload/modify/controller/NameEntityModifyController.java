@@ -1,6 +1,6 @@
 package dev.chinh.streamingservice.mediaupload.modify.controller;
 
-import dev.chinh.streamingservice.mediaupload.modify.NameAndThumbnailPostRequest;
+import dev.chinh.streamingservice.mediaupload.modify.dto.NameAndThumbnailPostRequest;
 import dev.chinh.streamingservice.mediaupload.modify.service.NameEntityModifyService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
