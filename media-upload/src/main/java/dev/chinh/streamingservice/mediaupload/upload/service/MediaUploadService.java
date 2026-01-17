@@ -11,6 +11,7 @@ import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.mediaupload.MediaBasicInfo;
 import dev.chinh.streamingservice.mediaupload.event.config.KafkaRedPandaConfig;
+import dev.chinh.streamingservice.mediaupload.validation.FileSystemValidator;
 import dev.chinh.streamingservice.persistence.entity.*;
 import dev.chinh.streamingservice.persistence.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -54,9 +55,6 @@ public class MediaUploadService {
         if (mediaType == MediaType.VIDEO && MediaType.detectMediaType(validatedObject) != MediaType.VIDEO) {
             throw new IllegalArgumentException("Invalid video type: " + validatedObject);
         }
-        else if (mediaType == MediaType.ALBUM && !isValidDirectoryPath(validatedObject)) {
-            throw new IllegalArgumentException("Album must be a valid directory path");
-        }
 
         return addCacheMediaUploadRequest(mediaType, validatedObject);
     }
@@ -85,12 +83,19 @@ public class MediaUploadService {
     }
 
     public String generatePresignedPartUrl(String sessionId, String uploadId, String object, int partNumber) {
+        var uploadRequest = getCachedMediaUploadRequest(sessionId);
+        if (uploadRequest == null) {
+            throw new IllegalArgumentException("Invalid session ID: " + sessionId);
+        }
+
         MediaType mediaType = getCachedFileUploadRequest(sessionId, uploadId);
         if (mediaType == null) {
             throw new IllegalArgumentException("Upload ID not found: " + uploadId);
         }
         String validatedObject = validateObject(object, mediaType);
         validateObjectWithMediaType(validatedObject, mediaType);
+
+        validateMediaSessionInfoWithRequest(uploadRequest, validatedObject, mediaType);
 
         addUploadSessionCacheLastAccess(sessionId, uploadSessionTimeout);
 
@@ -366,46 +371,14 @@ public class MediaUploadService {
     }
 
     private String validateObject(String object, MediaType mediaType) {
-        if (object == null) {
-            throw new IllegalArgumentException("Object name must not be null");
-        }
-
-        object = object.trim();
-
-        // Normalize separators
-        object = object.replace("\\", "/");
-
-        // Collapse multiple slashes
-        object = object.replaceAll("/+", "/");
-
-        // Remove trailing slash unless root
-        if (object.endsWith("/") && object.length() > 1) {
-            object = object.substring(0, object.length() - 1);
-        }
-
-        if (object.isBlank()) {
-            throw new IllegalArgumentException("Object name must not be empty");
-        }
-
-        // Block directory traversal
-        if (object.contains("..")) {
-            throw new IllegalArgumentException("Parent directory reference '..' is not allowed");
-        }
-
-        // KEEP:
-        // - Unicode letters
-        // - Numbers
-        // - underscore, hyphen, dot, slash
-        // REMOVE everything else
-        object = object.replaceAll("[^\\p{L}0-9._/-]", "");
-
-        if (object.isBlank()) {
-            throw new IllegalArgumentException("Object name is blank after sanitization");
+        String error = FileSystemValidator.isValidPath(object);
+        if (error != null) {
+            throw new IllegalArgumentException(error);
         }
 
         if (mediaType == MediaType.VIDEO) {
             int pathIndex = object.lastIndexOf("/");
-            if (pathIndex == -1) { // no base dir for vid, seem to vid folder - later save to user path or whatever
+            if (pathIndex == -1) { // no base dir for vid, set to vid folder - later save to user path or whatever
                 object = OSUtil.normalizePath(defaultVidPath, object);
             }
         }
@@ -416,46 +389,10 @@ public class MediaUploadService {
     private void validateObjectWithMediaType(String object, MediaType mediaType) {
         MediaType detectedType = MediaType.detectMediaType(object);
         if (detectedType == MediaType.OTHER) {
-            throw new IllegalArgumentException("Invalid file type: " + object);
+            throw new IllegalArgumentException("Invalid support file type: " + object);
         }
         if (mediaType == MediaType.VIDEO && detectedType != MediaType.VIDEO) {
             throw new IllegalArgumentException("Invalid video type: " + object);
         }
-    }
-
-    public boolean isValidDirectoryPath(String path) {
-        if (path == null) return false;
-
-        // Trim whitespace
-        path = path.trim();
-
-        // Normalize slashes
-        path = path.replace("\\", "/");
-
-        // Cannot start or end with '/'
-        if (path.startsWith("/") || path.endsWith("/")) {
-            return false;
-        }
-
-        // Split into segments
-        String[] segments = path.split("/");
-
-//        // Regex: allow unicode letters, digits, underscores, hyphens, spaces
-//        // NO filesystem-reserved characters
-//        String allowed = "^[\\p{L}\\p{N}_\\- ]+$";
-
-        for (String segment : segments) {
-            // Empty segments = invalid ("dir1//dir2")
-            if (segment.isBlank()) {
-                return false;
-            }
-
-//            // Validate each directory name
-//            if (!segment.matches(allowed)) {
-//                return false;
-//            }
-        }
-
-        return true;
     }
 }
