@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.mediaupload.modify.dto;
 
+import dev.chinh.streamingservice.mediaupload.validation.ValidImage;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -11,8 +12,10 @@ import org.springframework.web.multipart.MultipartFile;
 @AllArgsConstructor
 @NoArgsConstructor
 public class NameAndThumbnailPostRequest {
+
     @NotBlank
     private String name;
-    @NotNull
+
+    @NotNull @ValidImage
     private MultipartFile thumbnail;
 }
