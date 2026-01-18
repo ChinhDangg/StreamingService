@@ -70,17 +70,21 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
         AND length > 0
         RETURNING length
     """, nativeQuery = true)
-    Integer decrementLengthReturning(@Param("id") Long id);
+    Integer decrementLengthReturning(@Param("id") long id);
 
 
     @Query("SELECT m.title FROM MediaMetaData m WHERE m.id = :id")
-    String getMediaTitle(@Param("id") Long id);
+    String getMediaTitle(@Param("id") long id);
 
     @Modifying
     @Transactional
     @Query("UPDATE MediaMetaData m SET m.title = :title WHERE m.id = :id")
     int updateMediaTitle(Long id, String title);
 
+    @Modifying
+    @Transactional
+    @Query("UPDATE MediaMetaData m SET m.thumbnail = :thumbnail WHERE m.id = :id")
+    int updateMediaThumbnail(long id, String thumbnail);
 
     @Query("""
         SELECT new dev.chinh.streamingservice.persistence.projection.NameEntityDTO(a.id, a.name)
