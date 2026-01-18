@@ -2,6 +2,7 @@ package dev.chinh.streamingservice.mediabackup;
 
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.mediabackup.config.KafkaRedPandaConfig;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.InputStream;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -50,6 +52,9 @@ public class MediaBackupEventConsumer {
                     Files.createDirectories(parentPath);
 
                 Files.copy(inputStream, targetPath);
+            } catch (FileAlreadyExistsException e) {
+                System.err.println("File already exists: " + event.path());
+                // do nothing - just log
             } catch (Exception e) {
                 System.err.println("Failed to back up video: " + event.path());
                 throw e;
@@ -62,6 +67,24 @@ public class MediaBackupEventConsumer {
                 System.err.println("Failed to backup album: " + event.path());
                 throw e;
             }
+        } else {
+            System.err.println("Unknown media type: " + event.mediaType());
+        }
+
+        try (InputStream inputStream = minIOService.getFile(ContentMetaData.THUMBNAIL_BUCKET, event.thumbnail())){
+            String thumbnail = OSUtil.normalizePath(MEDIA_BACKUP_PATH + "/" + ContentMetaData.THUMBNAIL_BUCKET, event.thumbnail());
+            Path thumbnailPath = Paths.get(thumbnail);
+
+            Path parentPath = thumbnailPath.getParent();
+            if (parentPath != null && !Files.exists(parentPath))
+                Files.createDirectories(parentPath);
+
+            Files.copy(inputStream, thumbnailPath);
+        } catch (FileAlreadyExistsException e) {
+            System.err.println("File already exists: " + event.thumbnail());
+        } catch (Exception e) {
+            System.err.println("Failed to back up thumbnail: " + event.thumbnail());
+            throw e;
         }
     }
 
@@ -77,6 +100,9 @@ public class MediaBackupEventConsumer {
                     Files.createDirectories(parentPath);
 
                 Files.copy(inputStream, targetPath);
+            } catch (FileAlreadyExistsException e) {
+                System.err.println("File already exists: " + e.getMessage());
+                // do nothing - skip - just log
             }
         }
     }
@@ -121,6 +147,7 @@ public class MediaBackupEventConsumer {
         } else {
             System.err.println("Unknown media type: " + event.mediaType());
         }
+        Files.deleteIfExists(Path.of(OSUtil.normalizePath(MEDIA_BACKUP_PATH + "/" + ContentMetaData.THUMBNAIL_BUCKET, event.thumbnail())));
     }
 
 

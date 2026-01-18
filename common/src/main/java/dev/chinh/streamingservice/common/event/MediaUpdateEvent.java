@@ -12,7 +12,8 @@ public interface MediaUpdateEvent {
             MediaType mediaType,
             String bucket,
             String path,
-            String absolutePath
+            String absolutePath,
+            String thumbnail
     ) implements MediaUpdateEvent{}
 
     // search, object, and backup listener

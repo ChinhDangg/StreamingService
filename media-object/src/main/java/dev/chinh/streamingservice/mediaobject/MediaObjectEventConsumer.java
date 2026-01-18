@@ -156,7 +156,8 @@ public class MediaObjectEventConsumer {
                         event.mediaType(),
                         mediaMetaData.getBucket(),
                         mediaMetaData.getPath(),
-                        mediaMetaData.getAbsoluteFilePath()
+                        mediaMetaData.getAbsoluteFilePath(),
+                        mediaMetaData.getThumbnail()
                 ));
             }
         } catch (Exception e) {
