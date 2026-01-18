@@ -18,10 +18,10 @@ public class AppStartRunner implements ApplicationRunner {
     private String backupEnabled;
 
     @Override
-    public void run(ApplicationArguments args) throws Exception {
+    public void run(ApplicationArguments args) {
         if (!Boolean.parseBoolean(backupEnabled)) {
-            System.out.println("Media backup is disabled. Exiting.");
-            System.exit(1);
+            System.out.println("Media backup is disabled.");
+            return;
         }
 
         if (Files.notExists(Paths.get(backupPath))) {
