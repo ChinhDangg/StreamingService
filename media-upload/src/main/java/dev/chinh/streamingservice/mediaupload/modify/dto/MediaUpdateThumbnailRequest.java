@@ -13,7 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 @NoArgsConstructor
 public class MediaUpdateThumbnailRequest {
 
-    private Integer num;
+    private Double num;
 
     @ValidImage
     private MultipartFile thumbnail;
