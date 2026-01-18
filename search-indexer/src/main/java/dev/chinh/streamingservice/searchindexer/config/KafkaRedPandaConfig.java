@@ -32,8 +32,6 @@ public class KafkaRedPandaConfig {
 
     public static final String MEDIA_GROUP_ID = "media-search-indexer-service";
 
-    public static final String MEDIA_SEARCH_TOPIC = "media-search-events";
-
     @Bean
     public DefaultKafkaConsumerFactory<String, MediaUpdateEvent> consumerFactory() {
         Map<String, Object> props = new HashMap<>();

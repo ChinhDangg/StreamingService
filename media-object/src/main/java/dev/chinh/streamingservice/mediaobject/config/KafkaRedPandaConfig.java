@@ -31,8 +31,6 @@ public class KafkaRedPandaConfig {
 
     public static final String MEDIA_GROUP_ID = "media-object-service";
 
-    public static final String MEDIA_OBJECT_TOPIC = "media-object-events";
-
     @Bean
     public ConsumerFactory<String, MediaUpdateEvent> consumerFactory() {
         Map<String, Object> props = new HashMap<>();
