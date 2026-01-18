@@ -14,7 +14,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -23,14 +22,10 @@ public class ThumbnailService {
     private final MinIOService minIOService;
 
     private static final String diskDir = "disk";
-    private static final String defaultVidPath = "vid";
-    private static final String defaultAlbumPath = "album";
 
-    public String generateThumbnailFromVideo(long mediaId, String bucket, String objectName, double videoLength, Double timeInSeconds) throws Exception {
-        String thumbnailObjectBasePath = (objectName.startsWith(defaultVidPath) ? "" : (defaultVidPath + "/")) +
-                objectName.substring(0, objectName.lastIndexOf("/"));
-        String thumbnailName = mediaId + "_" + UUID.randomUUID() + "_thumb.jpg";
-        String thumbnailObject = OSUtil.normalizePath(thumbnailObjectBasePath, thumbnailName);
+    public String generateThumbnailFromVideo(String bucket, String objectName, String thumbnailObject, double videoLength, Double timeInSeconds) throws Exception {
+        String thumbnailObjectBasePath = thumbnailObject.substring(0, objectName.lastIndexOf("/"));
+        String thumbnailName = thumbnailObject.substring(thumbnailObject.lastIndexOf("/") + 1);
 
         String thumbnailOutput = OSUtil.normalizePath(
                 OSUtil.createDirInRAMDiskElseDisk(diskDir, OSUtil.normalizePath("thumbnail", thumbnailObjectBasePath)),
@@ -96,9 +91,7 @@ public class ThumbnailService {
         return logs;
     }
 
-    public String copyAlbumObjectToThumbnailBucket(long mediaId, String sourceBucket, String sourceObject) throws Exception {
-        String thumbnailObject = defaultAlbumPath + "/" + sourceObject.substring(0, sourceObject.lastIndexOf("/"))
-                + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb.jpg";
+    public String copyAlbumObjectToThumbnailBucket(String sourceBucket, String sourceObject, String thumbnailObject) throws Exception {
         minIOService.copyObjectToAnotherBucket(sourceBucket, sourceObject, ContentMetaData.THUMBNAIL_BUCKET, thumbnailObject);
         return thumbnailObject;
     }

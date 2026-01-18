@@ -43,12 +43,11 @@ public class MediaUploadService {
     private final MediaMetaDataRepository mediaRepository;
     private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
 
-    private final String mediaBucket = ContentMetaData.MEDIA_BUCKET;
-    public static final String defaultVidPath = "vid";
     private final Duration uploadSessionTimeout = Duration.ofHours(1);
-
-    @Value("${backup.enabled}")
-    private String backupEnabled;
+    private final String mediaBucket = ContentMetaData.MEDIA_BUCKET;
+    private static final String defaultVidPath = "vid";
+    private static final String defaultAlbumPath = "album";
+    private static final String defaultGrouperPath = "grouper";
 
     public String initiateMediaUploadRequest(String objectName, MediaType mediaType) {
         String validatedObject = validateObject(objectName, mediaType);
@@ -136,7 +135,7 @@ public class MediaUploadService {
 
         String extension = basicInfo.getThumbnail().getOriginalFilename() == null ? ".jpg"
                 : basicInfo.getThumbnail().getOriginalFilename().substring(basicInfo.getThumbnail().getOriginalFilename().lastIndexOf("."));
-        String path = "grouper/" + mediaMetaData.getUploadDate() + "_" + validateObject(basicInfo.getTitle(), MediaType.ALBUM) + extension;
+        String path = defaultGrouperPath + "/" + mediaMetaData.getUploadDate() + "_" + UUID.randomUUID() + extension;
 
         try {
             minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, path, basicInfo.getThumbnail());
@@ -149,10 +148,7 @@ public class MediaUploadService {
             MediaMetaData saved = mediaRepository.save(mediaMetaData);
             long savedId = saved.getId();
 
-            MediaUpdateEvent.MediaCreated mediaCreatedEvent = new MediaUpdateEvent.MediaCreated(savedId, true);
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaUpdateEnrichment(savedId, MediaType.GROUPER, KafkaRedPandaConfig.MEDIA_SEARCH_TOPIC, mediaCreatedEvent));
-
-            eventPublisher.publishEvent(mediaCreatedEvent);
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaUpdateEnrichment(savedId, MediaType.GROUPER, createMediaThumbnailString(MediaType.GROUPER, savedId, path)));
 
             return savedId;
         } catch (Exception e) {
@@ -216,12 +212,9 @@ public class MediaUploadService {
 
         Long savedId = mediaRepository.save(mediaMetaData).getId();
 
-        eventPublisher.publishEvent(new MediaUpdateEvent.MediaUpdateEnrichment(savedId, MediaType.ALBUM, null, null));
+        eventPublisher.publishEvent(new MediaUpdateEvent.MediaUpdateEnrichment(savedId, MediaType.ALBUM, null));
 
         eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMedia.getId(), updatedLength));
-
-        if (Boolean.parseBoolean(backupEnabled))
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaBackupCreated(mediaBucket, mediaMetaData.getPath(), mediaMetaData.getAbsoluteFilePath(), upload.mediaType));
 
         mediaSearchCacheService.removeCachedMediaSearchItem(grouperMedia.getId());
         mediaDisplayService.removeCacheGroupOfMedia(grouperMedia.getId());
@@ -266,17 +259,29 @@ public class MediaUploadService {
         MediaMetaData saved = mediaRepository.save(mediaMetaData);
         long savedId = saved.getId();
 
-        MediaUpdateEvent.MediaCreated mediaCreatedEvent = new MediaUpdateEvent.MediaCreated(savedId, false);
-        eventPublisher.publishEvent(new MediaUpdateEvent.MediaUpdateEnrichment(savedId, upload.mediaType, KafkaRedPandaConfig.MEDIA_SEARCH_TOPIC, mediaCreatedEvent));
+        String thumbnailObject = createMediaThumbnailString(upload.mediaType, savedId, mediaMetaData.getPath());
 
-        eventPublisher.publishEvent(mediaCreatedEvent);
-
-        if (Boolean.parseBoolean(backupEnabled))
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaBackupCreated(mediaBucket, mediaMetaData.getPath(), mediaMetaData.getAbsoluteFilePath(), upload.mediaType));
+        eventPublisher.publishEvent(new MediaUpdateEvent.MediaUpdateEnrichment(savedId, upload.mediaType, thumbnailObject));
 
         removeCacheMediaSessionRequest(sessionId);
 
         return savedId;
+    }
+
+    public static String createMediaThumbnailString(MediaType mediaType, long mediaId, String objectName) {
+        if (mediaType == MediaType.VIDEO) {
+            String thumbnailObjectBasePath = (objectName.startsWith(defaultVidPath) ? "" : (defaultVidPath + "/")) +
+                    objectName.substring(0, objectName.lastIndexOf("/"));
+            String thumbnailName = mediaId + "_" + UUID.randomUUID() + "_thumb.jpg";
+            return OSUtil.normalizePath(thumbnailObjectBasePath, thumbnailName);
+        } else if (mediaType == MediaType.ALBUM) {
+            return defaultAlbumPath + "/" + objectName.substring(0, objectName.lastIndexOf("/"))
+                    + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb.jpg";
+        } else if (mediaType == MediaType.GROUPER) {
+            String extension = objectName == null ? ".jpg" : objectName.substring(objectName.lastIndexOf("."));
+            return defaultGrouperPath + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb" + extension;
+        }
+        return null;
     }
 
     private void completeUpload(String sessionId) throws JsonProcessingException {

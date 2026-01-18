@@ -6,16 +6,40 @@ import dev.chinh.streamingservice.common.constant.MediaType;
 
 public interface MediaUpdateEvent {
 
-    // for search
+    // search and backup listener
+    record MediaCreated(
+            long mediaId,
+            MediaType mediaType,
+            String bucket,
+            String path,
+            String absolutePath
+    ) implements MediaUpdateEvent{}
+
+    // search, object, and backup listener
+    record MediaDeleted(
+            long mediaId,
+            String bucket,
+            String path,
+            boolean hasThumbnail,
+            String thumbnail,
+            MediaType mediaType,
+            String absolutePath
+    ) implements MediaUpdateEvent{}
+
+    // search and object listener
+    record MediaThumbnailUpdated(
+            long mediaId,
+            MediaType mediaType,
+            double num,
+            String thumbnailObject
+    ) implements MediaUpdateEvent {}
+
+
+    // for search only
     record LengthUpdated(
             long mediaId,
             Integer newLength
     ) implements MediaUpdateEvent {}
-
-    record MediaCreated(
-            long mediaId,
-            boolean isGrouper
-    ) implements MediaUpdateEvent{}
 
     record MediaNameEntityUpdated(
             long mediaId,
@@ -25,11 +49,6 @@ public interface MediaUpdateEvent {
     record MediaTitleUpdated(
             long mediaId
     ) implements MediaUpdateEvent{}
-
-    record MediaDeleted(
-            long mediaId
-    ) implements MediaUpdateEvent{}
-
 
     record NameEntityCreated(
             MediaNameEntityConstant nameEntityConstant,
@@ -48,41 +67,13 @@ public interface MediaUpdateEvent {
 
 
     // for object
-    record MediaObjectDeleted(
-            String bucket,
-            String path,
-            boolean hasThumbnail,
-            String thumbnail,
-            MediaType mediaType
-    ) implements MediaUpdateEvent {}
-
-    record ThumbnailObjectDeleted(
-            String path
-    ) implements MediaUpdateEvent {}
-
     record MediaUpdateEnrichment(
             long mediaId,
             MediaType mediaType,
-            String mediaSearchTopic,
-            MediaCreated mediaCreatedEvent
+            String thumbnailObject
     ) implements MediaUpdateEvent {}
 
-    record MediaThumbnailUpdated(
-            long mediaId,
-            MediaType mediaType,
-            int num
-    ) implements MediaUpdateEvent {}
-
-    // for backup
-    record MediaBackupCreated(
-            String bucket,
-            String path,
-            String absolutePath,
-            MediaType mediaType
-    ) implements MediaUpdateEvent {}
-
-    record MediaBackupDeleted(
-            String absolutePath,
-            MediaType mediaType
+    record ThumbnailDeleted(
+            String path
     ) implements MediaUpdateEvent {}
 }

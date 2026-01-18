@@ -1,7 +1,9 @@
 package dev.chinh.streamingservice.searchindexer;
 
 import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
+import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
+import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.persistence.projection.MediaGroupInfo;
 import dev.chinh.streamingservice.persistence.projection.MediaSearchItem;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
@@ -33,7 +35,7 @@ public class MediaSearchEventConsumer {
     private final OpenSearchService openSearchService;
     private final MediaMapper mediaMapper;
 
-    private void onUpdateLengthOpenSearch(MediaUpdateEvent.LengthUpdated event) {
+    private void onUpdateLengthSearch(MediaUpdateEvent.LengthUpdated event) {
         System.out.println("Received update length event: " + event.mediaId());
         try {
             openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, event.mediaId(), Map.of(ContentMetaData.LENGTH, event.newLength()));
@@ -42,14 +44,14 @@ public class MediaSearchEventConsumer {
         }
     }
 
-    private void onCreateMediaIndexOpenSearch(MediaUpdateEvent.MediaCreated event) {
+    private void onCreateMediaIndexSearch(MediaUpdateEvent.MediaCreated event) {
         System.out.println("Received new index event: " + event.mediaId());
         Optional<MediaMetaData> mediaMetaData = mediaMetaDataRepository.findByIdWithAllInfo(event.mediaId());
         if (mediaMetaData.isEmpty()) {
             return;
         }
         MediaSearchItem mediaSearchItem = mediaMapper.map(mediaMetaData.get());
-        if (event.isGrouper()) {
+        if (event.mediaType() == MediaType.GROUPER) {
             mediaSearchItem.setMediaGroupInfo(new MediaGroupInfo(mediaMetaData.get().getGrouperId(), -1L));
         }
         try {
@@ -59,7 +61,7 @@ public class MediaSearchEventConsumer {
         }
     }
 
-    private void onDeleteMediaIndexOpenSearch(MediaUpdateEvent.MediaDeleted event) {
+    private void onDeleteMediaIndexSearch(MediaUpdateEvent.MediaDeleted event) {
         System.out.println("Received delete index event: " + event.mediaId());
         try {
             openSearchService.deleteDocument(OpenSearchService.MEDIA_INDEX_NAME, event.mediaId());
@@ -68,7 +70,7 @@ public class MediaSearchEventConsumer {
         }
     }
 
-    private void onUpdateMediaNameEntityOpenSearch(MediaUpdateEvent.MediaNameEntityUpdated event) {
+    private void onUpdateMediaNameEntitySearch(MediaUpdateEvent.MediaNameEntityUpdated event) {
         System.out.println("Received update media name entity event: " + event.mediaId());
         List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(
                 event.mediaId(), event.nameEntityConstant());
@@ -80,7 +82,7 @@ public class MediaSearchEventConsumer {
         }
     }
 
-    private void onUpdateMediaTitleOpenSearch(MediaUpdateEvent.MediaTitleUpdated event) {
+    private void onUpdateMediaTitleSearch(MediaUpdateEvent.MediaTitleUpdated event) {
         System.out.println("Received update media title event: " + event.mediaId());
         String title = mediaMetaDataRepository.getMediaTitle(event.mediaId());
         try {
@@ -90,7 +92,17 @@ public class MediaSearchEventConsumer {
         }
     }
 
-    private void onCreateNameEntityOpenSearch(MediaUpdateEvent.NameEntityCreated event) {
+    private void onUpdateMediaThumbnailSearch(MediaUpdateEvent.MediaThumbnailUpdated event) {
+        System.out.println("Received update media thumbnail event: " + event.mediaId());
+        try {
+            openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, event.mediaId(), Map.of(ContentMetaData.THUMBNAIL, event.thumbnailObject()));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to update OpenSearch index thumbnail field for media " + event.mediaId(), e);
+        }
+    }
+
+
+    private void onCreateNameEntitySearch(MediaUpdateEvent.NameEntityCreated event) {
         System.out.println("Received create name entity");
         String name = getNameEntityName(event.nameEntityConstant(), event.nameEntityId());
         if (name != null) {
@@ -102,7 +114,7 @@ public class MediaSearchEventConsumer {
         }
     }
 
-    private void onUpdateNameEntityOpenSearch(MediaUpdateEvent.NameEntityUpdated event) {
+    private void onUpdateNameEntitySearch(MediaUpdateEvent.NameEntityUpdated event) {
         System.out.println("Received update name entity");
         String name = getNameEntityName(event.nameEntityConstant(), event.nameEntityId());
         if (name != null) {
@@ -121,7 +133,7 @@ public class MediaSearchEventConsumer {
         }
     }
 
-    private void onDeleteNameEntityOpenSearch(MediaUpdateEvent.NameEntityDeleted event) {
+    private void onDeleteNameEntitySearch(MediaUpdateEvent.NameEntityDeleted event) {
         System.out.println("Received delete name entity");
         try {
             openSearchService.deleteDocument(event.nameEntityConstant().getName(), event.nameEntityId());
@@ -149,23 +161,30 @@ public class MediaSearchEventConsumer {
         };
     }
 
-    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_SEARCH_TOPIC, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
-    public void handle(@Payload MediaUpdateEvent event, Acknowledgment acknowledgment) {
+
+    @KafkaListener(topics = {
+            EventTopics.MEDIA_SEARCH_TOPIC,
+            EventTopics.MEDIA_CREATED_TOPIC,
+            EventTopics.MEDIA_DELETED_TOPIC,
+            EventTopics.MEDIA_THUMBNAIL_UPDATED_TOPIC,
+    }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
+    public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) {
         try {
             switch (event) {
-                case MediaUpdateEvent.LengthUpdated e -> onUpdateLengthOpenSearch(e);
-                case MediaUpdateEvent.MediaCreated e -> onCreateMediaIndexOpenSearch(e);
-                case MediaUpdateEvent.MediaDeleted e -> onDeleteMediaIndexOpenSearch(e);
-                case MediaUpdateEvent.MediaNameEntityUpdated e -> onUpdateMediaNameEntityOpenSearch(e);
-                case MediaUpdateEvent.MediaTitleUpdated e -> onUpdateMediaTitleOpenSearch(e);
-                case MediaUpdateEvent.NameEntityCreated e -> onCreateNameEntityOpenSearch(e);
-                case MediaUpdateEvent.NameEntityUpdated e -> onUpdateNameEntityOpenSearch(e);
-                case MediaUpdateEvent.NameEntityDeleted e -> onDeleteNameEntityOpenSearch(e);
+                case MediaUpdateEvent.LengthUpdated e -> onUpdateLengthSearch(e);
+                case MediaUpdateEvent.MediaNameEntityUpdated e -> onUpdateMediaNameEntitySearch(e);
+                case MediaUpdateEvent.MediaTitleUpdated e -> onUpdateMediaTitleSearch(e);
+                case MediaUpdateEvent.NameEntityCreated e -> onCreateNameEntitySearch(e);
+                case MediaUpdateEvent.NameEntityUpdated e -> onUpdateNameEntitySearch(e);
+                case MediaUpdateEvent.NameEntityDeleted e -> onDeleteNameEntitySearch(e);
+                case MediaUpdateEvent.MediaCreated e -> onCreateMediaIndexSearch(e);
+                case MediaUpdateEvent.MediaDeleted e -> onDeleteMediaIndexSearch(e);
+                case MediaUpdateEvent.MediaThumbnailUpdated e -> onUpdateMediaThumbnailSearch(e);
                 default ->
                     // unknown event type → log and skip
-                        System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+                    System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
             }
-            acknowledgment.acknowledge();
+            ack.acknowledge();
         } catch (Exception e) {
             System.err.println(e.getMessage());
             // throwing the exception lets DefaultErrorHandler apply retry + DLQ
@@ -190,8 +209,8 @@ public class MediaSearchEventConsumer {
         switch (event) {
             case MediaUpdateEvent.LengthUpdated(long mediaId, Integer newLength) ->
                     System.out.println("Received update length event: " + mediaId + " newLength: " + newLength);
-            case MediaUpdateEvent.MediaCreated(long mediaId, boolean isGrouper) ->
-                    System.out.println("Received new index event: " + mediaId + " isGrouper: " + isGrouper);
+            case MediaUpdateEvent.MediaCreated e ->
+                    System.out.println("Received new index event: " + e.mediaId() + " type: " + e.mediaType());
             case MediaUpdateEvent.MediaNameEntityUpdated(long mediaId, MediaNameEntityConstant nameEntityConstant) ->
                     System.out.println("Received update media name entity event: " + mediaId + " nameEntityConstant: " + nameEntityConstant);
             case MediaUpdateEvent.MediaTitleUpdated(long mediaId) ->

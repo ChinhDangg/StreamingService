@@ -188,7 +188,7 @@ public class NameEntityModifyService {
 
             if (thumbnailChanged && oldThumbnailPath != null) {
                 try {
-                    eventPublisher.publishEvent(new MediaUpdateEvent.ThumbnailObjectDeleted(oldThumbnailPath));
+                    eventPublisher.publishEvent(new MediaUpdateEvent.ThumbnailDeleted(oldThumbnailPath));
                 } catch (Exception e) {
                     throw new RuntimeException("Failed to publish event clean up old thumbnail file: " + oldThumbnailPath, e);
                 }
@@ -252,7 +252,7 @@ public class NameEntityModifyService {
                         }
                         try {
                             if (nameEntity.getThumbnail() != null)
-                                eventPublisher.publishEvent(new MediaUpdateEvent.ThumbnailObjectDeleted(thumbnailPath));
+                                eventPublisher.publishEvent(new MediaUpdateEvent.ThumbnailDeleted(thumbnailPath));
                         } catch (Exception e) {
                             throw new RuntimeException("Failed to publish event delete thumbnail file: " + thumbnailPath, e);
                         }

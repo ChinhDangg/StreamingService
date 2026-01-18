@@ -2,10 +2,10 @@ package dev.chinh.streamingservice.mediabackup;
 
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
+import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.mediabackup.config.KafkaRedPandaConfig;
 import io.minio.Result;
-import io.minio.errors.*;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.io.FileUtils;
@@ -31,32 +31,38 @@ public class MediaBackupEventConsumer {
     @Value( "${media.backup.path}")
     private String MEDIA_BACKUP_PATH;
 
-    private void onMediaCreateBackup(MediaUpdateEvent.MediaBackupCreated event) throws Exception {
+    @Value("${backup.enabled}")
+    private String backupEnabled;
+
+    private void onMediaCreateBackup(MediaUpdateEvent.MediaCreated event) throws Exception {
+        if (!Boolean.parseBoolean(backupEnabled)) {
+            return;
+        }
         System.out.println("Received media create backup event: " + event.absolutePath());
 
-            if (event.mediaType() == MediaType.VIDEO) {
-                try (InputStream inputStream = minIOService.getFile(event.bucket(), event.path())) {
-                    String target = OSUtil.normalizePath(MEDIA_BACKUP_PATH, event.absolutePath());
-                    Path targetPath = Paths.get(target);
+        if (event.mediaType() == MediaType.VIDEO) {
+            try (InputStream inputStream = minIOService.getFile(event.bucket(), event.path())) {
+                String target = OSUtil.normalizePath(MEDIA_BACKUP_PATH, event.absolutePath());
+                Path targetPath = Paths.get(target);
 
-                    Path parentPath = targetPath.getParent();
-                    if (parentPath != null && !Files.exists(parentPath))
-                        Files.createDirectories(parentPath);
+                Path parentPath = targetPath.getParent();
+                if (parentPath != null && !Files.exists(parentPath))
+                    Files.createDirectories(parentPath);
 
-                    Files.copy(inputStream, targetPath);
-                } catch (Exception e) {
-                    System.err.println("Failed to back up video: " + event.path());
-                    throw e;
-                }
+                Files.copy(inputStream, targetPath);
+            } catch (Exception e) {
+                System.err.println("Failed to back up video: " + event.path());
+                throw e;
             }
-            else if (event.mediaType() == MediaType.ALBUM) {
-                try {
-                    backupAlbum(event.bucket(), event.path(), event.absolutePath());
-                } catch (Exception e) {
-                    System.err.println("Failed to backup album: " + event.path());
-                    throw e;
-                }
+        }
+        else if (event.mediaType() == MediaType.ALBUM) {
+            try {
+                backupAlbum(event.bucket(), event.path(), event.absolutePath());
+            } catch (Exception e) {
+                System.err.println("Failed to backup album: " + event.path());
+                throw e;
             }
+        }
     }
 
     private void backupAlbum(String bucket, String albumPath, String absolutePath) throws Exception {
@@ -101,7 +107,10 @@ public class MediaBackupEventConsumer {
         return absPath.resolve(objPath).toString().replace("\\", "/");
     }
 
-    private void onMediaDeleteBackup(MediaUpdateEvent.MediaBackupDeleted event) throws Exception {
+    private void onMediaDeleteBackup(MediaUpdateEvent.MediaDeleted event) throws Exception {
+        if (!Boolean.parseBoolean(backupEnabled)) {
+            return;
+        }
         System.out.println("Received media delete backup event: " + event.absolutePath());
         Path path = Paths.get(MEDIA_BACKUP_PATH, event.absolutePath());
         if (event.mediaType() == MediaType.VIDEO) {
@@ -114,18 +123,22 @@ public class MediaBackupEventConsumer {
         }
     }
 
-    @KafkaListener(topics = KafkaRedPandaConfig.MEDIA_BACKUP_TOPIC, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
-    public void handle(@Payload MediaUpdateEvent event, Acknowledgment acknowledgment) throws Exception {
+
+    @KafkaListener(topics = {
+            EventTopics.MEDIA_CREATED_TOPIC,
+            EventTopics.MEDIA_DELETED_TOPIC
+    }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
+    public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws Exception {
         try {
-            if (event instanceof MediaUpdateEvent.MediaBackupCreated e) {
+            if (event instanceof MediaUpdateEvent.MediaCreated e) {
                 onMediaCreateBackup(e);
-            } else if (event instanceof MediaUpdateEvent.MediaBackupDeleted e) {
+            } else if (event instanceof MediaUpdateEvent.MediaDeleted e) {
                 onMediaDeleteBackup(e);
             } else {
                 // unknown event type → log and skip
                 System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
             }
-            acknowledgment.acknowledge();
+            ack.acknowledge();
         } catch (Exception e) {
             System.err.println("Failed to handle media backup event: " + event + " " + e.getMessage());
             e.printStackTrace();
@@ -148,9 +161,9 @@ public class MediaBackupEventConsumer {
 
         // Accessing the POJO data directly
         switch (event) {
-            case MediaUpdateEvent.MediaBackupCreated e ->
+            case MediaUpdateEvent.MediaCreated e ->
                     System.out.println("Received media create backup event: " + e.path());
-            case MediaUpdateEvent.MediaBackupDeleted e ->
+            case MediaUpdateEvent.MediaDeleted e ->
                     System.out.println("Received media delete backup event: " + e.absolutePath());
             default -> {
                 System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());

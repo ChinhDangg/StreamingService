@@ -7,6 +7,7 @@ import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.common.exception.DuplicateEntryException;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaDisplayService;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaSearchCacheService;
+import dev.chinh.streamingservice.mediaupload.upload.service.MediaUploadService;
 import dev.chinh.streamingservice.mediaupload.upload.service.MinIOService;
 import dev.chinh.streamingservice.persistence.entity.MediaGroupMetaData;
 import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
@@ -154,32 +155,17 @@ public class MediaMetadataModifyService {
         mediaMetaDataRepository.deleteById(mediaMetaData.getId());
 
         try {
-//            if (mediaMetaData.getMediaType() == MediaType.GROUPER || mediaMetaData.getGrouperId() == null)
-//                // if is a grouper or not part of a grouper, delete the search entry
-//                // parts of a grouper are not individually searchable for now, only the grouper is.
-            // just send delete event to opensearch - if non-exist - no error anyway
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaDeleted(mediaId));
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to publish event delete opensearch index: " + mediaId, e);
-        }
-
-        try {
-            if (mediaMetaData.getMediaType() != MediaType.GROUPER)
-                eventPublisher.publishEvent(new MediaUpdateEvent.MediaBackupDeleted(mediaMetaData.getAbsoluteFilePath(), mediaMetaData.getMediaType()));
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to publish event delete backup file: " + mediaMetaData.getAbsoluteFilePath(), e);
-        }
-
-        try {
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaObjectDeleted(
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaDeleted(
+                    mediaId,
                     mediaMetaData.getBucket(),
                     mediaMetaData.getPath(),
                     mediaMetaData.hasThumbnail(),
                     mediaMetaData.getThumbnail(),
-                    mediaMetaData.getMediaType()
+                    mediaMetaData.getMediaType(),
+                    mediaMetaData.getAbsoluteFilePath()
             ));
         } catch (Exception e) {
-            throw new RuntimeException("Failed to publish event delete media object: " + mediaMetaData.getAbsoluteFilePath(), e);
+            throw new RuntimeException("Failed to publish event delete media: " + mediaId, e);
         }
 
         if (mediaMetaData.getMediaType() == MediaType.GROUPER) {
@@ -197,7 +183,8 @@ public class MediaMetadataModifyService {
         );
     }
 
-    public void updateMediaThumbnail(long mediaId, Integer num, MultipartFile multipartFile) throws Exception {
+    @Transactional(readOnly = true)
+    public void updateMediaThumbnail(long mediaId, Double num, MultipartFile multipartFile) throws Exception {
         boolean hasFile = multipartFile != null && multipartFile.getSize() > 0;
         if (!hasFile && num == null) {
             throw new IllegalArgumentException("Thumbnail file is empty and no thumbnail number provided");
@@ -210,7 +197,13 @@ public class MediaMetadataModifyService {
             if (num < 0 || num >= mediaMetaData.getLength()) {
                 throw new IllegalArgumentException("Invalid thumbnail number: " + num);
             }
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaThumbnailUpdated(mediaMetaData.getId(), mediaType, num));
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaThumbnailUpdated(
+                    mediaMetaData.getId(),
+                    mediaType,
+                    num,
+                    MediaUploadService.createMediaThumbnailString(mediaType, mediaMetaData.getId(), mediaMetaData.getPath())
+            ));
         }
+        mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
     }
 }
