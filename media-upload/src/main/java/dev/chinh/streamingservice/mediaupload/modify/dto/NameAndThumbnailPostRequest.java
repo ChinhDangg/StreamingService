@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.validator.constraints.Length;
 import org.springframework.web.multipart.MultipartFile;
 
 @Data
@@ -13,7 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 @NoArgsConstructor
 public class NameAndThumbnailPostRequest {
 
-    @NotBlank
+    @NotBlank @Length(min = 2, max = 255)
     private String name;
 
     @NotNull @ValidImage
