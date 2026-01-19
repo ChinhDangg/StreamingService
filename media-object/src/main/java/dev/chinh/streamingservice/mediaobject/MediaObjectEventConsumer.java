@@ -58,7 +58,7 @@ public class MediaObjectEventConsumer {
         } else if (mediaType == MediaType.ALBUM) {
             try {
                 String prefix = event.path();
-                // there is no filesystem in object storage, so we need to add the trailing slash to delete the exact path
+                // there is no filesystem in object storage, so we need to add the trailing slash to delete the exact oldThumbnail
                 if (!prefix.endsWith("/"))
                     prefix += "/";
                 Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(event.bucket(), prefix);
@@ -75,16 +75,6 @@ public class MediaObjectEventConsumer {
                 System.err.println("Failed to delete media files in album: " + event.path());
                 throw e;
             }
-        }
-    }
-
-    private void onDeleteThumbnailObject(MediaUpdateEvent.ThumbnailDeleted event) throws Exception {
-        System.out.println("Received thumbnail object delete event: " + event.path());
-        try {
-            minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, event.path());
-        } catch (Exception e) {
-            System.err.println("Failed to delete thumbnail file: " + event.path());
-            throw e;
         }
     }
 
@@ -173,9 +163,10 @@ public class MediaObjectEventConsumer {
                 () -> new IllegalArgumentException("Media not found: " + event.mediaId())
         );
         String oldThumbnail = null;
+        String newThumbnail = null;
         if (event.mediaType() == MediaType.VIDEO) {
             if (event.num() >= 0 && event.num() < mediaMetaData.getLength()) {
-                String newThumbnail = thumbnailService.generateThumbnailFromVideo(
+                newThumbnail = thumbnailService.generateThumbnailFromVideo(
                         mediaMetaData.getBucket(),
                         mediaMetaData.getPath(),
                         event.thumbnailObject(),
@@ -200,7 +191,6 @@ public class MediaObjectEventConsumer {
                 }
                 if (objectAtNum != null) {
                     MediaType mediaType = MediaType.detectMediaType(objectAtNum);
-                    String newThumbnail = null;
                     if (mediaType == MediaType.IMAGE) {
                         newThumbnail = thumbnailService.copyAlbumObjectToThumbnailBucket(mediaMetaData.getBucket(), objectAtNum, event.thumbnailObject());
                     } else if (mediaType == MediaType.VIDEO) {
@@ -215,9 +205,7 @@ public class MediaObjectEventConsumer {
                 }
             }
         }
-        if (oldThumbnail != null) {
-            eventPublisher.publishEvent(new MediaUpdateEvent.ThumbnailDeleted(oldThumbnail));
-        }
+        eventPublisher.publishEvent(new MediaUpdateEvent.ThumbnailUpdated(event.mediaId(), oldThumbnail, newThumbnail));
     }
 
 
@@ -225,8 +213,7 @@ public class MediaObjectEventConsumer {
     @KafkaListener(topics = {
             EventTopics.MEDIA_OBJECT_TOPIC,
             EventTopics.MEDIA_DELETED_TOPIC,
-            EventTopics.MEDIA_THUMBNAIL_UPDATED_TOPIC,
-            EventTopics.THUMBNAIL_DELETED_TOPIC,
+            EventTopics.MEDIA_THUMBNAIL_UPDATED_TOPIC
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws Exception {
         try {
@@ -234,7 +221,6 @@ public class MediaObjectEventConsumer {
                 case MediaUpdateEvent.MediaUpdateEnrichment e -> onUpdateMediaEnrichment(e);
                 case MediaUpdateEvent.MediaDeleted e -> onDeleteMediaObject(e);
                 case MediaUpdateEvent.MediaThumbnailUpdated e -> onUpdateMediaThumbnail(e);
-                case MediaUpdateEvent.ThumbnailDeleted e -> onDeleteThumbnailObject(e);
                 default ->
                     // unknown event type → log and skip
                     System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
@@ -265,8 +251,6 @@ public class MediaObjectEventConsumer {
         switch (event) {
             case MediaUpdateEvent.MediaDeleted e ->
                 System.out.println("Received media object delete event: " + e.mediaType() + " " + e.path());
-            case MediaUpdateEvent.ThumbnailDeleted e ->
-                System.out.println("Received thumbnail object delete event: " + e.path());
             case MediaUpdateEvent.MediaUpdateEnrichment e ->
                 System.out.println("Received media enrichment update event: " + e.mediaId());
             case MediaUpdateEvent.MediaThumbnailUpdated e ->

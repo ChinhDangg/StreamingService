@@ -51,11 +51,6 @@ public class MediaEventProducer {
         kafkaTemplate.send(EventTopics.MEDIA_OBJECT_TOPIC, event);
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void publishDeleteThumbnailObject(MediaUpdateEvent.ThumbnailDeleted event) {
-        kafkaTemplate.send(EventTopics.MEDIA_OBJECT_TOPIC, event);
-    }
-
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publishUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdated event) {

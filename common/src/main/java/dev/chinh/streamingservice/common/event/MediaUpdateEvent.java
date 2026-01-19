@@ -27,7 +27,7 @@ public interface MediaUpdateEvent {
             String absolutePath
     ) implements MediaUpdateEvent{}
 
-    // search and object listener
+    // search, object, and backup listener
     record MediaThumbnailUpdated(
             long mediaId,
             MediaType mediaType,
@@ -74,7 +74,9 @@ public interface MediaUpdateEvent {
             String thumbnailObject
     ) implements MediaUpdateEvent {}
 
-    record ThumbnailDeleted(
-            String path
+    record ThumbnailUpdated(
+            long id,
+            String oldThumbnail,
+            String newThumbnail
     ) implements MediaUpdateEvent {}
 }
