@@ -10,12 +10,10 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.mediaupload.MediaBasicInfo;
-import dev.chinh.streamingservice.mediaupload.event.config.KafkaRedPandaConfig;
 import dev.chinh.streamingservice.mediaupload.validation.FileSystemValidator;
 import dev.chinh.streamingservice.persistence.entity.*;
 import dev.chinh.streamingservice.persistence.repository.*;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -148,7 +146,7 @@ public class MediaUploadService {
             MediaMetaData saved = mediaRepository.save(mediaMetaData);
             long savedId = saved.getId();
 
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaUpdateEnrichment(savedId, MediaType.GROUPER, createMediaThumbnailString(MediaType.GROUPER, savedId, path)));
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, MediaType.GROUPER, createMediaThumbnailString(MediaType.GROUPER, savedId, path)));
 
             return savedId;
         } catch (Exception e) {
@@ -212,7 +210,7 @@ public class MediaUploadService {
 
         Long savedId = mediaRepository.save(mediaMetaData).getId();
 
-        eventPublisher.publishEvent(new MediaUpdateEvent.MediaUpdateEnrichment(savedId, MediaType.ALBUM, null));
+        eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, MediaType.ALBUM, null));
 
         eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMedia.getId(), updatedLength));
 
@@ -261,7 +259,7 @@ public class MediaUploadService {
 
         String thumbnailObject = createMediaThumbnailString(upload.mediaType, savedId, mediaMetaData.getPath());
 
-        eventPublisher.publishEvent(new MediaUpdateEvent.MediaUpdateEnrichment(savedId, upload.mediaType, thumbnailObject));
+        eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, upload.mediaType, thumbnailObject));
 
         removeCacheMediaSessionRequest(sessionId);
 
