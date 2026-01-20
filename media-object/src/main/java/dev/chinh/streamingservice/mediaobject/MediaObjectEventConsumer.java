@@ -46,7 +46,7 @@ public class MediaObjectEventConsumer {
     Logger logger = LoggerFactory.getLogger(MediaObjectEventConsumer.class);
 
     private MediaMetaData getMediaMetadataById(long id) {
-        return mediaMetaDataRepository.findByIdWithAllInfo(id).orElseThrow(
+        return mediaMetaDataRepository.findById(id).orElseThrow(
                 () -> new IllegalArgumentException("Media not found: " + id)
         );
     }
@@ -226,6 +226,9 @@ public class MediaObjectEventConsumer {
                 }
             }
         }
+        if (oldThumbnail != null) {
+            minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, oldThumbnail);
+        }
         eventPublisher.publishEvent(new MediaUpdateEvent.MediaThumbnailUpdatedReady(event.mediaId(), oldThumbnail, newThumbnail));
     }
 
@@ -239,6 +242,7 @@ public class MediaObjectEventConsumer {
                 nameEntityWithThumbnail.setThumbnail(
                         thumbnailService.copyAlbumObjectToThumbnailBucket(ContentMetaData.THUMBNAIL_BUCKET, event.thumbnailObject(), event.thumbnailPath())
                 );
+                minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, event.thumbnailObject());
             }
             eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityCreatedReady(event.nameEntityId(), event.nameEntityConstant(), event.thumbnailPath()));
         } catch (Exception e) {
@@ -253,6 +257,16 @@ public class MediaObjectEventConsumer {
             minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, event.thumbnailPath());
         } catch (Exception e) {
             System.err.println("Failed to delete name entity thumbnail: " + event.nameEntityConstant() + " nameEntityId: " + event.nameEntityId());
+            throw e;
+        }
+    }
+
+    private void onUpdateNameEntityThumbnail(MediaUpdateEvent.NameEntityThumbnailUpdatedReady event) throws Exception {
+        System.out.println("Received update name entity thumbnail: " + event.nameEntityId() + " " + event.nameEntityConstant());
+        try {
+            minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, event.oldThumbnail());
+        } catch (Exception e) {
+            System.err.println("Failed to delete name entity old thumbnail: " + event.oldThumbnail());
             throw e;
         }
     }
@@ -281,6 +295,7 @@ public class MediaObjectEventConsumer {
                 case MediaUpdateEvent.MediaThumbnailUpdated e -> onUpdateMediaThumbnail(e);
                 case MediaUpdateEvent.NameEntityCreated e -> onCreateNameEntity(e);
                 case MediaUpdateEvent.NameEntityDeleted e -> onDeleteNameEntity(e);
+                case MediaUpdateEvent.NameEntityThumbnailUpdatedReady e -> onUpdateNameEntityThumbnail(e);
                 default ->
                     // unknown event type → log and skip
                     System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
