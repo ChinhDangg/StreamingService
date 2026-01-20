@@ -51,7 +51,7 @@ public class KafkaRedPandaConfig {
     @Bean
     public KafkaAdmin.NewTopics mediaTopics() {
         return new KafkaAdmin.NewTopics(
-                TopicBuilder.name(EventTopics.MEDIA_SEARCH_TOPIC)
+                TopicBuilder.name(EventTopics.MEDIA_ALL_TOPIC)
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000") // delete after 7 days // if use for replay then use longer day
@@ -63,25 +63,13 @@ public class KafkaRedPandaConfig {
                         .config("retention.ms", "604800000") // delete after 7 days // if use for replay then use longer day
                         .config("segment.bytes", "100048576")
                         .build(),
-                TopicBuilder.name(EventTopics.MEDIA_CREATED_TOPIC)
+                TopicBuilder.name(EventTopics.MEDIA_SEARCH_TOPIC)
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000")
                         .config("segment.bytes", "100048576")
                         .build(),
-                TopicBuilder.name(EventTopics.MEDIA_DELETED_TOPIC)
-                        .partitions(1)
-                        .replicas(1)
-                        .config("retention.ms", "604800000")
-                        .config("segment.bytes", "100048576")
-                        .build(),
-                TopicBuilder.name(EventTopics.MEDIA_THUMBNAIL_UPDATED_TOPIC)
-                        .partitions(1)
-                        .replicas(1)
-                        .config("retention.ms", "604800000")
-                        .config("segment.bytes", "100048576")
-                        .build(),
-                TopicBuilder.name(EventTopics.THUMBNAIL_UPDATED_TOPIC)
+                TopicBuilder.name(EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC)
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000")

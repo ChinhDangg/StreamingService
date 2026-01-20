@@ -15,18 +15,18 @@ public class MediaEventProducer {
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void publishCreatedMediaEvent(MediaUpdateEvent.MediaCreated event) {
-        kafkaTemplate.send(EventTopics.MEDIA_CREATED_TOPIC, event);
+    public void publishCreatedReadyMediaEvent(MediaUpdateEvent.MediaCreatedReady event) {
+        kafkaTemplate.send(EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC, event);
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void publishUpdatedMediaThumbnailEvent(MediaUpdateEvent.MediaThumbnailUpdated event) {
-        kafkaTemplate.send(EventTopics.MEDIA_THUMBNAIL_UPDATED_TOPIC, event);
+    public void publishUpdatedMediaThumbnailEvent(MediaUpdateEvent.MediaThumbnailUpdatedReady event) {
+        kafkaTemplate.send(EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC, event);
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void publishUpdateThumbnailEvent(MediaUpdateEvent.ThumbnailUpdated event) {
-        kafkaTemplate.send(EventTopics.THUMBNAIL_UPDATED_TOPIC, event);
+    public void publishCreatedReadyNameEntityEvent(MediaUpdateEvent.NameEntityCreatedReady event) {
+        kafkaTemplate.send(EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC, event);
     }
 
 }
