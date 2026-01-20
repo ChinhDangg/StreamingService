@@ -192,7 +192,14 @@ public class MediaMetadataModifyService {
         MediaMetaData mediaMetaData = getMediaMetaData(mediaId);
         MediaType mediaType = mediaMetaData.getMediaType();
         if (hasFile) {
-            minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, mediaMetaData.getThumbnail(), multipartFile);
+            String newThumbnail = MediaUploadService.createMediaThumbnailString(mediaType, mediaMetaData.getId(), mediaMetaData.getPath());
+            minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnail, multipartFile);
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaThumbnailUpdated(
+                    mediaMetaData.getId(),
+                    mediaType,
+                    null,
+                    newThumbnail
+            ));
         } else if (mediaType == MediaType.VIDEO || mediaType == MediaType.ALBUM) {
             if (num < 0 || num >= mediaMetaData.getLength()) {
                 throw new IllegalArgumentException("Invalid thumbnail number: " + num);

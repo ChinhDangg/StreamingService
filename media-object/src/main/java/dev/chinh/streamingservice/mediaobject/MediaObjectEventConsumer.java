@@ -159,9 +159,17 @@ public class MediaObjectEventConsumer {
     @Transactional
     public void onUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdated event) throws Exception {
         System.out.println("Received media thumbnail update event: " + event.mediaId() + " " + event.num());
-        MediaMetaData mediaMetaData = mediaMetaDataRepository.findByIdWithAllInfo(event.mediaId()).orElseThrow(
-                () -> new IllegalArgumentException("Media not found: " + event.mediaId())
-        );
+        MediaMetaData mediaMetaData = getMediaMetadataById(event.mediaId());
+
+        if (event.num() == null) {
+            String oldThumbnail = mediaMetaData.getThumbnail();
+            minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, oldThumbnail);
+            mediaMetaData.setThumbnail(event.thumbnailObject());
+
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaThumbnailUpdatedReady(event.mediaId(), oldThumbnail, event.thumbnailObject()));
+            return;
+        }
+
         String oldThumbnail = null;
         String newThumbnail = null;
         if (event.mediaType() == MediaType.VIDEO) {
