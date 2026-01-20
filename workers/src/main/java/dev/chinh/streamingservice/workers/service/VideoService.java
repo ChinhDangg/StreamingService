@@ -372,9 +372,10 @@ public class VideoService extends MediaService implements ResourceCleanable {
                 System.out.println("ffmpeg video " + videoMasterFilePath + " exited with code " + exit);
                 // mark as completed
                 if (exit == 0) {
-                    System.out.println("here");
                     boolean wrote = OSUtil.writeTextToTempFile(videoMasterFilePath.replaceFirst("/chunks/", ""), List.of("#EXT-X-ENDLIST"), false);
-                    System.out.println(wrote);
+                    if (!wrote) {
+                        System.err.println("Failed to write to file: " + videoMasterFilePath);
+                    }
                 }
                 if (videoJobId != null && exit == 0) {
                     action.accept(data);

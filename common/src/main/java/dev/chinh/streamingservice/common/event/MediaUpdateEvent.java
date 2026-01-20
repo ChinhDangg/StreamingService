@@ -17,6 +17,12 @@ public interface MediaUpdateEvent {
             String absolutePath
     ) implements MediaUpdateEvent{}
 
+    record NameEntityDeleted(
+            MediaNameEntityConstant nameEntityConstant,
+            long nameEntityId,
+            String thumbnailPath
+    ) implements MediaUpdateEvent{}
+
 
     // search and backup listener
     record MediaCreatedReady(
@@ -66,12 +72,6 @@ public interface MediaUpdateEvent {
     record NameEntityUpdated(
             MediaNameEntityConstant nameEntityConstant,
             long nameEntityId
-    ) implements MediaUpdateEvent{}
-
-    record NameEntityDeleted(
-            MediaNameEntityConstant nameEntityConstant,
-            long nameEntityId,
-            String thumbnailPath
     ) implements MediaUpdateEvent{}
 
 
