@@ -28,6 +28,9 @@
         "type": "text",
         "analyzer": "autocomplete",
         "search_analyzer": "autocomplete_search"
+      },
+      "thumbnail": {
+        "type": "text"
       }
     }
   }
