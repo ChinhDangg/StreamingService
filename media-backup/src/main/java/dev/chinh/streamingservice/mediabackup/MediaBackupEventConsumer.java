@@ -37,7 +37,7 @@ public class MediaBackupEventConsumer {
     @Value("${backup.enabled}")
     private String backupEnabled;
 
-    private void onMediaCreateBackup(MediaUpdateEvent.MediaCreated event) throws Exception {
+    private void onMediaCreateBackup(MediaUpdateEvent.MediaCreatedReady event) throws Exception {
         if (!Boolean.parseBoolean(backupEnabled)) {
             return;
         }
@@ -179,31 +179,52 @@ public class MediaBackupEventConsumer {
         }
     }
 
-    private void onThumbnailUpdated(MediaUpdateEvent.ThumbnailUpdated event) throws Exception {
+    private void updateThumbnail(long id, String oldThumbnail, String newThumbnail) throws Exception {
         if (!Boolean.parseBoolean(backupEnabled)) {
             return;
         }
-        System.out.println("Received thumbnail update backup event: " + event.id() + ", old: " + event.oldThumbnail() + ", new: " + event.newThumbnail());
-        if (event.newThumbnail() != null) {
-            createThumbnailBackup(event.newThumbnail());
+        System.out.println("Received thumbnail update backup event: " + id + ", old: " + oldThumbnail + ", new: " + newThumbnail);
+        if (newThumbnail != null) {
+            createThumbnailBackup(newThumbnail);
         }
-        if (event.oldThumbnail() != null) {
-            deleteThumbnailBackup(event.oldThumbnail());
+        if (oldThumbnail != null) {
+            deleteThumbnailBackup(oldThumbnail);
         }
+    }
+
+    private void onUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdatedReady event) throws Exception {
+        updateThumbnail(event.mediaId(), event.oldThumbnail(), event.newThumbnail());
+    }
+
+    private void onUpdateNameEntityThumbnail(MediaUpdateEvent.NameEntityThumbnailUpdatedReady event) throws Exception {
+        updateThumbnail(event.nameEntityId(), event.oldThumbnail(), event.newThumbnail());
+    }
+
+    private void onNameEntityCreated(MediaUpdateEvent.NameEntityCreatedReady event) throws Exception {
+        System.out.println("Received name entity create backup event: " + event.nameEntityId());
+        createThumbnailBackup(event.thumbnailPath());
+    }
+
+    private void onNameEntityDeleted(MediaUpdateEvent.NameEntityDeleted event) {
+        System.out.println("Received name entity delete backup event: " + event.nameEntityId());
+        if (event.thumbnailPath() != null)
+            deleteThumbnailBackup(event.thumbnailPath());
     }
 
 
     @KafkaListener(topics = {
-            EventTopics.MEDIA_CREATED_TOPIC,
-            EventTopics.MEDIA_DELETED_TOPIC,
-            EventTopics.THUMBNAIL_UPDATED_TOPIC
+            EventTopics.MEDIA_ALL_TOPIC,
+            EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws Exception {
         try {
             switch (event) {
-                case MediaUpdateEvent.MediaCreated e -> onMediaCreateBackup(e);
                 case MediaUpdateEvent.MediaDeleted e -> onMediaDeleteBackup(e);
-                case MediaUpdateEvent.ThumbnailUpdated e -> onThumbnailUpdated(e);
+                case MediaUpdateEvent.MediaCreatedReady e -> onMediaCreateBackup(e);
+                case MediaUpdateEvent.MediaThumbnailUpdatedReady e -> onUpdateMediaThumbnail(e);
+                case MediaUpdateEvent.NameEntityCreatedReady e -> onNameEntityCreated(e);
+                case MediaUpdateEvent.NameEntityDeleted e -> onNameEntityDeleted(e);
+                case MediaUpdateEvent.NameEntityThumbnailUpdatedReady e -> onUpdateNameEntityThumbnail(e);
                 default ->
                     // unknown event type → log and skip
                     System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
@@ -231,10 +252,18 @@ public class MediaBackupEventConsumer {
 
         // Accessing the POJO data directly
         switch (event) {
-            case MediaUpdateEvent.MediaCreated e ->
-                    System.out.println("Received media create backup event: " + e.path());
             case MediaUpdateEvent.MediaDeleted e ->
                     System.out.println("Received media delete backup event: " + e.absolutePath());
+            case MediaUpdateEvent.MediaCreatedReady e ->
+                    System.out.println("Received media create backup event: " + e.path());
+            case MediaUpdateEvent.MediaThumbnailUpdatedReady e ->
+                    System.out.println("Received media thumbnail updated backup event: " + e.mediaId() + " old: " + e.oldThumbnail() + " new: " + e.newThumbnail());
+            case MediaUpdateEvent.NameEntityCreatedReady e ->
+                    System.out.println("Received name entity create backup event: " + e.nameEntityId());
+            case MediaUpdateEvent.NameEntityDeleted e ->
+                    System.out.println("Received name entity delete backup event: " + e.nameEntityId());
+            case MediaUpdateEvent.NameEntityThumbnailUpdatedReady e ->
+                System.out.println("Received name entity thumbnail updated backup event: " + e.nameEntityId() + " old: " + e.oldThumbnail() + " new: " + e.newThumbnail());
             default -> {
                 System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
                 ack.acknowledge(); // ack on poison event to skip it

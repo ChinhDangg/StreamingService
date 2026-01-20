@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.mediaobject;
 
+import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
@@ -9,9 +10,12 @@ import dev.chinh.streamingservice.mediaobject.probe.ImageMetadata;
 import dev.chinh.streamingservice.mediaobject.probe.MediaProbe;
 import dev.chinh.streamingservice.mediaobject.probe.VideoMetadata;
 import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
-import dev.chinh.streamingservice.persistence.repository.MediaMetaDataRepository;
+import dev.chinh.streamingservice.persistence.entity.MediaNameEntity;
+import dev.chinh.streamingservice.persistence.entity.MediaNameEntityWithThumbnail;
+import dev.chinh.streamingservice.persistence.repository.*;
 import io.minio.Result;
 import io.minio.messages.Item;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,11 +34,22 @@ public class MediaObjectEventConsumer {
     private final MinIOService minIOService;
     private final MediaProbe mediaProbe;
     private final ThumbnailService thumbnailService;
+
     private final MediaMetaDataRepository mediaMetaDataRepository;
+    private final MediaAuthorRepository mediaAuthorRepository;
+    private final MediaCharacterRepository mediaCharacterRepository;
+    private final MediaUniverseRepository mediaUniverseRepository;
+    private final MediaTagRepository mediaTagRepository;
 
     private final ApplicationEventPublisher eventPublisher;
 
     Logger logger = LoggerFactory.getLogger(MediaObjectEventConsumer.class);
+
+    private MediaMetaData getMediaMetadataById(long id) {
+        return mediaMetaDataRepository.findByIdWithAllInfo(id).orElseThrow(
+                () -> new IllegalArgumentException("Media not found: " + id)
+        );
+    }
 
     private void onDeleteMediaObject(MediaUpdateEvent.MediaDeleted event) throws Exception {
         System.out.println("Received media object delete event: " + event.mediaType() + " " + event.path());
@@ -79,12 +94,10 @@ public class MediaObjectEventConsumer {
     }
 
     @Transactional
-    public void onUpdateMediaEnrichment(MediaUpdateEvent.MediaUpdateEnrichment event) throws Exception {
+    public void onCreateMedia(MediaUpdateEvent.MediaCreated event) throws Exception {
         System.out.println("Received media enrichment update event: " + event.mediaId());
         try {
-            MediaMetaData mediaMetaData = mediaMetaDataRepository.findByIdWithAllInfo(event.mediaId()).orElseThrow(
-                    () -> new IllegalArgumentException("Media not found: " + event.mediaId())
-            );
+            MediaMetaData mediaMetaData = getMediaMetadataById(event.mediaId());
             if (event.mediaType() == MediaType.VIDEO) {
                 VideoMetadata videoMetadata = mediaProbe.parseMediaMetadata(mediaProbe.probeMediaInfo(mediaMetaData.getBucket(), mediaMetaData.getPath()), VideoMetadata.class);
                 mediaMetaData.setFrameRate(videoMetadata.frameRate());
@@ -141,7 +154,7 @@ public class MediaObjectEventConsumer {
 
             // send event to save media search in search and backup (2 groups)
             if (event.mediaType() != MediaType.GROUPER) {
-                eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(
+                eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreatedReady(
                         event.mediaId(),
                         event.mediaType(),
                         mediaMetaData.getBucket(),
@@ -185,7 +198,7 @@ public class MediaObjectEventConsumer {
                 mediaMetaDataRepository.updateMediaThumbnail(mediaMetaData.getId(), newThumbnail);
             }
         } else if (event.mediaType() == MediaType.ALBUM) {
-            int albumNum = (int) event.num();
+            int albumNum = event.num().intValue();
             if (albumNum >= 0 && albumNum < mediaMetaData.getLength()) {
                 var results = minIOService.getAllItemsInBucketWithPrefix(mediaMetaData.getBucket(), mediaMetaData.getPath());
                 int count = 0;
@@ -213,22 +226,61 @@ public class MediaObjectEventConsumer {
                 }
             }
         }
-        eventPublisher.publishEvent(new MediaUpdateEvent.ThumbnailUpdated(event.mediaId(), oldThumbnail, newThumbnail));
+        eventPublisher.publishEvent(new MediaUpdateEvent.MediaThumbnailUpdatedReady(event.mediaId(), oldThumbnail, newThumbnail));
+    }
+
+    @Transactional
+    public void onCreateNameEntity(MediaUpdateEvent.NameEntityCreated event) throws Exception {
+        System.out.println("Received create name entity: " + event.nameEntityConstant() + " nameEntityId: " + event.nameEntityId());
+        MediaNameEntity nameEntity = getNameEntityNameById(event.nameEntityConstant(), event.nameEntityId());
+        try {
+            if (event.thumbnailObject() != null && event.thumbnailPath() != null) {
+                MediaNameEntityWithThumbnail nameEntityWithThumbnail = (MediaNameEntityWithThumbnail) nameEntity;
+                nameEntityWithThumbnail.setThumbnail(
+                        thumbnailService.copyAlbumObjectToThumbnailBucket(ContentMetaData.THUMBNAIL_BUCKET, event.thumbnailObject(), event.thumbnailPath())
+                );
+            }
+            eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityCreatedReady(event.nameEntityId(), event.nameEntityConstant(), event.thumbnailPath()));
+        } catch (Exception e) {
+            System.err.println("Failed to create name entity thumbnail: " + event.nameEntityConstant() + " nameEntityId: " + event.nameEntityId());
+            throw e;
+        }
+    }
+
+    private void onDeleteNameEntity(MediaUpdateEvent.NameEntityDeleted event) throws Exception {
+        System.out.println("Received delete name entity: " + event.nameEntityConstant() + " nameEntityId: " + event.nameEntityId());
+        try {
+            minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, event.thumbnailPath());
+        } catch (Exception e) {
+            System.err.println("Failed to delete name entity thumbnail: " + event.nameEntityConstant() + " nameEntityId: " + event.nameEntityId());
+            throw e;
+        }
+    }
+
+    private MediaNameEntity getNameEntityNameById(MediaNameEntityConstant type, long id) {
+        var optional = switch (type) {
+            case MediaNameEntityConstant.AUTHORS -> mediaAuthorRepository.findById(id);
+            case MediaNameEntityConstant.CHARACTERS -> mediaCharacterRepository.findById(id);
+            case MediaNameEntityConstant.TAGS -> mediaTagRepository.findById(id);
+            case MediaNameEntityConstant.UNIVERSES -> mediaUniverseRepository.findById(id);
+        };
+        return optional.orElseThrow(() -> new EntityNotFoundException("Not found"));
     }
 
 
     @Transactional
     @KafkaListener(topics = {
-            EventTopics.MEDIA_OBJECT_TOPIC,
-            EventTopics.MEDIA_DELETED_TOPIC,
-            EventTopics.MEDIA_THUMBNAIL_UPDATED_TOPIC
+            EventTopics.MEDIA_ALL_TOPIC,
+            EventTopics.MEDIA_OBJECT_TOPIC
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws Exception {
         try {
             switch (event) {
-                case MediaUpdateEvent.MediaUpdateEnrichment e -> onUpdateMediaEnrichment(e);
                 case MediaUpdateEvent.MediaDeleted e -> onDeleteMediaObject(e);
+                case MediaUpdateEvent.MediaCreated e -> onCreateMedia(e);
                 case MediaUpdateEvent.MediaThumbnailUpdated e -> onUpdateMediaThumbnail(e);
+                case MediaUpdateEvent.NameEntityCreated e -> onCreateNameEntity(e);
+                case MediaUpdateEvent.NameEntityDeleted e -> onDeleteNameEntity(e);
                 default ->
                     // unknown event type → log and skip
                     System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
@@ -259,7 +311,7 @@ public class MediaObjectEventConsumer {
         switch (event) {
             case MediaUpdateEvent.MediaDeleted e ->
                 System.out.println("Received media object delete event: " + e.mediaType() + " " + e.path());
-            case MediaUpdateEvent.MediaUpdateEnrichment e ->
+            case MediaUpdateEvent.MediaCreated e ->
                 System.out.println("Received media enrichment update event: " + e.mediaId());
             case MediaUpdateEvent.MediaThumbnailUpdated e ->
                 System.out.println("Received media thumbnail update event: " + e.mediaId() + " " + e.num());

@@ -70,15 +70,17 @@ public class NameEntityModifyService {
     }
 
     @Transactional
-    protected <T extends MediaNameEntity> void addNameEntity(String name, MediaNameEntityConstant mediaNameEntityConstant, T mediaNameEntity, MediaNameEntityRepository<T, Long> repository) {
+    protected <T extends MediaNameEntity> void addNameEntity(String name,
+                                                             MediaNameEntityConstant mediaNameEntityConstant,
+                                                             T mediaNameEntity,
+                                                             MediaNameEntityRepository<T, Long> repository) {
         name = validateNameEntity(name);
-
         mediaNameEntity.setName(name);
 
         T added = repository.save(mediaNameEntity);
         long id = added.getId();
 
-        eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityCreated(mediaNameEntityConstant, id));
+        eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityCreated(mediaNameEntityConstant, id, null, null));
     }
 
     @Transactional
@@ -86,23 +88,37 @@ public class NameEntityModifyService {
                                                                           MediaNameEntityConstant mediaNameEntityConstant,
                                                                           T mediaNameEntity,
                                                                           MediaNameEntityRepository<T, Long> repository) {
-        String extension = request.getThumbnail().getOriginalFilename() == null ? ".jpg"
-                : request.getThumbnail().getOriginalFilename().substring(request.getThumbnail().getOriginalFilename().lastIndexOf("."));
-
-        String path = mediaNameEntityConstant.getName() + "/" + request.getName() + "_" + UUID.randomUUID() + extension;
-
+        String thumbnailObject = null;
         try {
-            // upload first to not start transaction first and hold the database connection
-            minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, path, request.getThumbnail());
+            String name = validateNameEntity(request.getName());
 
-            mediaNameEntity.setThumbnail(path);
-            addNameEntity(request.getName(), mediaNameEntityConstant, mediaNameEntity, repository);
+            String extension = null;
+            if (request.getThumbnail() != null) {
+                extension = request.getThumbnail().getOriginalFilename() == null ? ".jpg"
+                        : request.getThumbnail().getOriginalFilename().substring(request.getThumbnail().getOriginalFilename().lastIndexOf("."));
+
+                thumbnailObject = mediaNameEntityConstant.getName() + "/" + name + "_" + UUID.randomUUID() + extension;
+
+                // upload first to not start transaction first and hold the database connection
+                minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, thumbnailObject, request.getThumbnail());
+            }
+
+            mediaNameEntity.setName(name);
+
+            T added = repository.save(mediaNameEntity);
+            long id = added.getId();
+
+            String thumbnailPath = mediaNameEntityConstant.getName() + "/" + id + "_" + UUID.randomUUID() + extension;
+
+            eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityCreated(mediaNameEntityConstant, id, thumbnailObject, thumbnailPath));
         } catch (Exception e) {
             try {
-                minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, path);
-                System.out.println("Compensation successful: Deleted file " + path + " from MinIO.");
+                if (thumbnailObject != null) {
+                    minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, thumbnailObject);
+                    System.out.println("Compensation successful: Deleted file " + thumbnailObject + " from Object Storage.");
+                }
             } catch (Exception deleteEx) {
-                System.err.println("CRITICAL: Failed to clean up orphan file: " + path);
+                System.err.println("CRITICAL: Failed to clean up orphan file: " + thumbnailObject);
             }
             throw new RuntimeException("Entity creation failed after file upload.", e);
         }
@@ -162,7 +178,7 @@ public class NameEntityModifyService {
                 String extension = request.getThumbnail().getOriginalFilename() == null ? ".jpg" :
                         request.getThumbnail().getOriginalFilename().substring(request.getThumbnail().getOriginalFilename().lastIndexOf("."));
 
-                newThumbnailPath = mediaNameEntityConstant.getName() + "/" + newName + "_" + UUID.randomUUID() + extension;
+                newThumbnailPath = mediaNameEntityConstant.getName() + "/" + id + "_" + UUID.randomUUID() + extension;
                 minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnailPath, request.getThumbnail());
             }
         } catch (Exception e) {
@@ -188,7 +204,7 @@ public class NameEntityModifyService {
 
             if (thumbnailChanged && oldThumbnailPath != null) {
                 try {
-                    eventPublisher.publishEvent(new MediaUpdateEvent.ThumbnailDeleted(oldThumbnailPath));
+                    eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityThumbnailUpdatedReady(id, mediaNameEntityConstant, oldThumbnailPath, newThumbnailPath));
                 } catch (Exception e) {
                     throw new RuntimeException("Failed to publish event clean up old thumbnail file: " + oldThumbnailPath, e);
                 }
@@ -229,7 +245,7 @@ public class NameEntityModifyService {
     @Transactional
     protected <T extends MediaNameEntity> void deleteNameEntity(long id, MediaNameEntityConstant mediaNameEntityConstant, MediaNameEntityRepository<T, Long> repository) {
         repository.deleteById(id);
-        eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityDeleted(mediaNameEntityConstant, id));
+        eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityDeleted(mediaNameEntityConstant, id, null));
     }
 
     @Transactional
@@ -241,23 +257,7 @@ public class NameEntityModifyService {
 
         repository.delete(nameEntity);
 
-        TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        try {
-                            eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityDeleted(mediaNameEntityConstant, id));
-                        } catch (Exception e) {
-                            throw new RuntimeException("Failed to publish event delete opensearch name index" + mediaNameEntityConstant.getName() + " " + id, e);
-                        }
-                        try {
-                            if (nameEntity.getThumbnail() != null)
-                                eventPublisher.publishEvent(new MediaUpdateEvent.ThumbnailDeleted(thumbnailPath));
-                        } catch (Exception e) {
-                            throw new RuntimeException("Failed to publish event delete thumbnail file: " + thumbnailPath, e);
-                        }
-                    }
-                });
+        eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityDeleted(mediaNameEntityConstant, id, thumbnailPath));
     }
 
 
