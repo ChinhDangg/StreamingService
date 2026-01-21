@@ -276,7 +276,7 @@ public class MediaUploadService {
             return defaultAlbumPath + "/" + objectName.substring(0, objectName.lastIndexOf("/"))
                     + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb.jpg";
         } else if (mediaType == MediaType.GROUPER) {
-            String extension = objectName == null ? ".jpg" : objectName.substring(objectName.lastIndexOf("."));
+            String extension = (objectName == null || objectName.lastIndexOf(".") == -1) ? ".jpg" : objectName.substring(objectName.lastIndexOf("."));
             return defaultGrouperPath + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb" + extension;
         }
         return null;

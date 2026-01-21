@@ -192,7 +192,11 @@ public class MediaMetadataModifyService {
         MediaMetaData mediaMetaData = getMediaMetaData(mediaId);
         MediaType mediaType = mediaMetaData.getMediaType();
         if (hasFile) {
-            String newThumbnail = MediaUploadService.createMediaThumbnailString(mediaType, mediaMetaData.getId(), mediaMetaData.getPath());
+            String newThumbnail = MediaUploadService.createMediaThumbnailString(
+                    mediaType,
+                    mediaMetaData.getId(),
+                    mediaType == MediaType.GROUPER ? multipartFile.getOriginalFilename() : mediaMetaData.getPath()
+            );
             minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnail, multipartFile);
             eventPublisher.publishEvent(new MediaUpdateEvent.MediaThumbnailUpdated(
                     mediaMetaData.getId(),
