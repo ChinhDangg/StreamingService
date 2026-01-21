@@ -152,7 +152,7 @@ function initializeSearchName() {
     }
 
     const searchName = async (nameString) => {
-        const response = await apiRequest(`/api/search/name/${currentNameEntity}?name=${nameString}`);
+        const response = await apiRequest(`/api/search/name/${currentNameEntity}?s=${nameString}`);
         if (!response.ok) {
             alert('Failed to fetch name info: ' + await response.text());
             return;
