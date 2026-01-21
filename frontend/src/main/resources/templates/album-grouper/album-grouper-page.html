@@ -68,6 +68,7 @@
         </article>
     </section>
 
+    <div th:replace="~{upload/modify-thumbnail :: edit-thumbnail-section-html}"></div>
 
     <div class="mt-4"></div>
     <div th:replace="~{metadata-content :: metadata-tag-html}"></div>
@@ -173,8 +174,9 @@
 <script type="module" th:src="@{/static/js/album-grouper/album-grouper-page.js}" src="/static/js/album-grouper/album-grouper-page.js"></script>
 
 <th:block th:if="${modifyAllow}">
-    <script type="module" src="/static/js/upload/modify-media-metadata.js"></script>
+    <script type="module" th:src="@{/static/js/upload/modify-media-metadata.js}" src="/static/js/upload/modify-media-metadata.js"></script>
     <script type="module" th:src="@{/static/js/upload/upload-album-grouper.js}" src="/static/js/upload/upload-album-grouper.js"></script>
+    <script type="module" th:src="@{/static/js/upload/modify-thumbnail.js}" src="/static/js/upload/modify-thumbnail.js"></script>
 </th:block>
 
 </body>
