@@ -4,7 +4,7 @@ import {
     requestVideoPartial
 } from "/static/js/set-video-url.js";
 import { displayContentInfo } from "/static/js/metadata-display.js";
-import {apiRequest} from "/static/js/common.js";
+import {apiRequest, setMediaId, setMediaLength} from "/static/js/common.js";
 
 const container = document.querySelector('[data-player="videoPlayerContainer"]');
 container.dataset.player = 'videoPagePlayerContainer';
@@ -20,6 +20,8 @@ export async function initialize(videoId = null, videoInfo = null) {
         alert("No videoId provided");
         return;
     }
+
+    setMediaId(Number.parseInt(videoId));
 
     await Promise.all([
         displayVideoInfo(videoId, videoInfo),
@@ -69,6 +71,7 @@ async function displayVideoInfo(videoId, videoInfo = null) {
     //     "uploadDate": "2025-10-30",
     //     "year": null
     // };
+    setMediaLength(videoInfo.length);
 
     const videoMainContainer = document.getElementById('main-video-container');
     displayContentInfo(videoInfo, videoMainContainer);

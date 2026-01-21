@@ -21,6 +21,8 @@
         <div th:replace="~{video-player/video-player :: video-player-html}">
         </div> <!-- End of video player insert div -->
 
+        <div th:replace="~{upload/modify-thumbnail :: edit-thumbnail-section-html}"></div>
+
         <div th:replace="~{metadata-content :: metadata-universe-html('mt-5 pb-3 border-b border-gray-700')}"></div>
 
         <div th:replace="~{metadata-content :: metadata-author-html('mt-3 mb-5 pb-3 border-b border-gray-700')}"></div>
@@ -67,7 +69,8 @@
 <script type="module" th:src="@{/static/js/video/video-page.js}" src="/static/js/video/video-page.js"></script>
 
 <th:block th:if="${modifyAllow}">
-    <script type="module" src="/static/js/upload/modify-media-metadata.js"></script>
+    <script type="module" th:src="@{/static/js/upload/modify-media-metadata.js}" src="/static/js/upload/modify-media-metadata.js"></script>
+    <script type="module" th:src="@{/static/js/upload/video-modify-thumbnail.js}" src="/static/js/upload/video-modify-thumbnail.js"></script>
 </th:block>
 
 </body>

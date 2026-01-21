@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Edit thumbnail template</title>
+</head>
+<body>
+
+<th:block th:fragment="edit-thumbnail-section-html">
+    <th:block th:if="${modifyAllow}">
+        <div id="edit-thumbnail-section" class="rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-sm
+                dark:border-slate-700 dark:bg-slate-900">
+
+            <!-- Header -->
+            <div class="flex items-center">
+                <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100">
+                    Edit Thumbnail
+                </h3>
+                <button th:replace="~{upload/edit-name-section :: editButton('edit-thumbnail-btn')}"
+                        class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800">
+                </button>
+            </div>
+
+            <!-- Content -->
+            <div class="edit-thumbnail-content mt-4 hidden flex flex-col gap-4 items-start">
+
+                <!-- Input + Get Current -->
+                <div class="get-current-container hidden w-full flex flex-col gap-2 sm:flex-row sm:items-end">
+                    <input type="text" placeholder="Video Seconds or Album Num"
+                           class="current-thumbnail-text-input w-full sm:w-4/5 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:ring-blue-500/30"/>
+
+                    <button type="button"
+                            class="thumbnail-get-current-btn w-full sm:w-1/5 sm:mt-0 rounded-md border border-slate-300 bg-linear-to-b from-slate-100 to-slate-200 px-4 py-2 text-sm font-medium text-slate-700 dark:border-slate-600 dark:from-slate-800 dark:to-slate-700 dark:text-slate-200">
+                        Get Current
+                    </button>
+                </div>
+
+                <!-- Upload -->
+                <div class="flex flex-col items-start gap-3">
+                    <label for="upload-thumbnail-input" class="cursor-pointer rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+                        Upload New
+                    </label>
+
+                    <input id="upload-thumbnail-input" type="file" accept="image/*" class="hidden"/>
+
+                    <!-- Preview BELOW upload -->
+                    <div class="thumbnail-preview-container h-64 w-48 hidden overflow-auto rounded-lg border border-slate-300 bg-slate-200 dark:border-slate-600 dark:bg-slate-800">
+                        <img src="" alt="Thumbnail preview" class="thumbnail-preview-img h-full w-full object-contain"/>
+                    </div>
+
+                    <span class="text-xs text-slate-500 dark:text-slate-400">
+                            JPG, PNG, WEBP, GIF
+                        </span>
+                </div>
+
+                <button class="save-edit-thumbnail-btn px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-medium transition duration-150">
+                    Save
+                </button>
+
+            </div>
+        </div>
+    </th:block>
+</th:block>
+
+</body>
+</html>
