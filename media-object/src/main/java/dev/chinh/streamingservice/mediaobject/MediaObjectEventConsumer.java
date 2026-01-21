@@ -153,16 +153,15 @@ public class MediaObjectEventConsumer {
             }
 
             // send event to save media search in search and backup (2 groups)
-            if (event.mediaType() != MediaType.GROUPER) {
-                eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreatedReady(
-                        event.mediaId(),
-                        event.mediaType(),
-                        mediaMetaData.getBucket(),
-                        mediaMetaData.getPath(),
-                        mediaMetaData.getAbsoluteFilePath(),
-                        mediaMetaData.getThumbnail()
-                ));
-            }
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreatedReady(
+                    event.mediaId(),
+                    event.mediaType(),
+                    mediaMetaData.getBucket(),
+                    mediaMetaData.getPath(),
+                    mediaMetaData.getAbsoluteFilePath(),
+                    mediaMetaData.getThumbnail(),
+                    event.searchable()
+            ));
         } catch (Exception e) {
             System.err.println("Failed to update media enrichment: " + event.mediaId());
             throw e;

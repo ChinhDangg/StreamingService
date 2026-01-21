@@ -146,7 +146,7 @@ public class MediaUploadService {
             MediaMetaData saved = mediaRepository.save(mediaMetaData);
             long savedId = saved.getId();
 
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, MediaType.GROUPER, createMediaThumbnailString(MediaType.GROUPER, savedId, path)));
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, MediaType.GROUPER, createMediaThumbnailString(MediaType.GROUPER, savedId, path), true));
 
             return savedId;
         } catch (Exception e) {
@@ -210,7 +210,7 @@ public class MediaUploadService {
 
         Long savedId = mediaRepository.save(mediaMetaData).getId();
 
-        eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, MediaType.ALBUM, null));
+        eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, MediaType.ALBUM, null, false));
 
         eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMedia.getId(), updatedLength));
 
@@ -259,7 +259,7 @@ public class MediaUploadService {
 
         String thumbnailObject = createMediaThumbnailString(upload.mediaType, savedId, mediaMetaData.getPath());
 
-        eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, upload.mediaType, thumbnailObject));
+        eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, upload.mediaType, thumbnailObject, true));
 
         removeCacheMediaSessionRequest(sessionId);
 

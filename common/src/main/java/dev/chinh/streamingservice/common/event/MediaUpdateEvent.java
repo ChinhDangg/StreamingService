@@ -31,7 +31,8 @@ public interface MediaUpdateEvent {
             String bucket,
             String path,
             String absolutePath,
-            String thumbnail
+            String thumbnail,
+            boolean searchable
     ) implements MediaUpdateEvent{}
 
     record MediaThumbnailUpdatedReady(
@@ -79,7 +80,8 @@ public interface MediaUpdateEvent {
     record MediaCreated(
             long mediaId,
             MediaType mediaType,
-            String thumbnailObject
+            String thumbnailObject,
+            boolean searchable
     ) implements MediaUpdateEvent {}
 
     record NameEntityCreated(

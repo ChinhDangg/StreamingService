@@ -45,6 +45,9 @@ public class MediaSearchEventConsumer {
     }
 
     private void onCreateMediaIndexSearch(MediaUpdateEvent.MediaCreatedReady event) {
+        if (!event.searchable()) {
+            return;
+        }
         System.out.println("Received new index event: " + event.mediaId());
         Optional<MediaMetaData> mediaMetaData = mediaMetaDataRepository.findByIdWithAllInfo(event.mediaId());
         if (mediaMetaData.isEmpty()) {

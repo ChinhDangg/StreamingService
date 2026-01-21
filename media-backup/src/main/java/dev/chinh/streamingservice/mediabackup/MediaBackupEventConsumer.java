@@ -72,11 +72,11 @@ public class MediaBackupEventConsumer {
                 System.err.println("Failed to backup album: " + event.path());
                 throw e;
             }
-        } else {
+        } else if (event.mediaType() != MediaType.GROUPER) {
             System.err.println("Unknown media type: " + event.mediaType());
         }
 
-        createThumbnailBackup( event.thumbnail());
+        createThumbnailBackup(event.thumbnail());
     }
 
     private void backupAlbum(String bucket, String albumPath, String absolutePath) throws Exception {
