@@ -1,7 +1,7 @@
 import {initializeHeader, setAlertStatus} from "/static/js/header.js";
 import {setVideoResolution, pollPlaylistUrl, requestVideoPartial} from "/static/js/set-video-url.js";
 import { displayContentInfo, helperCloneAndUnHideNode } from "/static/js/metadata-display.js";
-import {apiRequest} from "/static/js/common.js";
+import {apiRequest, setMediaId, setMediaLength} from "/static/js/common.js";
 
 let albumId = null;
 const BATCH_SIZE = 5;
@@ -38,6 +38,8 @@ export async function initialize(id = null, albumInfo = null) {
         alert("No albumId provided");
         return;
     }
+
+    setMediaId(Number.parseInt(albumId));
 
     if (observer) {
         observer.unobserve(sentinel);
@@ -160,7 +162,8 @@ const fetchCheckResized = async (albumId, start) => {
     try {
         const checkResizedPolling = pollPlaylistUrl(fetchResizedCountUrl);
         const resizedCount = await checkResizedPolling.promise;
-        albumCheckResizedMap.set(albumResolution, parseInt(resizedCount));
+        albumCheckResizedMap.set(albumResolution, Number.parseInt(resizedCount));
+        setMediaLength(Number.parseInt(resizedCount));
         console.log(resizedCount);
         return true;
     } catch (err) {
@@ -231,6 +234,8 @@ async function displayAlbumItems(albumId) {
     const albumItems = await fetchAlbumItemUrlsByResolution(albumId, albumResolution);
     if (!albumItems) return;
     albumResUrlMap.set(albumResolution, albumItems);
+
+    setMediaLength(albumItems.length);
 
     // albumItems = [
     //     {

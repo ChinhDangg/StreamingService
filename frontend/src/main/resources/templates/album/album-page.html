@@ -60,6 +60,8 @@
 
     <div class="border-t border-gray-700 mt-4 mb-3"></div>
 
+    <div th:replace="~{upload/modify-thumbnail :: edit-thumbnail-section-html}"></div>
+
     <div id="resolution-selector-container" class="w-full max-w-xs">
         <label for="resolution-select" class="block mb-2 text-sm font-medium text-gray-200">
             Image Resolution
@@ -117,7 +119,8 @@
 <script type="module" th:src="@{/static/js/album/album-page.js}" src="/static/js/album/album-page.js"></script>
 
 <th:block th:if="${modifyAllow}">
-    <script type="module" src="/static/js/upload/modify-media-metadata.js"></script>
+    <script type="module" th:src="@{/static/js/upload/modify-media-metadata.js}" src="/static/js/upload/modify-media-metadata.js"></script>
+    <script type="module" th:src="@{/static/js/upload/album-modify-thumbnail.js}" src="/static/js/upload/album-modify-thumbnail.js"></script>
 </th:block>
 
 </body>
