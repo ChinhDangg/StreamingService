@@ -1,7 +1,7 @@
 import { initializeHeader } from "/static/js/header.js";
 import { displayContentInfo, helperCloneAndUnHideNode} from "/static/js/metadata-display.js";
 import { quickViewContentInOverlay } from "/static/js/overlay.js";
-import {apiRequest} from "/static/js/common.js";
+import {apiRequest, setMediaId} from "/static/js/common.js";
 
 async function initialize() {
     const queryString = window.location.search;
@@ -12,6 +12,7 @@ async function initialize() {
         alert('grouper Id not found');
         return;
     }
+    setMediaId(Number.parseInt(albumGrouperId));
 
     await Promise.all([
         displayAlbumGrouperInfo(albumGrouperId)
