@@ -315,7 +315,7 @@ public class MediaObjectEventConsumer {
             groupId = "media-object-dlq-group",
             containerFactory = "dlqListenerContainerFactory"
     )
-    public void handleDlq(@Payload MediaUpdateEvent event,
+    public void handleDlq(Object event, //@Payload MediaUpdateEvent event,
                           Acknowledgment ack,
                           @Header(name = "x-exception-message", required = false) String errorMessage) {
         System.out.println("======= DLQ EVENT DETECTED =======");
@@ -331,7 +331,7 @@ public class MediaObjectEventConsumer {
                 System.out.println("Received media thumbnail update event: " + e.mediaId() + " " + e.num());
             default -> {
                 System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
-                ack.acknowledge(); // ack on poison event to skip it
+                //ack.acknowledge(); // ack on poison event to skip it
             }
         }
         System.out.println("======= =======");
