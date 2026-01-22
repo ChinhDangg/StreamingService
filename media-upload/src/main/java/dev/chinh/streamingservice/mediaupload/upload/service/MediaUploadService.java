@@ -10,7 +10,7 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.mediaupload.MediaBasicInfo;
-import dev.chinh.streamingservice.mediaupload.validation.FileSystemValidator;
+import dev.chinh.streamingservice.common.validation.FileSystemValidator;
 import dev.chinh.streamingservice.persistence.entity.*;
 import dev.chinh.streamingservice.persistence.repository.*;
 import lombok.RequiredArgsConstructor;

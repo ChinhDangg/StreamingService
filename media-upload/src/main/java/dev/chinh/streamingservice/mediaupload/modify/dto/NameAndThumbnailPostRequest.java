@@ -1,6 +1,6 @@
 package dev.chinh.streamingservice.mediaupload.modify.dto;
 
-import dev.chinh.streamingservice.mediaupload.validation.ValidImage;
+import dev.chinh.streamingservice.common.validation.ValidImage;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
