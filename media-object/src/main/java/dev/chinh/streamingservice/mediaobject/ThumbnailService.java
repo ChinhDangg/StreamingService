@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -24,11 +25,10 @@ public class ThumbnailService {
     private static final String diskDir = "disk";
 
     public String generateThumbnailFromVideo(String bucket, String objectName, String thumbnailObject, double videoLength, Double timeInSeconds) throws Exception {
-        String thumbnailObjectBasePath = thumbnailObject.substring(0, objectName.lastIndexOf("/"));
-        String thumbnailName = thumbnailObject.substring(thumbnailObject.lastIndexOf("/") + 1);
+        String thumbnailName = UUID.randomUUID() + "_" + thumbnailObject.substring(thumbnailObject.lastIndexOf("/") + 1);
 
         String thumbnailOutput = OSUtil.normalizePath(
-                OSUtil.createDirInRAMDiskElseDisk(diskDir, OSUtil.normalizePath("thumbnail", thumbnailObjectBasePath)),
+                OSUtil.createDirInRAMDiskElseDisk(diskDir, "thumbnail"),
                 thumbnailName);
 
         String videoInput = minIOService.getObjectUrlForContainer(bucket, objectName);
