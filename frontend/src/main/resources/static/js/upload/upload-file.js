@@ -12,16 +12,14 @@ export async function startUploadSession(objectKey, mediaType) {
         })
     });
     if (!sessionResponse.ok) {
-        alert('Failed to start upload: ' + await sessionResponse.text());
-        return null;
+        return 'Error: Failed to start upload: ' + await sessionResponse.text();
     }
     return await sessionResponse.text();
 }
 
 export async function endUploadSession(body) {
     if (body.sessionId == null) {
-        alert('No sessionId found');
-        return null;
+        return 'Error: No sessionId found';
     }
     const endResponse = await apiRequest('/api/upload/media/end-session', {
         method: 'POST',
@@ -31,10 +29,9 @@ export async function endUploadSession(body) {
         body: JSON.stringify(body)
     });
     if (!endResponse.ok) {
-        alert('Failed to finalize upload: ' + await endResponse.text());
-        return null;
+        return 'Error: Failed to finalize upload: ' + await endResponse.text();
     }
-    return await endResponse.text();
+    return endResponse.text();
 }
 
 export async function uploadFile(sessionId, file, fileName, mediaType,
@@ -51,7 +48,7 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
     console.log(chunks);
 
     if (uploadingFiles)
-        uploadingFiles.set(file, { uploadId: uploadId, chunks: chunks, eTags: eTags, partNumber: chunks.partNumber ? chunks.partNumber : 0 });
+        uploadingFiles.set(file, { uploadId: uploadId, chunks: chunks, eTags: eTags, partNumber: chunks.partNumber ? chunks.partNumber : 0, mediaType: mediaType });
 
     const initiateUpload = async () => {
         const response = await apiRequest('/api/upload/media/initiate', {

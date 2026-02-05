@@ -214,7 +214,8 @@ submitBtn.addEventListener('click',async () => {
         let sessionId = currentSessionId;
         if (!sessionId) {
             sessionId = await startUploadSession(savingPath, currentMediaType);
-            if (!sessionId) {
+            if (sessionId.startsWith('Error:')) {
+                alert(sessionId);
                 return;
             }
             currentSessionId = sessionId;
@@ -273,7 +274,9 @@ submitBtn.addEventListener('click',async () => {
             }
         };
         endUploadSession(basicInfo).then(responseText => {
-            if (responseText) {
+            if (responseText.startsWith('Error:')) {
+                alert('Failed to end upload session: ' + responseText);
+            } else {
                 singleFileInput.value = '';
                 folderInput.value = '';
                 grouperInput.value = '';

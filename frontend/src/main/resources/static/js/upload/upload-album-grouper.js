@@ -97,8 +97,10 @@ async function uploadAlbum(files, savingPath, parentPath, sessionId = null, uplo
     if (!sessionId) {
         sessionId = await startUploadSession(objectName, 'ALBUM');
     }
-    if (!sessionId)
+    if (sessionId.startsWith('Error:')) {
+        alert(sessionId);
         return null;
+    }
 
     if (uploadingFiles.size) {
         for (const f of uploadingFiles.keys()) {
