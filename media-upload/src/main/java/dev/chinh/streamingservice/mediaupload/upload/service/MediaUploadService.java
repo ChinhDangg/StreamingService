@@ -306,6 +306,7 @@ public class MediaUploadService {
                     .toList();
 
             objectUploadService.completeMultipartUpload(mediaBucket, objectName, uploadId, completedParts);
+            redisStringTemplate.opsForHash().delete("upload::" + sessionId, uploadIdPart);
         }
     }
 
