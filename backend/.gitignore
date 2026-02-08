@@ -35,3 +35,4 @@ build/
 minio-data
 opensearch-data
 postgres_data
+mongo_data
