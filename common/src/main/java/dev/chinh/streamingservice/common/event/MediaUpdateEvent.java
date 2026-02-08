@@ -4,6 +4,8 @@ package dev.chinh.streamingservice.common.event;
 import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.common.constant.MediaType;
 
+import java.util.List;
+
 public interface MediaUpdateEvent {
 
     // search, object, and backup listener
@@ -96,5 +98,11 @@ public interface MediaUpdateEvent {
             MediaType mediaType,
             Double num,
             String thumbnailObject
+    ) implements MediaUpdateEvent {}
+
+
+    // for file-manager
+    record MediaUnfinishedCreated(
+            List<String> objectNames
     ) implements MediaUpdateEvent {}
 }
