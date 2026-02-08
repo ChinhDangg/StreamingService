@@ -74,6 +74,12 @@ public class KafkaRedPandaConfig {
                         .replicas(1)
                         .config("retention.ms", "604800000")
                         .config("segment.bytes", "100048576")
+                        .build(),
+                TopicBuilder.name(EventTopics.MEDIA_FILE_TOPIC)
+                        .partitions(1)
+                        .replicas(1)
+                        .config("retention.ms", "604800000")
+                        .config("segment.bytes", "100048576")
                         .build()
         );
     }

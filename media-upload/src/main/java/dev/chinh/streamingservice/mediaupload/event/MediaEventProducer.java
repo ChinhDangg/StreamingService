@@ -53,6 +53,12 @@ public class MediaEventProducer {
 
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void publishCreateMediaUnfinished(MediaUpdateEvent.MediaUnfinishedCreated event) {
+        kafkaTemplate.send(EventTopics.MEDIA_FILE_TOPIC, event);
+    }
+
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publishDeleteMediaEvent(MediaUpdateEvent.MediaDeleted event) {
         kafkaTemplate.send(EventTopics.MEDIA_ALL_TOPIC, event);
     }
