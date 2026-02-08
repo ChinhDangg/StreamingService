@@ -58,6 +58,12 @@ public class PageController {
     }
 
 
+    @GetMapping("/file")
+    public String filePage() {
+        return "file-manager/file-manager-page";
+    }
+
+
     @GetMapping("/login")
     public String loginPage(){
         return "login/login-page";
