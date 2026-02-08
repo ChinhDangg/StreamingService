@@ -71,4 +71,10 @@ public class MediaUploadController {
         return ResponseEntity.ok().body(mediaUploadService.saveMediaInGrouper(request.sessionId, request.grouperMediaId, request.title));
     }
 
+    @PostMapping("/end-session-unfinished")
+    public ResponseEntity<Void> endSessionUnfinishedMedia(String sessionId) throws JsonProcessingException {
+        mediaUploadService.saveUnfinishedMedia(sessionId);
+        return ResponseEntity.ok().build();
+    }
+
 }

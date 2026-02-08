@@ -113,6 +113,20 @@ public class MediaUploadService {
         addUploadSessionCacheLastAccess(sessionId, uploadSessionTimeout);
     }
 
+    @Transactional(readOnly = true)
+    public void saveUnfinishedMedia(String sessionId) throws JsonProcessingException {
+        MediaUploadRequest upload = getCachedMediaUploadRequest(sessionId);
+        if (upload == null) {
+            throw new IllegalArgumentException("Invalid session ID: " + sessionId);
+        }
+
+        List<String> objectNames = completeUpload(sessionId);
+
+        removeCacheMediaSessionRequest(sessionId);
+
+        eventPublisher.publishEvent(new MediaUpdateEvent.MediaUnfinishedCreated(objectNames));
+    }
+
 
     @Transactional
     public long saveGrouperMedia(MediaBasicInfo basicInfo) {
@@ -282,7 +296,8 @@ public class MediaUploadService {
         return null;
     }
 
-    private void completeUpload(String sessionId) throws JsonProcessingException {
+    private List<String> completeUpload(String sessionId) throws JsonProcessingException {
+        List<String> objectNames = new ArrayList<>();
         Map<Object, Object> uploadedParts = redisStringTemplate.opsForHash().entries("upload::" + sessionId);
         for (Map.Entry<Object, Object> entry : uploadedParts.entrySet()) {
             String uploadIdPart = (String) entry.getKey();
@@ -292,6 +307,7 @@ public class MediaUploadService {
             String uploadId = uploadIdPart.substring("parts:".length());
             //System.out.println("Upload ID: " + uploadId);
             String objectName = redisStringTemplate.opsForHash().get("upload::" + sessionId, uploadId).toString();
+            objectNames.add(objectName);
             //System.out.println("Object name: " + objectName);
 
             List<UploadedPart> parts = objectMapper.readValue(entry.getValue().toString(), new TypeReference<>() {});
@@ -306,8 +322,8 @@ public class MediaUploadService {
                     .toList();
 
             objectUploadService.completeMultipartUpload(mediaBucket, objectName, uploadId, completedParts);
-            redisStringTemplate.opsForHash().delete("upload::" + sessionId, uploadIdPart);
         }
+        return objectNames;
     }
 
 
