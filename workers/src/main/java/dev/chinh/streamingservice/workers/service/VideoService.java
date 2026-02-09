@@ -378,7 +378,8 @@ public class VideoService extends MediaService implements ResourceCleanable {
                     }
                 }
                 if (videoJobId != null && exit == 0) {
-                    action.accept(data);
+                    if (action != null && data != null)
+                        action.accept(data);
                     addCacheVideoJobStatus(videoJobId, null, null, MediaJobStatus.COMPLETED);
                 }
                 else {
