@@ -17,7 +17,7 @@ public class FileManagerController {
     }
 
     @PostMapping("/dir")
-    public ResponseEntity<?> getDirectoryContents(@RequestBody String directory) {
-        return ResponseEntity.ok(fileService.findFilesInDirectory(directory));
+    public ResponseEntity<?> getDirectoryContents(@RequestBody String directoryId) {
+        return ResponseEntity.ok(fileService.findFilesInDirectory(directoryId));
     }
 }

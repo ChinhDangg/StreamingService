@@ -4,7 +4,9 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
 
-public interface FileSystemRepository extends MongoRepository<FileSystemItem, Long> {
+public interface FileSystemRepository extends MongoRepository<FileSystemItem, String> {
+
+    List<FileSystemItem> findByParentId(String parentId);
 
     List<FileSystemItem> findByPath(String path);
 

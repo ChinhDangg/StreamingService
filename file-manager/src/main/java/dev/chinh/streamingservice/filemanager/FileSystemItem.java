@@ -6,11 +6,10 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Builder
-@Getter
-@ToString
+@Data
 @Document(collection = "fs_metadata")
 @NoArgsConstructor
 @AllArgsConstructor
@@ -26,13 +25,11 @@ public class FileSystemItem {
     @Indexed
     private String path; // use chain of parentId with comma separated or maybe just use array - possible to index too
 
-    private long mId;
-    private String name;
     private FileType fileType;
 
-    private String key;
+    private long mId;
+    private String name;
     private String thumbnail;
-
     private Long size;
-    private LocalDateTime uploadDate;
+    private Instant uploadDate;
 }
