@@ -177,6 +177,7 @@ public class MediaSearchEventConsumer {
 
     @KafkaListener(topics = {
             EventTopics.MEDIA_ALL_TOPIC,
+            EventTopics.MEDIA_ALL_EXCEPT_OBJECT_TOPIC,
             EventTopics.MEDIA_SEARCH_TOPIC,
             EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)

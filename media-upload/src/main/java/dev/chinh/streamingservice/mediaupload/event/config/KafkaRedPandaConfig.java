@@ -57,6 +57,12 @@ public class KafkaRedPandaConfig {
                         .config("retention.ms", "604800000") // delete after 7 days // if use for replay then use longer day
                         .config("segment.bytes", "100048576")
                         .build(),
+                TopicBuilder.name(EventTopics.MEDIA_ALL_EXCEPT_OBJECT_TOPIC)
+                        .partitions(1)
+                        .replicas(1)
+                        .config("retention.ms", "604800000") // delete after 7 days // if use for replay then use longer day
+                        .config("segment.bytes", "100048576")
+                        .build(),
                 TopicBuilder.name(EventTopics.MEDIA_OBJECT_TOPIC)
                         .partitions(1)
                         .replicas(1)

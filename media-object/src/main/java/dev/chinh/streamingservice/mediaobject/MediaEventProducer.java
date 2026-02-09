@@ -16,7 +16,7 @@ public class MediaEventProducer {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publishCreatedReadyMediaEvent(MediaUpdateEvent.MediaCreatedReady event) {
-        kafkaTemplate.send(EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC, event);
+        kafkaTemplate.send(EventTopics.MEDIA_ALL_EXCEPT_OBJECT_TOPIC, event);
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
