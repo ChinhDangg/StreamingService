@@ -160,6 +160,8 @@ public class MediaObjectEventConsumer {
                     mediaMetaData.getPath(),
                     mediaMetaData.getAbsoluteFilePath(),
                     mediaMetaData.getThumbnail(),
+                    mediaMetaData.getSize(),
+                    mediaMetaData.getUploadDate(),
                     event.searchable()
             ));
         } catch (Exception e) {
@@ -315,7 +317,7 @@ public class MediaObjectEventConsumer {
             groupId = "media-object-dlq-group",
             containerFactory = "dlqListenerContainerFactory"
     )
-    public void handleDlq(Object event, //@Payload MediaUpdateEvent event,
+    public void handleDlq(@Payload MediaUpdateEvent event,
                           Acknowledgment ack,
                           @Header(name = "x-exception-message", required = false) String errorMessage) {
         System.out.println("======= DLQ EVENT DETECTED =======");

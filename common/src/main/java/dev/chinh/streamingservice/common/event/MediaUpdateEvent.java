@@ -4,6 +4,7 @@ package dev.chinh.streamingservice.common.event;
 import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.common.constant.MediaType;
 
+import java.time.Instant;
 import java.util.List;
 
 public interface MediaUpdateEvent {
@@ -34,6 +35,8 @@ public interface MediaUpdateEvent {
             String path,
             String absolutePath,
             String thumbnail,
+            long size,
+            Instant uploadDate,
             boolean searchable
     ) implements MediaUpdateEvent{}
 
