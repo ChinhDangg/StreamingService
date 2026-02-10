@@ -1,0 +1,188 @@
+package dev.chinh.streamingservice.filemanager;
+
+import dev.chinh.streamingservice.common.constant.MediaType;
+import dev.chinh.streamingservice.common.event.EventTopics;
+import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
+import dev.chinh.streamingservice.filemanager.config.KafkaConfig;
+import io.minio.Result;
+import io.minio.messages.Item;
+import lombok.AllArgsConstructor;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.Acknowledgment;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+
+@Service
+@AllArgsConstructor
+public class MediaFileEventConsumer {
+
+    private final MongoTemplate mongoTemplate;
+    private final MinIOService minIOService;
+    private final FileService fileService;
+
+    private void onCreateUnfinishedMediaFile(MediaUpdateEvent.MediaUnfinishedCreated event) {
+        System.out.println("Received unfinished media create event");
+        try {
+            HashMap<String, String> folderIdMap = new HashMap<>();
+
+            String rootId = fileService.getRootFolderId();
+            for (String fileName : event.objectNames()) {
+                String currentIdPath = "," + rootId + ",";
+                String[] parts = fileName.split("/");
+                String parentId = rootId;
+                if (parts.length > 1) {
+                    for (int i = 0; i < parts.length - 1; i++) {
+                        String key = parts[i] + "|" + parentId;
+                        String folderId = folderIdMap.getOrDefault(
+                                key,
+                                getOrCreateFolder(parts[i], parentId, currentIdPath, FileType.DIR)
+                        );
+                        folderIdMap.putIfAbsent(key, folderId);
+                        parentId = folderId;
+                        currentIdPath += folderId + ',';
+                    }
+                }
+                FileSystemItem fileItem = FileSystemItem.builder()
+                        .parentId(parentId)
+                        .path(currentIdPath)
+                        .name(parts[parts.length - 1])
+                        .fileType(FileType.FILE)
+                        .uploadDate(Instant.now())
+                        .build();
+                mongoTemplate.insert(fileItem);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create unfinished media file", e);
+        }
+    }
+
+    private void onCreateMediaFile(MediaUpdateEvent.MediaCreatedReady event) {
+        System.out.println("Received media create event: " + event.mediaId());
+        try {
+            String rootId = fileService.getRootFolderId();
+            String currentIdPath = "," + rootId + ",";
+            String parentId = rootId;
+            String[] parts = event.path().split("/");
+            if (parts.length > 1) {
+                int end = event.mediaType() == MediaType.VIDEO ? parts.length - 1 : parts.length;
+                for (int i = 0; i < end; i++) {
+                    String folderId = getOrCreateFolder(parts[i], parentId, currentIdPath, end == parts.length ? FileType.ALBUM : FileType.DIR);
+                    parentId = folderId;
+                    currentIdPath += folderId + ',';
+                }
+            }
+            FileSystemItem fileItem = FileSystemItem.builder()
+                    .parentId(parentId)
+                    .path(currentIdPath)
+                    .mId(event.mediaId())
+                    .name(parts[parts.length - 1])
+                    .thumbnail(event.thumbnail())
+                    .size(event.size())
+                    .uploadDate(event.uploadDate())
+                    .build();
+            if (event.mediaType() == MediaType.VIDEO) {
+                fileItem.setFileType(FileType.VIDEO);
+            } else if (event.mediaType() == MediaType.ALBUM) {
+                fileItem.setFileType(FileType.ALBUM);
+            }
+            FileSystemItem saved = mongoTemplate.insert(fileItem);
+
+            if (event.mediaType() == MediaType.ALBUM) {
+                Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(event.bucket(), event.path());
+                for (Result<Item> result : results) {
+                    String objectName = result.get().objectName();
+                    String fileName = objectName.substring(objectName.lastIndexOf("/") + 1);
+                    FileSystemItem albumItem = FileSystemItem.builder()
+                            .parentId(saved.getId())
+                            .path(saved.getPath() + saved.getId() + ',')
+                            .fileType(FileType.FILE)
+                            .name(fileName)
+                            .size(result.get().size())
+                            .uploadDate(Instant.now())
+                            .build();
+                    mongoTemplate.insert(albumItem);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create media file", e);
+        }
+    }
+
+    private String getOrCreateFolder(String name, String parentId, String currentPath, FileType fileType) {
+        Query query = new Query(Criteria
+                .where("parentId").is(parentId)
+                .and("name").is(name)
+                .and("fileType").in(FileType.DIR, FileType.ALBUM)
+        );
+
+        Update update = new Update()
+                .setOnInsert("name", name)
+                .setOnInsert("parentId", parentId)
+                .setOnInsert("path", currentPath)
+                .setOnInsert("fileType", fileType)
+                .setOnInsert("uploadDate", LocalDateTime.now());
+
+        // upsert to create and return in one operation - atomic
+        FindAndModifyOptions options = new FindAndModifyOptions().upsert(true).returnNew(true);
+
+        FileSystemItem dir = mongoTemplate.findAndModify(query, update, options, FileSystemItem.class);
+
+        if (dir == null) throw new RuntimeException("Failed to create folder");
+
+        return dir.getId();
+    }
+
+    @KafkaListener(topics = {
+            EventTopics.MEDIA_FILE_TOPIC,
+            EventTopics.MEDIA_ALL_EXCEPT_OBJECT_TOPIC
+    }, groupId = KafkaConfig.MEDIA_GROUP_ID)
+    public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) {
+        try {
+            switch (event) {
+                case MediaUpdateEvent.MediaUnfinishedCreated e -> onCreateUnfinishedMediaFile(e);
+                case MediaUpdateEvent.MediaCreatedReady e -> onCreateMediaFile(e);
+                default ->
+                    System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+            }
+            ack.acknowledge();
+        } catch (Exception e) {
+            System.err.println(e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
+    }
+
+    @KafkaListener(
+            topics = KafkaConfig.MEDIA_FILE_DLQ_TOPIC,
+            groupId = "media-file-dlq-group",
+            containerFactory = "dlqListenerContainerFactory"
+    )
+    public void handleDlq(@Payload MediaUpdateEvent event,
+                          Acknowledgment ack,
+                          @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) byte[] errorMessage) {
+        System.out.println("======= DLQ EVENT DETECTED =======");
+        String message = errorMessage != null ? new String(errorMessage) : "No error message found";
+        System.out.printf("Error Message: %s\n", message);
+
+        switch (event) {
+            case MediaUpdateEvent.MediaUnfinishedCreated e ->
+                System.out.println("Received unfinished media create event: " + e.objectNames().getFirst());
+            case MediaUpdateEvent.MediaCreatedReady e ->
+                System.out.println("Received media create event: " + e.mediaId());
+            default ->
+                System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+        }
+        System.out.println("======= =======");
+    }
+}
