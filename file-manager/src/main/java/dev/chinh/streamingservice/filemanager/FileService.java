@@ -45,11 +45,15 @@ public class FileService {
         return fileSystemRepository.findByParentId(parentId);
     }
 
+    public String getRootFolderName() {
+        return mediaPath;
+    }
+
     public String getRootFolderId() {
         if (rootFolderId != null) return rootFolderId;
         Query query = new Query(Criteria
                 .where("name").is(mediaPath)
-                .and("path").is(",")
+                .and("path").is("/")
                 .and("fileType").is(FileType.DIR)
         );
         FileSystemItem item = mongoTemplate.findOne(query, FileSystemItem.class);
@@ -63,13 +67,13 @@ public class FileService {
     public void createRootFolder() {
         Query query = new Query(Criteria
                 .where("name").is(mediaPath)
-                .and("path").is(",")
+                .and("path").is("/")
                 .and("fileType").is(FileType.DIR)
         );
 
         Update update = new Update()
                 .setOnInsert("name", mediaPath)
-                .setOnInsert("path", ",")
+                .setOnInsert("path", "/")
                 .setOnInsert("fileType", FileType.DIR);
 
         UpdateResult result = mongoTemplate.upsert(query, update, FileSystemItem.class);

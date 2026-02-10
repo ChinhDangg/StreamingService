@@ -38,7 +38,7 @@ public class MediaFileEventConsumer {
 
             String rootId = fileService.getRootFolderId();
             for (String fileName : event.objectNames()) {
-                String currentIdPath = "," + rootId + ",";
+                String currentPath = "/" + fileService.getRootFolderName() + "/";
                 String[] parts = fileName.split("/");
                 String parentId = rootId;
                 if (parts.length > 1) {
@@ -46,16 +46,16 @@ public class MediaFileEventConsumer {
                         String key = parts[i] + "|" + parentId;
                         String folderId = folderIdMap.getOrDefault(
                                 key,
-                                getOrCreateFolder(parts[i], parentId, currentIdPath, FileType.DIR)
+                                getOrCreateFolder(parts[i], parentId, currentPath, FileType.DIR)
                         );
                         folderIdMap.putIfAbsent(key, folderId);
                         parentId = folderId;
-                        currentIdPath += folderId + ',';
+                        currentPath += parts[i] + "/";
                     }
                 }
                 FileSystemItem fileItem = FileSystemItem.builder()
                         .parentId(parentId)
-                        .path(currentIdPath)
+                        .path(currentPath)
                         .name(parts[parts.length - 1])
                         .fileType(FileType.FILE)
                         .uploadDate(Instant.now())
@@ -71,20 +71,19 @@ public class MediaFileEventConsumer {
         System.out.println("Received media create event: " + event.mediaId());
         try {
             String rootId = fileService.getRootFolderId();
-            String currentIdPath = "," + rootId + ",";
+            String currentPath = "/" + fileService.getRootFolderName() + "/";
             String parentId = rootId;
             String[] parts = event.path().split("/");
             if (parts.length > 1) {
                 int end = event.mediaType() == MediaType.VIDEO ? parts.length - 1 : parts.length;
                 for (int i = 0; i < end; i++) {
-                    String folderId = getOrCreateFolder(parts[i], parentId, currentIdPath, end == parts.length ? FileType.ALBUM : FileType.DIR);
-                    parentId = folderId;
-                    currentIdPath += folderId + ',';
+                    parentId = getOrCreateFolder(parts[i], parentId, currentPath, end == parts.length ? FileType.ALBUM : FileType.DIR);
+                    currentPath += parts[i] + "/";
                 }
             }
             FileSystemItem fileItem = FileSystemItem.builder()
                     .parentId(parentId)
-                    .path(currentIdPath)
+                    .path(currentPath)
                     .mId(event.mediaId())
                     .name(parts[parts.length - 1])
                     .thumbnail(event.thumbnail())
@@ -105,7 +104,7 @@ public class MediaFileEventConsumer {
                     String fileName = objectName.substring(objectName.lastIndexOf("/") + 1);
                     FileSystemItem albumItem = FileSystemItem.builder()
                             .parentId(saved.getId())
-                            .path(saved.getPath() + saved.getId() + ',')
+                            .path(saved.getPath() + saved.getName() + '/')
                             .fileType(FileType.FILE)
                             .name(fileName)
                             .size(result.get().size())
@@ -145,7 +144,7 @@ public class MediaFileEventConsumer {
 
     @KafkaListener(topics = {
             EventTopics.MEDIA_FILE_TOPIC,
-            EventTopics.MEDIA_ALL_EXCEPT_OBJECT_TOPIC
+            EventTopics.MEDIA_SEARCH_BACKUP_AND_FILE_TOPIC
     }, groupId = KafkaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) {
         try {

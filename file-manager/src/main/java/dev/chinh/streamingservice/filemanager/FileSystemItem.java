@@ -23,7 +23,7 @@ public class FileSystemItem {
     private String parentId;
 
     @Indexed
-    private String path; // use chain of parentId with comma separated or maybe just use array - possible to index too
+    private String path;
 
     private FileType fileType;
 
