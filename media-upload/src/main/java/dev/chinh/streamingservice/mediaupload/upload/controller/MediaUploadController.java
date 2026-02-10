@@ -72,7 +72,7 @@ public class MediaUploadController {
     }
 
     @PostMapping("/end-session-unfinished")
-    public ResponseEntity<Void> endSessionUnfinishedMedia(String sessionId) throws JsonProcessingException {
+    public ResponseEntity<Void> endSessionUnfinishedMedia(@RequestBody String sessionId) throws JsonProcessingException {
         mediaUploadService.saveUnfinishedMedia(sessionId);
         return ResponseEntity.ok().build();
     }
