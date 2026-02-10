@@ -27,7 +27,7 @@ public class FileSystemItem {
 
     private FileType fileType;
 
-    private long mId;
+    private Long mId;
     private String name;
     private String thumbnail;
     private Long size;
