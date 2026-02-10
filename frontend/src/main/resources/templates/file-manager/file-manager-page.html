@@ -7,9 +7,19 @@
     <style>
         .grid-view {
             display: grid;
-            /* 150px min, 100px max? See note below */
-            grid-template-columns: repeat(auto-fill, minmax(60px, 100px));
+            grid-template-columns: repeat(auto-fill, minmax(60px, 120px));
             gap: 0.5rem;
+        }
+
+        .grid-view .file-node-wrapper {
+            background-color: #1f2937; /* bg-gray-800 */
+            border-radius: 0.5rem; /* rounded */
+            cursor: pointer;
+            padding: 0.25rem;
+        }
+
+        .grid-view .file-node-wrapper:hover {
+            background-color: #374151; /* hover:bg-gray-700 */
         }
 
         .grid-view .file-node {
@@ -17,13 +27,6 @@
             flex-direction: column;
             align-items: center;
             height: 8rem; /* h-32 in Tailwind ~ 8rem */
-            background-color: #1f2937; /* bg-gray-800 */
-            border-radius: 0.5rem; /* rounded */
-            cursor: pointer;
-        }
-
-        .grid-view .file-node:hover {
-            background-color: #374151; /* hover:bg-gray-700 */
         }
 
         .grid-view .file-node .icon {
@@ -71,6 +74,10 @@
             -webkit-line-clamp: 3;
             -webkit-box-orient: vertical;
             line-height: 1rem;
+            width: 100%;
+            min-width: 0;
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
 
         /* List View */
@@ -79,6 +86,10 @@
             flex-direction: column;
             gap: 0.25rem; /* gap-2 */
             align-items: center;
+        }
+
+        .list-view .file-node-wrapper {
+            padding: 0;
         }
 
         .list-view .file-node {
@@ -250,6 +261,12 @@
             </div>
         </div>
 
+        <!-- Error Message -->
+        <div id="error-message-container"
+             class="hidden flex flex-col bg-red-900 border border-red-700 text-red-300 p-3 rounded-lg">
+            <span>Error something</span>
+        </div>
+
         <!-- Submit Button -->
         <button id="submit-btn"
                 type="submit"
@@ -258,10 +275,12 @@
         </button>
 
         <div id="file-view-container" class="grid-view grid text-xs">
-            <div class="file-node !hidden">
-                <div class="icon flex items-center justify-center">
-                </div>
-                <div class="name text-center line-clamp-3" title="">
+            <div class="file-node-wrapper !hidden">
+                <div class="file-node">
+                    <div class="icon flex items-center justify-center">
+                    </div>
+                    <div class="name" title="">
+                    </div>
                 </div>
             </div>
         </div>
@@ -297,7 +316,7 @@
 </div>
 
 
-<script type="module" src="file-manager-page.js"></script>
+<script type="module" src="/static/js/file-manager/file-manager-page.js"></script>
 
 </body>
 </html>

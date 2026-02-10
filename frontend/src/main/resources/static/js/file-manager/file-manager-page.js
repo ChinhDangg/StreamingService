@@ -2,7 +2,8 @@ import {
     uploadFile,
     startUploadSession,
     validateDirectory, endUploadSession,
-} from "./upload-file.js";
+} from "/static/js/upload/upload-file.js";
+import {apiRequest} from "/static/js/common.js";
 
 const view = document.getElementById("file-view-container");
 
@@ -28,10 +29,10 @@ listBtn.addEventListener("click", function () {
 });
 
 async function getRootDir() {
-    const rootDir = await fetch('/api/file/root');
+    const rootDir = await apiRequest('/api/file/root');
     if (!rootDir.ok) {
         alert('Failed to get root directory');
-        return;
+        return null;
     }
     return rootDir.json();
     // return [
@@ -50,14 +51,14 @@ async function getRootDir() {
     // ]
 }
 
-async function getFilesInDir(dirPath) {
-    const files = await fetch('/api/file/dir', {
+async function getFilesInDir(dirId) {
+    const files = await apiRequest('/api/file/dir', {
         method: 'POST',
-        body: dirPath
+        body: dirId
     });
     if (!files.ok) {
         alert('Failed to get files in directory');
-        return;
+        return null;
     }
     return files.json();
     // return [
@@ -89,7 +90,7 @@ async function getFilesInDir(dirPath) {
 }
 
 const fileViewContainer = document.getElementById('file-view-container');
-const fileNodeTem = fileViewContainer.querySelector('.file-node');
+const fileNodeTem = fileViewContainer.querySelector('.file-node-wrapper');
 
 const iconContainer = document.getElementById('icon-container');
 
@@ -130,11 +131,11 @@ function displayFileItem(fileItems) {
             fileNode.addEventListener('click', async function () {
                 if (isProcessing) return;
                 isProcessing = true;
-                const subFiles = await getFilesInDir(getDirPath(item.path, item.name));
+                const subFiles = await getFilesInDir(item.id);
                 isProcessing = false;
                 if (!subFiles) return;
                 displayFileItem(subFiles);
-                addToCurrentPath(item.path, item.name, fileType);
+                addToCurrentPath(item.id, item.name, fileType);
             });
         }
         fileViewContainer.appendChild(fileNode);
@@ -146,7 +147,7 @@ const currentPathStack = [];
 const pathBar = document.getElementById('path-bar');
 const pathNodeTem = pathBar.querySelector('.path-node');
 const currentPathText = document.getElementById('current-path');
-function addToCurrentPath(path, name, fileType, isRoot = false) {
+function addToCurrentPath(id, name, fileType, isRoot = false) {
     const pathNode = helperCloneAndUnHideNode(pathNodeTem);
     pathNode.innerText = name;
     pathBar.appendChild(pathNode);
@@ -154,7 +155,7 @@ function addToCurrentPath(path, name, fileType, isRoot = false) {
     span.innerText = '/';
     pathBar.appendChild(span);
     currentPathText.innerText = name;
-    currentPathStack.push({name: name, fileType: fileType, path: path});
+    currentPathStack.push({id: id, name: name, fileType: fileType});
     const thisIndex = currentPathStack.length - 1;
     console.log(thisIndex, currentPathStack[thisIndex]);
     pathNode.addEventListener('click', async function () {
@@ -164,8 +165,7 @@ function addToCurrentPath(path, name, fileType, isRoot = false) {
             removeLastPathStack();
         }
         currentPathText.innerText = currentPathStack[thisIndex].name;
-        const thisPath = currentPathStack[thisIndex].path;
-        const subFiles = isRoot ? await getRootDir() : await getFilesInDir(getDirPath(thisPath, currentPathStack[thisIndex].name));
+        const subFiles = isRoot ? (await getRootDir()).children : await getFilesInDir(currentPathStack[thisIndex].id);
         isProcessing = false;
         if (!subFiles) return;
         displayFileItem(subFiles);
@@ -196,27 +196,27 @@ pathBackBtn.addEventListener('click', async function () {
     if (currentPathStack.length <= 1) return;
     isProcessing = true;
     removeLastPathStack();
-    currentPathText.innerText = currentPathStack[currentPathStack.length - 1].name;
-    const thisPath = currentPathStack[currentPathStack.length - 1].path;
+    const lastPath = getCurrentPath();
+    currentPathText.innerText = lastPath.name;
     const subFiles = currentPathStack.length === 1
-        ? await getRootDir()
-        : await getFilesInDir(getDirPath(thisPath, currentPathStack[currentPathStack.length - 1].name));
+        ? (await getRootDir()).children
+        : await getFilesInDir(lastPath.id);
+    console.log(subFiles);
     isProcessing = false;
     if (!subFiles) return;
     displayFileItem(subFiles);
 });
 
 async function initialize() {
-    const fileAtRoot = await getRootDir();
-    if (!fileAtRoot) return;
-    displayFileItem(fileAtRoot);
-    if (fileAtRoot.length) {
-        addToCurrentPath(fileAtRoot[0].path, fileAtRoot[0].path, 'DIR', true);
-    }
+    const rootInfo = await getRootDir();
+    if (!rootInfo) return;
+    addToCurrentPath(rootInfo.rootId, rootInfo.rootName, 'DIR', true);
+    displayFileItem(rootInfo.children);
 }
 
-//initialize();
-
+window.addEventListener('DOMContentLoaded', async function () {
+    await initialize();
+})
 
 const fileDropZone = document.getElementById('file-zone');
 const fileInput = document.getElementById('file-input');
@@ -336,7 +336,11 @@ sortSelection.addEventListener('change', function () {
 })
 
 function sortFileAndDisplay(fileList) {
-    if (fileList.length <= 1) return;
+    if (fileList.length === 0) return;
+    else if (fileList.length === 1) {
+        addUploadingFile(fileList[0].name);
+        return;
+    }
     const sortSelectionValue = sortSelection.value;
     switch (sortSelectionValue) {
         case 'name-asc':
@@ -451,7 +455,12 @@ submitBtn.addEventListener('click', async function () {
 async function uploadFiles(fileList) {
     const mediaType = allVideo ? 'VIDEO' : 'ALBUM';
     const currentFullPath = getFullCurrentPath();
-    let sessionId = allVideo ? null : await startUploadSession(getDirPath(currentFullPath, ''), mediaType);
+    let sessionId = allVideo ? null : await startUploadSession(getDirPath(currentFullPath, savingPath), mediaType);
+
+    if (sessionId === null && !allVideo) {
+        alert('Failed to start upload session');
+        return;
+    }
 
     const endSession = async (sessionId, title) => {
         const basicInfo = {
@@ -495,7 +504,7 @@ async function uploadFiles(fileList) {
                 showProgress
             );
             if (!passed) {
-                uploadingFiles.get(file).sessionId = sId;
+                uploadingFiles.get(file.file).sessionId = sId;
                 displayFailTexts(currentFailTexts);
             } else if (allVideo) {
                 await endSession(sId, file.name.substring(file.name.lastIndexOf('/') + 1));
@@ -509,7 +518,7 @@ async function uploadFiles(fileList) {
     }
 
     if (!allVideo) {
-        const response = await fetch('api/upload/media/end-session-unfinished', {
+        const response = await apiRequest('/api/upload/media/end-session-unfinished', {
             method: 'POST',
             body: sessionId
         });
