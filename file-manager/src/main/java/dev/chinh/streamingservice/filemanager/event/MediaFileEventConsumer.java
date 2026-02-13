@@ -1,8 +1,10 @@
-package dev.chinh.streamingservice.filemanager;
+package dev.chinh.streamingservice.filemanager.event;
 
+import com.mongodb.client.result.UpdateResult;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
+import dev.chinh.streamingservice.filemanager.*;
 import dev.chinh.streamingservice.filemanager.config.KafkaConfig;
 import io.minio.Result;
 import io.minio.messages.Item;
@@ -31,7 +33,7 @@ public class MediaFileEventConsumer {
     private final MinIOService minIOService;
     private final FileService fileService;
 
-    private void onCreateUnfinishedMediaFile(MediaUpdateEvent.MediaUnfinishedCreated event) {
+    private void onCreateMediaFile(MediaUpdateEvent.MediaFileCreated event) {
         System.out.println("Received unfinished media create event");
         try {
             HashMap<String, String> folderIdMap = new HashMap<>();
@@ -53,11 +55,12 @@ public class MediaFileEventConsumer {
                         currentPath += parts[i] + "/";
                     }
                 }
+                String objectName = parts[parts.length - 1];
                 FileSystemItem fileItem = FileSystemItem.builder()
                         .parentId(parentId)
                         .path(currentPath)
-                        .name(parts[parts.length - 1])
-                        .fileType(FileType.FILE)
+                        .name(objectName)
+                        .fileType(FileType.detectFileTypeFromMediaType(MediaType.detectMediaType(objectName)))
                         .uploadDate(Instant.now())
                         .build();
                 mongoTemplate.insert(fileItem);
@@ -67,7 +70,11 @@ public class MediaFileEventConsumer {
         }
     }
 
-    private void onCreateMediaFile(MediaUpdateEvent.MediaCreatedReady event) {
+    private void onCreateMedia(MediaUpdateEvent.MediaCreatedReady event) {
+        if (event.fileId() != null) {
+            onCompleteFileToMedia(event);
+            return;
+        }
         System.out.println("Received media create event: " + event.mediaId());
         try {
             String rootId = fileService.getRootFolderId();
@@ -105,7 +112,7 @@ public class MediaFileEventConsumer {
                     FileSystemItem albumItem = FileSystemItem.builder()
                             .parentId(saved.getId())
                             .path(saved.getPath() + saved.getName() + '/')
-                            .fileType(FileType.FILE)
+                            .fileType(FileType.detectFileTypeFromMediaType(MediaType.detectMediaType(fileName)))
                             .name(fileName)
                             .size(result.get().size())
                             .uploadDate(Instant.now())
@@ -115,6 +122,22 @@ public class MediaFileEventConsumer {
             }
         } catch (Exception e) {
             throw new RuntimeException("Failed to create media file", e);
+        }
+    }
+
+    private void onCompleteFileToMedia(MediaUpdateEvent.MediaCreatedReady event) {
+        System.out.println("Received media create event from file: " + event.mediaId());
+        try {
+            UpdateResult result = fileService.updateFileToMedia(
+                    event.fileId(),
+                    event.mediaId(),
+                    FileType.detectFileTypeFromMediaType(event.mediaType()),
+                    event.thumbnail()
+            );
+            if (result.getModifiedCount() != 1)
+                throw new RuntimeException("Failed to update file to media");
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create media from file", e);
         }
     }
 
@@ -149,8 +172,8 @@ public class MediaFileEventConsumer {
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) {
         try {
             switch (event) {
-                case MediaUpdateEvent.MediaUnfinishedCreated e -> onCreateUnfinishedMediaFile(e);
-                case MediaUpdateEvent.MediaCreatedReady e -> onCreateMediaFile(e);
+                case MediaUpdateEvent.MediaFileCreated e -> onCreateMediaFile(e);
+                case MediaUpdateEvent.MediaCreatedReady e -> onCreateMedia(e);
                 default ->
                     System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
             }
@@ -175,7 +198,7 @@ public class MediaFileEventConsumer {
         System.out.printf("Error Message: %s\n", message);
 
         switch (event) {
-            case MediaUpdateEvent.MediaUnfinishedCreated e ->
+            case MediaUpdateEvent.MediaFileCreated e ->
                 System.out.println("Received unfinished media create event: " + e.objectNames().getFirst());
             case MediaUpdateEvent.MediaCreatedReady e ->
                 System.out.println("Received media create event: " + e.mediaId());
