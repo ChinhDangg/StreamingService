@@ -37,7 +37,8 @@ public interface MediaUpdateEvent {
             String thumbnail,
             long size,
             Instant uploadDate,
-            boolean searchable
+            boolean searchable,
+            String fileId
     ) implements MediaUpdateEvent{}
 
     record MediaThumbnailUpdatedReady(
@@ -86,7 +87,8 @@ public interface MediaUpdateEvent {
             long mediaId,
             MediaType mediaType,
             String thumbnailObject,
-            boolean searchable
+            boolean searchable,
+            String fileId
     ) implements MediaUpdateEvent {}
 
     record NameEntityCreated(
@@ -105,7 +107,16 @@ public interface MediaUpdateEvent {
 
 
     // for file-manager
-    record MediaUnfinishedCreated(
+    record MediaFileCreated(
             List<String> objectNames
+    ) implements MediaUpdateEvent {}
+
+
+    // for upload
+    record FileToMediaInitiated(
+            String fileId,
+            MediaType mediaType,
+            String objectName,
+            Instant uploadDate
     ) implements MediaUpdateEvent {}
 }

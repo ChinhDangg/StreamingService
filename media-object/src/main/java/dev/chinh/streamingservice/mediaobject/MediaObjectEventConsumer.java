@@ -162,7 +162,8 @@ public class MediaObjectEventConsumer {
                     mediaMetaData.getThumbnail(),
                     mediaMetaData.getSize(),
                     mediaMetaData.getUploadDate(),
-                    event.searchable()
+                    event.searchable(),
+                    event.fileId()
             ));
         } catch (Exception e) {
             System.err.println("Failed to update media enrichment: " + event.mediaId());
@@ -286,7 +287,7 @@ public class MediaObjectEventConsumer {
     @Transactional
     @KafkaListener(topics = {
             EventTopics.MEDIA_ALL_TOPIC,
-            EventTopics.MEDIA_OBJECT_TOPIC
+            EventTopics.MEDIA_OBJECT_TOPIC,
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws Exception {
         try {
