@@ -20,4 +20,14 @@ public class FileManagerController {
     public ResponseEntity<?> getDirectoryContents(@RequestBody String directoryId) {
         return ResponseEntity.ok(fileService.findFilesInDirectory(directoryId));
     }
+
+    @PostMapping("/vid/{fileId}")
+    public ResponseEntity<?> addFileAsVideo(@PathVariable String fileId) {
+        return ResponseEntity.ok(fileService.addFileAsVideo(fileId));
+    }
+
+    @PostMapping("/album/${fileId")
+    public ResponseEntity<?> addDirectoryAsAlbum(@PathVariable String fileId) {
+        return ResponseEntity.ok(fileService.addDirectoryAsAlbum(fileId));
+    }
 }

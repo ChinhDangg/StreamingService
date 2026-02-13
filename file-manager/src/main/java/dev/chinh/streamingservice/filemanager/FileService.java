@@ -1,14 +1,22 @@
 package dev.chinh.streamingservice.filemanager;
 
 import com.mongodb.client.result.UpdateResult;
+import dev.chinh.streamingservice.common.constant.MediaType;
+import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
+import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.common.validation.FileSystemValidator;
+import dev.chinh.streamingservice.filemanager.event.MediaFileEventProducer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.data.mongodb.MongoTransactionException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.lang.NonNull;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -29,6 +37,7 @@ public class FileService {
 
     private final FileSystemRepository fileSystemRepository;
     private final MongoTemplate mongoTemplate;
+    private final MediaFileEventProducer eventPublisher;
 
     private final String mediaPath = "media";
 
@@ -43,6 +52,73 @@ public class FileService {
 
     public List<FileSystemItem> findFilesInDirectory(String parentId) {
         return fileSystemRepository.findByParentId(parentId);
+    }
+
+    @Retryable(
+            retryFor = { QueryTimeoutException.class, MongoTransactionException.class },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2)
+    )
+    public String addFileAsVideo(String fileId) {
+        FileSystemItem item = getFileSystemItem(fileId);
+        if (item.getFileType() != FileType.VIDEO) {
+            throw new IllegalArgumentException("File is not a video");
+        }
+        if (item.getMId() != null && item.getMId() != 0) {
+            return "Item is already marked as video";
+        }
+        fileSystemRepository.updateMId(fileId, -1L);
+        String fileFullName = item.getPath() + item.getName();
+        if (fileFullName.startsWith(mediaPath))
+            fileFullName = fileFullName.substring(mediaPath.length() + 1);
+        eventPublisher.publishCreatedFinishedMedia(new MediaUpdateEvent.FileToMediaInitiated(fileId, MediaType.VIDEO, fileFullName, item.getUploadDate()));
+        return "Added as video";
+    }
+
+    @Retryable(
+            retryFor = { QueryTimeoutException.class, MongoTransactionException.class },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2)
+    )
+    public String addDirectoryAsAlbum(String fileId) {
+        FileSystemItem item = getFileSystemItem(fileId);
+        if (item.getFileType() == FileType.ALBUM) {
+            return "Item is already an album";
+        }
+        if (item.getFileType() != FileType.DIR) {
+            throw new IllegalArgumentException("File is not a directory");
+        }
+        if (item.getMId() != null && item.getMId() != 0) {
+            return "Item is already marked as media";
+        }
+        fileSystemRepository.updateMId(fileId, -1L);
+        String path = item.getPath();
+        if (path.startsWith(mediaPath)) {
+            path = path.substring(mediaPath.length() + 1);
+        }
+        eventPublisher.publishCreatedFinishedMedia(new MediaUpdateEvent.FileToMediaInitiated(fileId, MediaType.ALBUM, path, item.getUploadDate()));
+        return "Added as album";
+    }
+
+    @Retryable(
+            retryFor = { QueryTimeoutException.class, MongoTransactionException.class },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2)
+    )
+    public UpdateResult updateFileToMedia(String fileId, long mediaId, FileType fileType, String thumbnailObject) {
+        Query query = new Query(Criteria.where("id").is(fileId));
+        Update update = new Update()
+                .set("mId", mediaId)
+                .set("fileType", fileType)
+                .set("thumbnail", thumbnailObject);
+        return mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+    }
+
+
+    private FileSystemItem getFileSystemItem(String id) {
+        return fileSystemRepository.findById(id).orElseThrow(() ->
+                new ResourceNotFoundException("File not found with id: " + id)
+        );
     }
 
     public String getRootFolderName() {
