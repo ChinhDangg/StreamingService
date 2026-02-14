@@ -65,11 +65,11 @@ public class MediaEventProducer {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publishDeleteNameEntityIndexOpenSearch(MediaUpdateEvent.NameEntityDeleted event) {
-        kafkaTemplate.send(EventTopics.MEDIA_ALL_TOPIC, event);
+        kafkaTemplate.send(EventTopics.MEDIA_SEARCH_BACKUP_AND_OBJECT_TOPIC, event);
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publishUpdateNameEntityThumbnail(MediaUpdateEvent.NameEntityThumbnailUpdatedReady event) {
-        kafkaTemplate.send(EventTopics.MEDIA_ALL_TOPIC, event);
+        kafkaTemplate.send(EventTopics.MEDIA_SEARCH_BACKUP_AND_OBJECT_TOPIC, event);
     }
 }

@@ -68,10 +68,22 @@ public class KafkaRedPandaConfig {
                         .config("retention.ms", "604800000") // delete after 7 days // if use for replay then use longer day
                         .config("segment.bytes", "100048576")
                         .build(),
+                TopicBuilder.name(EventTopics.MEDIA_UPLOAD_TOPIC)
+                        .partitions(1)
+                        .replicas(1)
+                        .config("retention.ms", "604800000") // delete after 7 days // if use for replay then use longer day
+                        .config("segment.bytes", "100048576")
+                        .build(),
                 TopicBuilder.name(EventTopics.MEDIA_OBJECT_TOPIC)
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000") // delete after 7 days // if use for replay then use longer day
+                        .config("segment.bytes", "100048576")
+                        .build(),
+                TopicBuilder.name(EventTopics.MEDIA_SEARCH_BACKUP_AND_OBJECT_TOPIC)
+                        .partitions(1)
+                        .replicas(1)
+                        .config("retention.ms", "604800000")
                         .config("segment.bytes", "100048576")
                         .build(),
                 TopicBuilder.name(EventTopics.MEDIA_SEARCH_TOPIC)
@@ -93,12 +105,6 @@ public class KafkaRedPandaConfig {
                         .config("segment.bytes", "100048576")
                         .build(),
                 TopicBuilder.name(EventTopics.MEDIA_SEARCH_BACKUP_AND_FILE_TOPIC)
-                        .partitions(1)
-                        .replicas(1)
-                        .config("retention.ms", "604800000") // delete after 7 days // if use for replay then use longer day
-                        .config("segment.bytes", "100048576")
-                        .build(),
-                TopicBuilder.name(EventTopics.MEDIA_UPLOAD_TOPIC)
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000") // delete after 7 days // if use for replay then use longer day

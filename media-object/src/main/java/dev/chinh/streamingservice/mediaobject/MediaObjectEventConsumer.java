@@ -288,6 +288,7 @@ public class MediaObjectEventConsumer {
     @KafkaListener(topics = {
             EventTopics.MEDIA_ALL_TOPIC,
             EventTopics.MEDIA_OBJECT_TOPIC,
+            EventTopics.MEDIA_SEARCH_BACKUP_AND_OBJECT_TOPIC
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws Exception {
         try {
