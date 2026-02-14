@@ -492,7 +492,7 @@ public class OSUtil {
 
 
     public static String normalizePath(String baseDir, String relativePath) {
-        if (relativePath.startsWith("/")) {
+        if (relativePath.startsWith("/") || baseDir.endsWith("/")) {
             return baseDir + relativePath; // e.g. "/dir1" → "/chunks/dir1"
         }
         return baseDir + "/" + relativePath; // e.g. "dir1" → "/chunks/dir1"
