@@ -16,6 +16,7 @@
             border-radius: 0.5rem; /* rounded */
             cursor: pointer;
             padding: 0.25rem;
+            height: fit-content;
         }
 
         .grid-view .file-node-wrapper:hover {
@@ -196,85 +197,140 @@
     </div>
 </div>
 
-<div class="px-4 py-2 w-fit text-sm text-gray-300 border-b border-gray-700">
-    In: <span id="current-path">root</span>
+<div class="flex items-center ml-2 mt-1">
+    <button id="upload-toggle-btn"
+            class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-2 rounded-md transition duration-200">
+        <!-- Upload Icon (Heroicon SVG) -->
+        <svg xmlns="http://www.w3.org/2000/svg"
+             class="h-5 w-5"
+             fill="none"
+             viewBox="0 0 24 24"
+             stroke="currentColor">
+            <path stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4" />
+        </svg>
+        <span>Upload</span>
+    </button>
+    <div class="px-2 py-2 w-fit text-sm text-gray-300 border-b border-gray-700">
+        In: <span id="current-path">root</span>
+    </div>
 </div>
 
 <!-- Main Content -->
 <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
 
     <!-- File Explorer -->
-    <div id="file-zone" class="flex-1 p-4 overflow-auto">
-        <label for="file-input"
-                class="inline-flex items-center gap-2 cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus-within:ring-2 focus-within:ring-blue-400 focus-within:ring-offset-2">
-            📁 Upload files
-        </label>
-        <input id="file-input" type="file" multiple class="sr-only" />
-        <label for="folder-input"
-               class="inline-flex items-center gap-2 cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus-within:ring-2 focus-within:ring-blue-400 focus-within:ring-offset-2">
-            📁 Upload folder
-        </label>
-        <input id="folder-input" type="file" multiple webkitdirectory class="sr-only" />
-
-        <label class="flex items-center gap-2 mt-2 text-gray-300 text-sm cursor-pointer">
-            <input type="checkbox"
-                   name="upload_type"
-                   value="video"
-                   id="upload-video-checkbox"
-                   class="w-4 h-4 border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-gray-900" />
-            <span>Upload as Video(s)</span>
-        </label>
-
-        <div class="flex gap-2 mt-2 items-center">
-            <label for="sort-file-upload-select">Sort Upload:</label>
-            <select id="sort-file-upload-select" class="block w-56 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                <optgroup label="Name">
-                    <option value="name-asc" selected>Name (A → Z)</option>
-                    <option value="name-desc">Name (Z → A)</option>
-                </optgroup>
-
-                <optgroup label="Last modified">
-                    <option value="modified-asc">Last modified (Oldest)</option>
-                    <option value="modified-desc">Last modified (Newest)</option>
-                </optgroup>
-            </select>
-        </div>
-
-        <div class="mt-4 max-h-24 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white">
-            <ul id="upload-list" class="w-full divide-y divide-gray-200 text-sm">
-                <li class="px-3 truncate text-gray-800 !hidden">File Name</li>
-            </ul>
-        </div>
-
-        <!-- Upload Progress Bar -->
-        <div id="upload-progress" class="hidden w-full max-w-md rounded-lg bg-slate-900 p-4 shadow-md">
-            <div class="mb-2 flex items-center justify-between text-sm text-slate-300">
-                <span>Upload Progress:</span>
-                <span id="progress-percent">0%</span>
+    <div id="file-zone" class="flex-1 p-2 overflow-auto">
+        <div id="info-message-container" class="flex items-center gap-3 p-4 rounded-xl bg-indigo-100 border border-indigo-200 text-blue-800 shadow-sm">
+            <!-- Icon -->
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 class="w-5 h-5 mt-0.5 text-indigo-500"
+                 viewBox="0 0 20 20"
+                 fill="currentColor">
+                <path fill-rule="evenodd"
+                      d="M18 10A8 8 0 11 2 10a8 8 0 0116 0zm-8-3a1 1 0 100 2 1 1 0 000-2zm1 4a1 1 0 10-2 0v3a1 1 0 102 0v-3z"
+                      clip-rule="evenodd" />
+            </svg>
+            <div>
+                <p class="info-message text-sm">
+                </p>
             </div>
-            <div class="h-2 w-full overflow-hidden rounded-full bg-slate-700">
-                <div id="progress-bar-fill"
-                     class="h-full w-0 rounded-full
-                bg-linear-to-r from-blue-500 to-blue-400
-                transition-[width] duration-150 ease-out">
+        </div>
+
+        <div id="upload-container" class="mt-4">
+            <label for="file-input"
+                   class="inline-flex items-center gap-2 cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus-within:ring-2 focus-within:ring-indigo-400 focus-within:ring-offset-2">
+                <!-- File Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     class="w-6 h-6 text-white">
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5l5 5v11a2 2 0 01-2 2z" />
+                </svg>
+                Upload files
+            </label>
+            <input id="file-input" type="file" multiple class="sr-only" />
+            <label for="folder-input"
+                   class="inline-flex items-center gap-2 cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus-within:ring-2 focus-within:ring-indigo-400 focus-within:ring-offset-2">
+                <!-- Folder Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     class="w-6 h-6 text-white">
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+                </svg>
+                Upload folder
+            </label>
+            <input id="folder-input" type="file" multiple webkitdirectory class="sr-only" />
+
+            <label class="flex items-center w-fit gap-2 mt-2 text-gray-300 text-sm cursor-pointer">
+                <input type="checkbox"
+                       name="upload_type"
+                       value="video"
+                       id="upload-video-checkbox"
+                       class="w-4 h-4 border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-gray-900" />
+                <span>Upload as Video(s)</span>
+            </label>
+
+            <div class="flex gap-2 mt-2 items-center">
+                <label for="sort-file-upload-select">Sort Upload:</label>
+                <select id="sort-file-upload-select" class="block w-56 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <optgroup label="Name">
+                        <option value="name-asc" selected>Name (A → Z)</option>
+                        <option value="name-desc">Name (Z → A)</option>
+                    </optgroup>
+
+                    <optgroup label="Last modified">
+                        <option value="modified-asc">Last modified (Oldest)</option>
+                        <option value="modified-desc">Last modified (Newest)</option>
+                    </optgroup>
+                </select>
+            </div>
+
+            <div class="mt-4 max-h-24 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white">
+                <ul id="upload-list" class="w-full divide-y divide-gray-200 text-sm">
+                    <li class="px-3 truncate text-gray-800 !hidden">File Name</li>
+                </ul>
+            </div>
+
+            <!-- Upload Progress Bar -->
+            <div id="upload-progress" class="hidden w-full max-w-md rounded-lg bg-slate-900 p-4 shadow-md">
+                <div class="mb-2 flex items-center justify-between text-sm text-slate-300">
+                    <span>Upload Progress:</span>
+                    <span id="progress-percent">0%</span>
+                </div>
+                <div class="h-2 w-full overflow-hidden rounded-full bg-slate-700">
+                    <div id="progress-bar-fill"
+                         class="h-full w-0 rounded-full bg-linear-to-r from-blue-500 to-blue-400 transition-[width] duration-150 ease-out">
+                    </div>
                 </div>
             </div>
+
+            <!-- Error Message -->
+            <div id="error-message-container"
+                 class="hidden flex flex-col bg-red-900 border border-red-700 text-red-300 p-3 rounded-lg">
+                <span>Error something</span>
+            </div>
+
+            <!-- Submit Button -->
+            <button id="submit-btn"
+                    type="submit"
+                    class="w-fit px-4 py-2 mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow">
+                Submit
+            </button>
         </div>
 
-        <!-- Error Message -->
-        <div id="error-message-container"
-             class="hidden flex flex-col bg-red-900 border border-red-700 text-red-300 p-3 rounded-lg">
-            <span>Error something</span>
-        </div>
-
-        <!-- Submit Button -->
-        <button id="submit-btn"
-                type="submit"
-                class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg shadow">
-            Submit
-        </button>
-
-        <div id="file-view-container" class="grid-view grid text-xs">
+        <div id="file-view-container" class="mt-4 h-full grid-view grid text-xs border-t border-gray-700 pt-2">
             <div class="file-node-wrapper !hidden">
                 <div class="file-node">
                     <div class="icon flex items-center justify-center">
@@ -314,6 +370,39 @@
         </svg>
     </div>
 </div>
+
+
+<!-- Context Menu -->
+<div id="custom-right-menu" class="hidden fixed z-50 w-56 rounded-lg border border-gray-700 bg-gray-900 shadow-lg">
+    <ul class="py-2 text-sm text-gray-200">
+        <li>
+            <button class="new-folder-btn flex w-full items-center px-4 py-2 transition hover:bg-gray-800">
+                New Folder
+            </button>
+        </li>
+
+        <li>
+            <button class="add-as-video-btn flex w-full items-center px-4 py-2 transition hover:bg-gray-800">
+                Add as Video
+            </button>
+        </li>
+
+        <li>
+            <button class="add-as-album-btn flex w-full items-center px-4 py-2 transition hover:bg-gray-800">
+                Add as Album
+            </button>
+        </li>
+
+        <li class="my-1 border-t border-gray-700"></li>
+
+        <li>
+            <button class="flex w-full items-center px-4 py-2 text-red-400 transition hover:bg-red-500/10 hover:text-red-300">
+                Delete
+            </button>
+        </li>
+    </ul>
+</div>
+
 
 
 <script type="module" src="/static/js/file-manager/file-manager-page.js"></script>

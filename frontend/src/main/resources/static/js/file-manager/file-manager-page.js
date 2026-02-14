@@ -127,6 +127,7 @@ function displayFileItem(fileItems) {
         }
         fileNode.querySelector('.name').innerText = item.name;
         fileNode.querySelector('.name').title = item.name;
+        fileNode.dataset.id = item.id;
         if (fileType === 'DIR' || fileType === 'ALBUM') {
             fileNode.addEventListener('click', async function () {
                 if (isProcessing) return;
@@ -218,6 +219,13 @@ window.addEventListener('DOMContentLoaded', async function () {
     await initialize();
 })
 
+
+const uploadToggleButton = document.getElementById('upload-toggle-btn');
+const uploadContainer = document.getElementById('upload-container');
+uploadToggleButton.addEventListener('click', function () {
+    uploadContainer.classList.toggle('hidden');
+});
+
 const fileDropZone = document.getElementById('file-zone');
 const fileInput = document.getElementById('file-input');
 const folderInput = document.getElementById('folder-input');
@@ -238,7 +246,7 @@ async function handleFiles(files) {
             file: file
         });
     }
-    sortFileAndDisplay(fileList);
+    sortFileAndDisplayFileName(fileList);
 }
 
 folderInput.addEventListener('change', async (e) => {
@@ -256,7 +264,7 @@ async function handleFolderFiles(files) {
             file: file
         });
     }
-    sortFileAndDisplay(fileList);
+    sortFileAndDisplayFileName(fileList);
 }
 
 // prevent default drag behavior
@@ -302,7 +310,7 @@ async function handleFileArray(fileArray) {
             file: file.file
         });
     }
-    sortFileAndDisplay(fileList);
+    sortFileAndDisplayFileName(fileList);
 }
 
 async function traverseEntry(entry, filesArray, path = "") {
@@ -332,10 +340,10 @@ async function traverseEntry(entry, filesArray, path = "") {
 
 const sortSelection = document.getElementById('sort-file-upload-select');
 sortSelection.addEventListener('change', function () {
-    sortFileAndDisplay(fileList);
+    sortFileAndDisplayFileName(fileList);
 })
 
-function sortFileAndDisplay(fileList) {
+function sortFileAndDisplayFileName(fileList) {
     if (fileList.length === 0) return;
     else if (fileList.length === 1) {
         addUploadingFile(fileList[0].name);
@@ -593,4 +601,91 @@ function helperCloneAndUnHideNode(node) {
     const clone = node.cloneNode(true);
     clone.classList.remove('!hidden');
     return clone;
+}
+
+
+const customRightMenu = document.getElementById('custom-right-menu');
+const newFolderButton = customRightMenu.querySelector('.new-folder-btn');
+const addAsVideoButton = customRightMenu.querySelector('.add-as-video-btn');
+const addAsAlbumButton = customRightMenu.querySelector('.add-as-album-btn');
+
+let currentRightMenuTargetId = null;
+
+fileViewContainer.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    const targetNode = event.target.closest('.file-node-wrapper');
+
+    if (!targetNode) {
+        currentRightMenuTargetId = null;
+        addAsVideoButton.disabled = true;
+        addAsAlbumButton.disabled = true;
+        showCustomRightMenu(event.clientX, event.clientY);
+        return;
+    }
+
+    addAsVideoButton.disabled = false;
+    addAsAlbumButton.disabled = false;
+    showCustomRightMenu(event.clientX, event.clientY);
+
+    currentRightMenuTargetId = targetNode.getAttribute('data-id');
+});
+
+function showCustomRightMenu(posX, posY) {
+    customRightMenu.style.display = 'block';
+
+    const menuWidth = customRightMenu.offsetWidth;
+    const menuHeight = customRightMenu.offsetHeight;
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    // Horizontal Check
+    if (posX + menuWidth > windowWidth) {
+        posX = posX - menuWidth;
+    }
+    // Vertical Check
+    if (posY + menuHeight > windowHeight) {
+        posY = posY - menuHeight;
+    }
+    customRightMenu.style.left = `${posX}px`;
+    customRightMenu.style.top = `${posY}px`;
+}
+
+addAsVideoButton.addEventListener('click', async function () {
+    if (currentRightMenuTargetId === null) {
+        console.log('No target selected');
+        return;
+    }
+    const response = await apiRequest(`/api/file/vid/${currentRightMenuTargetId}`, {
+        method: 'POST'
+    });
+    if (!response.ok) {
+        alert('Failed to add as video: ' + await response.text());
+        return;
+    }
+    displayInfoMessage(await response.text());
+});
+
+addAsAlbumButton.addEventListener('click', async function () {
+    if (currentRightMenuTargetId === null) {
+        console.log('No target selected');
+        return;
+    }
+    const response = await apiRequest(`/api/file/album/${currentRightMenuTargetId}`, {
+        method: 'POST'
+    });
+    if (!response.ok) {
+        alert('Failed to add as album: ' + await response.text());
+    }
+    displayInfoMessage(await response.text());
+});
+
+document.addEventListener('click', () => {
+    customRightMenu.style.display = 'none';
+    currentRightMenuTargetId = null;
+});
+
+const infoMessageContainer = document.getElementById('info-message-container');
+function displayInfoMessage(message) {
+    infoMessageContainer.querySelector('.info-message').textContent = message;
+    infoMessageContainer.classList.remove('hidden');
+    setTimeout(() => infoMessageContainer.classList.add('hidden'), 5000);
 }
