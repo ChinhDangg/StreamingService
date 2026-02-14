@@ -38,7 +38,7 @@ public class MediaFileEventConsumer {
         try {
             HashMap<String, String> folderIdMap = new HashMap<>();
 
-            String rootId = fileService.getRootFolderId();
+            String rootId = fileService.getROOT_FOLDER_ID();
             for (String fileName : event.objectNames()) {
                 String currentPath = "/" + fileService.getRootFolderName() + "/";
                 String[] parts = fileName.split("/");
@@ -77,7 +77,7 @@ public class MediaFileEventConsumer {
         }
         System.out.println("Received media create event: " + event.mediaId());
         try {
-            String rootId = fileService.getRootFolderId();
+            String rootId = fileService.getROOT_FOLDER_ID();
             String currentPath = "/" + fileService.getRootFolderName() + "/";
             String parentId = rootId;
             String[] parts = event.path().split("/");

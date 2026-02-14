@@ -95,7 +95,7 @@ public class MediaObjectEventConsumer {
 
     @Transactional
     public void onCreateMedia(MediaUpdateEvent.MediaCreated event) throws Exception {
-        System.out.println("Received media enrichment update event: " + event.mediaId());
+        System.out.println("Received media enrichment update event: " + event.mediaId() + " " + event.mediaType());
         try {
             MediaMetaData mediaMetaData = getMediaMetadataById(event.mediaId());
             if (event.mediaType() == MediaType.VIDEO) {

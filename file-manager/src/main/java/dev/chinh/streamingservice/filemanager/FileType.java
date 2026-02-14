@@ -6,6 +6,9 @@ public enum FileType {
     DIR, FILE, VIDEO, IMAGE, ALBUM, ERROR;
 
     public static FileType detectFileTypeFromMediaType(MediaType mediaType) {
-        return mediaType == MediaType.VIDEO ? FileType.VIDEO : mediaType == MediaType.IMAGE ? FileType.IMAGE: FileType.FILE;
+        return mediaType == MediaType.VIDEO ? FileType.VIDEO
+                : mediaType == MediaType.ALBUM ? FileType.ALBUM
+                : mediaType == MediaType.IMAGE ? FileType.IMAGE
+                : FileType.FILE;
     }
 }

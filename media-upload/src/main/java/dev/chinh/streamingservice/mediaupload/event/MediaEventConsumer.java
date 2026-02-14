@@ -31,7 +31,7 @@ public class MediaEventConsumer {
                     event.objectName(), event.mediaType()
             );
             MediaBasicInfo mediaBasicInfo = new MediaBasicInfo(
-                    event.objectName().substring(event.objectName().lastIndexOf("/") + 1),
+                    event.objectName(),
                     (short) event.uploadDate().atOffset(ZoneOffset.UTC).getYear()
             );
             mediaUploadService.saveMedia(uploadRequest, mediaBasicInfo, event.fileId());
@@ -46,8 +46,11 @@ public class MediaEventConsumer {
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) {
         try {
-            if (event instanceof MediaUpdateEvent.FileToMediaInitiated) {
-                onInitiateFileToMedia((MediaUpdateEvent.FileToMediaInitiated) event);
+            switch (event) {
+                case MediaUpdateEvent.FileToMediaInitiated e -> onInitiateFileToMedia(e);
+                default -> {
+                    System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+                }
             }
             ack.acknowledge();
         } catch (Exception e) {

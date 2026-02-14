@@ -1,7 +1,9 @@
 package dev.chinh.streamingservice.filemanager;
 
 import com.mongodb.client.result.UpdateResult;
+import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.common.validation.FileSystemValidator;
@@ -39,15 +41,15 @@ public class FileService {
     private final MongoTemplate mongoTemplate;
     private final MediaFileEventProducer eventPublisher;
 
-    private final String mediaPath = "media";
+    private final String mediaPath = ContentMetaData.MEDIA_BUCKET;
 
-    public static String rootFolderId = null;
+    public static String ROOT_FOLDER_ID = null;
 
     public record FileRootResult(String rootId, String rootName, List<FileSystemItem> children) {}
 
     public FileRootResult findFilesAtRoot() {
-        List<FileSystemItem> items = fileSystemRepository.findByParentId(rootFolderId);
-        return new FileRootResult(getRootFolderId(), mediaPath, items);
+        List<FileSystemItem> items = fileSystemRepository.findByParentId(ROOT_FOLDER_ID);
+        return new FileRootResult(getROOT_FOLDER_ID(), mediaPath, items);
     }
 
     public List<FileSystemItem> findFilesInDirectory(String parentId) {
@@ -67,12 +69,10 @@ public class FileService {
         if (item.getMId() != null && item.getMId() != 0) {
             return "Item is already marked as video";
         }
-        fileSystemRepository.updateMId(fileId, -1L);
-        String fileFullName = item.getPath() + item.getName();
-        if (fileFullName.startsWith(mediaPath))
-            fileFullName = fileFullName.substring(mediaPath.length() + 1);
-        eventPublisher.publishCreatedFinishedMedia(new MediaUpdateEvent.FileToMediaInitiated(fileId, MediaType.VIDEO, fileFullName, item.getUploadDate()));
-        return "Added as video";
+        updateMId(fileId, -1L);
+        eventPublisher.publishCreatedFinishedMedia(new MediaUpdateEvent.FileToMediaInitiated(
+                fileId, MediaType.VIDEO, getFileItemPath(item.getPath(), item.getName()), item.getUploadDate()));
+        return "Processing as video";
     }
 
     @Retryable(
@@ -91,13 +91,27 @@ public class FileService {
         if (item.getMId() != null && item.getMId() != 0) {
             return "Item is already marked as media";
         }
-        fileSystemRepository.updateMId(fileId, -1L);
-        String path = item.getPath();
-        if (path.startsWith(mediaPath)) {
-            path = path.substring(mediaPath.length() + 1);
+        updateMId(fileId, -1L);
+        eventPublisher.publishCreatedFinishedMedia(new MediaUpdateEvent.FileToMediaInitiated(
+                fileId, MediaType.ALBUM, getFileItemPath(item.getPath(), item.getName()), item.getUploadDate()));
+        return "Processing as album";
+    }
+
+    private void updateMId(String fileId, long mid) {
+        Query query = new Query(Criteria.where("mId").is(fileId));
+        Update update = new Update().set("mId", mid);
+        mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+    }
+
+    private String getFileItemPath(String path, String name) {
+        String rootPath = "/" + mediaPath + "/";
+        if (path.startsWith(rootPath)) {
+            int begin = rootPath.length() + 1; // to start after "/"
+            if (begin > path.length()) // path probably == root path
+                return name;
+            return OSUtil.normalizePath(path.substring(begin), name);
         }
-        eventPublisher.publishCreatedFinishedMedia(new MediaUpdateEvent.FileToMediaInitiated(fileId, MediaType.ALBUM, path, item.getUploadDate()));
-        return "Added as album";
+        return OSUtil.normalizePath(path, name);
     }
 
     @Retryable(
@@ -125,8 +139,8 @@ public class FileService {
         return mediaPath;
     }
 
-    public String getRootFolderId() {
-        if (rootFolderId != null) return rootFolderId;
+    public String getROOT_FOLDER_ID() {
+        if (ROOT_FOLDER_ID != null) return ROOT_FOLDER_ID;
         Query query = new Query(Criteria
                 .where("name").is(mediaPath)
                 .and("path").is("/")
@@ -136,8 +150,8 @@ public class FileService {
 
         if (item == null) throw new RuntimeException("Failed to find root folder");
 
-        rootFolderId = item.getId();
-        return rootFolderId;
+        ROOT_FOLDER_ID = item.getId();
+        return ROOT_FOLDER_ID;
     }
 
     public void createRootFolder() {

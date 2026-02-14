@@ -11,6 +11,4 @@ public interface FileSystemRepository extends MongoRepository<FileSystemItem, St
     List<FileSystemItem> findByPath(String path);
 
     List<FileSystemItem> findByPathStartingWith(String path);
-
-    void updateMId(String id, Long mId);
 }

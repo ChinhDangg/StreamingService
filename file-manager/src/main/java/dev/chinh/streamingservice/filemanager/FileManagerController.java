@@ -26,7 +26,7 @@ public class FileManagerController {
         return ResponseEntity.ok(fileService.addFileAsVideo(fileId));
     }
 
-    @PostMapping("/album/${fileId")
+    @PostMapping("/album/{fileId}")
     public ResponseEntity<?> addDirectoryAsAlbum(@PathVariable String fileId) {
         return ResponseEntity.ok(fileService.addDirectoryAsAlbum(fileId));
     }
