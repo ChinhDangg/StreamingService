@@ -400,19 +400,21 @@ public class MediaUploadService {
     }
 
     private String validateObject(String object, MediaType mediaType) {
-        String error = FileSystemValidator.isValidPath(object);
-        if (error != null) {
-            throw new IllegalArgumentException(error);
+        var validationResult = FileSystemValidator.isValidPath(object);
+        if (validationResult.errorMessage() != null) {
+            throw new IllegalArgumentException(validationResult.errorMessage());
         }
 
+        String validatedPath = validationResult.validatedPath();
+
         if (mediaType == MediaType.VIDEO) {
-            int pathIndex = object.lastIndexOf("/");
+            int pathIndex = validatedPath.lastIndexOf("/");
             if (pathIndex == -1) { // no base dir for vid, set to vid folder - later save to user path or whatever
-                object = OSUtil.normalizePath(defaultVidPath, object);
+                validatedPath = defaultVidPath + "/" + validatedPath;
             }
         }
 
-        return object;
+        return validatedPath;
     }
 
     private void validateObjectWithMediaType(String object, MediaType mediaType) {

@@ -492,8 +492,10 @@ public class OSUtil {
 
 
     public static String normalizePath(String baseDir, String relativePath) {
-        if (relativePath.startsWith("/") || baseDir.endsWith("/")) {
-            return baseDir + relativePath; // e.g. "/dir1" → "/chunks/dir1"
+        baseDir = baseDir.trim().replace('\\', '/');
+        relativePath = relativePath.trim().replace('\\', '/');
+        if (baseDir.endsWith("/") || relativePath.startsWith("/")) {
+            return baseDir + relativePath; // e.g. "/dir1" → "/chunks/dir1" or "chunks/" → "/chunks/dir1/"
         }
         return baseDir + "/" + relativePath; // e.g. "dir1" → "/chunks/dir1"
     }

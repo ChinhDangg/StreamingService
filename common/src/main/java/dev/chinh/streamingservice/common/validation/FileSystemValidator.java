@@ -18,9 +18,11 @@ public class FileSystemValidator {
             "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
     };
 
-    public static String isValidPath(String path) {
+    public record ValidationResult(String validatedPath, String errorMessage) {}
+
+    public static ValidationResult isValidPath(String path) {
         if (path == null || path.isBlank()) {
-            return "Path must not be null or empty";
+            return new ValidationResult(null, "Path must not be null or empty");
         }
 
         // Trim whitespace
@@ -31,7 +33,7 @@ public class FileSystemValidator {
 
         // Cannot start or end with '/'
         if (path.startsWith("/") || path.endsWith("/")) {
-            return "Path must not start or end with '/";
+            return new ValidationResult(path, "Path must not start or end with '/");
         }
 
         // Split into segments
@@ -39,16 +41,16 @@ public class FileSystemValidator {
 
         for (String segment : segments) {
             if (segment.isBlank()) {
-                return "Path must not contain empty segments";
+                return new ValidationResult(path, "Path must not contain empty segments");
             }
 
             String error = isValidName(segment);
             if (error != null) {
-                return error;
+                return new ValidationResult(path, error);
             }
         }
 
-        return null;
+        return new ValidationResult(path, null);
     }
 
     public static String isValidName(String name) {
@@ -76,7 +78,7 @@ public class FileSystemValidator {
             return "Name cannot contain '..'";
         }
 
-        // 3. ALLOWED: Hidden folders (Starting with single dot)
+        // 3. Hidden folders (Starting with single dot)
         // If the name is ".myfolder", this is perfectly fine for a normal user.
         if (name.startsWith(".") && name.length() > 1 && !name.startsWith("..")) {
             // This is a valid hidden folder but not allowing for this service
