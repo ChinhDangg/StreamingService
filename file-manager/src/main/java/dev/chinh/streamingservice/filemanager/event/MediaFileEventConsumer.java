@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.regex.Pattern;
 
 @Service
 @AllArgsConstructor
@@ -128,7 +129,7 @@ public class MediaFileEventConsumer {
     private void onCompleteFileToMedia(MediaUpdateEvent.MediaCreatedReady event) {
         System.out.println("Received media create event from file: " + event.mediaId());
         try {
-            UpdateResult result = fileService.updateFileToMedia(
+            UpdateResult result = fileService.updateFileMetadataAsMedia(
                     event.fileId(),
                     event.mediaId(),
                     FileType.detectFileTypeFromMediaType(event.mediaType()),
@@ -165,7 +166,41 @@ public class MediaFileEventConsumer {
         return dir.getId();
     }
 
+    private void onDeleteMedia(MediaUpdateEvent.MediaDeleted event) {
+        System.out.println("Received media delete event: " + event.mediaId());
+        try {
+            if (event.mediaType() == MediaType.ALBUM) {
+                String parentPath = Pattern.quote(fileService.getPathForFileItem(event.path()));
+                // remove all children where path starts with parentPath
+                mongoTemplate.remove(new Query(Criteria
+                        .where("path").regex("^" + parentPath)), FileSystemItem.class);
+            }
+            mongoTemplate.remove(new Query(Criteria.where("mId").is(event.mediaId())), FileSystemItem.class);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to delete media", e);
+        }
+    }
+
+    private void onDeleteMediaFile(MediaUpdateEvent.MediaFileDeleted event) {
+        System.out.println("Received media file delete event: " + event.fileId());
+        try {
+            FileSystemItem fileItem = mongoTemplate.findById(event.fileId(), FileSystemItem.class);
+            if (fileItem == null) return;
+            if (fileItem.getFileType() == FileType.DIR) {
+                String parentPath = Pattern.quote(fileService.getPathForFileItem(fileItem.getPath()));
+                // remove all children where path starts with parentPath
+                mongoTemplate.remove(new Query(Criteria
+                        .where("path").regex("^" + parentPath)), FileSystemItem.class);
+            }
+            mongoTemplate.remove(new Query(Criteria.where("id").is(event.fileId())));
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to delete media file", e);
+        }
+    }
+
+
     @KafkaListener(topics = {
+            EventTopics.MEDIA_ALL_TOPIC,
             EventTopics.MEDIA_FILE_TOPIC,
             EventTopics.MEDIA_SEARCH_BACKUP_AND_FILE_TOPIC
     }, groupId = KafkaConfig.MEDIA_GROUP_ID)
@@ -174,6 +209,8 @@ public class MediaFileEventConsumer {
             switch (event) {
                 case MediaUpdateEvent.MediaFileCreated e -> onCreateMediaFile(e);
                 case MediaUpdateEvent.MediaCreatedReady e -> onCreateMedia(e);
+                case MediaUpdateEvent.MediaDeleted e -> onDeleteMedia(e);
+                case MediaUpdateEvent.MediaFileDeleted e -> onDeleteMediaFile(e);
                 default ->
                     System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
             }

@@ -111,6 +111,10 @@ public interface MediaUpdateEvent {
             List<String> objectNames
     ) implements MediaUpdateEvent {}
 
+    record MediaFileDeleted(
+            String fileId
+    ) implements MediaUpdateEvent {}
+
 
     // for upload
     record FileToMediaInitiated(

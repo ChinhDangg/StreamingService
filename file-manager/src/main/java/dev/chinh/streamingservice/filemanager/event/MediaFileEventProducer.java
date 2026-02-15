@@ -12,7 +12,11 @@ public class MediaFileEventProducer {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    public void publishCreatedFinishedMedia(MediaUpdateEvent.FileToMediaInitiated event) {
+    public void publishCreateFinishedMedia(MediaUpdateEvent.FileToMediaInitiated event) {
         kafkaTemplate.send(EventTopics.MEDIA_UPLOAD_TOPIC, event);
+    }
+
+    public void publishDeleteMediaFile(MediaUpdateEvent.MediaFileDeleted event) {
+        kafkaTemplate.send(EventTopics.MEDIA_FILE_TOPIC, event);
     }
 }
