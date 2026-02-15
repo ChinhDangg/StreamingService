@@ -30,4 +30,10 @@ public class FileManagerController {
     public ResponseEntity<?> addDirectoryAsAlbum(@PathVariable String fileId) {
         return ResponseEntity.ok(fileService.addDirectoryAsAlbum(fileId));
     }
+
+    @DeleteMapping("/{fileId}")
+    public ResponseEntity<?> deleteFile(@PathVariable String fileId) {
+        fileService.deleteFile(fileId);
+        return ResponseEntity.ok().build();
+    }
 }
