@@ -492,12 +492,10 @@ public class OSUtil {
 
 
     public static String normalizePath(String baseDir, String relativePath) {
-        baseDir = baseDir.trim().replace('\\', '/');
-        relativePath = relativePath.trim().replace('\\', '/');
-        if (baseDir.endsWith("/") || relativePath.startsWith("/")) {
-            return baseDir + relativePath; // e.g. "/dir1" → "/chunks/dir1" or "chunks/" → "/chunks/dir1/"
-        }
-        return baseDir + "/" + relativePath; // e.g. "dir1" → "/chunks/dir1"
+        String cleanBase = baseDir.trim().replace('\\', '/');
+        String cleanRelative = relativePath.trim().replace('\\', '/');
+
+        return (cleanBase + "/" + cleanRelative).replaceAll("/+", "/");
     }
 
     public static String runCommandAndLog(String[] cmd, List<Integer> acceptableCode) throws Exception {
