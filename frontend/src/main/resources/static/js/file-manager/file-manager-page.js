@@ -113,6 +113,14 @@ function displayFileItem(fileItems) {
     if (first) fileViewContainer.replaceChildren(first);
     currentFileItems = fileItems;
 
+    if (fileItems.length === 0) {
+        const emptyNode = document.createElement('div');
+        emptyNode.classList.add('flex', 'w-full', 'h-full', 'justify-center', 'items-center', 'absolute', 'text-lg')
+        emptyNode.innerText = 'No files found';
+        fileViewContainer.appendChild(emptyNode);
+        return;
+    }
+
     fileItems.forEach(item => {
         const fileNode = helperCloneAndUnHideNode(fileNodeTem);
         const fileType = item.fileType;
@@ -128,6 +136,8 @@ function displayFileItem(fileItems) {
         fileNode.querySelector('.name').innerText = item.name;
         fileNode.querySelector('.name').title = item.name;
         fileNode.dataset.id = item.id;
+        if (item.mid)
+            fileNode.dataset.mid = item.mid;
         if (fileType === 'DIR' || fileType === 'ALBUM') {
             fileNode.addEventListener('click', async function () {
                 if (isProcessing) return;
@@ -608,8 +618,10 @@ const customRightMenu = document.getElementById('custom-right-menu');
 const newFolderButton = customRightMenu.querySelector('.new-folder-btn');
 const addAsVideoButton = customRightMenu.querySelector('.add-as-video-btn');
 const addAsAlbumButton = customRightMenu.querySelector('.add-as-album-btn');
+const deleteFileButton = customRightMenu.querySelector('.delete-file-btn');
 
 let currentRightMenuTargetId = null;
+let currentRightMenuTargetMId = null;
 
 fileViewContainer.addEventListener('contextmenu', (event) => {
     event.preventDefault();
@@ -617,17 +629,23 @@ fileViewContainer.addEventListener('contextmenu', (event) => {
 
     if (!targetNode) {
         currentRightMenuTargetId = null;
+        currentRightMenuTargetMId = null;
         addAsVideoButton.disabled = true;
         addAsAlbumButton.disabled = true;
+        addAsVideoButton.classList.add('invisible');
+        addAsAlbumButton.classList.add('invisible');
         showCustomRightMenu(event.clientX, event.clientY);
         return;
     }
 
     addAsVideoButton.disabled = false;
     addAsAlbumButton.disabled = false;
+    addAsVideoButton.classList.remove('invisible');
+    addAsAlbumButton.classList.remove('invisible');
     showCustomRightMenu(event.clientX, event.clientY);
 
     currentRightMenuTargetId = targetNode.getAttribute('data-id');
+    currentRightMenuTargetMId = targetNode.getAttribute('data-mid');
 });
 
 function showCustomRightMenu(posX, posY) {
@@ -674,9 +692,42 @@ addAsAlbumButton.addEventListener('click', async function () {
     });
     if (!response.ok) {
         alert('Failed to add as album: ' + await response.text());
+        return
     }
     displayInfoMessage(await response.text());
 });
+
+deleteFileButton.addEventListener('click', async function () {
+    if (currentRightMenuTargetId === null && currentRightMenuTargetMId === null) {
+        console.log('No target selected');
+        return;
+    }
+    const confirmDelete = confirm('Are you sure to delete this file?');
+    if (!confirmDelete) return;
+    if (currentRightMenuTargetMId) {
+        if (Number.parseInt(currentRightMenuTargetMId) < 0) {
+            displayInfoMessage("Item is still processing: " + currentRightMenuTargetId, false);
+            return;
+        }
+        const response = await apiRequest(`/api/modify/media/${currentRightMenuTargetMId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            alert('Failed to delete media: ' + await response.text());
+            return
+        }
+        displayInfoMessage("Processing to delete media");
+        return;
+    }
+    const response = await apiRequest(`/api/file/${currentRightMenuTargetId}`, {
+        method: 'DELETE'
+    });
+    if (!response.ok) {
+        alert('Failed to delete file: ' + await response.text());
+        return
+    }
+    displayInfoMessage("Processing to delete file");
+})
 
 document.addEventListener('click', () => {
     customRightMenu.style.display = 'none';
@@ -684,8 +735,10 @@ document.addEventListener('click', () => {
 });
 
 const infoMessageContainer = document.getElementById('info-message-container');
-function displayInfoMessage(message) {
+function displayInfoMessage(message, hasTimeout = true) {
+    console.log(message);
     infoMessageContainer.querySelector('.info-message').textContent = message;
     infoMessageContainer.classList.remove('hidden');
-    setTimeout(() => infoMessageContainer.classList.add('hidden'), 5000);
+    if (hasTimeout)
+        setTimeout(() => infoMessageContainer.classList.add('hidden'), 5000);
 }

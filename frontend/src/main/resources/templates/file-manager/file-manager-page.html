@@ -86,7 +86,7 @@
             display: flex;
             flex-direction: column;
             gap: 0.25rem; /* gap-2 */
-            align-items: center;
+            align-items: start;
         }
 
         .list-view .file-node-wrapper {
@@ -197,49 +197,54 @@
     </div>
 </div>
 
-<div class="flex items-center ml-2 mt-1">
-    <button id="upload-toggle-btn"
-            class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-2 rounded-md transition duration-200">
-        <!-- Upload Icon (Heroicon SVG) -->
+<div class="px-2">
+    <div class="flex items-center mt-1">
+        <button id="upload-toggle-btn"
+                class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-2 rounded-md transition duration-200">
+            <!-- Upload Icon (Heroicon SVG) -->
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 class="h-5 w-5"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor">
+                <path stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4" />
+            </svg>
+            <span>Upload</span>
+        </button>
+        <div class="px-2 py-2 w-fit text-sm text-gray-300 border-b border-gray-700">
+            In: <span id="current-path">root</span>
+        </div>
+    </div>
+</div>
+
+<div id="info-message-container" class="px-2 mt-4 hidden">
+    <div class="flex items-center gap-3 p-4 rounded-xl bg-indigo-100 border border-indigo-200 text-blue-800 shadow-sm">
+        <!-- Icon -->
         <svg xmlns="http://www.w3.org/2000/svg"
-             class="h-5 w-5"
-             fill="none"
-             viewBox="0 0 24 24"
-             stroke="currentColor">
-            <path stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4" />
+             class="w-5 h-5 mt-0.5 text-indigo-500"
+             viewBox="0 0 20 20"
+             fill="currentColor">
+            <path fill-rule="evenodd"
+                  d="M18 10A8 8 0 11 2 10a8 8 0 0116 0zm-8-3a1 1 0 100 2 1 1 0 000-2zm1 4a1 1 0 10-2 0v3a1 1 0 102 0v-3z"
+                  clip-rule="evenodd" />
         </svg>
-        <span>Upload</span>
-    </button>
-    <div class="px-2 py-2 w-fit text-sm text-gray-300 border-b border-gray-700">
-        In: <span id="current-path">root</span>
+        <div>
+            <p class="info-message text-sm">
+            </p>
+        </div>
     </div>
 </div>
 
 <!-- Main Content -->
-<div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+<div class="flex-1 mt-2 flex flex-col md:flex-row overflow-hidden relative">
 
     <!-- File Explorer -->
     <div id="file-zone" class="flex-1 p-2 overflow-auto">
-        <div id="info-message-container" class="flex items-center gap-3 p-4 rounded-xl bg-indigo-100 border border-indigo-200 text-blue-800 shadow-sm">
-            <!-- Icon -->
-            <svg xmlns="http://www.w3.org/2000/svg"
-                 class="w-5 h-5 mt-0.5 text-indigo-500"
-                 viewBox="0 0 20 20"
-                 fill="currentColor">
-                <path fill-rule="evenodd"
-                      d="M18 10A8 8 0 11 2 10a8 8 0 0116 0zm-8-3a1 1 0 100 2 1 1 0 000-2zm1 4a1 1 0 10-2 0v3a1 1 0 102 0v-3z"
-                      clip-rule="evenodd" />
-            </svg>
-            <div>
-                <p class="info-message text-sm">
-                </p>
-            </div>
-        </div>
 
-        <div id="upload-container" class="mt-4">
+        <div id="upload-container">
             <label for="file-input"
                    class="inline-flex items-center gap-2 cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus-within:ring-2 focus-within:ring-indigo-400 focus-within:ring-offset-2">
                 <!-- File Icon -->
@@ -340,6 +345,8 @@
                 </div>
             </div>
         </div>
+
+        <div class="min-h-16"></div>
     </div>
 
     <div id="icon-container" class="hidden">
@@ -396,7 +403,7 @@
         <li class="my-1 border-t border-gray-700"></li>
 
         <li>
-            <button class="flex w-full items-center px-4 py-2 text-red-400 transition hover:bg-red-500/10 hover:text-red-300">
+            <button class="delete-file-btn flex w-full items-center px-4 py-2 text-red-400 transition hover:bg-red-500/10 hover:text-red-300">
                 Delete
             </button>
         </li>
