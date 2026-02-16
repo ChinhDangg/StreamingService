@@ -139,7 +139,8 @@ public class MediaBackupEventConsumer {
             System.err.println("Unknown media type: " + event.mediaType());
         }
 
-        deleteThumbnailBackup(event.thumbnail());
+        if (event.thumbnail() != null)
+            deleteThumbnailBackup(event.thumbnail());
     }
 
     private void createThumbnailBackup(String newThumbnail) throws Exception {
@@ -214,8 +215,9 @@ public class MediaBackupEventConsumer {
 
     @KafkaListener(topics = {
             EventTopics.MEDIA_ALL_TOPIC,
-            EventTopics.MEDIA_SEARCH_BACKUP_AND_FILE_TOPIC,
+            EventTopics.MEDIA_OBJECT_AND_BACKUP_TOPIC,
             EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC,
+            EventTopics.MEDIA_SEARCH_BACKUP_AND_FILE_TOPIC,
             EventTopics.MEDIA_SEARCH_BACKUP_AND_OBJECT_TOPIC
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws Exception {
