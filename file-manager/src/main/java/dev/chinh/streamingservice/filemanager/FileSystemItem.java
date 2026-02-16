@@ -27,7 +27,7 @@ public class FileSystemItem {
 
     private FileType fileType;
 
-    @Indexed(unique = true)
+    @Indexed
     private Long mId;
     private String name;
     private String thumbnail;
