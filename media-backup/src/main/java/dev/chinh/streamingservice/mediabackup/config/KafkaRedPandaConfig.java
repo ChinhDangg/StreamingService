@@ -136,6 +136,8 @@ public class KafkaRedPandaConfig {
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, fixedBackOff);
 
         errorHandler.addNotRetryableExceptions(FileAlreadyExistsException.class);
+        errorHandler.addNotRetryableExceptions(NullPointerException.class);
+        errorHandler.addNotRetryableExceptions(IllegalArgumentException.class);
 
         return errorHandler;
     }
