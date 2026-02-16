@@ -100,6 +100,21 @@ services:
       - ./postgres_data:/var/lib/postgresql
       - ./postgres/initdb.d:/docker-entrypoint-initdb.d
 
+  postgres-init:
+    image: postgres:18
+    depends_on:
+      - postgres
+    restart: "no"
+    entrypoint: [ "/bin/bash", "/scripts/bootstrap.sh" ]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_SUPERUSER: ${DB_USERNAME}
+      DB_SUPERUSER_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./postgres/initdb.d:/scripts
+
   redpanda:
     image: redpandadata/redpanda:v25.2.12
     container_name: redpanda_kafka
@@ -116,21 +131,6 @@ services:
       - --node-id=0
       - --check=false
 
-  bootstrap:
-    image: postgres:18
-    depends_on:
-      - postgres
-    restart: "no"
-    entrypoint: [ "/bin/bash", "/scripts/bootstrap.sh" ]
-    environment:
-      DB_HOST: postgres
-      DB_PORT: ${DB_PORT}
-      DB_NAME: ${DB_NAME}
-      DB_SUPERUSER: ${DB_USERNAME}
-      DB_SUPERUSER_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - ./postgres/initdb.d:/scripts
-
   mongodb:
     image: mongo:7
     container_name: mongodb
@@ -140,8 +140,26 @@ services:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: strongpassword
       MONGO_INITDB_DATABASE: media_catalog
+    # Starts mongo with replica set mode enabled
+    command: [ "--replSet", "rs0", "--bind_ip_all", "--keyFile", "/data/configdb/mongo-keyfile" ]
+    healthcheck:
+      test: [ "CMD", "mongosh", "--username", "admin", "--password", "strongpassword", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     volumes:
       - ./mongo_data:/data/db
+      - ./mongo/mongo-keyfile:/data/configdb/mongo-keyfile
+
+  mongo-init:
+    image: mongo:7
+    container_name: mongo-init
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    entrypoint: [ "/bin/bash", "/scripts/init.sh", "admin", "strongpassword" ]
+    volumes:
+      - ./mongo/init:/scripts
 
 #  logstash:
 #    image: docker.elastic.co/logstash/logstash:8.17.10
