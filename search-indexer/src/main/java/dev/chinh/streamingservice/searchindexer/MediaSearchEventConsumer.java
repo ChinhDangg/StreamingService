@@ -19,6 +19,7 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -106,12 +107,16 @@ public class MediaSearchEventConsumer {
 
 
     private void onCreateNameEntitySearch(MediaUpdateEvent.NameEntityCreatedReady event) {
-        System.out.println("Received create name entity");
+        System.out.println("Received create name entity: " + event.nameEntityConstant() + " nameEntityId: " + event.nameEntityId());
         String name = getNameEntityName(event.nameEntityConstant(), event.nameEntityId());
         if (name != null) {
             try {
-                openSearchService.indexDocument(event.nameEntityConstant().getName(), event.nameEntityId(),
-                        Map.of(ContentMetaData.NAME, name, ContentMetaData.THUMBNAIL, event.thumbnailPath()));
+                Map<String, Object> fields = new HashMap<>();
+                fields.put(ContentMetaData.NAME, name);
+                if (event.thumbnailPath() != null) {
+                    fields.put(ContentMetaData.THUMBNAIL, event.thumbnailPath());
+                }
+                openSearchService.indexDocument(event.nameEntityConstant().getName(), event.nameEntityId(), fields);
             } catch (IOException e) {
                 throw new RuntimeException("Failed to update Search index field for name entity " + event.nameEntityId(), e);
             }
@@ -156,21 +161,21 @@ public class MediaSearchEventConsumer {
     }
 
     private List<NameEntityDTO> getMediaNameEntityInfo(long mediaId, MediaNameEntityConstant nameEntity) {
-        return switch (nameEntity.getName()) {
-            case ContentMetaData.AUTHORS -> mediaMetaDataRepository.findAuthorsByMediaId(mediaId);
-            case ContentMetaData.CHARACTERS -> mediaMetaDataRepository.findCharactersByMediaId(mediaId);
-            case ContentMetaData.UNIVERSES -> mediaMetaDataRepository.findUniversesByMediaId(mediaId);
-            case ContentMetaData.TAGS -> mediaMetaDataRepository.findTagsByMediaId(mediaId);
+        return switch (nameEntity) {
+            case AUTHORS -> mediaMetaDataRepository.findAuthorsByMediaId(mediaId);
+            case CHARACTERS -> mediaMetaDataRepository.findCharactersByMediaId(mediaId);
+            case UNIVERSES -> mediaMetaDataRepository.findUniversesByMediaId(mediaId);
+            case TAGS -> mediaMetaDataRepository.findTagsByMediaId(mediaId);
             default -> throw new IllegalArgumentException("Invalid name entity type: " + nameEntity);
         };
     }
 
     private String getNameEntityName(MediaNameEntityConstant nameEntity, long nameEntityId) {
         return switch (nameEntity) {
-            case AUTHORS -> mediaAuthorRepository.getNameEntityName(nameEntityId);
-            case CHARACTERS -> mediaCharacterRepository.getNameEntityName(nameEntityId);
-            case UNIVERSES -> mediaUniverseRepository.getNameEntityName(nameEntityId);
-            case TAGS -> mediaTagRepository.getNameEntityName(nameEntityId);
+            case AUTHORS -> mediaAuthorRepository.getNameEntityNameById(nameEntityId);
+            case CHARACTERS -> mediaCharacterRepository.getNameEntityNameById(nameEntityId);
+            case UNIVERSES -> mediaUniverseRepository.getNameEntityNameById(nameEntityId);
+            case TAGS -> mediaTagRepository.getNameEntityNameById(nameEntityId);
         };
     }
 
