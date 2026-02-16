@@ -7,9 +7,9 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.common.validation.FileSystemValidator;
-import dev.chinh.streamingservice.filemanager.event.MediaFileEventProducer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.mongodb.MongoTransactionException;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -20,6 +20,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -29,6 +30,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -39,7 +41,7 @@ public class FileService {
 
     private final FileSystemRepository fileSystemRepository;
     private final MongoTemplate mongoTemplate;
-    private final MediaFileEventProducer eventPublisher;
+    private final ApplicationEventPublisher eventPublisher;
 
     private final String mediaPath = ContentMetaData.MEDIA_BUCKET;
     private final String rootPath = "/" + mediaPath + "/";
@@ -68,6 +70,7 @@ public class FileService {
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
+    @Transactional
     public String addFileAsVideo(String fileId) {
         FileSystemItem item = getFileSystemItem(fileId);
         if (item.getFileType() != FileType.VIDEO) {
@@ -76,9 +79,12 @@ public class FileService {
         if (item.getMId() != null && item.getMId() > 0) {
             return "Item is already marked as video";
         }
-        updateMId(fileId, -1L);
-        eventPublisher.publishCreateFinishedMedia(new MediaUpdateEvent.FileToMediaInitiated(
-                fileId, MediaType.VIDEO, getFileItemPath(item.getPath(), item.getName()), item.getUploadDate()));
+        UpdateResult result = updateMId(fileId, -1L);
+        if (result.getModifiedCount() == 0) {
+            return "Item is already marked as processing";
+        }
+        eventPublisher.publishEvent(new MediaUpdateEvent.FileToMediaInitiated(
+                fileId, MediaType.VIDEO, getFileItemPathAsObjectName(item.getPath(), item.getName()), item.getUploadDate()));
         return "Processing as video";
     }
 
@@ -87,6 +93,7 @@ public class FileService {
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
+    @Transactional
     public String addDirectoryAsAlbum(String fileId) {
         FileSystemItem item = getFileSystemItem(fileId);
         if (item.getFileType() == FileType.ALBUM) {
@@ -98,9 +105,12 @@ public class FileService {
         if (item.getMId() != null && item.getMId() > 0) {
             return "Item is already marked as media";
         }
-        updateMId(fileId, -1L);
-        eventPublisher.publishCreateFinishedMedia(new MediaUpdateEvent.FileToMediaInitiated(
-                fileId, MediaType.ALBUM, getFileItemPath(item.getPath(), item.getName()), item.getUploadDate()));
+        UpdateResult result = updateMId(fileId, -1L);
+        if (result.getModifiedCount() == 0) {
+            return "Item is already marked as processing";
+        }
+        eventPublisher.publishEvent(new MediaUpdateEvent.FileToMediaInitiated(
+                fileId, MediaType.ALBUM, getFileItemPathAsObjectName(item.getPath(), item.getName()), item.getUploadDate()));
         return "Processing as album";
     }
 
@@ -110,18 +120,25 @@ public class FileService {
         return mongoTemplate.updateFirst(query, update, FileSystemItem.class);
     }
 
-    private String getFileItemPath(String path, String name) {
+    // need the returning path to NOT start and end with "/"
+    // assume name is filename and contains no "/"
+    private String getFileItemPathAsObjectName(String path, String name) {
         if (path.startsWith(rootPath)) {
             int begin = rootPath.length() + 1; // to start after "/"
             if (begin > path.length()) // path probably == root path
                 return name;
             return OSUtil.normalizePath(path.substring(begin), name);
         }
-        return OSUtil.normalizePath(path, name);
+        String p = OSUtil.normalizePath(path, name);
+        if (p.startsWith("/")) return p.substring(1);
+        return p;
     }
 
-    public String getPathForFileItem(String path) {
-        return OSUtil.normalizePath(rootPath, path + (path.endsWith("/") ? "" : "/"));
+    // need the returning path to start and end with "/"
+    public String getPathForFileItem(String path, String name) {
+        if (path.startsWith(rootPath))
+            return OSUtil.normalizePath(rootPath, name + "/");
+        return OSUtil.normalizePath(rootPath, path + "/" + name + "/");
     }
 
     @Retryable(
@@ -138,16 +155,68 @@ public class FileService {
         return mongoTemplate.updateFirst(query, update, FileSystemItem.class);
     }
 
-    public void deleteFile(String fileId) {
-        UpdateResult result = updateMId(fileId, -2L);
-        if (result.getMatchedCount() == 0) {
-            throw new ResourceNotFoundException("File not found with id: " + fileId);
-        }
-        if (result.getModifiedCount() == 0) {
+    @Transactional
+    public void initiateDeleteFile(String fileId) {
+        FileSystemItem item = getFileSystemItem(fileId);
+        if (item.getMId() != null && item.getMId() == -2)
             return;
+        if (item.getFileType() == FileType.DIR) {
+            boolean anyChildMedia = mongoTemplate.exists(
+                    new Query(Criteria
+                            .where("path").regex("^" + item.getPath() + item.getName() + "/")
+                            .and("mId").nin(null, 0)),
+                    FileSystemItem.class);
+            if (anyChildMedia) {
+                throw new IllegalArgumentException("Directory is not empty - include media item");
+            }
         }
-        eventPublisher.publishDeleteMediaFile(new MediaUpdateEvent.MediaFileDeleted(fileId));
+        updateMId(fileId, -2L);
+        if (item.getMId() == null || item.getMId() == 0) {
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaFileDeleted(fileId));
+            // send delete to backup and object service to delete backup file and object
+            String objectName = getFileItemPathAsObjectName(item.getPath(), item.getName());
+            eventPublisher.publishEvent(new MediaUpdateEvent.MediaDeleted(
+                    -1,
+                    ContentMetaData.MEDIA_BUCKET,
+                    objectName,
+                    false,
+                    null,
+                    item.getFileType() == FileType.DIR ? MediaType.ALBUM : MediaType.VIDEO,
+                    OSUtil.normalizePath(mediaPath, objectName)
+            ));
+        } else if (item.getMId() > 0) {
+            throw new IllegalArgumentException("File is already marked as media - delete through media item instead: " + item.getMId());
+        }
     }
+
+    // to be called by kafka listener consumer
+    @Transactional
+    public void deleteFile(String fileId) {
+        FileSystemItem fileItem = findById(fileId);
+        if (fileItem == null) return;
+        if (fileItem.getFileType() == FileType.DIR) {
+            String parentPath = Pattern.quote(getPathForFileItem(fileItem.getPath(), fileItem.getName()));
+            // remove all children where path starts with parentPath
+            mongoTemplate.remove(new Query(Criteria
+                    .where("path").regex("^" + parentPath)), FileSystemItem.class);
+        }
+        mongoTemplate.remove(new Query(Criteria.where("id").is(fileId)), FileSystemItem.class);
+    }
+
+    // to be called by kafka listener consumer
+    @Transactional
+    public void deleteMedia(long mediaId) {
+        FileSystemItem fileItem = findByMId(mediaId);
+        if (fileItem.getFileType() == FileType.ALBUM) {
+            String parentPath = Pattern.quote(getPathForFileItem(fileItem.getPath(), fileItem.getName()));
+            // remove all children where path starts with parentPath
+            mongoTemplate.remove(new Query(Criteria
+                    .where("path").regex("^" + parentPath)), FileSystemItem.class);
+        }
+        mongoTemplate.remove(new Query(Criteria.where("id").is(fileItem.getId())), FileSystemItem.class);
+    }
+
+
 
 
     public FileSystemItem findByMId(long mId) {
@@ -159,6 +228,10 @@ public class FileService {
         return fileSystemRepository.findById(id).orElseThrow(() ->
                 new ResourceNotFoundException("File not found with id: " + id)
         );
+    }
+
+    private FileSystemItem findById(String id) {
+        return mongoTemplate.findById(id, FileSystemItem.class);
     }
 
     public String getRootFolderName() {
