@@ -33,7 +33,7 @@ public class FileManagerController {
 
     @DeleteMapping("/{fileId}")
     public ResponseEntity<?> deleteFile(@PathVariable String fileId) {
-        fileService.deleteFile(fileId);
+        fileService.initiateDeleteFile(fileId);
         return ResponseEntity.ok().build();
     }
 }
