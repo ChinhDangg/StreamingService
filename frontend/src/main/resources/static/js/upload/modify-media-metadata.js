@@ -283,7 +283,7 @@ async function initializeEditAddingArea() {
     }
 
     const searchName = async (nameString) => {
-        const response = await apiRequest(`/api/search/name/${currentNameEntity}?name=${nameString}`);
+        const response = await apiRequest(`/api/search/name/${currentNameEntity}?s=${nameString}`);
         if (!response.ok) {
             alert('Failed to fetch name info: ' + await response.text());
             return;
@@ -299,6 +299,8 @@ async function initializeEditAddingArea() {
             const searchEntry = helperCloneAndUnHideNode(searchEntryTem);
             searchEntry.textContent = 'No matching name found. Please try another name.'
             searchEntryList.appendChild(searchEntry);
+            searchEntryList.classList.remove('hidden');
+            return;
         }
         nameEntityInfo.forEach(nameEntity => addSearchEntry(nameEntity));
     }
