@@ -150,7 +150,7 @@ async function initializeEdit() {
         currentArea.innerHTML = '';
         currentNameEntityEditMap.get('current').forEach((name, id) => {
             addToCurrent(name, id);
-        })
+        });
     }
 
     const currentEditNameTitle = editAreaContainer.querySelector('.current-edit-name-title');
