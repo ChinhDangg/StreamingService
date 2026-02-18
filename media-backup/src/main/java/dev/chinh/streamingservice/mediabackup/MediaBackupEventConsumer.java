@@ -76,7 +76,8 @@ public class MediaBackupEventConsumer {
             System.err.println("Unknown media type: " + event.mediaType());
         }
 
-        createThumbnailBackup(event.thumbnail());
+        if (event.thumbnail() != null)
+            createThumbnailBackup(event.thumbnail());
     }
 
     private void backupAlbum(String bucket, String albumPath, String absolutePath) throws Exception {
@@ -203,7 +204,8 @@ public class MediaBackupEventConsumer {
 
     private void onNameEntityCreated(MediaUpdateEvent.NameEntityCreatedReady event) throws Exception {
         System.out.println("Received name entity create backup event: " + event.nameEntityId());
-        createThumbnailBackup(event.thumbnailPath());
+        if (event.thumbnailPath() != null)
+            createThumbnailBackup(event.thumbnailPath());
     }
 
     private void onNameEntityDeleted(MediaUpdateEvent.NameEntityDeleted event) {
