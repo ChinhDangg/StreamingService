@@ -75,11 +75,18 @@ public class MediaMetadataModifyService {
     ) {}
 
     @Transactional
-    public List<NameEntityDTO> updateNameEntityInMedia(UpdateList updateList, long mediaId) {
-        if (updateList.adding.isEmpty() && updateList.removing.isEmpty()) return new ArrayList<>();
+    public void updateNameEntityInMediaInBatch(List<UpdateList> updateLists, long mediaId) {
+        for (UpdateList updateList : updateLists) {
+            updateNameEntityInMedia(updateList, mediaId);
+        }
+    }
 
-        List<NameEntityDTO> uniqueAdding = new ArrayList<>(updateList.adding.stream().distinct().toList());
-        List<NameEntityDTO> uniqueRemoving = updateList.removing.stream().distinct().toList();
+    @Transactional
+    public List<NameEntityDTO> updateNameEntityInMedia(UpdateList updateList, long mediaId) {
+        if ((updateList.adding == null || updateList.adding.isEmpty()) && (updateList.removing == null || updateList.removing.isEmpty())) return new ArrayList<>();
+
+        List<NameEntityDTO> uniqueAdding = updateList.adding == null ? new ArrayList<>() : new ArrayList<>(updateList.adding.stream().distinct().toList());
+        List<NameEntityDTO> uniqueRemoving = updateList.removing == null ? new ArrayList<>() : updateList.removing.stream().distinct().toList();
         uniqueAdding.removeAll(uniqueRemoving);
 
         if (uniqueAdding.isEmpty() && uniqueRemoving.isEmpty()) return new ArrayList<>();

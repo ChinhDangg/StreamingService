@@ -36,6 +36,13 @@ public class MediaMetadataModifyController {
         return ResponseEntity.ok().body(mediaMetadataModifyService.updateNameEntityInMedia(updateList, id));
     }
 
+    @PutMapping("/update-batch/{id}")
+    public ResponseEntity<Void> updateMediaNameEntityInfoInBatch(@PathVariable long id,
+                                                      @RequestBody List<MediaMetadataModifyService.UpdateList> updateLists) {
+        mediaMetadataModifyService.updateNameEntityInMediaInBatch(updateLists, id);
+        return ResponseEntity.ok().build();
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteMedia(@PathVariable long id) {
         mediaMetadataModifyService.deleteMedia(id);
