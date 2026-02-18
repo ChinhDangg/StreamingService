@@ -227,7 +227,9 @@ async function initialize() {
 
 window.addEventListener('DOMContentLoaded', async function () {
     await initialize();
-})
+    initializeAddNameEntity();
+    initializeEditArea();
+});
 
 
 const uploadToggleButton = document.getElementById('upload-toggle-btn');
@@ -491,11 +493,13 @@ async function uploadFiles(fileList) {
         const responseText = await endUploadSession(basicInfo);
         if (responseText.startsWith('Error:')) {
             currentFailTexts.push(responseText);
+            return null;
         }
+        return responseText; // media id
     }
 
     if (uploadingFiles.size) {
-        for (const f of uploadingFiles.key()) {
+        for (const f of uploadingFiles.keys()) {
             const uploadingFile = uploadingFiles.get(f);
             const fileName = getDirPath(currentFullPath, f.name);
             uploadingFile.chunks.partNumber = uploadingFile.partNumber;
@@ -507,7 +511,12 @@ async function uploadFiles(fileList) {
             if (!passed) {
                 displayFailTexts(currentFailTexts);
             } else if (allVideo) {
-                await endSession(uploadingFile.sessionId, f.name.substring(f.name.lastIndexOf('/') + 1));
+                const mediaId = await endSession(uploadingFile.sessionId, f.name.substring(f.name.lastIndexOf('/') + 1));
+                const errorMess = await uploadNameEntityForMediaInBatch(mediaId);
+                if (errorMess) {
+                    displayFailTexts([errorMess]);
+                    currentFailTexts.push(errorMess);
+                }
             } else {
                 sessionId = uploadingFile.sessionId;
             }
@@ -525,13 +534,19 @@ async function uploadFiles(fileList) {
                 uploadingFiles.get(file.file).sessionId = sId;
                 displayFailTexts(currentFailTexts);
             } else if (allVideo) {
-                await endSession(sId, file.name.substring(file.name.lastIndexOf('/') + 1));
+                const mediaId = await endSession(sId, file.name.substring(file.name.lastIndexOf('/') + 1));
+                const errorMess = await uploadNameEntityForMediaInBatch(mediaId);
+                if (errorMess) {
+                    displayFailTexts([errorMess]);
+                    currentFailTexts.push(errorMess);
+                }
             }
         }
     }
 
-    if (uploadingFiles.size) {
+    if (uploadingFiles.size || currentFailTexts.length > 0) {
         submitBtn.textContent = 'Retry';
+        currentFailTexts.length = 0;
         return;
     }
 
@@ -605,12 +620,192 @@ function clearUploadingList() {
     uploadingFiles.clear();
     clearProgress();
     totalProgress = 0;
+    currentFailTexts.length = 0;
+    errorMessageContainer.classList.add('hidden');
+    clearNameEntityMap();
 }
 
 function helperCloneAndUnHideNode(node) {
     const clone = node.cloneNode(true);
-    clone.classList.remove('!hidden');
+    clone.classList.remove('!hidden', 'hidden');
     return clone;
+}
+
+
+const editNameSection = document.getElementById('edit-name-section');
+const editAreaContainer = editNameSection.querySelector('#editAreaContainer');
+const addNameEntityContainer = document.getElementById('add-name-entity-container');
+uploadAsVideoCheckbox.addEventListener('change', function () {
+    if (uploadAsVideoCheckbox.checked) {
+        editNameSection.classList.remove('hidden');
+    } else {
+        editNameSection.classList.add('hidden');
+    }
+});
+
+const NameEntities = Object.freeze({
+    Universes: 'universes',
+    Characters: 'characters',
+    Authors: 'authors',
+    Tags: 'tags'
+});
+let currentNameEntity = null;
+let currentNameEntityNode = null;
+const nameEntityEditMap = new Map();
+
+function initializeAddNameEntity() {
+    const nameEntityTem = addNameEntityContainer.querySelector('.name-entity-item');
+    Object.entries(NameEntities).forEach(([key, value]) => {
+        const nameEntity = helperCloneAndUnHideNode(nameEntityTem);
+        nameEntity.querySelector('.name-text').textContent = key + ':';
+        const nameEditButton = nameEntity.querySelector('button');
+        nameEditButton.id = 'edit-' + key + '-btn';
+        nameEditButton.addEventListener('click', function () {
+            currentNameEntity = key;
+            currentNameEntityNode = nameEntity;
+            loadCurrentNameEntityToEditArea();
+            editAreaContainer.querySelector('.current-edit-name-title').textContent = value;
+            editAreaContainer.classList.remove('hidden');
+        });
+        nameEntityEditMap.set(key, new Map());
+        addNameEntityContainer.appendChild(nameEntity);
+    });
+}
+
+function loadCurrentNameEntityToEditArea() {
+    clearNameEntityDisplayNode();
+    nameEntityEditMap.get(currentNameEntity).forEach((value, key) => {
+        addNameEntity(currentNameEntityNode, currentNameEntity, value, key);
+    });
+}
+
+function initializeEditArea() {
+    editNameSection.querySelector('.save-edit-name-btn').classList.add('hidden');
+    editNameSection.querySelector('.close-edit-name-btn').addEventListener('click', function () {
+        editAreaContainer.classList.add('hidden');
+    });
+
+    let searchTimeOut = null;
+    const searchInput = editAreaContainer.querySelector('.adding-search-input');
+    const searchEntryList = editAreaContainer.querySelector('.search-dropdown-ul');
+
+    const searchEntryTem = searchEntryList.querySelector('li');
+    const addSearchEntry = (nameEntity) => {
+        const searchEntry = helperCloneAndUnHideNode(searchEntryTem);
+        searchEntry.textContent = nameEntity.name;
+        searchEntry.addEventListener('click', () => {
+            if (currentNameEntity === null) return;
+            if (nameEntityEditMap.get(currentNameEntity).has(nameEntity.id)) return;
+            nameEntityEditMap.get(currentNameEntity).set(nameEntity.id, nameEntity.name);
+            addNameEntity(currentNameEntityNode, currentNameEntity, nameEntity.name, nameEntity.id);
+        });
+        searchEntryList.appendChild(searchEntry);
+        searchEntryList.classList.remove('hidden');
+    }
+
+    const searchName = async (nameString) => {
+        const response = await apiRequest(`/api/search/name/${currentNameEntity}?s=${nameString}`);
+        if (!response.ok) {
+            alert('Failed to fetch name info: ' + await response.text());
+            return;
+        }
+        const nameEntityInfo = await response.json();
+        // const nameEntityInfo = [
+        //     {id: 1, name: 'name1', thumbnail: 'thumbnail1'},
+        //     {id: 2, name: 'name2', thumbnail: 'thumbnail1'},
+        // ];
+        const first = searchEntryList.firstElementChild;
+        if (first) searchEntryList.replaceChildren(first);
+        if (nameEntityInfo.length === 0) {
+            const searchEntry = helperCloneAndUnHideNode(searchEntryTem);
+            searchEntry.textContent = 'No matching name found.'
+            searchEntryList.appendChild(searchEntry);
+            searchEntryList.classList.remove('hidden');
+            return;
+        }
+        nameEntityInfo.forEach(nameEntity => addSearchEntry(nameEntity));
+    }
+
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimeOut);
+        const searchInputValue = searchInput.value.trim();
+        if (searchInputValue.length < 2) {
+            const first = searchEntryList.firstElementChild;
+            if (first) searchEntryList.replaceChildren(first);
+            return;
+        }
+        searchTimeOut = setTimeout(async () => {
+            await searchName(searchInputValue)
+        }, 500);
+    });
+
+    searchInput.addEventListener('blur', () => {
+        setTimeout(() => {
+            if (document.activeElement === searchEntryList)
+                return
+            const first = searchEntryList.firstElementChild;
+            if (first) searchEntryList.replaceChildren(first);
+            searchEntryList.classList.add('hidden');
+        }, 100)
+    });
+    searchEntryList.addEventListener('blur', () => {
+        setTimeout(() => {
+            const first = searchEntryList.firstElementChild;
+            if (first) searchEntryList.replaceChildren(first);
+            searchEntryList.classList.add('hidden');
+        }, 100);
+    });
+}
+
+function addNameEntity(nameEntityNode, nameEntity, name, nameId) {
+    const infoNodeTem = nameEntityNode.querySelector('.info-node');
+    const infoNode = helperCloneAndUnHideNode(infoNodeTem);
+    infoNode.textContent = name;
+    nameEntityNode.querySelector('.info-container').appendChild(infoNode);
+
+    const tempEditNodeLi = editAreaContainer.querySelector('.temp-edit-node-li');
+    const tempEditNode = helperCloneAndUnHideNode(tempEditNodeLi);
+    tempEditNode.querySelector('.text-name').textContent = name;
+    tempEditNode.addEventListener('click', () => {
+        infoNode.remove();
+        tempEditNode.remove();
+        nameEntityEditMap.get(nameEntity).delete(nameId);
+    });
+    editAreaContainer.querySelector('#currentArea').appendChild(tempEditNode);
+}
+
+async function uploadNameEntityForMediaInBatch(mediaId) {
+    const body = [];
+    nameEntityEditMap.forEach((value, key) => {
+        const adding = [];
+        value.forEach((name, id) => adding.push({name: name, id: id}));
+        if (adding.length > 0)
+            body.push({nameEntity: key.toUpperCase(), adding: adding});
+    });
+    if (body.length === 0) return null;
+    const response = await apiRequest(`/api/modify/media/update-batch/${mediaId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+        return `Failed to add name entity: ${await response.text()}`;
+    }
+    return null;
+}
+
+function clearNameEntityMap() {
+    clearNameEntityDisplayNode();
+    nameEntityEditMap.forEach((value, key) => value.clear());
+}
+
+function clearNameEntityDisplayNode() {
+    const infoContainer = currentNameEntityNode.querySelector('.info-container');
+    const first = infoContainer.firstElementChild;
+    if (first) infoContainer.replaceChildren(first);
+    editAreaContainer.querySelector('#currentArea').textContent = '';
 }
 
 

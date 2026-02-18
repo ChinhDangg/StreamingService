@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <title>File Explorer Layout</title>
+    <link rel="stylesheet" th:href="@{/static/css/tailwind.css}" href="/static/css/tailwind.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .grid-view {
@@ -91,6 +92,7 @@
 
         .list-view .file-node-wrapper {
             padding: 0;
+            width: 100%;
         }
 
         .list-view .file-node {
@@ -244,7 +246,7 @@
     <!-- File Explorer -->
     <div id="file-zone" class="flex-1 p-2 overflow-auto">
 
-        <div id="upload-container">
+        <div id="upload-container" class="hidden">
             <label for="file-input"
                    class="inline-flex items-center gap-2 cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus-within:ring-2 focus-within:ring-indigo-400 focus-within:ring-offset-2">
                 <!-- File Icon -->
@@ -287,6 +289,23 @@
                 <span>Upload as Video(s)</span>
             </label>
 
+            <section id="edit-name-section" class="mt-4">
+                <div id="add-name-entity-container" class="flex flex-col gap-1">
+                    <div class="name-entity-item hidden flex items-center gap-2">
+                        <button th:replace="~{upload/edit-name-section :: editButton('editUniverseBtn')}"></button>
+                        <span class="name-text text-sm font-bold uppercase text-gray-500 mr-3">Universes:</span>
+                        <div class="info-container inline-flex flex-wrap items-center gap-2">
+                            <span class="info-node hidden text-xs font-medium px-3 py-1 rounded-full bg-gray-700 text-gray-300 hover:bg-indigo-600 hover:text-white transition cursor-pointer">
+                                #Astrophotography
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <div th:replace="~{upload/edit-name-section :: edit-name-area-html}"></div>
+                </div>
+            </section>
+
             <div class="flex gap-2 mt-2 items-center">
                 <label for="sort-file-upload-select">Sort Upload:</label>
                 <select id="sort-file-upload-select" class="block w-56 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
@@ -324,7 +343,7 @@
             <!-- Error Message -->
             <div id="error-message-container"
                  class="hidden flex flex-col bg-red-900 border border-red-700 text-red-300 p-3 rounded-lg">
-                <span>Error something</span>
+                <span>Error:</span>
             </div>
 
             <!-- Submit Button -->
@@ -335,7 +354,7 @@
             </button>
         </div>
 
-        <div id="file-view-container" class="mt-4 h-full grid-view grid text-xs border-t border-gray-700 pt-2">
+        <div id="file-view-container" class="mt-4 h-full grid-view text-xs border-t border-gray-700 pt-2">
             <div class="file-node-wrapper !hidden">
                 <div class="file-node">
                     <div class="icon flex items-center justify-center">
