@@ -224,8 +224,14 @@ public class MediaFileEventConsumer {
                 System.out.println("Received unfinished media create event: " + e.objectNames().getFirst());
             case MediaUpdateEvent.MediaCreatedReady e ->
                 System.out.println("Received media create event: " + e.mediaId());
-            default ->
+            case MediaUpdateEvent.MediaDeleted e ->
+                System.out.println("Received media delete event: " + e.mediaId());
+            case MediaUpdateEvent.MediaFileDeleted e ->
+                System.out.println("Received file delete event: " + e.fileId());
+            default -> {
                 System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+                ack.acknowledge();
+            }
         }
         System.out.println("======= =======");
     }
