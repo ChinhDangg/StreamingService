@@ -136,8 +136,13 @@ function displayFileItem(fileItems) {
         fileNode.querySelector('.name').innerText = item.name;
         fileNode.querySelector('.name').title = item.name;
         fileNode.dataset.id = item.id;
-        if (item.mid)
+        if (item.mid) {
             fileNode.dataset.mid = item.mid;
+            fileNode.style.backgroundColor = '#4f46e5';
+        }
+        if (item.statusCode) {
+            fileNode.dataset.status = item.statusCode;
+        }
         if (fileType === 'DIR' || fileType === 'ALBUM') {
             fileNode.addEventListener('click', async function () {
                 if (isProcessing) return;
@@ -186,13 +191,12 @@ function addToCurrentPath(id, name, fileType, isRoot = false) {
 
 function getDirPath(filePath, fileName) {
     const firstSlashIndex = filePath.indexOf('/');
-    if (firstSlashIndex === -1) return fileName;
     const rootOmitted = filePath.substring(firstSlashIndex + 1);
-    if (rootOmitted.lastIndexOf('/') === -1)
-        return rootOmitted + '/' + fileName;
-    if (fileName.length === 0)
-        return rootOmitted.substring(0, rootOmitted.length - 1);
-    return rootOmitted + fileName;
+    fileName = fileName == null ? '' : fileName;
+    let path =  rootOmitted + (rootOmitted.endsWith('/') ? '' : '/') + fileName;
+    if (path.startsWith('/')) path = path.substring(1);
+    if (path.endsWith('/')) path = path.substring(0, path.length - 1);
+    return path;
 }
 
 function removeLastPathStack() {
@@ -467,15 +471,20 @@ submitBtn.addEventListener('click', async function () {
     if (isSubmitting) return;
     isSubmitting = true;
     submitBtn.textContent = 'Submit';
-    if (!validateAllowUpload(fileList)) return;
+    if (!validateAllowUpload(fileList)) {
+        isSubmitting = false;
+        return;
+    }
     await uploadFiles(fileList);
     isSubmitting = false;
 });
 
 async function uploadFiles(fileList) {
+    allVideo = allVideo && uploadAsVideoCheckbox.checked;
     const mediaType = allVideo ? 'VIDEO' : 'ALBUM';
     const currentFullPath = getFullCurrentPath();
     let sessionId = allVideo ? null : await startUploadSession(getDirPath(currentFullPath, savingPath), mediaType);
+    console.log('path: ' + getDirPath(currentFullPath, savingPath));
 
     if (sessionId === null && !allVideo) {
         alert('Failed to start upload session');
@@ -524,6 +533,7 @@ async function uploadFiles(fileList) {
     } else {
         for (const file of fileList) {
             const fileName = getDirPath(currentFullPath, file.name);
+            console.log('Uploading file: ' + fileName);
             const sId = allVideo ? await startUploadSession(fileName, mediaType) : sessionId;
             const passed = await uploadFile(
                 sId, file.file, fileName, mediaType, uploadingFiles, currentFailTexts,
@@ -802,6 +812,7 @@ function clearNameEntityMap() {
 }
 
 function clearNameEntityDisplayNode() {
+    if (currentNameEntityNode === null) return;
     const infoContainer = currentNameEntityNode.querySelector('.info-container');
     const first = infoContainer.firstElementChild;
     if (first) infoContainer.replaceChildren(first);
@@ -822,7 +833,7 @@ fileViewContainer.addEventListener('contextmenu', (event) => {
     event.preventDefault();
     const targetNode = event.target.closest('.file-node-wrapper');
 
-    if (!targetNode) {
+    if (!targetNode || targetNode.getAttribute('data-statusCode')) {
         currentRightMenuTargetId = null;
         currentRightMenuTargetMId = null;
         addAsVideoButton.disabled = true;
