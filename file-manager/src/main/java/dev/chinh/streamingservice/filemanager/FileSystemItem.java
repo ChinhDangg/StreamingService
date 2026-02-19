@@ -1,5 +1,7 @@
 package dev.chinh.streamingservice.filemanager;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
@@ -16,6 +18,7 @@ import java.time.Instant;
 @CompoundIndex(name = "parent_name_unique_idx", def = "{'parentId': 1, 'name': 1}", unique = true)
 public class FileSystemItem {
 
+    @JsonProperty(ContentMetaData.ID)
     @Id
     private String id;
 
@@ -29,8 +32,14 @@ public class FileSystemItem {
 
     @Indexed
     private Long mId;
+    @JsonProperty(ContentMetaData.NAME)
     private String name;
+    @JsonProperty(ContentMetaData.THUMBNAIL)
     private String thumbnail;
+    @JsonProperty(ContentMetaData.SIZE)
     private Long size;
+    @JsonProperty(ContentMetaData.UPLOAD_DATE)
     private Instant uploadDate;
+
+    private Short statusCode;
 }

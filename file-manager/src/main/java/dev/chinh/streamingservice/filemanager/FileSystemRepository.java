@@ -1,14 +1,15 @@
 package dev.chinh.streamingservice.filemanager;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-import java.util.List;
 
 public interface FileSystemRepository extends MongoRepository<FileSystemItem, String> {
 
-    List<FileSystemItem> findByParentId(String parentId);
+    Page<FileSystemItem> findByParentId(String parentId, Pageable pageable);
 
-    List<FileSystemItem> findByPath(String path);
+    Page<FileSystemItem> findByPath(String path, Pageable pageable);
 
-    List<FileSystemItem> findByPathStartingWith(String path);
+    Page<FileSystemItem> findByPathStartingWith(String path, Pageable pageable);
 }

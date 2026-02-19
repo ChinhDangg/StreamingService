@@ -7,10 +7,15 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.common.validation.FileSystemValidator;
+import dev.chinh.streamingservice.filemanager.constant.SortBy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.QueryTimeoutException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.MongoTransactionException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -48,20 +53,23 @@ public class FileService {
 
     public static String ROOT_FOLDER_ID = null;
 
-    public record FileRootResult(String rootId, String rootName, List<FileSystemItem> children) {}
+    public record FileRootResult(String rootId, String rootName, Page<FileSystemItem> children) {}
 
-    public FileRootResult findFilesAtRoot() {
-        List<FileSystemItem> items = fileSystemRepository.findByParentId(ROOT_FOLDER_ID);
+    public FileRootResult findFilesAtRoot(int offset, SortBy sortBy, Sort.Direction sortOrder) {
+        Page<FileSystemItem> items = fileSystemRepository.findByParentId(ROOT_FOLDER_ID, getPageable(offset, sortBy, sortOrder));
         return new FileRootResult(getROOT_FOLDER_ID(), mediaPath, items);
     }
 
-    public List<FileSystemItem> findFilesInDirectory(String parentId) {
-        return fileSystemRepository.findByParentId(parentId);
+    public Page<FileSystemItem> findFilesInDirectory(String parentId, int offset, SortBy sortBy, Sort.Direction sortOrder) {
+        return fileSystemRepository.findByParentId(parentId, getPageable(offset, sortBy, sortOrder));
     }
 
-    // using mid as file status:
-    // positive - media id
-    // 0 or null - not a media - just a file
+    private Pageable getPageable(int offset, SortBy sortBy, Sort.Direction sortOrder) {
+        final int pageSize = 25;
+        return PageRequest.of(offset, pageSize, Sort.by(sortOrder, sortBy.getField()));
+    }
+
+    // using codeStatus as file status:
     // -1 - processing to be added as media
     // -2 - marked as deleted
 
@@ -76,10 +84,10 @@ public class FileService {
         if (item.getFileType() != FileType.VIDEO) {
             throw new IllegalArgumentException("File is not a video");
         }
-        if (item.getMId() != null && item.getMId() > 0) {
+        if (item.getMId() != null && item.getMId() != 0) {
             return "Item is already marked as video";
         }
-        UpdateResult result = updateMId(fileId, -1L);
+        UpdateResult result = updateStatusCode(fileId, -1L);
         if (result.getModifiedCount() == 0) {
             return "Item is already marked as processing";
         }
@@ -102,10 +110,10 @@ public class FileService {
         if (item.getFileType() != FileType.DIR) {
             throw new IllegalArgumentException("File is not a directory");
         }
-        if (item.getMId() != null && item.getMId() > 0) {
+        if (item.getMId() != null && item.getMId() != 0) {
             return "Item is already marked as media";
         }
-        UpdateResult result = updateMId(fileId, -1L);
+        UpdateResult result = updateStatusCode(fileId, -1L);
         if (result.getModifiedCount() == 0) {
             return "Item is already marked as processing";
         }
@@ -114,9 +122,9 @@ public class FileService {
         return "Processing as album";
     }
 
-    private UpdateResult updateMId(String fileId, long mid) {
+    private UpdateResult updateStatusCode(String fileId, long code) {
         Query query = new Query(Criteria.where("id").is(fileId));
-        Update update = new Update().set("mId", mid);
+        Update update = new Update().set("statusCode", code);
         return mongoTemplate.updateFirst(query, update, FileSystemItem.class);
     }
 
@@ -124,8 +132,8 @@ public class FileService {
     // assume name is filename and contains no "/"
     private String getFileItemPathAsObjectName(String path, String name) {
         if (path.startsWith(rootPath)) {
-            int begin = rootPath.length() + 1; // to start after "/"
-            if (begin > path.length()) // path probably == root path
+            int begin = rootPath.length(); // to start after "/"
+            if (begin == path.length()) // path probably == root path
                 return name;
             return OSUtil.normalizePath(path.substring(begin), name);
         }
@@ -151,14 +159,15 @@ public class FileService {
         Update update = new Update()
                 .set("mId", mediaId)
                 .set("fileType", fileType)
-                .set("thumbnail", thumbnailObject);
+                .set("thumbnail", thumbnailObject)
+                .unset("statusCode");
         return mongoTemplate.updateFirst(query, update, FileSystemItem.class);
     }
 
     @Transactional
     public void initiateDeleteFile(String fileId) {
         FileSystemItem item = getFileSystemItem(fileId);
-        if (item.getMId() != null && item.getMId() == -2)
+        if (item.getStatusCode() == -2)
             return;
         if (item.getFileType() == FileType.DIR) {
             boolean anyChildMedia = mongoTemplate.exists(
@@ -170,7 +179,7 @@ public class FileService {
                 throw new IllegalArgumentException("Directory is not empty - include media item");
             }
         }
-        updateMId(fileId, -2L);
+        updateStatusCode(fileId, -2L);
         if (item.getMId() == null || item.getMId() == 0) {
             eventPublisher.publishEvent(new MediaUpdateEvent.MediaFileDeleted(fileId));
             // send delete to backup and object service to delete backup file and object
