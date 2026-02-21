@@ -13,6 +13,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @RequiredArgsConstructor
@@ -22,10 +23,14 @@ public class ThumbnailService {
     private final MinIOService minIOService;
 
     public static final Resolution thumbnailResolution = Resolution.p360;
+    private static final AtomicInteger counter = new AtomicInteger(2);
 
     public record AlbumUrlInfo(List<String> mediaUrlList, List<String> buckets, List<String> pathList) {}
 
     public void processThumbnails(List<NameEntityDTO> items) {
+        if (counter.get() == 0)
+            return;
+        counter.decrementAndGet();
         long now = System.currentTimeMillis() + 60 * 60 * 1000;
         List<NameEntityDTO> newThumbnails = new ArrayList<>();
         for (NameEntityDTO item : items) {
@@ -50,11 +55,16 @@ public class ThumbnailService {
                 addCacheThumbnails(path.substring(path.lastIndexOf("/") + 1), now);
             }
         } catch (InterruptedException | IOException e) {
+            counter.incrementAndGet();
             throw new RuntimeException(e);
         }
+        counter.incrementAndGet();
     }
 
     public void processThumbnails(Collection<? extends MediaDescription> items) {
+        if (counter.get() == 0)
+            return;
+        counter.decrementAndGet();
         List<MediaDescription> newThumbnails = new ArrayList<>();
         for (MediaDescription item : items) {
             if (!item.hasThumbnail())
@@ -79,8 +89,10 @@ public class ThumbnailService {
                 addCacheThumbnails(path.substring(path.lastIndexOf("/") + 1), now);
             }
         } catch (InterruptedException | IOException e) {
+            counter.incrementAndGet();
             throw new RuntimeException(e);
         }
+        counter.incrementAndGet();
     }
 
     private AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList) {
