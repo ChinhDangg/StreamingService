@@ -80,10 +80,10 @@ public class FileSystemValidator {
 
         // 3. Hidden folders (Starting with single dot)
         // If the name is ".myfolder", this is perfectly fine for a normal user.
-        if (name.startsWith(".") && name.length() > 1 && !name.startsWith("..")) {
-            // This is a valid hidden folder but not allowing for this service
-            return "Name cannot start with '.'";
-        }
+//        if (name.startsWith(".") && name.length() > 1 && !name.startsWith("..")) {
+//            // This is a valid hidden folder but not allowing for this service
+//            return "Name cannot start with '.'";
+//        }
 
         // 2. Check for OS-specific illegal characters
         String os = System.getProperty("os.name").toLowerCase();
