@@ -288,7 +288,7 @@
                        value="video"
                        id="upload-video-checkbox"
                        class="w-4 h-4 border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-gray-900" />
-                <span>Upload as Video(s)</span>
+                <span>Upload as Media Video(s)</span>
             </label>
 
             <section id="edit-name-section" class="mt-4">
@@ -360,30 +360,40 @@
             <label for="file-sort-by-select">Sort by:</label>
             <select id="file-sort-by-select" class="block w-56 rounded-md border border-gray-300 bg-gray-600 px-3 py-2 text-sm text-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                 <optgroup label="Name">
-                    <option value="name-asc" selected>Name (A → Z)</option>
-                    <option value="name-desc">Name (Z → A)</option>
+                    <option value="NAME-ASC" selected>Name (A → Z)</option>
+                    <option value="NAME-DESC">Name (Z → A)</option>
                 </optgroup>
 
                 <optgroup label="Size">
-                    <option value="size-asc">Size (Smallest)</option>
-                    <option value="size-desc">Size (Largest)</option>
+                    <option value="SIZE-ASC">Size (Smallest)</option>
+                    <option value="SIZE-DESC">Size (Largest)</option>
+                </optgroup>
+
+                <optgroup label="Length">
+                    <option value="LENGTH-ASC">Length (Shortest)</option>
+                    <option value="LENGTH-DESC">Length (Longest)</option>
                 </optgroup>
 
                 <optgroup label="Last modified">
-                    <option value="modified-asc">Last modified (Oldest)</option>
-                    <option value="modified-desc">Last modified (Newest)</option>
+                    <option value="UPLOAD-ASC">Last modified (Oldest)</option>
+                    <option value="UPLOAD-DESC">Last modified (Newest)</option>
                 </optgroup>
             </select>
         </div>
 
-        <div id="file-view-container" class="mt-4 h-full grid-view text-xs border-t border-gray-700 pt-2">
-            <div class="file-node-wrapper !hidden">
-                <div class="file-node">
-                    <div class="icon flex items-center justify-center">
-                    </div>
-                    <div class="name" title="">
+        <div id="file-view-wrapper">
+            <div id="file-view-container" class="mt-4 grid-view text-xs border-t border-gray-700 pt-2">
+                <div class="file-node-wrapper !hidden">
+                    <div class="file-node">
+                        <div class="icon flex items-center justify-center">
+                        </div>
+                        <div class="name" title="">
+                        </div>
                     </div>
                 </div>
+            </div>
+            <div class="end-of-file-text mt-[50px] flex w-full h-full text-sm items-center justify-center">
+                End of file list
             </div>
         </div>
 

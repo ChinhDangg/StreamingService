@@ -1,7 +1,7 @@
 import {
     uploadFile,
     startUploadSession,
-    validateDirectory, endUploadSession,
+    endUploadSession,
 } from "/static/js/upload/upload-file.js";
 import {apiRequest} from "/static/js/common.js";
 
@@ -34,7 +34,12 @@ async function getRootDir() {
         alert('Failed to get root directory');
         return null;
     }
-    return rootDir.json();
+    const subFiles = await rootDir.json();
+    if (subFiles.children.hasNext)
+        nextPage = subFiles.children.pageable.pageNumber + 1;
+    else
+        nextPage = -1;
+    return subFiles;
     // return [
     //     {
     //         id: 1,
@@ -52,15 +57,17 @@ async function getRootDir() {
 }
 
 async function getFilesInDir(dirId) {
-    const files = await apiRequest('/api/file/dir', {
-        method: 'POST',
-        body: dirId
-    });
+    const files = await apiRequest('/api/file/dir?id=' + dirId);
     if (!files.ok) {
         alert('Failed to get files in directory');
         return null;
     }
-    return files.json();
+    const subFiles = await files.json();
+    if (subFiles.hasNext)
+        nextPage = subFiles.pageable.pageNumber + 1;
+    else
+        nextPage = -1;
+    return subFiles;
     // return [
     //     {
     //         id: 3,
@@ -106,12 +113,19 @@ function getIconNode(fileType) {
 }
 
 let isProcessing = false;
-let currentFileItems = null;
+const currentFileItems = [];
 
-function displayFileItem(fileItems) {
-    const first = fileViewContainer.firstElementChild;
-    if (first) fileViewContainer.replaceChildren(first);
-    currentFileItems = fileItems;
+function displayFileItem(fileItems, clearNode = true, clearFileList = true) {
+    if (clearNode) {
+        const first = fileViewContainer.firstElementChild;
+        if (first) fileViewContainer.replaceChildren(first);
+        if (observer)
+            observer.observe(sentinel);
+    }
+    if (clearFileList)
+        currentFileItems.length = 0;
+
+    fileViewWrapper.querySelector('.end-of-file-text').classList.add('hidden');
 
     if (fileItems.length === 0) {
         const emptyNode = document.createElement('div');
@@ -122,6 +136,9 @@ function displayFileItem(fileItems) {
     }
 
     fileItems.forEach(item => {
+        if (clearFileList)
+            currentFileItems.push(item);
+
         const fileNode = helperCloneAndUnHideNode(fileNodeTem);
         const fileType = item.fileType;
         if (item.thumbnail) {
@@ -136,8 +153,8 @@ function displayFileItem(fileItems) {
         fileNode.querySelector('.name').innerText = item.name;
         fileNode.querySelector('.name').title = item.name;
         fileNode.dataset.id = item.id;
-        if (item.mid) {
-            fileNode.dataset.mid = item.mid;
+        if (item.mId) {
+            fileNode.dataset.mid = item.mId;
             fileNode.style.backgroundColor = '#4f46e5';
         }
         if (item.statusCode) {
@@ -147,7 +164,7 @@ function displayFileItem(fileItems) {
             fileNode.addEventListener('click', async function () {
                 if (isProcessing) return;
                 isProcessing = true;
-                const subFiles = await getFilesInDir(item.id);
+                const subFiles = (await getFilesInDir(item.id)).content;
                 isProcessing = false;
                 if (!subFiles) return;
                 displayFileItem(subFiles);
@@ -156,6 +173,127 @@ function displayFileItem(fileItems) {
         }
         fileViewContainer.appendChild(fileNode);
     });
+
+    if (nextPage === -1) {
+        fileViewWrapper.querySelector('.end-of-file-text').classList.remove('hidden');
+    }
+}
+
+const fileViewWrapper = document.getElementById('file-view-wrapper');
+const sortSelect = document.getElementById('file-sort-by-select');
+const sentinel = document.createElement("div");
+let observer;
+let nextPage = -1;
+async function fetchMoreFiles(subId, page = 0) {
+    if (isProcessing) return false;
+    isProcessing = true;
+    const params = new URLSearchParams();
+    if (subId) params.append('id', subId);
+    params.append('p', page);
+    params.append('by', sortSelect.value.substring(0, sortSelect.value.indexOf('-')));
+    params.append('order', sortSelect.value.includes('DESC') ? 'DESC' : 'ASC');
+
+    const url = subId ? '/api/file/dir' : '/api/file/root';
+    const response = await apiRequest(url + '?' + params.toString());
+    if (!response.ok) {
+        alert('Failed to fetch more files');
+        isProcessing = false;
+        return null;
+    }
+    const subFiles = await response.json();
+    if (subId) {
+        if (subFiles.hasNext)
+            nextPage = subFiles.pageable.pageNumber + 1;
+        else
+            nextPage = -1;
+        isProcessing = false;
+        return subFiles.content;
+    }
+    if (subFiles.children.hasNext)
+        nextPage = subFiles.children.pageable.pageNumber + 1;
+    else
+        nextPage = -1;
+    isProcessing = false;
+    return subFiles.children.content;
+}
+
+sortSelect.addEventListener('change', async function () {
+    if (nextPage === -1) {
+        // reached the end - should have all files with all info to sort locally
+        const value = sortSelect.value;
+        let key; let order;
+        if (value.includes('NAME'))
+            key = 'name';
+        else if (value.includes('SIZE'))
+            key = 'size';
+        else if (value.includes('LENGTH'))
+            key = 'length';
+        else if (value.includes('UPLOAD'))
+            key = 'uploadDate';
+        if (value.includes('DESC'))
+            order = 'DESC';
+        else
+            order = 'ASC';
+        currentFileItems.sort(dynamicSortByField(key, order));
+        displayFileItem(currentFileItems, true, false);
+        return;
+    }
+    const currentPathStack = getCurrentPath();
+    if (!currentPathStack) {
+        return;
+    }
+    const subId = currentPathStack.id;
+    if (!subId) return;
+    const subFiles = await fetchMoreFiles(subId);
+    if (!subFiles) return
+    displayFileItem(subFiles);
+    if (observer)
+        observer.observe(sentinel);
+});
+
+function dynamicSortByField(key, order = 'ASC') {
+    return function innerSort(a, b) {
+        if (!a.hasOwnProperty(key) || !b.hasOwnProperty(key)) {
+            return 0;
+        }
+        const varA = (typeof a[key] === 'string') ? a[key].toUpperCase() : a[key];
+        const varB = (typeof b[key] === 'string') ? b[key].toUpperCase() : b[key];
+        let comparison = 0;
+        if (varA > varB) {
+            comparison = 1;
+        } else if (varA < varB) {
+            comparison = -1;
+        }
+        return (order === 'DESC') ? (comparison * -1) : comparison;
+    }
+}
+
+function initializeObserveFileViewContainer() {
+    fileViewWrapper.appendChild(sentinel);
+    observer = new IntersectionObserver(async (entries) => {
+        if (entries[0].isIntersecting) {
+            console.log('Intersecting');
+            const currentPathStack = getCurrentPath();
+            if (currentPathStack == null) {
+                observer.unobserve(sentinel);
+                return;
+            }
+            const subId = currentPathStack.id;
+            if (nextPage === -1) {
+                observer.unobserve(sentinel);
+                return;
+            }
+            const subFiles = await fetchMoreFiles(subId, nextPage);
+            if (subFiles === false)
+                return;
+            if (subFiles == null) {
+                observer.unobserve(sentinel);
+                return;
+            }
+            displayFileItem(subFiles, false);
+        }
+    }, { rootMargin: '500px' });
+    observer.observe(sentinel);
 }
 
 const currentPathStack = [];
@@ -181,7 +319,9 @@ function addToCurrentPath(id, name, fileType, isRoot = false) {
             removeLastPathStack();
         }
         currentPathText.innerText = currentPathStack[thisIndex].name;
-        const subFiles = isRoot ? (await getRootDir()).children : await getFilesInDir(currentPathStack[thisIndex].id);
+        const subFiles = isRoot
+            ? (await getRootDir()).children.content
+            : (await getFilesInDir(currentPathStack[thisIndex].id)).content;
         isProcessing = false;
         if (!subFiles) return;
         displayFileItem(subFiles);
@@ -214,8 +354,8 @@ pathBackBtn.addEventListener('click', async function () {
     const lastPath = getCurrentPath();
     currentPathText.innerText = lastPath.name;
     const subFiles = currentPathStack.length === 1
-        ? (await getRootDir()).children
-        : await getFilesInDir(lastPath.id);
+        ? (await getRootDir()).children.content
+        : (await getFilesInDir(lastPath.id)).content;
     console.log(subFiles);
     isProcessing = false;
     if (!subFiles) return;
@@ -226,13 +366,14 @@ async function initialize() {
     const rootInfo = await getRootDir();
     if (!rootInfo) return;
     addToCurrentPath(rootInfo.rootId, rootInfo.rootName, 'DIR', true);
-    displayFileItem(rootInfo.children);
+    displayFileItem(rootInfo.children.content);
 }
 
 window.addEventListener('DOMContentLoaded', async function () {
     await initialize();
     initializeAddNameEntity();
     initializeEditArea();
+    initializeObserveFileViewContainer();
 });
 
 
@@ -427,7 +568,7 @@ function getFullCurrentPath() {
     currentPathStack.forEach(item => {
         fullPath += item.name + '/';
     });
-    return fullPath.substring(0, fullPath.length - 1);
+    return fullPath;
 }
 
 const uploadingList = document.getElementById('upload-list');
@@ -456,11 +597,6 @@ function validateAllowUpload(fileList) {
         alert('No target folder selected');
         return false;
     }
-    const currentPath = getCurrentPath();
-    if (currentPath.fileType !== 'ALBUM' && !allVideo && !savingPath) {
-        alert('Cannot upload non-video files to non-album folder - images should be saved in separated album folder first');
-        return false;
-    }
     return true;
 }
 
@@ -481,17 +617,21 @@ submitBtn.addEventListener('click', async function () {
 
 async function uploadFiles(fileList) {
     allVideo = allVideo && uploadAsVideoCheckbox.checked;
-    const mediaType = allVideo ? 'VIDEO' : 'ALBUM';
+    const mediaType = allVideo ? 'VIDEO' : savingPath ? 'ALBUM' : 'OTHER';
     const currentFullPath = getFullCurrentPath();
-    let sessionId = allVideo ? null : await startUploadSession(getDirPath(currentFullPath, savingPath), mediaType);
-    console.log('path: ' + getDirPath(currentFullPath, savingPath));
+    let sessionId = mediaType === 'ALBUM'
+        ? await startUploadSession(getDirPath(currentFullPath, savingPath), mediaType)
+        : null;
 
-    if (sessionId === null && !allVideo) {
+    if (sessionId === null && mediaType === 'ALBUM') {
         alert('Failed to start upload session');
+        return;
+    } else if (sessionId !== null && sessionId.startsWith('Error:') && !allVideo) {
+        displayFailTexts([sessionId]);
         return;
     }
 
-    const endSession = async (sessionId, title) => {
+    const endMediaSession = async (sessionId, title) => {
         const basicInfo = {
             sessionId: sessionId,
             basicInfo: {
@@ -507,6 +647,18 @@ async function uploadFiles(fileList) {
         return responseText; // media id
     }
 
+    const endFileSession = async (sessionId) => {
+        const response = await apiRequest('/api/upload/media/end-session-file', {
+            method: 'POST',
+            body: sessionId
+        });
+        if (!response.ok) {
+            displayFailTexts(['Failed to end upload session']);
+            return null;
+        }
+        return response.text();
+    }
+
     if (uploadingFiles.size) {
         for (const f of uploadingFiles.keys()) {
             const uploadingFile = uploadingFiles.get(f);
@@ -519,8 +671,10 @@ async function uploadFiles(fileList) {
             );
             if (!passed) {
                 displayFailTexts(currentFailTexts);
-            } else if (allVideo) {
-                const mediaId = await endSession(uploadingFile.sessionId, f.name.substring(f.name.lastIndexOf('/') + 1));
+            } else if (mediaType !== 'ALBUM') {
+                const mediaId = allVideo
+                    ? await endMediaSession(uploadingFile.sessionId, f.name.substring(f.name.lastIndexOf('/') + 1))
+                    : await endFileSession(uploadingFile.sessionId);
                 const errorMess = await uploadNameEntityForMediaInBatch(mediaId);
                 if (errorMess) {
                     displayFailTexts([errorMess]);
@@ -533,8 +687,11 @@ async function uploadFiles(fileList) {
     } else {
         for (const file of fileList) {
             const fileName = getDirPath(currentFullPath, file.name);
-            console.log('Uploading file: ' + fileName);
-            const sId = allVideo ? await startUploadSession(fileName, mediaType) : sessionId;
+            const sId = sessionId === null ? await startUploadSession(fileName, mediaType) : sessionId;
+            if (!sId) {
+                displayFailTexts(['Failed to start upload session']);
+                return;
+            }
             const passed = await uploadFile(
                 sId, file.file, fileName, mediaType, uploadingFiles, currentFailTexts,
                 null, null, null,
@@ -543,8 +700,10 @@ async function uploadFiles(fileList) {
             if (!passed) {
                 uploadingFiles.get(file.file).sessionId = sId;
                 displayFailTexts(currentFailTexts);
-            } else if (allVideo) {
-                const mediaId = await endSession(sId, file.name.substring(file.name.lastIndexOf('/') + 1));
+            } else if (mediaType !== 'ALBUM') {
+                const mediaId = allVideo
+                    ? await endMediaSession(sId, file.name.substring(file.name.lastIndexOf('/') + 1))
+                    : await endFileSession(sId);
                 const errorMess = await uploadNameEntityForMediaInBatch(mediaId);
                 if (errorMess) {
                     displayFailTexts([errorMess]);
@@ -560,11 +719,8 @@ async function uploadFiles(fileList) {
         return;
     }
 
-    if (!allVideo) {
-        const response = await apiRequest('/api/upload/media/end-session-unfinished', {
-            method: 'POST',
-            body: sessionId
-        });
+    if (mediaType === 'ALBUM') {
+        const response = endFileSession(sessionId);
         if (!response.ok) {
             displayFailTexts(['Failed to end upload session']);
             return;
