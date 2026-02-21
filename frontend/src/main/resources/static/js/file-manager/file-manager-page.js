@@ -721,8 +721,7 @@ async function uploadFiles(fileList) {
 
     if (mediaType === 'ALBUM') {
         const response = endFileSession(sessionId);
-        if (!response.ok) {
-            displayFailTexts(['Failed to end upload session']);
+        if (response === null) {
             return;
         }
     }
