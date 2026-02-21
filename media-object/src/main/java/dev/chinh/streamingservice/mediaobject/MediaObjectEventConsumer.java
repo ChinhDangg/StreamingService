@@ -161,6 +161,7 @@ public class MediaObjectEventConsumer {
                     mediaMetaData.getAbsoluteFilePath(),
                     mediaMetaData.getThumbnail(),
                     mediaMetaData.getSize(),
+                    mediaMetaData.getLength(),
                     mediaMetaData.getUploadDate(),
                     event.searchable(),
                     event.fileId()
