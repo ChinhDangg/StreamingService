@@ -36,6 +36,7 @@ public interface MediaUpdateEvent {
             String absolutePath,
             String thumbnail,
             long size,
+            int length,
             Instant uploadDate,
             boolean searchable,
             String fileId
