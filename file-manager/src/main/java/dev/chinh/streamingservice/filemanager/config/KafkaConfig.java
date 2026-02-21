@@ -121,6 +121,7 @@ public class KafkaConfig {
 
         errorHandler.addNotRetryableExceptions(IllegalArgumentException.class);
         errorHandler.addNotRetryableExceptions(MappingException.class);
+        errorHandler.addNotRetryableExceptions(NullPointerException.class);
 
         return errorHandler;
     }
