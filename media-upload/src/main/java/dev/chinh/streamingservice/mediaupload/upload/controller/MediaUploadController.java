@@ -20,11 +20,6 @@ public class MediaUploadController {
 
     public record InitiateMultipartUploadRequest(String sessionId, String objectKey, MediaType mediaType) {}
 
-    @PostMapping("/create-session")
-    public String initiateSession(@RequestBody InitiateMultipartUploadRequest request) {
-        return mediaUploadService.initiateMediaUploadRequest(request.objectKey, request.mediaType);
-    }
-
     @PostMapping("/initiate")
     public String initiateUpload(@RequestBody InitiateMultipartUploadRequest request) {
         return mediaUploadService.initiateMultipartUploadRequest(request.sessionId, request.objectKey, request.mediaType);
@@ -71,9 +66,9 @@ public class MediaUploadController {
         return ResponseEntity.ok().body(mediaUploadService.saveMediaInGrouper(request.sessionId, request.grouperMediaId, request.title));
     }
 
-    @PostMapping("/end-session-unfinished")
+    @PostMapping("/end-session-file")
     public ResponseEntity<Void> endSessionUnfinishedMedia(@RequestBody String sessionId) throws JsonProcessingException {
-        mediaUploadService.saveUnfinishedMedia(sessionId);
+        mediaUploadService.saveFile(sessionId);
         return ResponseEntity.ok().build();
     }
 

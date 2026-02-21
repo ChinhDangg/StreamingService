@@ -47,22 +47,13 @@ public class MediaUploadService {
     private static final String defaultAlbumPath = "album";
     private static final String defaultGrouperPath = "grouper";
 
-    public String initiateMediaUploadRequest(String objectName, MediaType mediaType) {
-        String validatedObject = validateObject(objectName, mediaType);
-        if (mediaType == MediaType.VIDEO && MediaType.detectMediaType(validatedObject) != MediaType.VIDEO) {
-            throw new IllegalArgumentException("Invalid video type: " + validatedObject);
-        }
-
-        return addCacheMediaUploadRequest(mediaType, validatedObject);
-    }
-
     public String initiateMultipartUploadRequest(String sessionId, String object, MediaType mediaType) {
         var uploadRequest = getCachedMediaUploadRequest(sessionId);
         if (uploadRequest == null) {
             throw new IllegalArgumentException("Invalid session ID: " + sessionId);
         }
 
-        String validatedObject = validateObject(object, mediaType);
+        String validatedObject = validateObject(object);
         validateObjectWithMediaType(validatedObject, mediaType);
 
         validateMediaSessionInfoWithRequest(uploadRequest, validatedObject, mediaType);
@@ -89,7 +80,7 @@ public class MediaUploadService {
         if (mediaType == null) {
             throw new IllegalArgumentException("Upload ID not found: " + uploadId);
         }
-        String validatedObject = validateObject(object, mediaType);
+        String validatedObject = validateObject(object);
         validateObjectWithMediaType(validatedObject, mediaType);
 
         validateMediaSessionInfoWithRequest(uploadRequest, validatedObject, mediaType);
@@ -106,7 +97,7 @@ public class MediaUploadService {
         if (mediaType == null) {
             throw new IllegalArgumentException("Upload ID not found: " + uploadId);
         }
-        String validatedObject = validateObject(object, mediaType);
+        String validatedObject = validateObject(object);
         validateObjectWithMediaType(validatedObject, mediaType);
 
         addCacheFileUploadParts(sessionId, uploadId, uploadedParts);
@@ -115,7 +106,7 @@ public class MediaUploadService {
 
 
     @Transactional(readOnly = true)
-    public void saveUnfinishedMedia(String sessionId) throws JsonProcessingException {
+    public void saveFile(String sessionId) throws JsonProcessingException {
         MediaUploadRequest upload = getCachedMediaUploadRequest(sessionId);
         if (upload == null) {
             throw new IllegalArgumentException("Invalid session ID: " + sessionId);
@@ -245,6 +236,11 @@ public class MediaUploadService {
             throw new IllegalArgumentException("Invalid session ID: " + sessionId);
         }
 
+        if (upload.mediaType != MediaType.ALBUM && upload.mediaType != MediaType.VIDEO) {
+            removeCacheMediaSessionRequest(sessionId);
+            throw new IllegalArgumentException("Invalid media type: " + upload.mediaType);
+        }
+
         completeUpload(sessionId);
 
         long savedId = saveMedia(upload, basicInfo, null);
@@ -272,7 +268,7 @@ public class MediaUploadService {
 
         if (upload.mediaType == MediaType.VIDEO) {
             int index = upload.objectName.lastIndexOf("/");
-            mediaMetaData.setParentPath(upload.objectName.substring(0, index));
+            mediaMetaData.setParentPath(index != -1 ? upload.objectName.substring(0, index) : "");
             mediaMetaData.setKey(upload.objectName.substring(index + 1));
             mediaMetaData.setFrameRate((short) -1);
         } else if (upload.mediaType == MediaType.ALBUM) {
@@ -292,7 +288,7 @@ public class MediaUploadService {
     public static String createMediaThumbnailString(MediaType mediaType, long mediaId, String objectName) {
         if (mediaType == MediaType.VIDEO) {
             String thumbnailObjectBasePath = (objectName.startsWith(defaultVidPath) ? "" : (defaultVidPath + "/")) +
-                    objectName.substring(0, objectName.lastIndexOf("/"));
+                    objectName.substring(0, objectName.lastIndexOf("/") + 1);
             String thumbnailName = mediaId + "_" + UUID.randomUUID() + "_thumb.jpg";
             return OSUtil.normalizePath(thumbnailObjectBasePath, thumbnailName);
         } else if (mediaType == MediaType.ALBUM) {
@@ -357,16 +353,6 @@ public class MediaUploadService {
 
     public record MediaUploadRequest(String objectName, MediaType mediaType) {}
 
-    private String addCacheMediaUploadRequest(MediaType mediaType, String objectName) {
-        String id = Instant.now().toEpochMilli() + "-" + UUID.randomUUID();
-        String redisKey = "upload::" + id;
-
-        redisStringTemplate.opsForHash().put(redisKey, "objectName", objectName);
-        redisStringTemplate.opsForHash().put(redisKey, "mediaType", mediaType.name());
-        addUploadSessionCacheLastAccess(id, uploadSessionTimeout);
-        return id;
-    }
-
     public MediaUploadRequest getCachedMediaUploadRequest(String mediaUploadId) {
         String key = "upload::" + mediaUploadId;
         Object cached = redisStringTemplate.opsForHash().get(key, "objectName");
@@ -399,29 +385,20 @@ public class MediaUploadService {
         }
     }
 
-    private String validateObject(String object, MediaType mediaType) {
+    private String validateObject(String object) {
         var validationResult = FileSystemValidator.isValidPath(object);
         if (validationResult.errorMessage() != null) {
             throw new IllegalArgumentException(validationResult.errorMessage());
         }
 
-        String validatedPath = validationResult.validatedPath();
-
-        if (mediaType == MediaType.VIDEO) {
-            int pathIndex = validatedPath.lastIndexOf("/");
-            if (pathIndex == -1) { // no base dir for vid, set to vid folder - later save to user path or whatever
-                validatedPath = defaultVidPath + "/" + validatedPath;
-            }
-        }
-
-        return validatedPath;
+        return validationResult.validatedPath();
     }
 
     private void validateObjectWithMediaType(String object, MediaType mediaType) {
         MediaType detectedType = MediaType.detectMediaType(object);
-        if (detectedType == MediaType.OTHER) {
-            throw new IllegalArgumentException("Invalid support file type: " + object);
-        }
+//        if (detectedType == MediaType.OTHER) {
+//            throw new IllegalArgumentException("Invalid support file type: " + object);
+//        }
         if (mediaType == MediaType.VIDEO && detectedType != MediaType.VIDEO) {
             throw new IllegalArgumentException("Invalid video type: " + object);
         }
