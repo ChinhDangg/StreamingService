@@ -1,7 +1,6 @@
 package dev.chinh.streamingservice.backend.content.service;
 
 import dev.chinh.streamingservice.common.OSUtil;
-import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.constant.Resolution;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.persistence.entity.MediaDescription;
@@ -24,8 +23,7 @@ public class ThumbnailService {
 
     public static final Resolution thumbnailResolution = Resolution.p360;
 
-    public record MediaUrl(MediaType type, String url) {}
-    public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, List<String> buckets, List<String> pathList) {}
+    public record AlbumUrlInfo(List<String> mediaUrlList, List<String> buckets, List<String> pathList) {}
 
     public void processThumbnails(List<NameEntityDTO> items) {
         long now = System.currentTimeMillis() + 60 * 60 * 1000;
@@ -44,12 +42,12 @@ public class ThumbnailService {
         try {
             if (albumUrlInfo.mediaUrlList().isEmpty())
                 return;
-            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), false);
+            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), true);
             if (exitCode != 0) {
                 throw new RuntimeException("Failed to resize thumbnails");
             }
-            for (NameEntityDTO item : newThumbnails) {
-                addCacheThumbnails(Paths.get(getThumbnailPath(item.getName(), item.getThumbnail())).getFileName().toString(), now);
+            for (String path : albumUrlInfo.pathList) {
+                addCacheThumbnails(path.substring(path.lastIndexOf("/") + 1), now);
             }
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
@@ -72,13 +70,13 @@ public class ThumbnailService {
         try {
             if (albumUrlInfo.mediaUrlList().isEmpty())
                 return;
-            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), false);
+            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), true);
             if (exitCode != 0) {
                 System.out.println("Failed to resize thumbnails");
             }
             long now = System.currentTimeMillis() + 60 * 60 * 1000;
-            for (MediaDescription item : newThumbnails) {
-                addCacheThumbnails(Paths.get(getThumbnailPath(item.getId(), item.getThumbnail())).getFileName().toString(), now);
+            for (String path : albumUrlInfo.pathList) {
+                addCacheThumbnails(path.substring(path.lastIndexOf("/") + 1), now);
             }
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
@@ -87,7 +85,7 @@ public class ThumbnailService {
 
     private AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList) {
         List<String> pathList = new ArrayList<>();
-        List<MediaUrl> albumUrlList = new ArrayList<>();
+        List<String> albumUrlList = new ArrayList<>();
 //        List<String> bucketList = new ArrayList<>();
         for (MediaDescription mediaDescription : mediaDescriptionList) {
             if (!mediaDescription.hasThumbnail())
@@ -97,10 +95,10 @@ public class ThumbnailService {
 //                bucketList.add(ContentMetaData.THUMBNAIL_BUCKET);
 //            else
 //                bucketList.add(mediaDescription.getBucket());
-//            pathList.add(mediaDescription.getThumbnail());
+            pathList.add(mediaDescription.getThumbnail());
 
             String pathString = "/chunks" + getThumbnailPath(mediaDescription.getId(), mediaDescription.getThumbnail());
-            albumUrlList.add(new MediaUrl(MediaType.IMAGE, pathString));
+            albumUrlList.add(pathString);
         }
 //        return new AlbumUrlInfo(albumUrlList, bucketList, pathList);
         return new AlbumUrlInfo(albumUrlList, List.of(ContentMetaData.THUMBNAIL_BUCKET), pathList);
@@ -108,7 +106,7 @@ public class ThumbnailService {
 
     private AlbumUrlInfo getThumbnailImagesAsAlbumUrls(List<NameEntityDTO> mediaNameEntryList) {
         List<String> pathList = new ArrayList<>();
-        List<MediaUrl> albumUrlList = new ArrayList<>();
+        List<String> albumUrlList = new ArrayList<>();
         for (NameEntityDTO mediaNameEntry : mediaNameEntryList) {
             if (mediaNameEntry.getThumbnail() == null)
                 continue;
@@ -116,7 +114,7 @@ public class ThumbnailService {
             pathList.add(mediaNameEntry.getThumbnail());
 
             String pathString = "/chunks" + getThumbnailPath(mediaNameEntry.getName(), mediaNameEntry.getThumbnail());
-            albumUrlList.add(new MediaUrl(MediaType.IMAGE, pathString));
+            albumUrlList.add(pathString);
         }
         return new AlbumUrlInfo(albumUrlList, List.of(ContentMetaData.THUMBNAIL_BUCKET), pathList);
     }
@@ -158,7 +156,7 @@ public class ThumbnailService {
 
             String scale = getFfmpegScaleString(resolution, true);
             for (int i = 0; i < albumUrlInfo.mediaUrlList.size(); i++) {
-                String output = albumUrlInfo.mediaUrlList.get(i).url;
+                String output = albumUrlInfo.mediaUrlList.get(i);
 
                 String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(i);
                 String input = minIOService.getObjectUrlForContainer(bucket, albumUrlInfo.pathList.get(i));
