@@ -1,7 +1,8 @@
-package dev.chinh.streamingservice.filemanager;
+package dev.chinh.streamingservice.filemanager.data;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
+import dev.chinh.streamingservice.filemanager.constant.FileType;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;

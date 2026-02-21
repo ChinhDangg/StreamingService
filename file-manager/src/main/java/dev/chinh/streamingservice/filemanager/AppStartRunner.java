@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.filemanager;
 
+import dev.chinh.streamingservice.filemanager.service.FileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;

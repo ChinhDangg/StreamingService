@@ -1,6 +1,7 @@
-package dev.chinh.streamingservice.filemanager;
+package dev.chinh.streamingservice.filemanager.controller;
 
 import dev.chinh.streamingservice.common.constant.MediaType;
+import dev.chinh.streamingservice.filemanager.service.FileService;
 import dev.chinh.streamingservice.filemanager.constant.SortBy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;

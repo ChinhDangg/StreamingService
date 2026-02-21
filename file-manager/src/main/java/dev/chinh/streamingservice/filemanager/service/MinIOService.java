@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.filemanager;
+package dev.chinh.streamingservice.filemanager.service;
 
 import io.minio.*;
 import io.minio.errors.ErrorResponseException;

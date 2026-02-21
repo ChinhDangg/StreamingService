@@ -1,11 +1,10 @@
 package dev.chinh.streamingservice.filemanager;
 
+import dev.chinh.streamingservice.filemanager.repository.FileSystemRepository;
+import dev.chinh.streamingservice.filemanager.service.FileService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
-
-import java.time.LocalDateTime;
 
 @SpringBootApplication
 public class FileManagerApplication {

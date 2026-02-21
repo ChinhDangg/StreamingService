@@ -1,5 +1,6 @@
-package dev.chinh.streamingservice.filemanager;
+package dev.chinh.streamingservice.filemanager.repository;
 
+import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.mongodb.repository.MongoRepository;

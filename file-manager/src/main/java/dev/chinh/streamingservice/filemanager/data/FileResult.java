@@ -1,5 +1,6 @@
-package dev.chinh.streamingservice.filemanager;
+package dev.chinh.streamingservice.filemanager.data;
 
+import dev.chinh.streamingservice.filemanager.constant.FileType;
 import lombok.*;
 
 @Getter

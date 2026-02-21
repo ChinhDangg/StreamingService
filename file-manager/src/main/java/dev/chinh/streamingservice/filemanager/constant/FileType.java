@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.filemanager;
+package dev.chinh.streamingservice.filemanager.constant;
 
 import dev.chinh.streamingservice.common.constant.MediaType;
 
