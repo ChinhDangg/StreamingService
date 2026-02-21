@@ -4,13 +4,20 @@ import io.minio.*;
 import io.minio.errors.ErrorResponseException;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.UriUtils;
+
+import java.nio.charset.StandardCharsets;
 
 @Service
 @RequiredArgsConstructor
 public class MinIOService {
 
     private final MinioClient minioClient;
+
+    @Value("${minio.container.url}")
+    private String minioContainerUrl;
 
     public Iterable<Result<Item>> getAllItemsInBucketWithPrefix(String bucketName, String prefix) {
         return minioClient.listObjects(
@@ -39,5 +46,17 @@ public class MinIOService {
         } catch (Exception e) {
             throw new RuntimeException("Error checking object existence", e);
         }
+    }
+
+    private String encodeUriPathSegment(String str) {
+        return UriUtils.encodePathSegment(str, StandardCharsets.UTF_8);
+    }
+
+    private String encodeUriPath(String str) {
+        return UriUtils.encodePath(str, StandardCharsets.UTF_8); // preserve '/'
+    }
+
+    public String getObjectUrlForContainer(String bucket, String object) {
+        return minioContainerUrl + "/" + encodeUriPathSegment(bucket) + "/" + encodeUriPath(object);
     }
 }
