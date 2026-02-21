@@ -71,7 +71,9 @@ public class MediaEventConsumer {
         System.out.println("======= DLQ EVENT DETECTED =======");
         String message = errorMessage != null ? new String(errorMessage) : "No error message found";
         System.out.printf("Error Message: %s\n", message);
-
+        if (event instanceof MediaUpdateEvent.FileToMediaInitiated) {
+            System.out.println("Received file to media initiated event: " + ((MediaUpdateEvent.FileToMediaInitiated) event).fileId());
+        }
 
         System.out.println("======= =======");
     }
