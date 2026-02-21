@@ -1,6 +1,6 @@
 package dev.chinh.streamingservice.filemanager.exception;
 
-import dev.chinh.streamingservice.common.exception.DuplicateEntryException;
+import org.springframework.core.convert.ConversionFailedException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -19,6 +19,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException e) {
         e.printStackTrace();
         return ResponseEntity.badRequest().body("Not supported method");
+    }
+
+    @ExceptionHandler(ConversionFailedException.class)
+    public ResponseEntity<String> handleConversionFailedException(ConversionFailedException e) {
+        e.printStackTrace();
+        return ResponseEntity.badRequest().body("Invalid parameter");
     }
 
     @ExceptionHandler(Exception.class)
