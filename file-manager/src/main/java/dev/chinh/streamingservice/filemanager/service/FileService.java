@@ -53,9 +53,10 @@ public class FileService {
     private final FileSystemRepository fileSystemRepository;
     private final MongoTemplate mongoTemplate;
     private final ApplicationEventPublisher eventPublisher;
+    private final ThumbnailService thumbnailService;
 
-    private final String mediaPath = ContentMetaData.MEDIA_BUCKET;
-    private final String rootPath = "/" + mediaPath + "/";
+    private static final String mediaPath = ContentMetaData.MEDIA_BUCKET;
+    public static final String rootPath = "/" + mediaPath + "/";
 
     public static String ROOT_FOLDER_ID = null;
 
@@ -63,11 +64,31 @@ public class FileService {
 
     public FileRootResult findFilesAtRoot(int page, SortBy sortBy, Sort.Direction sortOrder) {
         Slice<FileSystemItem> items = fileSystemRepository.findByParentId(getROOT_FOLDER_ID(), getPageable(page, sortBy, sortOrder));
-        return new FileRootResult(getROOT_FOLDER_ID(), mediaPath, items);
+        List<FileSystemItem> itemInRoot = items.getContent();
+        List<String> thumbnailName = thumbnailService.processThumbnail(itemInRoot);
+        for (int i = 0; i < thumbnailName.size(); i++) {
+            itemInRoot.get(i).setThumbnail(thumbnailName.get(i));
+        }
+        Slice<FileSystemItem> updated = new SliceImpl<>(
+                itemInRoot,
+                items.getPageable(),
+                items.hasNext()
+        );
+        return new FileRootResult(getROOT_FOLDER_ID(), mediaPath, updated);
     }
 
     public Slice<FileSystemItem> findFilesInDirectory(String parentId, int page, SortBy sortBy, Sort.Direction sortOrder) {
-        return fileSystemRepository.findByParentId(parentId, getPageable(page, sortBy, sortOrder));
+        Slice<FileSystemItem> items = fileSystemRepository.findByParentId(parentId, getPageable(page, sortBy, sortOrder));
+        List<FileSystemItem> itemInRoot = items.getContent();
+        List<String> thumbnailName = thumbnailService.processThumbnail(itemInRoot);
+        for (int i = 0; i < thumbnailName.size(); i++) {
+            itemInRoot.get(i).setThumbnail(thumbnailName.get(i));
+        }
+        return new SliceImpl<>(
+                itemInRoot,
+                items.getPageable(),
+                items.hasNext()
+        );
     }
 
     private Pageable getPageable(int page, SortBy sortBy, Sort.Direction sortOrder) {

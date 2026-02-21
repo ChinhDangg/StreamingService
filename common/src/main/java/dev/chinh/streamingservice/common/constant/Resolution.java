@@ -11,7 +11,8 @@ public enum Resolution {
     p720(720),
     p480(480),
     p360(360),
-    p240(240);
+    p240(240),
+    p144(144);
 
     private final int resolution;
 
@@ -40,6 +41,8 @@ public enum Resolution {
             return 640;
         else if (resolution == Resolution.p240)
             return 426;
+        else if (resolution == Resolution.p144)
+            return 256;
         return -1;
     }
 }
