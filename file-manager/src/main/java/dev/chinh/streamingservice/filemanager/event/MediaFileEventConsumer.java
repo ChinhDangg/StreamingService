@@ -82,7 +82,7 @@ public class MediaFileEventConsumer {
             String parentId = rootId;
             String[] parts = event.path().split("/");
             if (parts.length > 1) {
-                int end = event.mediaType() == MediaType.VIDEO ? parts.length - 1 : parts.length;
+                int end = event.mediaType() == MediaType.ALBUM ? parts.length : parts.length - 1;
                 for (int i = 0; i < end; i++) {
                     parentId = getOrCreateFolder(parts[i], parentId, currentPath, end == parts.length ? FileType.ALBUM : FileType.DIR);
                     currentPath += parts[i] + "/";
@@ -95,13 +95,10 @@ public class MediaFileEventConsumer {
                     .name(parts[parts.length - 1])
                     .thumbnail(event.thumbnail())
                     .size(event.size())
+                    .length(event.length())
                     .uploadDate(event.uploadDate())
                     .build();
-            if (event.mediaType() == MediaType.VIDEO) {
-                fileItem.setFileType(FileType.VIDEO);
-            } else if (event.mediaType() == MediaType.ALBUM) {
-                fileItem.setFileType(FileType.ALBUM);
-            }
+            fileItem.setFileType(FileType.detectFileTypeFromMediaType(event.mediaType()));
             FileSystemItem saved = mongoTemplate.insert(fileItem);
 
             if (event.mediaType() == MediaType.ALBUM) {
@@ -132,7 +129,9 @@ public class MediaFileEventConsumer {
                     event.fileId(),
                     event.mediaId(),
                     FileType.detectFileTypeFromMediaType(event.mediaType()),
-                    event.thumbnail()
+                    event.thumbnail(),
+                    event.size(),
+                    event.length()
             );
             if (result.getModifiedCount() != 1)
                 throw new RuntimeException("Failed to update file to media");

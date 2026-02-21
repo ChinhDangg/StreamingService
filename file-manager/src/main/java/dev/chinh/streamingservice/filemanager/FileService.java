@@ -12,15 +12,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.QueryTimeoutException;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.data.mongodb.MongoTransactionException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.lang.NonNull;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
@@ -33,8 +31,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 @Service
@@ -44,6 +45,7 @@ public class FileService {
     @Value("${media.backup.path}")
     private String filePath;
 
+    private final RedisTemplate<String, String> redisStringTemplate;
     private final FileSystemRepository fileSystemRepository;
     private final MongoTemplate mongoTemplate;
     private final ApplicationEventPublisher eventPublisher;
@@ -53,21 +55,55 @@ public class FileService {
 
     public static String ROOT_FOLDER_ID = null;
 
-    public record FileRootResult(String rootId, String rootName, Page<FileSystemItem> children) {}
+    public record FileRootResult(String rootId, String rootName, Slice<FileSystemItem> children) {}
 
-    public FileRootResult findFilesAtRoot(int offset, SortBy sortBy, Sort.Direction sortOrder) {
-        Page<FileSystemItem> items = fileSystemRepository.findByParentId(ROOT_FOLDER_ID, getPageable(offset, sortBy, sortOrder));
+    public FileRootResult findFilesAtRoot(int page, SortBy sortBy, Sort.Direction sortOrder) {
+        Slice<FileSystemItem> items = fileSystemRepository.findByParentId(getROOT_FOLDER_ID(), getPageable(page, sortBy, sortOrder));
         return new FileRootResult(getROOT_FOLDER_ID(), mediaPath, items);
     }
 
-    public Page<FileSystemItem> findFilesInDirectory(String parentId, int offset, SortBy sortBy, Sort.Direction sortOrder) {
-        return fileSystemRepository.findByParentId(parentId, getPageable(offset, sortBy, sortOrder));
+    public Slice<FileSystemItem> findFilesInDirectory(String parentId, int page, SortBy sortBy, Sort.Direction sortOrder) {
+        return fileSystemRepository.findByParentId(parentId, getPageable(page, sortBy, sortOrder));
     }
 
-    private Pageable getPageable(int offset, SortBy sortBy, Sort.Direction sortOrder) {
+    private Pageable getPageable(int page, SortBy sortBy, Sort.Direction sortOrder) {
         final int pageSize = 25;
-        return PageRequest.of(offset, pageSize, Sort.by(sortOrder, sortBy.getField()));
+        return PageRequest.of(page, pageSize, Sort.by(sortOrder, sortBy.getField()));
     }
+
+
+    public String initiateUploadRequest(String filePath, MediaType mediaType) {
+        var validatedFile = FileSystemValidator.isValidPath(filePath);
+        if (validatedFile.errorMessage() != null) {
+            throw new IllegalArgumentException(validatedFile.errorMessage());
+        }
+        String validatedPath = validatedFile.validatedPath();
+        if (mediaType == MediaType.VIDEO && MediaType.detectMediaType(validatedPath) != MediaType.VIDEO) {
+            throw new IllegalArgumentException("Invalid video type: " + validatedPath);
+        }
+        if (mediaType != MediaType.ALBUM) {
+            int lastSlashIndex = validatedPath.lastIndexOf("/");
+            String fileFullPath = rootPath + ((lastSlashIndex == -1) ? "" : validatedPath.substring(0, lastSlashIndex));
+            String fileName = validatedPath.substring(lastSlashIndex + 1);
+            boolean exists = mongoTemplate.exists(new Query(Criteria
+                            .where("path").is(fileFullPath)
+                            .and("name").is(fileName)),
+                    FileSystemItem.class);
+            if (exists) throw new IllegalArgumentException("File already exists: " + validatedPath);
+        }
+        return addCacheMediaUploadRequest(mediaType, validatedPath);
+    }
+
+    private String addCacheMediaUploadRequest(MediaType mediaType, String objectName) {
+        String id = Instant.now().toEpochMilli() + "-" + UUID.randomUUID();
+        String redisKey = "upload::" + id;
+
+        redisStringTemplate.opsForHash().put(redisKey, "objectName", objectName);
+        redisStringTemplate.opsForHash().put(redisKey, "mediaType", mediaType.name());
+        redisStringTemplate.expire(redisKey, Duration.ofHours(1));
+        return id;
+    }
+
 
     // using codeStatus as file status:
     // -1 - processing to be added as media
@@ -154,12 +190,14 @@ public class FileService {
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
-    public UpdateResult updateFileMetadataAsMedia(String fileId, long mediaId, FileType fileType, String thumbnailObject) {
+    public UpdateResult updateFileMetadataAsMedia(String fileId, long mediaId, FileType fileType, String thumbnailObject, long size, int length) {
         Query query = new Query(Criteria.where("id").is(fileId));
         Update update = new Update()
                 .set("mId", mediaId)
                 .set("fileType", fileType)
                 .set("thumbnail", thumbnailObject)
+                .set("size", size)
+                .set("length", length)
                 .unset("statusCode");
         return mongoTemplate.updateFirst(query, update, FileSystemItem.class);
     }
@@ -167,7 +205,7 @@ public class FileService {
     @Transactional
     public void initiateDeleteFile(String fileId) {
         FileSystemItem item = getFileSystemItem(fileId);
-        if (item.getStatusCode() == -2)
+        if (item.getStatusCode() != null && item.getStatusCode() == -2)
             return;
         if (item.getFileType() == FileType.DIR) {
             boolean anyChildMedia = mongoTemplate.exists(

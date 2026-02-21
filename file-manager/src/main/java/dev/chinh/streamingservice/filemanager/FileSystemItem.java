@@ -38,6 +38,8 @@ public class FileSystemItem {
     private String thumbnail;
     @JsonProperty(ContentMetaData.SIZE)
     private Long size;
+    @JsonProperty(ContentMetaData.LENGTH)
+    private Integer length;
     @JsonProperty(ContentMetaData.UPLOAD_DATE)
     private Instant uploadDate;
 
