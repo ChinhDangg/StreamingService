@@ -1,7 +1,7 @@
 import {apiRequest} from "/static/js/common.js";
 
 export async function startUploadSession(objectKey, mediaType) {
-    const sessionResponse = await apiRequest('/api/upload/media/create-session', {
+    const sessionResponse = await apiRequest('/api/file/upload/create-session', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
