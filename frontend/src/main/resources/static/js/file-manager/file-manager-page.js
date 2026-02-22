@@ -153,12 +153,10 @@ function displayFileItem(fileItems, clearNode = true, clearFileList = true) {
         fileNode.querySelector('.name').innerText = item.name;
         fileNode.querySelector('.name').title = item.name;
         fileNode.dataset.id = item.id;
+        fileNode.dataset.type = fileType;
         if (item.mId) {
             fileNode.dataset.mid = item.mId;
             fileNode.style.backgroundColor = '#4f46e5';
-        }
-        if (item.statusCode) {
-            fileNode.dataset.status = item.statusCode;
         }
         if (fileType === 'DIR' || fileType === 'ALBUM') {
             fileNode.addEventListener('click', async function () {
@@ -979,34 +977,57 @@ const customRightMenu = document.getElementById('custom-right-menu');
 const newFolderButton = customRightMenu.querySelector('.new-folder-btn');
 const addAsVideoButton = customRightMenu.querySelector('.add-as-video-btn');
 const addAsAlbumButton = customRightMenu.querySelector('.add-as-album-btn');
+const openMediaButton = customRightMenu.querySelector('.open-media-btn');
 const deleteFileButton = customRightMenu.querySelector('.delete-file-btn');
 
-let currentRightMenuTargetId = null;
-let currentRightMenuTargetMId = null;
+const currentTargetNode = {
+    id: null,
+    type: null,
+    mId: null,
+}
+
+function clearTargetNode() {
+    currentTargetNode.id = null;
+    currentTargetNode.type = null;
+    currentTargetNode.mId = null;
+}
 
 fileViewContainer.addEventListener('contextmenu', (event) => {
     event.preventDefault();
+    clearTargetNode();
     const targetNode = event.target.closest('.file-node-wrapper');
 
-    if (!targetNode || targetNode.getAttribute('data-statusCode')) {
-        currentRightMenuTargetId = null;
-        currentRightMenuTargetMId = null;
-        addAsVideoButton.disabled = true;
-        addAsAlbumButton.disabled = true;
-        addAsVideoButton.classList.add('invisible');
-        addAsAlbumButton.classList.add('invisible');
+    addAsVideoButton.disabled = true;
+    addAsAlbumButton.disabled = true;
+    openMediaButton.disabled = true;
+    addAsVideoButton.classList.add('invisible');
+    addAsAlbumButton.classList.add('invisible');
+    openMediaButton.classList.add('invisible');
+
+    if (!targetNode) {
         showCustomRightMenu(event.clientX, event.clientY);
         return;
     }
 
-    addAsVideoButton.disabled = false;
-    addAsAlbumButton.disabled = false;
-    addAsVideoButton.classList.remove('invisible');
-    addAsAlbumButton.classList.remove('invisible');
-    showCustomRightMenu(event.clientX, event.clientY);
+    currentTargetNode.id = targetNode.getAttribute('data-id');
+    currentTargetNode.type = targetNode.getAttribute('data-type');
+    currentTargetNode.mId = targetNode.getAttribute('data-mId');
 
-    currentRightMenuTargetId = targetNode.getAttribute('data-id');
-    currentRightMenuTargetMId = targetNode.getAttribute('data-mid');
+    if (currentTargetNode.mId) {
+        openMediaButton.disabled = false;
+        openMediaButton.classList.remove('invisible');
+    } else {
+        if (currentTargetNode.type === 'VIDEO') {
+            addAsVideoButton.disabled = false;
+            addAsVideoButton.classList.remove('invisible');
+        }
+        if (currentTargetNode.type === 'DIR') {
+            addAsAlbumButton.disabled = false;
+            addAsAlbumButton.classList.remove('invisible');
+        }
+    }
+
+    showCustomRightMenu(event.clientX, event.clientY);
 });
 
 function showCustomRightMenu(posX, posY) {
@@ -1029,11 +1050,11 @@ function showCustomRightMenu(posX, posY) {
 }
 
 addAsVideoButton.addEventListener('click', async function () {
-    if (currentRightMenuTargetId === null) {
+    if (currentTargetNode.id === null) {
         console.log('No target selected');
         return;
     }
-    const response = await apiRequest(`/api/file/vid/${currentRightMenuTargetId}`, {
+    const response = await apiRequest(`/api/file/vid/${currentTargetNode.id}`, {
         method: 'POST'
     });
     if (!response.ok) {
@@ -1044,11 +1065,11 @@ addAsVideoButton.addEventListener('click', async function () {
 });
 
 addAsAlbumButton.addEventListener('click', async function () {
-    if (currentRightMenuTargetId === null) {
+    if (currentTargetNode.id === null) {
         console.log('No target selected');
         return;
     }
-    const response = await apiRequest(`/api/file/album/${currentRightMenuTargetId}`, {
+    const response = await apiRequest(`/api/file/album/${currentTargetNode.id}`, {
         method: 'POST'
     });
     if (!response.ok) {
@@ -1058,19 +1079,29 @@ addAsAlbumButton.addEventListener('click', async function () {
     displayInfoMessage(await response.text());
 });
 
+openMediaButton.addEventListener('click', async function () {
+    if (currentTargetNode.mId === null) {
+        console.log('No target selected');
+        return;
+    }
+    let url;
+    if (currentTargetNode.type === 'VIDEO')
+        url = `/page/video?mediaId=${currentTargetNode.mId}`;
+    else if (currentTargetNode.type === 'ALBUM')
+        url = `/page/album?mediaId=${currentTargetNode.mId}`;
+    if (url)
+        window.open(url);
+});
+
 deleteFileButton.addEventListener('click', async function () {
-    if (currentRightMenuTargetId === null && currentRightMenuTargetMId === null) {
+    if (currentTargetNode.id === null && currentTargetNode.mId === null) {
         console.log('No target selected');
         return;
     }
     const confirmDelete = confirm('Are you sure to delete this file?');
     if (!confirmDelete) return;
-    if (currentRightMenuTargetMId) {
-        if (Number.parseInt(currentRightMenuTargetMId) < 0) {
-            displayInfoMessage("Item is still processing: " + currentRightMenuTargetId, false);
-            return;
-        }
-        const response = await apiRequest(`/api/modify/media/${currentRightMenuTargetMId}`, {
+    if (currentTargetNode.mId) {
+        const response = await apiRequest(`/api/modify/media/${currentTargetNode.mId}`, {
             method: 'DELETE'
         });
         if (!response.ok) {
@@ -1080,7 +1111,7 @@ deleteFileButton.addEventListener('click', async function () {
         displayInfoMessage("Processing to delete media");
         return;
     }
-    const response = await apiRequest(`/api/file/${currentRightMenuTargetId}`, {
+    const response = await apiRequest(`/api/file/${currentTargetNode.id}`, {
         method: 'DELETE'
     });
     if (!response.ok) {
@@ -1092,7 +1123,6 @@ deleteFileButton.addEventListener('click', async function () {
 
 document.addEventListener('click', () => {
     customRightMenu.style.display = 'none';
-    currentRightMenuTargetId = null;
 });
 
 const infoMessageContainer = document.getElementById('info-message-container');
