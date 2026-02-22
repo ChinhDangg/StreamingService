@@ -37,8 +37,6 @@ public class MediaDisplayService {
     private final RedisTemplate<String, String> redisStringTemplate;
     private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
 
-    private final int maxBatchSize = 20;
-
     @Value("${always-show-original-resolution}")
     private String alwaysShowOriginalResolution;
 
@@ -103,6 +101,7 @@ public class MediaDisplayService {
             throw new ResourceNotFoundException("No media grouper found with id: " + mediaId);
         }
 
+        final int maxBatchSize = 20;
         Pageable pageable = PageRequest.of(offset, maxBatchSize, Sort.by(sortOrder, ContentMetaData.NUM_INFO));
         Slice<Long> groupOfMedia = mediaGroupMetaDataRepository.findMediaMetadataIdsByGrouperMetaDataId(mediaItem.getGrouperId(), pageable);
         GroupSlice groupSlice = new GroupSlice(groupOfMedia.getContent(), offset, maxBatchSize, groupOfMedia.hasNext());
