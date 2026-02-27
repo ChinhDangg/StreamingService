@@ -2,9 +2,11 @@ package dev.chinh.streamingservice.mediaupload.modify.service;
 
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
+import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.common.exception.DuplicateEntryException;
+import dev.chinh.streamingservice.mediaupload.event.MediaUploadEventProducer;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaDisplayService;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaSearchCacheService;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaUploadService;
@@ -64,7 +66,10 @@ public class MediaMetadataModifyService {
         int updated = mediaMetaDataRepository.updateMediaTitle(mediaId, newTitle);
         if (updated == 0) throw new IllegalArgumentException("Media not found: " + mediaId);
 
-        eventPublisher.publishEvent(new MediaUpdateEvent.MediaTitleUpdated(mediaId));
+        eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                EventTopics.MEDIA_SEARCH_TOPIC,
+                new MediaUpdateEvent.MediaTitleUpdated(mediaId)
+        ));
 
         mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
         return newTitle;
@@ -103,7 +108,10 @@ public class MediaMetadataModifyService {
         }
         List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(mediaId, updateList.nameEntity);
 
-        eventPublisher.publishEvent(new MediaUpdateEvent.MediaNameEntityUpdated(mediaId, updateList.nameEntity));
+        eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                EventTopics.MEDIA_SEARCH_TOPIC,
+                new MediaUpdateEvent.MediaNameEntityUpdated(mediaId, updateList.nameEntity)
+        ));
 
         mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
         return updatedMediaNameEntityList;
@@ -150,7 +158,10 @@ public class MediaMetadataModifyService {
             );
             grouperMediaId = grouperMetaData.getMediaMetaDataId();
             Integer newLength = mediaMetaDataRepository.decrementLengthReturning(grouperMediaId);
-            eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMediaId, newLength));
+            eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                    EventTopics.MEDIA_SEARCH_TOPIC,
+                    new MediaUpdateEvent.LengthUpdated(grouperMediaId, newLength)
+            ));
             mediaGroupMetaDataRepository.decrementNumInfo(mediaMetaData.getGrouperId());
         }
 
@@ -160,20 +171,6 @@ public class MediaMetadataModifyService {
         mediaMetaDataRepository.decrementTagLengths(mediaMetaData.getId());
 
         mediaMetaDataRepository.deleteById(mediaMetaData.getId());
-
-        try {
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaDeleted(
-                    mediaId,
-                    mediaMetaData.getBucket(),
-                    mediaMetaData.getPath(),
-                    mediaMetaData.hasThumbnail(),
-                    mediaMetaData.getThumbnail(),
-                    mediaMetaData.getMediaType(),
-                    mediaMetaData.getAbsoluteFilePath()
-            ));
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to publish event delete media: " + mediaId, e);
-        }
 
         if (mediaMetaData.getMediaType() == MediaType.GROUPER) {
             mediaDisplayService.removeCacheGroupOfMedia(mediaMetaData.getId());
@@ -198,30 +195,47 @@ public class MediaMetadataModifyService {
         }
         MediaMetaData mediaMetaData = getMediaMetaData(mediaId);
         MediaType mediaType = mediaMetaData.getMediaType();
+
         if (hasFile) {
-            String newThumbnail = MediaUploadService.createMediaThumbnailString(
-                    mediaType,
-                    mediaMetaData.getId(),
-                    mediaType == MediaType.GROUPER ? multipartFile.getOriginalFilename() : mediaMetaData.getPath()
-            );
+            String extension = MediaUploadService.getFileExtension(multipartFile.getOriginalFilename());
+            String newThumbnail = mediaMetaData.getThumbnail().endsWith(extension)
+                    ? mediaMetaData.getThumbnail()
+                    : MediaUploadService.createMediaThumbnailString(mediaType, mediaId, multipartFile.getOriginalFilename());
             minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnail, multipartFile);
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaThumbnailUpdated(
-                    mediaMetaData.getId(),
-                    mediaType,
-                    null,
-                    newThumbnail
-            ));
+            if (newThumbnail != null && !newThumbnail.equals(mediaMetaData.getThumbnail())) {
+                eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                        EventTopics.MEDIA_OBJECT_TOPIC,
+                        new MediaUpdateEvent.MediaThumbnailUpdated(mediaId, mediaType, num, mediaMetaData.getBucket(), newThumbnail)
+                ));
+            }
         } else if (mediaType == MediaType.VIDEO || mediaType == MediaType.ALBUM) {
             if (num < 0 || num >= mediaMetaData.getLength()) {
                 throw new IllegalArgumentException("Invalid thumbnail number: " + num);
             }
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaThumbnailUpdated(
-                    mediaMetaData.getId(),
-                    mediaType,
-                    num,
-                    MediaUploadService.createMediaThumbnailString(mediaType, mediaMetaData.getId(), mediaMetaData.getPath())
-            ));
-        }
+            if (mediaType == MediaType.VIDEO) {
+                eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                        EventTopics.MEDIA_OBJECT_TOPIC,
+                        new MediaUpdateEvent.MediaThumbnailUpdated(
+                                mediaMetaData.getId(),
+                                mediaType,
+                                num,
+                                mediaMetaData.getBucket(),
+                                mediaMetaData.getThumbnail()
+                        )
+                ));
+            }
+            if (mediaType == MediaType.ALBUM) {
+                eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                        EventTopics.MEDIA_FILE_TOPIC,
+                        new MediaUpdateEvent.MediaThumbnailUpdateInitiated(
+                                mediaMetaData.getId(),
+                                mediaType,
+                                Integer.parseInt(num.toString())
+                        )
+                ));
+            }
+        } else
+            return;
         mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
     }
 }

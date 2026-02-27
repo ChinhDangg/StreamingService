@@ -40,12 +40,13 @@ public class ThumbnailService {
             if (exitCode != 0) {
                 throw new RuntimeException("Failed to resize thumbnails");
             }
+            long now = System.currentTimeMillis() + 60 * 60 * 1000;
             for (String path : albumUrlInfo.pathList) {
-                addCacheThumbnails(path.substring(path.lastIndexOf("/") + 1), System.currentTimeMillis() + 60 * 60 * 1000);
+                addCacheThumbnails(path.substring(path.lastIndexOf("/") + 1), now);
             }
-        } catch (InterruptedException | IOException e) {
+        } catch (Exception e) {
             counter.incrementAndGet();
-            throw new RuntimeException(e);
+            System.err.println(e.getMessage());
         }
         counter.incrementAndGet();
         return albumUrlInfo.fullUrlList;
@@ -64,7 +65,7 @@ public class ThumbnailService {
 
             String thumbnailFileName = getThumbnailPath(
                     item.getMId() == null ? item.getId() : item.getMId().toString(),
-                    item.getThumbnail() == null ? item.getName() : item.getThumbnail()
+                    item.getThumbnail() == null ? item.getObjectName() : item.getThumbnail()
             );
             fullUrlList.add(thumbnailFileName);
 
@@ -73,17 +74,8 @@ public class ThumbnailService {
                 buckets.add(ContentMetaData.THUMBNAIL_BUCKET);
             }
             else {
-                String path = item.getPath();
-                int begin = FileService.rootPath.length();
-                if (item.getPath().startsWith(FileService.rootPath)) {
-                    if (item.getPath().length() > begin) {
-                        path = item.getPath().substring(begin);
-                    } else {
-                        path = "";
-                    }
-                }
-                pathList.add(path + item.getName());
-                buckets.add(ContentMetaData.MEDIA_BUCKET);
+                pathList.add(item.getObjectName());
+                buckets.add(item.getBucket());
             }
             if (hasCacheThumbnails(pathList.getLast())) {
                 pathList.removeLast();
@@ -144,6 +136,7 @@ public class ThumbnailService {
             writer.write("exit\n");
             writer.flush();
         } catch (Exception e) {
+            System.err.println("Failed to execute ffmpeg command");
             throw new RuntimeException(e);
         }
 
@@ -155,6 +148,7 @@ public class ThumbnailService {
                 logs.add("[ffmpeg] " + line);
             }
         } catch (Exception e) {
+            System.err.println("Failed to read ffmpeg logs");
             throw new RuntimeException(e);
         }
 

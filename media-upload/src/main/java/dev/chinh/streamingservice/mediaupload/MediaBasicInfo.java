@@ -3,6 +3,7 @@ package dev.chinh.streamingservice.mediaupload;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -13,7 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 @AllArgsConstructor
 public class MediaBasicInfo {
 
-    @NotBlank @Max(255)
+    @NotBlank @Size(max = 255)
     private String title;
 
     @NotNull

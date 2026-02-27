@@ -69,6 +69,8 @@ GRANT USAGE ON SCHEMA auth TO auth_service;
 
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA auth TO auth_service;
 
+CREATE TABLE IF NOT EXISTS auth.users();
+
 GRANT SELECT, INSERT, UPDATE, DELETE
     ON TABLE auth.users
     TO auth_service;

@@ -1,14 +1,14 @@
-package dev.chinh.streamingservice.filemanager.event;
+package dev.chinh.streamingservice.mediaupload.event;
 
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 @Service
-@AllArgsConstructor
-public class MediaFileEventProducer {
+@RequiredArgsConstructor
+public class MediaUploadEventProducer {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 

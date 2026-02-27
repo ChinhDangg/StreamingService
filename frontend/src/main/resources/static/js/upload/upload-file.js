@@ -1,40 +1,41 @@
 import {apiRequest} from "/static/js/common.js";
 
-export async function startUploadSession(objectKey, mediaType) {
-    const sessionResponse = await apiRequest('/api/file/upload/create-session', {
+export async function endVideoUploadSession(uploadId, uploadedParts, basicInfo) {
+    const endResponse = await apiRequest('/api/upload/media/end-session-video', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            objectKey: objectKey,
-            mediaType: mediaType
+            uploadId: uploadId,
+            uploadedParts: uploadedParts,
+            basicInfo: basicInfo
         })
     });
-    if (!sessionResponse.ok) {
-        return 'Error: Failed to start upload: ' + await sessionResponse.text();
-    }
-    return await sessionResponse.text();
-}
-
-export async function endUploadSession(body) {
-    if (body.sessionId == null) {
-        return 'Error: No sessionId found';
-    }
-    const endResponse = await apiRequest('/api/upload/media/end-session', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-    });
     if (!endResponse.ok) {
-        return 'Error: Failed to finalize upload: ' + await endResponse.text();
+        return 'Error: Failed to finalize video upload: ' + await endResponse.text();
     }
     return endResponse.text();
 }
 
-export async function uploadFile(sessionId, file, fileName, mediaType,
+export async function endFileSession(uploadId, uploadedParts){
+    const response = await apiRequest('/api/upload/media/end-session-file', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            uploadId: uploadId,
+            uploadedParts: uploadedParts
+        })
+    });
+    if (!response.ok) {
+        return 'Error: Failed to finalize file upload: ' + await response.text();
+    }
+    return response.text();
+}
+
+export async function uploadFile(sessionId, file, fileName,
                                  uploadingFiles = null, currentFailTexts = null,
                                  chunks = null, eTags = null, uploadId = null,
                                  showProgressFn = null) {
@@ -48,7 +49,34 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
     console.log(chunks);
 
     if (uploadingFiles)
-        uploadingFiles.set(file, { uploadId: uploadId, chunks: chunks, eTags: eTags, partNumber: chunks.partNumber ? chunks.partNumber : 0, mediaType: mediaType });
+        uploadingFiles.set(file, { sessionId: sessionId, uploadId: uploadId, chunks: chunks, eTags: eTags, partNumber: chunks.partNumber ? chunks.partNumber : 0 });
+
+    const startUploadSession = async(filePath) => {
+        const sessionResponse = await apiRequest('/api/file/upload/create-session', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                filePath: filePath
+            })
+        });
+        if (!sessionResponse.ok) {
+            return 'Error: Failed to start upload: ' + await sessionResponse.text();
+        }
+        return await sessionResponse.text();
+    }
+
+    sessionId = sessionId == null ? await startUploadSession(fileName) : sessionId;
+    if (!sessionId || sessionId.startsWith('Error:')) {
+        if (currentFailTexts)
+            currentFailTexts.push(sessionId);
+        return false;
+    }
+    console.log('sessionId: ' + sessionId);
+
+    if (uploadingFiles)
+        uploadingFiles.get(file).sessionId = sessionId;
 
     const initiateUpload = async () => {
         const response = await apiRequest('/api/upload/media/initiate', {
@@ -57,9 +85,7 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                sessionId: sessionId,
-                objectKey: fileName,
-                mediaType: mediaType
+                sessionId: sessionId
             })
         });
         if (!response.ok) {
@@ -88,9 +114,7 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                sessionId: sessionId,
                 uploadId: uploadId,
-                objectKey: fileName,
                 partNumber: c.partNumber
             })
         });
@@ -125,27 +149,6 @@ export async function uploadFile(sessionId, file, fileName, mediaType,
         if (showProgressFn)
             showProgressFn(c.size);
     }
-
-    const completeResponse = await apiRequest('/api/upload/media/complete', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            sessionId: sessionId,
-            uploadId: uploadId,
-            objectKey: fileName,
-            uploadedParts: eTags
-        })
-    });
-    if (!completeResponse.ok) {
-        if (currentFailTexts)
-            currentFailTexts.push('Complete: ' + await completeResponse.text());
-        return false;
-    }
-
-    if (uploadingFiles)
-        uploadingFiles.delete(file);
 
     return true;
 }
@@ -205,13 +208,6 @@ export function validateDirectory(path) {
     if (/[/\\]$/.test(trimmed)) {
         errors.push("Directory path must not end with a slash.");
     }
-
-    // // Cannot look like a file (should have no extension)
-    // const parts = trimmed.split(/[/\\]/).filter(Boolean);
-    // const last = parts.at(-1);
-    // if (/\.[^./\\]+$/i.test(last)) {
-    //     errors.push("This looks like a file, not a directory.");
-    // }
 
     // Must contain at least ONE letter (any language)
     // \p{L} covers all alphabets: Chinese, Vietnamese, Arabic, etc.

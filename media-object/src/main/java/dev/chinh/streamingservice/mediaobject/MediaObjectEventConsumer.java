@@ -1,8 +1,6 @@
 package dev.chinh.streamingservice.mediaobject;
 
-import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.common.constant.MediaType;
-import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.mediaobject.config.KafkaRedPandaConfig;
@@ -10,12 +8,8 @@ import dev.chinh.streamingservice.mediaobject.probe.ImageMetadata;
 import dev.chinh.streamingservice.mediaobject.probe.MediaProbe;
 import dev.chinh.streamingservice.mediaobject.probe.VideoMetadata;
 import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
-import dev.chinh.streamingservice.persistence.entity.MediaNameEntity;
-import dev.chinh.streamingservice.persistence.entity.MediaNameEntityWithThumbnail;
 import dev.chinh.streamingservice.persistence.repository.*;
-import io.minio.Result;
-import io.minio.messages.Item;
-import jakarta.persistence.EntityNotFoundException;
+import io.minio.messages.DeleteObject;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +21,8 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class MediaObjectEventConsumer {
@@ -36,12 +32,9 @@ public class MediaObjectEventConsumer {
     private final ThumbnailService thumbnailService;
 
     private final MediaMetaDataRepository mediaMetaDataRepository;
-    private final MediaAuthorRepository mediaAuthorRepository;
-    private final MediaCharacterRepository mediaCharacterRepository;
-    private final MediaUniverseRepository mediaUniverseRepository;
-    private final MediaTagRepository mediaTagRepository;
 
     private final ApplicationEventPublisher eventPublisher;
+
 
     Logger logger = LoggerFactory.getLogger(MediaObjectEventConsumer.class);
 
@@ -51,123 +44,65 @@ public class MediaObjectEventConsumer {
         );
     }
 
-    private void onDeleteMediaObject(MediaUpdateEvent.MediaDeleted event) throws Exception {
-        System.out.println("Received media object delete event: " + event.mediaType() + " " + event.path());
-        MediaType mediaType = event.mediaType();
-
-        try {
-            if (event.hasThumbnail())
-                minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, event.thumbnail());
-        } catch (Exception e) {
-            System.err.println("Failed to delete thumbnail file: " + event.thumbnail());
-            throw e;
-        }
-
-        if (mediaType == MediaType.VIDEO) {
-            try {
-                minIOService.removeFile(event.bucket(), event.path());
-            } catch (Exception e) {
-                System.err.println("Failed to delete media file: " + event.path());
-                throw e;
-            }
-        } else if (mediaType == MediaType.ALBUM) {
-            try {
-                String prefix = event.path();
-                // there is no filesystem in object storage, so we need to add the trailing slash to delete the exact oldThumbnail
-                if (!prefix.endsWith("/"))
-                    prefix += "/";
-                Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(event.bucket(), prefix);
-                for (Result<Item> result : results) {
-                    String objectName = result.get().objectName();
-                    if (!objectName.startsWith(prefix)) {
-                        // this should not happen but for safeguard
-                        logger.warn("Skipping unsafe delete: {}", objectName);
-                        continue;
-                    }
-                    minIOService.removeFile(event.bucket(), objectName);
-                }
-            } catch (Exception e) {
-                System.err.println("Failed to delete media files in album: " + event.path());
-                throw e;
-            }
-        }
-    }
-
     @Transactional
-    public void onCreateMedia(MediaUpdateEvent.MediaCreated event) throws Exception {
-        System.out.println("Received media enrichment update event: " + event.mediaId() + " " + event.mediaType());
+    public void onMediaEnrich(MediaUpdateEvent.MediaEnriched event) throws Exception {
+        logger.info("Received media enrichment update event: {} {}", event.mediaId(), event.mediaType());
         try {
             MediaMetaData mediaMetaData = getMediaMetadataById(event.mediaId());
             if (event.mediaType() == MediaType.VIDEO) {
-                VideoMetadata videoMetadata = mediaProbe.parseMediaMetadata(mediaProbe.probeMediaInfo(mediaMetaData.getBucket(), mediaMetaData.getPath()), VideoMetadata.class);
+                VideoMetadata videoMetadata = mediaProbe.parseMediaMetadata(mediaProbe.probeMediaInfo(mediaMetaData.getBucket(), mediaMetaData.getKey()), VideoMetadata.class);
                 mediaMetaData.setFrameRate(videoMetadata.frameRate());
                 mediaMetaData.setFormat(videoMetadata.format());
                 mediaMetaData.setSize(videoMetadata.size());
                 mediaMetaData.setWidth(videoMetadata.width());
                 mediaMetaData.setHeight(videoMetadata.height());
                 mediaMetaData.setLength((int) videoMetadata.durationSeconds());
-                mediaMetaData.setThumbnail(thumbnailService.generateThumbnailFromVideo(mediaMetaData.getBucket(), mediaMetaData.getPath(), event.thumbnailObject(), mediaMetaData.getLength(), null));
-            } else if (event.mediaType() == MediaType.ALBUM) {
-                var results = minIOService.getAllItemsInBucketWithPrefix(mediaMetaData.getBucket(), mediaMetaData.getPath());
-                int count = 0;
-                long totalSize = 0;
-                String firstImage = null;
-                String firstVideo = null;
-                for (Result<Item> result : results) {
-                    count++;
-                    Item item = result.get();
-                    if (MediaType.detectMediaType(item.objectName()) == MediaType.IMAGE) {
-                        if (firstImage == null)
-                            firstImage = item.objectName();
-                        totalSize += item.size();
-                    }
-                    if (firstImage == null && firstVideo == null && MediaType.detectMediaType(item.objectName()) == MediaType.VIDEO) {
-                        firstVideo = item.objectName();
-                    }
-                }
-                mediaMetaData.setSize(totalSize);
-                mediaMetaData.setLength(count);
-                if (firstImage != null) {
-                    ImageMetadata imageMetadata = mediaProbe.parseMediaMetadata(mediaProbe.probeMediaInfo(mediaMetaData.getBucket(), firstImage), ImageMetadata.class);
+                mediaMetaData.setThumbnail(thumbnailService.generateThumbnailFromVideo(mediaMetaData.getBucket(), mediaMetaData.getKey(), event.thumbnailObject(), mediaMetaData.getLength(), null));
+            } else {
+                mediaMetaData.setSize(event.size());
+                mediaMetaData.setLength(event.length());
+
+                MediaType thumbnailMediaType = MediaType.detectMediaType(mediaMetaData.getKey());
+                if (thumbnailMediaType == MediaType.IMAGE) {
+                    ImageMetadata imageMetadata = mediaProbe.parseMediaMetadata(mediaProbe.probeMediaInfo(mediaMetaData.getBucket(), mediaMetaData.getKey()), ImageMetadata.class);
                     mediaMetaData.setWidth(imageMetadata.width());
                     mediaMetaData.setHeight(imageMetadata.height());
                     mediaMetaData.setFormat(imageMetadata.format());
-                    mediaMetaData.setThumbnail(thumbnailService.copyAlbumObjectToThumbnailBucket(mediaMetaData.getBucket(), firstImage, event.thumbnailObject()));
-                } else if (firstVideo != null) {
-                    VideoMetadata videoMetadata = mediaProbe.parseMediaMetadata(mediaProbe.probeMediaInfo(mediaMetaData.getBucket(), firstVideo), VideoMetadata.class);
+                    mediaMetaData.setThumbnail(thumbnailService.copyAlbumObjectToThumbnailBucket(mediaMetaData.getBucket(), mediaMetaData.getKey(), event.thumbnailObject()));
+                } else if (thumbnailMediaType == MediaType.VIDEO) {
+                    VideoMetadata videoMetadata = mediaProbe.parseMediaMetadata(mediaProbe.probeMediaInfo(mediaMetaData.getBucket(), mediaMetaData.getKey()), VideoMetadata.class);
                     mediaMetaData.setWidth(videoMetadata.width());
                     mediaMetaData.setHeight(videoMetadata.height());
                     mediaMetaData.setFormat(videoMetadata.format());
                     mediaMetaData.setFrameRate(videoMetadata.frameRate());
-                    mediaMetaData.setThumbnail(thumbnailService.generateThumbnailFromVideo(mediaMetaData.getBucket(), firstVideo, event.thumbnailObject(), (int) videoMetadata.durationSeconds(), null));
+                    mediaMetaData.setThumbnail(thumbnailService.generateThumbnailFromVideo(mediaMetaData.getBucket(), mediaMetaData.getKey(), event.thumbnailObject(), (int) videoMetadata.durationSeconds(), null));
                 }
-            } else if (event.mediaType() == MediaType.GROUPER) {
-                ImageMetadata imageMetadata = mediaProbe.parseMediaMetadata(mediaProbe.probeMediaInfo(ContentMetaData.THUMBNAIL_BUCKET, mediaMetaData.getThumbnail()), ImageMetadata.class);
-                mediaMetaData.setSize(imageMetadata.size());
-                mediaMetaData.setWidth(imageMetadata.width());
-                mediaMetaData.setHeight(imageMetadata.height());
-                mediaMetaData.setFormat(imageMetadata.format());
-                String oldThumbnail = mediaMetaData.getThumbnail();
-                mediaMetaData.setThumbnail(thumbnailService.copyAlbumObjectToThumbnailBucket(ContentMetaData.THUMBNAIL_BUCKET, oldThumbnail, event.thumbnailObject()));
-                minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, oldThumbnail);
             }
+            mediaMetaDataRepository.save(mediaMetaData);
 
-            // send event to save media search in search and backup (2 groups)
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreatedReady(
-                    event.mediaId(),
-                    event.mediaType(),
-                    mediaMetaData.getBucket(),
-                    mediaMetaData.getPath(),
-                    mediaMetaData.getAbsoluteFilePath(),
-                    mediaMetaData.getThumbnail(),
-                    mediaMetaData.getSize(),
-                    mediaMetaData.getLength(),
-                    mediaMetaData.getUploadDate(),
-                    event.searchable(),
-                    event.fileId()
+            String topic = event.searchable() ? EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC : EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC;
+            eventPublisher.publishEvent(new MediaObjectEventProducer.EventWrapper(
+                    topic,
+                    new MediaUpdateEvent.MediaCreatedReady(
+                            event.fileId(),
+                            event.mediaId(),
+                            event.mediaType(),
+                            mediaMetaData.getThumbnail(),
+                            mediaMetaData.getLength())
             ));
         } catch (Exception e) {
-            System.err.println("Failed to update media enrichment: " + event.mediaId());
+            logger.error("Failed to update media enrichment: {} {}", event.mediaId(), event.mediaType());
+            throw e;
+        }
+    }
+
+    private void onDeleteObject(MediaUpdateEvent.ObjectDeleted event) {
+        logger.info("Received media object delete event: {}: {} objects", event.bucket(), event.objectNames().size());
+        try {
+            List<DeleteObject> objects = event.objectNames().stream().map(DeleteObject::new).toList();
+            minIOService.removeBulk(event.bucket(), objects);
+        } catch (Exception e) {
+            logger.error("Failed to delete objects: {}: {}", event.bucket(), event.objectNames().size());
             throw e;
         }
     }
@@ -177,130 +112,53 @@ public class MediaObjectEventConsumer {
         System.out.println("Received media thumbnail update event: " + event.mediaId() + " " + event.num());
         MediaMetaData mediaMetaData = getMediaMetadataById(event.mediaId());
 
-        if (event.num() == null) {
-            String oldThumbnail = mediaMetaData.getThumbnail();
-            minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, oldThumbnail);
-            mediaMetaData.setThumbnail(event.thumbnailObject());
+        boolean sameName = event.thumbnailObject().equals(mediaMetaData.getThumbnail());
 
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaThumbnailUpdatedReady(event.mediaId(), oldThumbnail, event.thumbnailObject()));
-            return;
-        }
-
-        String oldThumbnail = null;
-        String newThumbnail = null;
-        if (event.mediaType() == MediaType.VIDEO) {
-            if (event.num() >= 0 && event.num() < mediaMetaData.getLength()) {
-                newThumbnail = thumbnailService.generateThumbnailFromVideo(
-                        mediaMetaData.getBucket(),
-                        mediaMetaData.getPath(),
-                        event.thumbnailObject(),
-                        mediaMetaData.getLength(),
-                        event.num()
-                );
-                oldThumbnail = mediaMetaData.getThumbnail();
-                mediaMetaDataRepository.updateMediaThumbnail(mediaMetaData.getId(), newThumbnail);
+        if (event.num() != null && event.mediaType() == MediaType.VIDEO) {
+            thumbnailService.generateThumbnailFromVideo(
+                    mediaMetaData.getBucket(),
+                    mediaMetaData.getKey(),
+                    event.thumbnailObject(),
+                    mediaMetaData.getLength(),
+                    event.num()
+            );
+        } else if (event.num() != null && event.mediaType() == MediaType.ALBUM) {
+            MediaType thumbnailType = MediaType.detectMediaType(event.thumbnailObject());
+            if (thumbnailType == MediaType.IMAGE) {
+                ImageMetadata imageMetadata = mediaProbe.parseMediaMetadata(mediaProbe.probeMediaInfo(mediaMetaData.getBucket(), event.thumbnailObject()), ImageMetadata.class);
+                mediaMetaData.setWidth(imageMetadata.width());
+                mediaMetaData.setHeight(imageMetadata.height());
+                mediaMetaData.setFormat(imageMetadata.format());
+            } else if (thumbnailType == MediaType.VIDEO) {
+                VideoMetadata videoMetadata = mediaProbe.parseMediaMetadata(mediaProbe.probeMediaInfo(mediaMetaData.getBucket(), event.thumbnailObject()), VideoMetadata.class);
+                mediaMetaData.setWidth(videoMetadata.width());
+                mediaMetaData.setHeight(videoMetadata.height());
             }
-        } else if (event.mediaType() == MediaType.ALBUM) {
-            int albumNum = event.num().intValue();
-            if (albumNum >= 0 && albumNum < mediaMetaData.getLength()) {
-                var results = minIOService.getAllItemsInBucketWithPrefix(mediaMetaData.getBucket(), mediaMetaData.getPath());
-                int count = 0;
-                String objectAtNum = null;
-                for (Result<Item> result : results) {
-                    if (count == albumNum) {
-                        objectAtNum = result.get().objectName();
-                        break;
-                    }
-                    count++;
-                }
-                if (objectAtNum != null) {
-                    MediaType mediaType = MediaType.detectMediaType(objectAtNum);
-                    if (mediaType == MediaType.IMAGE) {
-                        newThumbnail = thumbnailService.copyAlbumObjectToThumbnailBucket(mediaMetaData.getBucket(), objectAtNum, event.thumbnailObject());
-                    } else if (mediaType == MediaType.VIDEO) {
-                        VideoMetadata videoMetadata = mediaProbe.parseMediaMetadata(mediaProbe.probeMediaInfo(mediaMetaData.getBucket(), objectAtNum), VideoMetadata.class);
-                        newThumbnail = thumbnailService.generateThumbnailFromVideo(
-                                mediaMetaData.getBucket(), objectAtNum, event.thumbnailObject(), (int) videoMetadata.durationSeconds(), null);
-                    }
-                    if (newThumbnail != null) {
-                        oldThumbnail = mediaMetaData.getThumbnail();
-                        mediaMetaDataRepository.updateMediaThumbnail(mediaMetaData.getId(), newThumbnail);
-                    }
-                }
-            }
-        }
-        if (oldThumbnail != null) {
-            minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, oldThumbnail);
-        }
-        eventPublisher.publishEvent(new MediaUpdateEvent.MediaThumbnailUpdatedReady(event.mediaId(), oldThumbnail, newThumbnail));
-    }
+        } else if (!sameName) {
+            thumbnailService.copyAlbumObjectToThumbnailBucket(event.bucket(), event.thumbnailObject(), event.thumbnailObject());
+            minIOService.removeFile(event.bucket(), mediaMetaData.getThumbnail());
 
-    @Transactional
-    public void onCreateNameEntity(MediaUpdateEvent.NameEntityCreated event) throws Exception {
-        System.out.println("Received create name entity: " + event.nameEntityConstant() + " nameEntityId: " + event.nameEntityId());
-        MediaNameEntity nameEntity = getNameEntityNameById(event.nameEntityConstant(), event.nameEntityId());
-        try {
-            if (event.thumbnailObject() != null && event.thumbnailPath() != null) {
-                MediaNameEntityWithThumbnail nameEntityWithThumbnail = (MediaNameEntityWithThumbnail) nameEntity;
-                nameEntityWithThumbnail.setThumbnail(
-                        thumbnailService.copyAlbumObjectToThumbnailBucket(ContentMetaData.THUMBNAIL_BUCKET, event.thumbnailObject(), event.thumbnailPath())
-                );
-                minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, event.thumbnailObject());
-            }
-            eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityCreatedReady(event.nameEntityId(), event.nameEntityConstant(), event.thumbnailPath()));
-        } catch (Exception e) {
-            System.err.println("Failed to create name entity thumbnail: " + event.nameEntityConstant() + " nameEntityId: " + event.nameEntityId());
-            throw e;
+            mediaMetaDataRepository.updateMediaThumbnail(mediaMetaData.getId(), event.thumbnailObject());
         }
-    }
 
-    private void onDeleteNameEntity(MediaUpdateEvent.NameEntityDeleted event) throws Exception {
-        System.out.println("Received delete name entity: " + event.nameEntityConstant() + " nameEntityId: " + event.nameEntityId());
-        try {
-            minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, event.thumbnailPath());
-        } catch (Exception e) {
-            System.err.println("Failed to delete name entity thumbnail: " + event.nameEntityConstant() + " nameEntityId: " + event.nameEntityId());
-            throw e;
-        }
-    }
-
-    private void onUpdateNameEntityThumbnail(MediaUpdateEvent.NameEntityThumbnailUpdatedReady event) throws Exception {
-        System.out.println("Received update name entity thumbnail: " + event.nameEntityId() + " " + event.nameEntityConstant());
-        try {
-            minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, event.oldThumbnail());
-        } catch (Exception e) {
-            System.err.println("Failed to delete name entity old thumbnail: " + event.oldThumbnail());
-            throw e;
-        }
-    }
-
-    private MediaNameEntity getNameEntityNameById(MediaNameEntityConstant type, long id) {
-        var optional = switch (type) {
-            case MediaNameEntityConstant.AUTHORS -> mediaAuthorRepository.findById(id);
-            case MediaNameEntityConstant.CHARACTERS -> mediaCharacterRepository.findById(id);
-            case MediaNameEntityConstant.TAGS -> mediaTagRepository.findById(id);
-            case MediaNameEntityConstant.UNIVERSES -> mediaUniverseRepository.findById(id);
-        };
-        return optional.orElseThrow(() -> new EntityNotFoundException("Not found"));
+        String topic = sameName ? EventTopics.MEDIA_BACKUP_TOPIC : EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC;
+        eventPublisher.publishEvent(new MediaObjectEventProducer.EventWrapper(
+                topic,
+                new MediaUpdateEvent.MediaThumbnailUpdatedReady(event.mediaId(), mediaMetaData.getThumbnail(), event.thumbnailObject()))
+        );
     }
 
 
     @Transactional
     @KafkaListener(topics = {
-            EventTopics.MEDIA_ALL_TOPIC,
-            EventTopics.MEDIA_OBJECT_TOPIC,
-            EventTopics.MEDIA_OBJECT_AND_BACKUP_TOPIC,
-            EventTopics.MEDIA_SEARCH_BACKUP_AND_OBJECT_TOPIC
+            EventTopics.MEDIA_OBJECT_TOPIC
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws Exception {
         try {
             switch (event) {
-                case MediaUpdateEvent.MediaDeleted e -> onDeleteMediaObject(e);
-                case MediaUpdateEvent.MediaCreated e -> onCreateMedia(e);
+                case MediaUpdateEvent.MediaEnriched e -> onMediaEnrich(e);
+                case MediaUpdateEvent.ObjectDeleted e -> onDeleteObject(e);
                 case MediaUpdateEvent.MediaThumbnailUpdated e -> onUpdateMediaThumbnail(e);
-                case MediaUpdateEvent.NameEntityCreated e -> onCreateNameEntity(e);
-                case MediaUpdateEvent.NameEntityDeleted e -> onDeleteNameEntity(e);
-                case MediaUpdateEvent.NameEntityThumbnailUpdatedReady e -> onUpdateNameEntityThumbnail(e);
                 default ->
                     // unknown event type → log and skip
                     System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
@@ -329,10 +187,10 @@ public class MediaObjectEventConsumer {
 
         // Accessing the POJO data directly
         switch (event) {
-            case MediaUpdateEvent.MediaDeleted e ->
-                System.out.println("Received media object delete event: " + e.mediaType() + " " + e.path());
-            case MediaUpdateEvent.MediaCreated e ->
+            case MediaUpdateEvent.MediaEnriched e ->
                 System.out.println("Received media enrichment update event: " + e.mediaId());
+            case MediaUpdateEvent.ObjectDeleted e ->
+                System.out.println("Received media object delete event: " + e.bucket() + " " + e.objectNames());
             case MediaUpdateEvent.MediaThumbnailUpdated e ->
                 System.out.println("Received media thumbnail update event: " + e.mediaId() + " " + e.num());
             default -> {

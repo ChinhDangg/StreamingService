@@ -82,8 +82,8 @@ public class KafkaRedPandaConfig {
             }
         };
         Map<String, Class<?>> mappings = new HashMap<>();
-        mappings.put("dev.chinh.streamingservice.common.event.MediaUpdateEvent$MediaCreated", MediaUpdateEvent.MediaCreated.class);
-        mappings.put("dev.chinh.streamingservice.common.event.MediaUpdateEvent$MediaDeleted", MediaUpdateEvent.MediaDeleted.class);
+        mappings.put("dev.chinh.streamingservice.common.event.MediaUpdateEvent$MediaEnriched", MediaUpdateEvent.MediaEnriched.class);
+        mappings.put("dev.chinh.streamingservice.common.event.MediaUpdateEvent$ObjectDeleted", MediaUpdateEvent.ObjectDeleted.class);
         mappings.put("dev.chinh.streamingservice.common.event.MediaUpdateEvent$MediaThumbnailUpdated", MediaUpdateEvent.MediaThumbnailUpdated.class);
 
         typeMapper.setIdClassMapping(mappings);

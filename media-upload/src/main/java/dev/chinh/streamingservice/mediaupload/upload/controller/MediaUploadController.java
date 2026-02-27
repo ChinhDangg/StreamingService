@@ -1,10 +1,10 @@
 package dev.chinh.streamingservice.mediaupload.upload.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.mediaupload.MediaBasicInfo;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaUploadService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,57 +18,38 @@ public class MediaUploadController {
 
     private final MediaUploadService mediaUploadService;
 
-    public record InitiateMultipartUploadRequest(String sessionId, String objectKey, MediaType mediaType) {}
+    public record InitiateMultipartUploadRequest(@Size(max = 100) String sessionId) {}
 
     @PostMapping("/initiate")
     public String initiateUpload(@RequestBody InitiateMultipartUploadRequest request) {
-        return mediaUploadService.initiateMultipartUploadRequest(request.sessionId, request.objectKey, request.mediaType);
+        return mediaUploadService.initiateMultipartUploadRequest(request.sessionId);
     }
 
     public record PresignUploadRequest(
-            String sessionId,
+            @Size(max = 256, message = "Invalid Upload ID length")
             String uploadId,
-            String objectKey,
+            @Max(1500)
             int partNumber) {}
 
     @PostMapping("/presign-part-url")
-    public String getPresignPartUrl(@RequestBody PresignUploadRequest request) {
-        return mediaUploadService.generatePresignedPartUrl(request.sessionId, request.uploadId, request.objectKey, request.partNumber);
+    public String getPresignPartUrl(@RequestBody @Valid PresignUploadRequest request) {
+        return mediaUploadService.generatePresignedPartUrl(request.uploadId, request.partNumber);
     }
 
-    public record CompleteMultipartUploadRequest(
-            String sessionId,
+    public record EndSessionRequest(
+            @Size(max = 256, message = "Invalid Upload ID length")
             String uploadId,
-            String objectKey,
-            List<MediaUploadService.UploadedPart> uploadedParts) {}
+            List<MediaUploadService.UploadedPart> uploadedParts,
+            MediaBasicInfo basicInfo) {}
 
-    @PostMapping("/complete")
-    public void completeUpload(@RequestBody CompleteMultipartUploadRequest request) throws JsonProcessingException {
-        mediaUploadService.markCompletingMultipartUpload(request.sessionId, request.uploadId, request.objectKey, request.uploadedParts);
-    }
-
-    public record EndSessionRequest(String sessionId, MediaBasicInfo basicInfo) {}
-
-    @PostMapping("/end-session")
-    public ResponseEntity<Long> endSession(@RequestBody EndSessionRequest request) throws Exception {
-        return ResponseEntity.ok().body(mediaUploadService.saveMedia(request.sessionId, request.basicInfo));
-    }
-
-    @PostMapping(value = "/create-grouper", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<Long> createGrouperMedia(@Valid @ModelAttribute MediaBasicInfo basicInfo) {
-        return ResponseEntity.ok().body(mediaUploadService.saveGrouperMedia(basicInfo));
-    }
-
-    public record EndSessionGrouperRequest(String sessionId, long grouperMediaId, String title) {}
-
-    @PostMapping("/end-session-grouper")
-    public ResponseEntity<Long> endSessionGrouper(@RequestBody EndSessionGrouperRequest request) throws Exception {
-        return ResponseEntity.ok().body(mediaUploadService.saveMediaInGrouper(request.sessionId, request.grouperMediaId, request.title));
+    @PostMapping("/end-session-video")
+    public ResponseEntity<Long> endSession(@RequestBody EndSessionRequest request) {
+        return ResponseEntity.ok().body(mediaUploadService.saveAsVideoMedia(request.uploadId, request.basicInfo, request.uploadedParts));
     }
 
     @PostMapping("/end-session-file")
-    public ResponseEntity<Void> endSessionUnfinishedMedia(@RequestBody String sessionId) throws JsonProcessingException {
-        mediaUploadService.saveFile(sessionId);
+    public ResponseEntity<Void> endSessionUnfinishedMedia(@RequestBody @Valid EndSessionRequest request) {
+        mediaUploadService.saveFile(request.uploadId, request.uploadedParts);
         return ResponseEntity.ok().build();
     }
 

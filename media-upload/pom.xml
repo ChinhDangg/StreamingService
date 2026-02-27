@@ -111,6 +111,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.github.f4b6a3</groupId>
+            <artifactId>uuid-creator</artifactId>
+            <version>6.1.1</version>
+        </dependency>
+
+        <dependency>
             <groupId>dev.chinh.streamingservice</groupId>
             <artifactId>common</artifactId>
             <version>0.0.1-SNAPSHOT</version>

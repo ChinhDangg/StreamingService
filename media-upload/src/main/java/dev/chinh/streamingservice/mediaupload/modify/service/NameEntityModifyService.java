@@ -1,8 +1,10 @@
 package dev.chinh.streamingservice.mediaupload.modify.service;
 
 import dev.chinh.streamingservice.common.data.ContentMetaData;
+import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
+import dev.chinh.streamingservice.mediaupload.event.MediaUploadEventProducer;
 import dev.chinh.streamingservice.mediaupload.modify.dto.NameAndThumbnailPostRequest;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.mediaupload.upload.service.MinIOService;
@@ -12,9 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -80,7 +81,10 @@ public class NameEntityModifyService {
         T added = repository.save(mediaNameEntity);
         long id = added.getId();
 
-        eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityCreated(mediaNameEntityConstant, id, null, null));
+        eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                EventTopics.MEDIA_SEARCH_TOPIC,
+                new MediaUpdateEvent.NameEntityCreated(mediaNameEntityConstant, id, null)
+        ));
     }
 
     @Transactional
@@ -88,37 +92,43 @@ public class NameEntityModifyService {
                                                                           MediaNameEntityConstant mediaNameEntityConstant,
                                                                           T mediaNameEntity,
                                                                           MediaNameEntityRepository<T, Long> repository) {
-        String thumbnailObject = null;
+        String thumbnailPath = null;
         try {
             String name = validateNameEntity(request.getName());
-
-            String extension = null;
-            if (request.getThumbnail() != null) {
-                extension = request.getThumbnail().getOriginalFilename() == null ? ".jpg"
-                        : request.getThumbnail().getOriginalFilename().substring(request.getThumbnail().getOriginalFilename().lastIndexOf("."));
-
-                thumbnailObject = mediaNameEntityConstant.getName() + "/" + name + "_" + UUID.randomUUID() + extension;
-
-                // upload first to not start transaction first and hold the database connection
-                minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, thumbnailObject, request.getThumbnail());
-            }
 
             mediaNameEntity.setName(name);
 
             T added = repository.save(mediaNameEntity);
             long id = added.getId();
 
-            String thumbnailPath = mediaNameEntityConstant.getName() + "/" + id + "_" + UUID.randomUUID() + extension;
+            if (request.getThumbnail() != null) {
+                String extension = request.getThumbnail().getOriginalFilename() == null ? ".jpg"
+                        : request.getThumbnail().getOriginalFilename().substring(request.getThumbnail().getOriginalFilename().lastIndexOf("."));
 
-            eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityCreated(mediaNameEntityConstant, id, thumbnailObject, thumbnailPath));
+                thumbnailPath = createNameEntityThumbnail(mediaNameEntityConstant, id, extension);
+
+                minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, thumbnailPath, request.getThumbnail());
+            }
+
+            if (request.getThumbnail() != null)
+                mediaNameEntity.setThumbnail(thumbnailPath);
+            repository.save(mediaNameEntity);
+
+            String topic = thumbnailPath != null
+                    ? EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC
+                    : EventTopics.MEDIA_SEARCH_TOPIC;
+            eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                    topic,
+                    new MediaUpdateEvent.NameEntityCreated(mediaNameEntityConstant, id, thumbnailPath)
+            ));
         } catch (Exception e) {
             try {
-                if (thumbnailObject != null) {
-                    minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, thumbnailObject);
-                    System.out.println("Compensation successful: Deleted file " + thumbnailObject + " from Object Storage.");
+                if (thumbnailPath != null) {
+                    minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, thumbnailPath);
+                    System.out.println("Compensation successful: Deleted file " + thumbnailPath + " from Object Storage.");
                 }
             } catch (Exception deleteEx) {
-                System.err.println("CRITICAL: Failed to clean up orphan file: " + thumbnailObject);
+                System.err.println("CRITICAL: Failed to clean up orphan file: " + thumbnailPath);
             }
             throw new RuntimeException("Entity creation failed after file upload.", e);
         }
@@ -154,7 +164,12 @@ public class NameEntityModifyService {
         if (nameEntity.getName().equals(name))
             return;
         nameEntity.setName(name);
-        addNameEntity(name, mediaNameEntityConstant, nameEntity, repository);
+        repository.save(nameEntity);
+
+        eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                EventTopics.MEDIA_SEARCH_TOPIC,
+                new MediaUpdateEvent.NameEntityUpdated(mediaNameEntityConstant, id, null, null)
+        ));
     }
 
     @Transactional
@@ -178,7 +193,9 @@ public class NameEntityModifyService {
                 String extension = request.getThumbnail().getOriginalFilename() == null ? ".jpg" :
                         request.getThumbnail().getOriginalFilename().substring(request.getThumbnail().getOriginalFilename().lastIndexOf("."));
 
-                newThumbnailPath = mediaNameEntityConstant.getName() + "/" + id + "_" + UUID.randomUUID() + extension;
+                newThumbnailPath = oldThumbnailPath.endsWith(extension)
+                        ? oldThumbnailPath
+                        : createNameEntityThumbnail(mediaNameEntityConstant, id, extension);
                 minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnailPath, request.getThumbnail());
             }
         } catch (Exception e) {
@@ -187,30 +204,30 @@ public class NameEntityModifyService {
 
         try {
             boolean nameChanged = !oldName.equals(newName);
-            boolean thumbnailChanged = newThumbnailPath != null;
+            boolean thumbnailChanged = newThumbnailPath != null && !newThumbnailPath.equals(oldThumbnailPath);
 
             if (nameChanged) nameEntity.setName(newName);
             if (thumbnailChanged) nameEntity.setThumbnail(newThumbnailPath);
 
-            if (nameChanged || thumbnailChanged) repository.save(nameEntity);
+            if (nameChanged || thumbnailChanged) {
+                repository.save(nameEntity);
 
-            if (nameChanged) {
-                try {
-                    eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityUpdated(mediaNameEntityConstant, id));
-                } catch (Exception e) {
-                    throw new RuntimeException("Failed to publish event name entity updated for " + mediaNameEntityConstant.getName() + " " + id, e);
-                }
+                String topic = newThumbnailPath != null // new file has uploaded
+                        ? EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC
+                        : EventTopics.MEDIA_SEARCH_TOPIC;
+                eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                        topic,
+                        new MediaUpdateEvent.NameEntityUpdated(mediaNameEntityConstant, id, oldThumbnailPath, newThumbnailPath)
+                ));
+                if (thumbnailChanged)
+                    eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                            EventTopics.MEDIA_OBJECT_TOPIC,
+                            new MediaUpdateEvent.ObjectDeleted(ContentMetaData.THUMBNAIL_BUCKET, List.of(oldThumbnailPath))
+                    ));
             }
 
-            if (thumbnailChanged && oldThumbnailPath != null) {
-                try {
-                    eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityThumbnailUpdatedReady(id, mediaNameEntityConstant, oldThumbnailPath, newThumbnailPath));
-                } catch (Exception e) {
-                    throw new RuntimeException("Failed to publish event clean up old thumbnail file: " + oldThumbnailPath, e);
-                }
-            }
         } catch (Exception e) {
-            if (newThumbnailPath != null) {
+            if (newThumbnailPath != null && !newThumbnailPath.equals(oldThumbnailPath)) {
                 try {
                     minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnailPath);
                 } catch (Exception deleteEx) {
@@ -218,6 +235,10 @@ public class NameEntityModifyService {
                 }
             }
         }
+    }
+
+    private String createNameEntityThumbnail(MediaNameEntityConstant name, long id, String extension) {
+        return name + "/" + id + "_" + UUID.randomUUID() + extension;
     }
 
 
@@ -245,7 +266,11 @@ public class NameEntityModifyService {
     @Transactional
     protected <T extends MediaNameEntity> void deleteNameEntity(long id, MediaNameEntityConstant mediaNameEntityConstant, MediaNameEntityRepository<T, Long> repository) {
         repository.deleteById(id);
-        eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityDeleted(mediaNameEntityConstant, id, null));
+
+        eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                EventTopics.MEDIA_SEARCH_TOPIC,
+                new MediaUpdateEvent.NameEntityDeleted(mediaNameEntityConstant, id, null)
+        ));
     }
 
     @Transactional
@@ -257,7 +282,18 @@ public class NameEntityModifyService {
 
         repository.delete(nameEntity);
 
-        eventPublisher.publishEvent(new MediaUpdateEvent.NameEntityDeleted(mediaNameEntityConstant, id, thumbnailPath));
+        String topic = thumbnailPath == null
+                ? EventTopics.MEDIA_SEARCH_TOPIC
+                : EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC;
+        eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                topic,
+                new MediaUpdateEvent.NameEntityDeleted(mediaNameEntityConstant, id, thumbnailPath)
+        ));
+        if (thumbnailPath != null)
+            eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                    EventTopics.MEDIA_OBJECT_TOPIC,
+                    new MediaUpdateEvent.ObjectDeleted(ContentMetaData.THUMBNAIL_BUCKET, List.of(thumbnailPath))
+            ));
     }
 
 

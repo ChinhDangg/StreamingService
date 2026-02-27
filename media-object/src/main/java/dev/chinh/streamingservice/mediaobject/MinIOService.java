@@ -2,6 +2,8 @@ package dev.chinh.streamingservice.mediaobject;
 
 import io.minio.*;
 import io.minio.errors.*;
+import io.minio.messages.DeleteError;
+import io.minio.messages.DeleteObject;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,6 +12,7 @@ import org.springframework.web.util.UriUtils;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -92,6 +95,16 @@ public class MinIOService {
                         .build()
         );
         System.out.println("Removed object " + bucket + "/" + object);
+    }
+
+    public void removeBulk(String bucket, List<DeleteObject> objects) {
+        Iterable<Result<DeleteError>> results = minioClient.removeObjects(
+                RemoveObjectsArgs.builder()
+                        .bucket(bucket)
+                        .objects(objects)
+                        .build()
+        );
+        results.forEach(System.out::println);
     }
 
     public void moveFileToObject(String bucket, String object, String filePath) throws Exception {

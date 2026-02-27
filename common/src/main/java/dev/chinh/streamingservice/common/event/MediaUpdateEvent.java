@@ -9,59 +9,6 @@ import java.util.List;
 
 public interface MediaUpdateEvent {
 
-    // search, object, and backup listener
-    record MediaDeleted(
-            long mediaId,
-            String bucket,
-            String path,
-            boolean hasThumbnail,
-            String thumbnail,
-            MediaType mediaType,
-            String absolutePath
-    ) implements MediaUpdateEvent{}
-
-    record NameEntityDeleted(
-            MediaNameEntityConstant nameEntityConstant,
-            long nameEntityId,
-            String thumbnailPath
-    ) implements MediaUpdateEvent{}
-
-
-    // search and backup listener
-    record MediaCreatedReady(
-            long mediaId,
-            MediaType mediaType,
-            String bucket,
-            String path,
-            String absolutePath,
-            String thumbnail,
-            long size,
-            int length,
-            Instant uploadDate,
-            boolean searchable,
-            String fileId
-    ) implements MediaUpdateEvent{}
-
-    record MediaThumbnailUpdatedReady(
-            long mediaId,
-            String oldThumbnail,
-            String newThumbnail
-    ) implements MediaUpdateEvent {}
-
-    record NameEntityCreatedReady(
-            long nameEntityId,
-            MediaNameEntityConstant nameEntityConstant,
-            String thumbnailPath
-    ) implements MediaUpdateEvent {}
-
-    record NameEntityThumbnailUpdatedReady(
-            long nameEntityId,
-            MediaNameEntityConstant nameEntityConstant,
-            String oldThumbnail,
-            String newThumbnail
-    ) implements MediaUpdateEvent {}
-
-
     // for search only
     record LengthUpdated(
             long mediaId,
@@ -77,51 +24,113 @@ public interface MediaUpdateEvent {
             long mediaId
     ) implements MediaUpdateEvent{}
 
-    record NameEntityUpdated(
-            MediaNameEntityConstant nameEntityConstant,
-            long nameEntityId
-    ) implements MediaUpdateEvent{}
-
-
-    // for object
-    record MediaCreated(
-            long mediaId,
-            MediaType mediaType,
-            String thumbnailObject,
-            boolean searchable,
-            String fileId
-    ) implements MediaUpdateEvent {}
 
     record NameEntityCreated(
             MediaNameEntityConstant nameEntityConstant,
             long nameEntityId,
-            String thumbnailObject,
             String thumbnailPath
     ) implements MediaUpdateEvent{}
+
+    record NameEntityDeleted(
+            MediaNameEntityConstant nameEntityConstant,
+            long nameEntityId,
+            String thumbnailPath
+    ) implements MediaUpdateEvent{}
+
+    record NameEntityUpdated(
+            MediaNameEntityConstant nameEntityConstant,
+            long nameEntityId,
+            String oldThumbnail,
+            String newThumbnail
+    ) implements MediaUpdateEvent{}
+
+
+    record MediaEnriched(
+            long mediaId,
+            MediaType mediaType,
+            String thumbnailObject,
+            boolean searchable,
+            String fileId,
+            Long size,
+            Integer length
+    ) implements MediaUpdateEvent {}
 
     record MediaThumbnailUpdated(
             long mediaId,
             MediaType mediaType,
             Double num,
+            String bucket,
             String thumbnailObject
     ) implements MediaUpdateEvent {}
 
+    record MediaThumbnailUpdateInitiated(
+            long mediaId,
+            MediaType mediaType,
+            int num
+    ) implements MediaUpdateEvent {}
 
-    // for file-manager
-    record MediaFileCreated(
+    record ObjectDeleted(
+            String bucket,
             List<String> objectNames
     ) implements MediaUpdateEvent {}
 
-    record MediaFileDeleted(
-            String fileId
+
+    record FileCreated(
+            String bucket,
+            String objectName,
+            String fileName,
+            long size
     ) implements MediaUpdateEvent {}
 
+    record FileDeleted(
+            String fileId,
+            String fileName,
+            boolean isNotDirectory,
+            Long mediaId
+    ) implements MediaUpdateEvent {}
 
-    // for upload
     record FileToMediaInitiated(
             String fileId,
             MediaType mediaType,
+            String bucket,
             String objectName,
-            Instant uploadDate
+            String fileName,
+            Instant uploadDate,
+            Long parentMediaId,
+            Integer childNum
+    ) implements MediaUpdateEvent {}
+
+    record DirectoryToMediaInitiated(
+            String fileId,
+            long mediaId,
+            MediaType mediaType,
+            boolean searchable,
+            String thumbnailObject,
+            long initialSize,
+            int offset
+    ) implements MediaUpdateEvent {}
+
+    record NestedDirectoryToMediaInitiated(
+            String fileId,
+            long mediaId,
+            MediaType parentType,
+            MediaType childType,
+            boolean childSearchable,
+            String thumbnailObject,
+            int offset
+    ) implements MediaUpdateEvent {}
+
+    record MediaCreatedReady(
+            String fileId,
+            long mediaId,
+            MediaType mediaType,
+            String thumbnail,
+            int length
+    ) implements MediaUpdateEvent{}
+
+    record MediaThumbnailUpdatedReady(
+            long mediaId,
+            String oldThumbnail,
+            String newThumbnail
     ) implements MediaUpdateEvent {}
 }

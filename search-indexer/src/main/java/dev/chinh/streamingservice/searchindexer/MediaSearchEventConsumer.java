@@ -36,19 +36,7 @@ public class MediaSearchEventConsumer {
     private final OpenSearchService openSearchService;
     private final MediaMapper mediaMapper;
 
-    private void onUpdateLengthSearch(MediaUpdateEvent.LengthUpdated event) {
-        System.out.println("Received update length event: " + event.mediaId());
-        try {
-            openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, event.mediaId(), Map.of(ContentMetaData.LENGTH, event.newLength()));
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to update Search index length field for media " + event.mediaId(), e);
-        }
-    }
-
     private void onCreateMediaIndexSearch(MediaUpdateEvent.MediaCreatedReady event) {
-        if (!event.searchable()) {
-            return;
-        }
         System.out.println("Received new index event: " + event.mediaId());
         Optional<MediaMetaData> mediaMetaData = mediaMetaDataRepository.findByIdWithAllInfo(event.mediaId());
         if (mediaMetaData.isEmpty()) {
@@ -61,16 +49,16 @@ public class MediaSearchEventConsumer {
         try {
             openSearchService.indexDocument(OpenSearchService.MEDIA_INDEX_NAME, mediaMetaData.get().getId(), mediaSearchItem);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to index media " + mediaMetaData.get().getId() + " to OpenSearch", e);
+            throw new RuntimeException("Failed to index media " + mediaMetaData.get().getId() + " to Search", e);
         }
     }
 
-    private void onDeleteMediaIndexSearch(MediaUpdateEvent.MediaDeleted event) {
+    private void onDeleteMediaIndexSearch(MediaUpdateEvent.FileDeleted event) {
         System.out.println("Received delete index event: " + event.mediaId());
         try {
             openSearchService.deleteDocument(OpenSearchService.MEDIA_INDEX_NAME, event.mediaId());
         } catch (IOException e) {
-            throw new RuntimeException("Failed to delete media " + event.mediaId() + " from OpenSearch", e);
+            throw new RuntimeException("Failed to delete media index " + event.mediaId() + " from Search", e);
         }
     }
 
@@ -105,8 +93,16 @@ public class MediaSearchEventConsumer {
         }
     }
 
+    private void onUpdateLengthSearch(MediaUpdateEvent.LengthUpdated event) {
+        System.out.println("Received update length event: " + event.mediaId());
+        try {
+            openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, event.mediaId(), Map.of(ContentMetaData.LENGTH, event.newLength()));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to update Search index length field for media " + event.mediaId(), e);
+        }
+    }
 
-    private void onCreateNameEntitySearch(MediaUpdateEvent.NameEntityCreatedReady event) {
+    private void onCreateNameEntitySearch(MediaUpdateEvent.NameEntityCreated event) {
         System.out.println("Received create name entity: " + event.nameEntityConstant() + " nameEntityId: " + event.nameEntityId());
         String name = getNameEntityName(event.nameEntityConstant(), event.nameEntityId());
         if (name != null) {
@@ -147,16 +143,7 @@ public class MediaSearchEventConsumer {
         try {
             openSearchService.deleteDocument(event.nameEntityConstant().getName(), event.nameEntityId());
         } catch (IOException e) {
-            throw new RuntimeException("Failed to delete Search index field for name entity " + event.nameEntityId(), e);
-        }
-    }
-
-    private void onUpdateNameEntityThumbnail(MediaUpdateEvent.NameEntityThumbnailUpdatedReady event) {
-        System.out.println("Received update name entity thumbnail");
-        try {
-            openSearchService.partialUpdateDocument(event.nameEntityConstant().getName(), event.nameEntityId(), Map.of(ContentMetaData.THUMBNAIL, event.newThumbnail()));
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to update Search index field for name entity " + event.nameEntityId(), e);
+            throw new RuntimeException("Failed to delete Search index field for name entity " + event.nameEntityConstant().getName() + ", id:" + event.nameEntityId(), e);
         }
     }
 
@@ -181,28 +168,28 @@ public class MediaSearchEventConsumer {
 
 
     @KafkaListener(topics = {
-            EventTopics.MEDIA_ALL_TOPIC,
-            EventTopics.MEDIA_SEARCH_BACKUP_AND_FILE_TOPIC,
             EventTopics.MEDIA_SEARCH_TOPIC,
             EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC,
-            EventTopics.MEDIA_SEARCH_BACKUP_AND_OBJECT_TOPIC
+            EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC,
+            EventTopics.MEDIA_FILE_UPLOAD_SEARCH_BACKUP_TOPIC,
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) {
         try {
             switch (event) {
-                case MediaUpdateEvent.MediaDeleted e -> onDeleteMediaIndexSearch(e);
                 case MediaUpdateEvent.MediaCreatedReady e -> onCreateMediaIndexSearch(e);
+                case MediaUpdateEvent.FileDeleted e -> onDeleteMediaIndexSearch(e);
                 case MediaUpdateEvent.MediaThumbnailUpdatedReady e -> onUpdateMediaThumbnailSearch(e);
-                case MediaUpdateEvent.NameEntityCreatedReady e -> onCreateNameEntitySearch(e);
+                case MediaUpdateEvent.MediaNameEntityUpdated e -> onUpdateMediaNameEntitySearch(e);
+                case MediaUpdateEvent.LengthUpdated e -> onUpdateLengthSearch(e);
+                case MediaUpdateEvent.MediaTitleUpdated e -> onUpdateMediaTitleSearch(e);
+
+                case MediaUpdateEvent.NameEntityCreated e -> onCreateNameEntitySearch(e);
                 case MediaUpdateEvent.NameEntityUpdated e -> onUpdateNameEntitySearch(e);
                 case MediaUpdateEvent.NameEntityDeleted e -> onDeleteNameEntitySearch(e);
-                case MediaUpdateEvent.NameEntityThumbnailUpdatedReady e -> onUpdateNameEntityThumbnail(e);
-                case MediaUpdateEvent.LengthUpdated e -> onUpdateLengthSearch(e);
-                case MediaUpdateEvent.MediaNameEntityUpdated e -> onUpdateMediaNameEntitySearch(e);
-                case MediaUpdateEvent.MediaTitleUpdated e -> onUpdateMediaTitleSearch(e);
+
                 default ->
                     // unknown event type → log and skip
-                    System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+                        System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
             }
             ack.acknowledge();
         } catch (Exception e) {
@@ -227,24 +214,25 @@ public class MediaSearchEventConsumer {
 
         // Accessing the POJO data directly
         switch (event) {
-            case MediaUpdateEvent.MediaDeleted e ->
-                    System.out.println("Received delete index event: " + e.mediaId());
             case MediaUpdateEvent.MediaCreatedReady e ->
                     System.out.println("Received new index event: " + e.mediaId() + " type: " + e.mediaType());
+            case MediaUpdateEvent.FileDeleted e ->
+                    System.out.println("Received delete index event: " + e.mediaId());
             case MediaUpdateEvent.MediaThumbnailUpdatedReady e ->
                     System.out.println("Received update media thumbnail event: " + e.mediaId() + " old: " + e.oldThumbnail() + " new: " + e.newThumbnail());
-            case MediaUpdateEvent.NameEntityCreatedReady e ->
+            case MediaUpdateEvent.MediaNameEntityUpdated(long mediaId, MediaNameEntityConstant nameEntityConstant) ->
+                    System.out.println("Received update media name entity event: " + mediaId + " nameEntityConstant: " + nameEntityConstant);
+            case MediaUpdateEvent.LengthUpdated(long mediaId, Integer newLength) ->
+                    System.out.println("Received update length event: " + mediaId + " newLength: " + newLength);
+            case MediaUpdateEvent.MediaTitleUpdated(long mediaId) ->
+                    System.out.println("Received update media title event: " + mediaId);
+
+            case MediaUpdateEvent.NameEntityCreated e ->
                     System.out.println("Received create name entity: " + e.nameEntityConstant() + " nameEntityId: " + e.nameEntityId());
             case MediaUpdateEvent.NameEntityDeleted e ->
                     System.out.println("Received delete name entity: " + e.nameEntityConstant() + " nameEntityId: " + e.nameEntityId());
-            case MediaUpdateEvent.NameEntityUpdated(MediaNameEntityConstant nameEntityConstant, long nameEntityId) ->
-                    System.out.println("Received update name entity: " + nameEntityConstant + " nameEntityId: " + nameEntityId);
-            case MediaUpdateEvent.LengthUpdated(long mediaId, Integer newLength) ->
-                    System.out.println("Received update length event: " + mediaId + " newLength: " + newLength);
-            case MediaUpdateEvent.MediaNameEntityUpdated(long mediaId, MediaNameEntityConstant nameEntityConstant) ->
-                    System.out.println("Received update media name entity event: " + mediaId + " nameEntityConstant: " + nameEntityConstant);
-            case MediaUpdateEvent.MediaTitleUpdated(long mediaId) ->
-                    System.out.println("Received update media title event: " + mediaId);
+            case MediaUpdateEvent.NameEntityUpdated e ->
+                    System.out.println("Received update name entity: " + e.nameEntityConstant() + " nameEntityId: " + e.nameEntityId());
             default -> {
                 System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
                 ack.acknowledge(); // ack on poison event to skip it

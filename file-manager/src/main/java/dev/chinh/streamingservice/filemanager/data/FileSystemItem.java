@@ -6,6 +6,7 @@ import dev.chinh.streamingservice.filemanager.constant.FileType;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -16,14 +17,24 @@ import java.time.Instant;
 @Document(collection = "fs_metadata")
 @NoArgsConstructor
 @AllArgsConstructor
-@CompoundIndex(name = "parent_name_unique_idx", def = "{'parentId': 1, 'name': 1}", unique = true)
+@CompoundIndexes({
+        @CompoundIndex(name = "path_name_idx", def = "{'path': 1, 'name': 1}"),
+
+        // SortBy.UPLOAD: Usually we want newest first (-1)
+        @CompoundIndex(name = "parent_upload_idx", def = "{'parentId': 1, 'uploadDate': -1}"),
+        // SortBy.NAME: Usually alphabetical (1)
+        @CompoundIndex(name = "parent_name_idx", def = "{'parentId': 1, 'name': 1}", unique = true),
+        // SortBy.SIZE: Smallest or Largest (1 covers both)
+        @CompoundIndex(name = "parent_size_idx", def = "{'parentId': 1, 'size': 1}"),
+        // SortBy.LENGTH:
+        @CompoundIndex(name = "parent_length_idx", def = "{'parentId': 1, 'length': 1}")
+})
 public class FileSystemItem {
 
     @JsonProperty(ContentMetaData.ID)
     @Id
     private String id;
 
-    @Indexed
     private String parentId;
 
     @Indexed
@@ -35,6 +46,10 @@ public class FileSystemItem {
     private Long mId;
     @JsonProperty(ContentMetaData.NAME)
     private String name;
+    @JsonProperty(ContentMetaData.BUCKET)
+    private String bucket;
+    @JsonProperty(ContentMetaData.OBJECT_NAME)
+    private String objectName;
     @JsonProperty(ContentMetaData.THUMBNAIL)
     private String thumbnail;
     @JsonProperty(ContentMetaData.SIZE)

@@ -15,8 +15,15 @@ public class AppStartRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if (!minIOService.bucketExists(ContentMetaData.MEDIA_BUCKET))
-            minIOService.createBucket(ContentMetaData.MEDIA_BUCKET);
+        if (!minIOService.bucketExists(ContentMetaData.VIDEO_BUCKET))
+            minIOService.createBucket(ContentMetaData.VIDEO_BUCKET);
+        if (!minIOService.bucketExists(ContentMetaData.IMAGE_BUCKET))
+            minIOService.createBucket(ContentMetaData.IMAGE_BUCKET);
+        if (!minIOService.bucketExists(ContentMetaData.AUDIO_BUCKET))
+            minIOService.createBucket(ContentMetaData.AUDIO_BUCKET);
+        if (!minIOService.bucketExists(ContentMetaData.OTHER_BUCKET))
+            minIOService.createBucket(ContentMetaData.OTHER_BUCKET);
+
         if (!minIOService.bucketExists(ContentMetaData.THUMBNAIL_BUCKET))
             minIOService.createBucket(ContentMetaData.THUMBNAIL_BUCKET);
         if (!minIOService.bucketExists(ContentMetaData.PREVIEW_BUCKET))

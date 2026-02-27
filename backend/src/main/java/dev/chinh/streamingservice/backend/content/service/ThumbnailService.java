@@ -54,9 +54,9 @@ public class ThumbnailService {
             for (String path : albumUrlInfo.pathList) {
                 addCacheThumbnails(path.substring(path.lastIndexOf("/") + 1), now);
             }
-        } catch (InterruptedException | IOException e) {
+        } catch (Exception e) {
             counter.incrementAndGet();
-            throw new RuntimeException(e);
+            System.err.println(e.getMessage());
         }
         counter.incrementAndGet();
     }
@@ -82,15 +82,15 @@ public class ThumbnailService {
                 return;
             int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), true);
             if (exitCode != 0) {
-                System.out.println("Failed to resize thumbnails");
+                throw new RuntimeException("Failed to resize thumbnails");
             }
             long now = System.currentTimeMillis() + 60 * 60 * 1000;
             for (String path : albumUrlInfo.pathList) {
                 addCacheThumbnails(path.substring(path.lastIndexOf("/") + 1), now);
             }
-        } catch (InterruptedException | IOException e) {
+        } catch (Exception e) {
             counter.incrementAndGet();
-            throw new RuntimeException(e);
+            System.err.println(e.getMessage());
         }
         counter.incrementAndGet();
     }

@@ -34,7 +34,7 @@ public class VideoService extends MediaService {
 
     public String getOriginalVideoUrl(long videoId) {
         MediaDescription mediaDescription = getMediaDescription(videoId);
-        return minIOService.getRedirectObjectUrl(mediaDescription.getBucket(), mediaDescription.getPath());
+        return minIOService.getRedirectObjectUrl(mediaDescription.getBucket(), mediaDescription.getKey());
     }
 
     @Transactional
@@ -45,7 +45,7 @@ public class VideoService extends MediaService {
         }
         String cacheJobId = getCachePreviewJobId(videoId);
         addCacheVideoLastAccess(cacheJobId, null);
-        String previewName = OSUtil.normalizePath(mediaDescription.getParentPath(), (mediaDescription.getId() + "_" + UUID.randomUUID() + "_preview.mp4"));
+        String previewName = "preview_" + mediaDescription.getKey();
         MediaJobDescription jobDescription = getMediaJobDescription(videoId, cacheJobId, null, "preview");
         jobDescription.setPreview(previewName);
         String status = addJobToFfmpegQueue(ffmpegQueueKey, cacheJobId, jobDescription);

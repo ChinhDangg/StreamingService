@@ -307,16 +307,16 @@ public class OpenSearchService {
     public void updateAllNestedFieldNameWithIdInIndex(String indexName,
                                                       String fieldName,
                                                       long nestedId,
-                                                      String nestFieldName,
+                                                      String nestedSubFieldName,
                                                       String newName) throws IOException {
         String painlessScript =
-        "if (ctx._source." + fieldName + " != null) { " +
-        "   for (def item : ctx._source." + fieldName + ") { " +
-        "       if (item.id == params.nestedId) { " +
-        "           item." + nestFieldName + " = params.newName; " +
-        "       } " +
-        "   } " +
-        "}";
+            "if (ctx._source.containsKey(params.fieldName) && ctx._source[params.fieldName] instanceof List) { " +
+            "    for (item in ctx._source[params.fieldName]) { " +
+            "        if (item != null && item.id == params.nestedId) { " +
+            "            item[params.nestedSubFieldName] = params.newName; " +
+            "        } " +
+            "    } " +
+            "}";
 
         UpdateByQueryRequest request = new UpdateByQueryRequest.Builder()
                 .index(indexName)
@@ -336,12 +336,15 @@ public class OpenSearchService {
                                 .lang(l -> l.builtin(BuiltinScriptLanguage.Painless))
                                 .source(painlessScript)
                                 .params(Map.of(
+                                        "fieldName", JsonData.of(fieldName),
                                         "nestedId", JsonData.of(nestedId),
+                                        "nestedSubFieldName", JsonData.of(nestedSubFieldName),
                                         "newName", JsonData.of(newName)
                                 ))
                         )
                 )
-                .refresh(Refresh.True)
+                .waitForCompletion(false)
+                .refresh(Refresh.False) // default anyway
                 .build();
 
         UpdateByQueryResponse response = client.updateByQuery(request);

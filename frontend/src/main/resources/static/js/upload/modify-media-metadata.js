@@ -58,7 +58,7 @@ function initializeEditTitle() {
     deleteMediaBtn.addEventListener('click', async () => {
         const confirmDelete = confirm(`Are you sure you want to delete this media?`);
         if (!confirmDelete) return;
-        const response = await apiRequest(`/api/modify/media/${mediaId}`, {
+        const response = await apiRequest(`/api/file/media/${mediaId}`, {
             method: 'DELETE'
         });
         if (!response.ok) {

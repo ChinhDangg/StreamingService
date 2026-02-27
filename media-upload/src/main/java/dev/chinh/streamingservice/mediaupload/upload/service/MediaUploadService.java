@@ -1,18 +1,17 @@
 package dev.chinh.streamingservice.mediaupload.upload.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.chinh.streamingservice.common.OSUtil;
+import com.github.f4b6a3.uuid.UuidCreator;
 import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
+import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
-import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.mediaupload.MediaBasicInfo;
-import dev.chinh.streamingservice.common.validation.FileSystemValidator;
+import dev.chinh.streamingservice.mediaupload.event.MediaUploadEventProducer;
 import dev.chinh.streamingservice.persistence.entity.*;
 import dev.chinh.streamingservice.persistence.repository.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -30,11 +29,8 @@ public class MediaUploadService {
 
     private final RedisTemplate<String, String> redisStringTemplate;
 
-    private final ObjectMapper objectMapper;
     private final ObjectUploadService objectUploadService;
     private final MinIOService minIOService;
-    private final MediaDisplayService mediaDisplayService;
-    private final MediaSearchCacheService mediaSearchCacheService;
 
     private final ApplicationEventPublisher eventPublisher;
 
@@ -42,222 +38,124 @@ public class MediaUploadService {
     private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
 
     private final Duration uploadSessionTimeout = Duration.ofHours(1);
-    private final String mediaBucket = ContentMetaData.MEDIA_BUCKET;
     private static final String defaultVidPath = "vid";
     private static final String defaultAlbumPath = "album";
     private static final String defaultGrouperPath = "grouper";
 
-    public String initiateMultipartUploadRequest(String sessionId, String object, MediaType mediaType) {
-        var uploadRequest = getCachedMediaUploadRequest(sessionId);
-        if (uploadRequest == null) {
+    public String getBucketOnMediaType(String filename) {
+        MediaType mediaType = MediaType.detectMediaType(filename);
+        return switch (mediaType) {
+            case VIDEO -> ContentMetaData.VIDEO_BUCKET;
+            case IMAGE -> ContentMetaData.IMAGE_BUCKET;
+            default -> ContentMetaData.OTHER_BUCKET;
+        };
+    }
+
+    public String initiateMultipartUploadRequest(String sessionId) {
+        String fileName = getCachedSessionRequest(sessionId);
+        if (fileName == null) {
             throw new IllegalArgumentException("Invalid session ID: " + sessionId);
         }
-
-        String validatedObject = validateObject(object);
-        validateObjectWithMediaType(validatedObject, mediaType);
-
-        validateMediaSessionInfoWithRequest(uploadRequest, validatedObject, mediaType);
-
-        if (minIOService.objectExists(mediaBucket, validatedObject)) {
-            // Personal system - so only check for name to ensure uniqueness (not content itself).
-            // For wide usage - generate unique names for every object and keep all content
-            // or check etag but multipart upload must ensure same part number and size.
-            throw new IllegalArgumentException("Object already exists: " + validatedObject);
-        }
-
-        String uploadId = objectUploadService.getMultipartUploadId(mediaBucket, validatedObject);
-        addCacheFileUploadRequest(sessionId, uploadId, validatedObject);
+        String objectName = generateUniqueObjectName(fileName);
+        String uploadId = objectUploadService.getMultipartUploadId(getBucketOnMediaType(fileName), objectName);
+        addCacheFileUploadRequest(sessionId, uploadId, objectName, fileName);
         return uploadId;
     }
 
-    public String generatePresignedPartUrl(String sessionId, String uploadId, String object, int partNumber) {
-        var uploadRequest = getCachedMediaUploadRequest(sessionId);
-        if (uploadRequest == null) {
-            throw new IllegalArgumentException("Invalid session ID: " + sessionId);
-        }
-
-        MediaType mediaType = getCachedFileUploadRequest(sessionId, uploadId);
-        if (mediaType == null) {
+    public String generatePresignedPartUrl(String uploadId, int partNumber) {
+        String combinedName = getCachedFileUploadRequest(uploadId);
+        if (combinedName == null) {
             throw new IllegalArgumentException("Upload ID not found: " + uploadId);
         }
-        String validatedObject = validateObject(object);
-        validateObjectWithMediaType(validatedObject, mediaType);
 
-        validateMediaSessionInfoWithRequest(uploadRequest, validatedObject, mediaType);
-
-        addUploadSessionCacheLastAccess(sessionId, uploadSessionTimeout);
-
-        return objectUploadService.getPresignedPartUrl(mediaBucket, validatedObject, uploadId, partNumber, uploadSessionTimeout);
+        String objectName = combinedName.substring(0, combinedName.indexOf(":|:"));
+        String fileName = combinedName.substring(combinedName.indexOf(":|:") + 3);
+        return objectUploadService.getPresignedPartUrl(getBucketOnMediaType(fileName), objectName, uploadId, partNumber, uploadSessionTimeout);
     }
 
-    public record UploadedPart(int partNumber, String etag) {}
+    public record UploadedPart(@Max(1500) int partNumber, @Size(max = 100) String etag) {}
 
-    public void markCompletingMultipartUpload(String sessionId, String uploadId, String object, List<UploadedPart> uploadedParts) throws JsonProcessingException {
-        MediaType mediaType = getCachedFileUploadRequest(sessionId, uploadId);
-        if (mediaType == null) {
+    private String completeUpload(String uploadId, List<UploadedPart> parts) {
+        String combinedName = getCachedFileUploadRequest(uploadId);
+        if (combinedName == null) {
             throw new IllegalArgumentException("Upload ID not found: " + uploadId);
         }
-        String validatedObject = validateObject(object);
-        validateObjectWithMediaType(validatedObject, mediaType);
 
-        addCacheFileUploadParts(sessionId, uploadId, uploadedParts);
-        addUploadSessionCacheLastAccess(sessionId, uploadSessionTimeout);
+        List<CompletedPart> completedParts = parts.stream()
+                .map(p -> CompletedPart.builder()
+                        .partNumber(p.partNumber)
+                        .eTag(p.etag)
+                        .build()
+                )
+                .toList();
+
+        String objectName = combinedName.substring(0, combinedName.indexOf(":|:"));
+        objectUploadService.completeMultipartUpload(getBucketOnMediaType(objectName), objectName, uploadId, completedParts);
+        return combinedName;
     }
 
 
     @Transactional(readOnly = true)
-    public void saveFile(String sessionId) throws JsonProcessingException {
-        MediaUploadRequest upload = getCachedMediaUploadRequest(sessionId);
-        if (upload == null) {
-            throw new IllegalArgumentException("Invalid session ID: " + sessionId);
-        }
+    public void saveFile(String uploadId, List<UploadedPart> parts) {
+        String combinedName = completeUpload(uploadId, parts);
 
-        List<String> objectNames = completeUpload(sessionId);
+        String objectName = combinedName.substring(0, combinedName.indexOf(":|:"));
+        String fileName = combinedName.substring(combinedName.indexOf(":|:") + 3);
+        String bucket = getBucketOnMediaType(fileName);
 
-        removeCacheMediaSessionRequest(sessionId);
+        long size = minIOService.getObjectSize(bucket, objectName);
+        eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
+                new MediaUpdateEvent.FileCreated(bucket, objectName, fileName, size)
+        ));
 
-        eventPublisher.publishEvent(new MediaUpdateEvent.MediaFileCreated(objectNames));
+        removeCacheFileUploadRequest(uploadId);
     }
 
 
+    public record MediaUploadRequest(String bucket, String objectName, String fileName, MediaType mediaType, boolean searchable) {}
+
     @Transactional
-    public long saveGrouperMedia(MediaBasicInfo basicInfo) {
-        MediaMetaData mediaMetaData = new MediaMetaData();
-        mediaMetaData.setTitle(basicInfo.getTitle());
-        mediaMetaData.setYear(basicInfo.getYear());
-        mediaMetaData.setUploadDate(Instant.now());
-        mediaMetaData.setBucket(mediaBucket);
-        mediaMetaData.setAbsoluteFilePath(mediaBucket + "/grouper-not-media");
-        mediaMetaData.setParentPath("grouper-not-media");
-        mediaMetaData.setKey("grouper-not-media");
-        mediaMetaData.setLength(0);
-
-        MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
-        mediaGroupInfo.setNumInfo(0);
-        mediaGroupInfo.setMediaMetaData(mediaMetaData);
-        mediaMetaData.setGroupInfo(mediaGroupInfo);
-
-        String extension = basicInfo.getThumbnail().getOriginalFilename() == null ? ".jpg"
-                : basicInfo.getThumbnail().getOriginalFilename().substring(basicInfo.getThumbnail().getOriginalFilename().lastIndexOf("."));
-        String path = defaultGrouperPath + "/" + mediaMetaData.getUploadDate() + "_" + UUID.randomUUID() + extension;
-
-        try {
-            minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, path, basicInfo.getThumbnail());
-            mediaMetaData.setThumbnail(path);
-            mediaMetaData.setSize(-1L);
-            mediaMetaData.setWidth(-1);
-            mediaMetaData.setHeight(-1);
-            mediaMetaData.setFormat(MediaJobStatus.PROCESSING.name());
-
-            MediaMetaData saved = mediaRepository.save(mediaMetaData);
-            long savedId = saved.getId();
-
-            eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(
-                    savedId, MediaType.GROUPER, createMediaThumbnailString(MediaType.GROUPER, savedId, path), true, null));
-
-            return savedId;
-        } catch (Exception e) {
-            try {
-                minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, path);
-            } catch (Exception ex) {
-                throw new RuntimeException("Critical: Failed to delete thumbnail from MinIO to rollback", ex);
-            }
-            throw new RuntimeException("Failed to save media grouper metadata", e);
-        }
-    }
-
-//    You always see your own writes in a transaction.
-//    READ_COMMITTED still allows this.
-//    REPEATABLE_READ also allows this.
-//    SERIALIZABLE of course does.
-    @Transactional
-    public long saveMediaInGrouper(String sessionId, long grouperMediaId, String title) throws Exception {
-        MediaUploadRequest upload = getCachedMediaUploadRequest(sessionId);
-        if (upload == null) {
-            throw new IllegalArgumentException("Invalid session ID: " + sessionId);
+    public long saveAsVideoMedia(String uploadId, MediaBasicInfo basicInfo, List<UploadedPart> parts) {
+        String combinedName = getCachedFileUploadRequest(uploadId);
+        if (combinedName == null) {
+            throw new IllegalArgumentException("Invalid upload ID: " + uploadId);
         }
 
-        MediaMetaData grouperMedia = mediaRepository.findById(grouperMediaId).orElseThrow(
-                () -> new ResourceNotFoundException("Media not found: " + grouperMediaId)
+        String fileName = combinedName.substring(combinedName.indexOf(":|:") + 3);
+        if (validateObjectWithMediaType(fileName, MediaType.VIDEO)) {
+            removeCacheFileUploadRequest(uploadId);
+            throw new IllegalArgumentException("Invalid video media type with object: " + fileName);
+        }
+
+        completeUpload(uploadId, parts);
+
+        String objectName = combinedName.substring(0, combinedName.indexOf(":|:"));
+        long savedId = saveMedia(
+                new MediaUploadRequest(ContentMetaData.VIDEO_BUCKET, objectName, fileName, MediaType.VIDEO, true),
+                basicInfo,
+                null,
+                null,
+                null
         );
-        if (!grouperMedia.isGrouper()) {
-            throw new IllegalArgumentException("Media is not a grouper media: " + grouperMediaId);
-        }
 
-        completeUpload(sessionId);
-
-        MediaGroupMetaData grouperGroupInfo = grouperMedia.getGroupInfo();
-
-        MediaMetaData mediaMetaData = new MediaMetaData();
-        mediaMetaData.setTitle(title);
-        mediaMetaData.setYear(grouperMedia.getYear());
-        mediaMetaData.setUploadDate(Instant.now());
-        mediaMetaData.setBucket(mediaBucket);
-        mediaMetaData.setAbsoluteFilePath(mediaBucket + "/" + upload.objectName);
-        mediaMetaData.setParentPath(upload.objectName);
-
-        mediaMetaData.setSize(-1L);
-        mediaMetaData.setLength(-1);
-        mediaMetaData.setThumbnail(MediaJobStatus.PROCESSING.name());
-        mediaMetaData.setWidth(-1);
-        mediaMetaData.setHeight(-1);
-        mediaMetaData.setFormat(MediaJobStatus.PROCESSING.name());
-
-//        mediaRepository.incrementLength(grouperMedia.getId());
-//        mediaGroupMetaDataRepository.incrementNumInfo(grouperGroupInfo.getId());
-
-        Integer updatedNumInfo = mediaGroupMetaDataRepository.incrementNumInfoReturning(grouperGroupInfo.getId());
-        Integer updatedLength = mediaRepository.incrementLengthReturning(grouperMedia.getId());
-
-        MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
-        mediaGroupInfo.setGrouperMetaData(grouperGroupInfo);
-        mediaGroupInfo.setMediaMetaData(mediaMetaData);
-        mediaGroupInfo.setNumInfo(updatedNumInfo);
-        mediaMetaData.setGroupInfo(mediaGroupInfo);
-
-        Long savedId = mediaRepository.save(mediaMetaData).getId();
-
-        eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, MediaType.ALBUM, null, false, null));
-
-        eventPublisher.publishEvent(new MediaUpdateEvent.LengthUpdated(grouperMedia.getId(), updatedLength));
-
-        mediaSearchCacheService.removeCachedMediaSearchItem(grouperMedia.getId());
-        mediaDisplayService.removeCacheGroupOfMedia(grouperMedia.getId());
-
-        removeCacheMediaSessionRequest(sessionId);
+        removeCacheFileUploadRequest(uploadId);
 
         return savedId;
     }
 
     @Transactional
-    public long saveMedia(String sessionId, MediaBasicInfo basicInfo) throws Exception {
-        MediaUploadRequest upload = getCachedMediaUploadRequest(sessionId);
-        if (upload == null) {
-            throw new IllegalArgumentException("Invalid session ID: " + sessionId);
+    public long saveMedia(MediaUploadRequest upload, MediaBasicInfo basicInfo, String fileId, Long parentMediaId, Integer childNum) {
+        if (upload.mediaType == MediaType.OTHER || upload.mediaType == MediaType.IMAGE) {
+            throw new IllegalArgumentException("Unsupported type to be a media: " + upload.mediaType);
         }
-
-        if (upload.mediaType != MediaType.ALBUM && upload.mediaType != MediaType.VIDEO) {
-            removeCacheMediaSessionRequest(sessionId);
-            throw new IllegalArgumentException("Invalid media type: " + upload.mediaType);
-        }
-
-        completeUpload(sessionId);
-
-        long savedId = saveMedia(upload, basicInfo, null);
-
-        removeCacheMediaSessionRequest(sessionId);
-
-        return savedId;
-    }
-
-    @Transactional
-    public long saveMedia(MediaUploadRequest upload, MediaBasicInfo basicInfo, String fileId) {
         MediaMetaData mediaMetaData = new MediaMetaData();
         mediaMetaData.setTitle(basicInfo.getTitle());
         mediaMetaData.setYear(basicInfo.getYear());
         mediaMetaData.setUploadDate(Instant.now());
-        mediaMetaData.setBucket(mediaBucket);
-        mediaMetaData.setAbsoluteFilePath(mediaBucket + "/" + upload.objectName);
+        mediaMetaData.setBucket(upload.bucket);
+        mediaMetaData.setMediaType(upload.mediaType);
+        mediaMetaData.setAbsoluteFilePath(ContentMetaData.MEDIA_BUCKET + "/" + upload.fileName);
         mediaMetaData.setThumbnail(MediaJobStatus.PROCESSING.name());
 
         mediaMetaData.setFormat(MediaJobStatus.PROCESSING.name());
@@ -265,142 +163,94 @@ public class MediaUploadService {
         mediaMetaData.setWidth(-1);
         mediaMetaData.setHeight(-1);
         mediaMetaData.setLength(-1);
+        mediaMetaData.setKey(upload.objectName);
 
         if (upload.mediaType == MediaType.VIDEO) {
-            int index = upload.objectName.lastIndexOf("/");
-            mediaMetaData.setParentPath(index != -1 ? upload.objectName.substring(0, index) : "");
-            mediaMetaData.setKey(upload.objectName.substring(index + 1));
             mediaMetaData.setFrameRate((short) -1);
-        } else if (upload.mediaType == MediaType.ALBUM) {
-            mediaMetaData.setParentPath(upload.objectName);
         }
 
         MediaMetaData saved = mediaRepository.save(mediaMetaData);
         long savedId = saved.getId();
 
-        String thumbnailObject = createMediaThumbnailString(upload.mediaType, savedId, mediaMetaData.getPath());
+        String thumbnailObject = createMediaThumbnailString(upload.mediaType, savedId, upload.objectName);
 
-        eventPublisher.publishEvent(new MediaUpdateEvent.MediaCreated(savedId, upload.mediaType, thumbnailObject, true, fileId));
+        if (parentMediaId != null) {
+            MediaMetaData grouperMedia = mediaRepository.findById(parentMediaId).orElse(null);
+            if (grouperMedia != null) {
+                MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
+                mediaGroupInfo.setGrouperMetaData(grouperMedia.getGroupInfo());
+                mediaGroupInfo.setMediaMetaData(mediaMetaData);
+                mediaGroupInfo.setNumInfo(childNum);
+                mediaMetaData.setGroupInfo(mediaGroupInfo);
+            }
+        }
 
+        // upload service can send media enriched for a single file
+        // for multiple files as one media like ALBUM or GROUPER need file service to retrieve all contents
+        if (upload.mediaType == MediaType.VIDEO) {
+            eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                    EventTopics.MEDIA_OBJECT_TOPIC,
+                    new MediaUpdateEvent.MediaEnriched(
+                            savedId,
+                            upload.mediaType,
+                            thumbnailObject,
+                            upload.searchable,
+                            fileId,
+                            null, null)
+            ));
+        }
         return savedId;
     }
 
     public static String createMediaThumbnailString(MediaType mediaType, long mediaId, String objectName) {
+        String extension = getFileExtension(objectName);
+        if (MediaType.detectMediaType(extension) != MediaType.IMAGE)
+            extension = ".jpg";
         if (mediaType == MediaType.VIDEO) {
-            String thumbnailObjectBasePath = (objectName.startsWith(defaultVidPath) ? "" : (defaultVidPath + "/")) +
-                    objectName.substring(0, objectName.lastIndexOf("/") + 1);
-            String thumbnailName = mediaId + "_" + UUID.randomUUID() + "_thumb.jpg";
-            return OSUtil.normalizePath(thumbnailObjectBasePath, thumbnailName);
+            return defaultVidPath + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb" + extension;
         } else if (mediaType == MediaType.ALBUM) {
-            return defaultAlbumPath + "/" + objectName.substring(0, objectName.lastIndexOf("/"))
-                    + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb.jpg";
+            return defaultAlbumPath + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb" + extension;
         } else if (mediaType == MediaType.GROUPER) {
-            String extension = (objectName == null || objectName.lastIndexOf(".") == -1) ? ".jpg" : objectName.substring(objectName.lastIndexOf("."));
             return defaultGrouperPath + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb" + extension;
         }
         return null;
     }
 
-    private List<String> completeUpload(String sessionId) throws JsonProcessingException {
-        List<String> objectNames = new ArrayList<>();
-        Map<Object, Object> uploadedParts = redisStringTemplate.opsForHash().entries("upload::" + sessionId);
-        for (Map.Entry<Object, Object> entry : uploadedParts.entrySet()) {
-            String uploadIdPart = (String) entry.getKey();
-            if (!uploadIdPart.startsWith("parts:"))
-                continue;
-
-            String uploadId = uploadIdPart.substring("parts:".length());
-            //System.out.println("Upload ID: " + uploadId);
-            String objectName = redisStringTemplate.opsForHash().get("upload::" + sessionId, uploadId).toString();
-            objectNames.add(objectName);
-            //System.out.println("Object name: " + objectName);
-
-            List<UploadedPart> parts = objectMapper.readValue(entry.getValue().toString(), new TypeReference<>() {});
-            //System.out.println("Parts: " + parts);
-
-            List<CompletedPart> completedParts = parts.stream()
-                    .map(p -> CompletedPart.builder()
-                            .partNumber(p.partNumber)
-                            .eTag(p.etag)
-                            .build()
-                    )
-                    .toList();
-
-            objectUploadService.completeMultipartUpload(mediaBucket, objectName, uploadId, completedParts);
-        }
-        return objectNames;
+    private String generateUniqueObjectName(String fileName) {
+        return UuidCreator.getTimeOrderedEpoch().toString() + getFileExtension(fileName);
     }
 
-
-    private void addCacheFileUploadParts(String sessionId, String uploadId, List<UploadedPart> parts) throws JsonProcessingException {
-        String key = "upload::" + sessionId;
-        String json = objectMapper.writeValueAsString(parts);
-        redisStringTemplate.opsForHash().put(key, "parts:" + uploadId, json);
-    }
-
-    private void addCacheFileUploadRequest(String sessionId, String uploadId, String object) {
-        redisStringTemplate.opsForHash().put("upload::" + sessionId, uploadId, object);
-    }
-
-    private MediaType getCachedFileUploadRequest(String sessionId, String uploadId) {
-        String key = "upload::" + sessionId;
-        Object cached = redisStringTemplate.opsForHash().get(key, uploadId);
-
-        if (cached == null) return null;
-
-        return MediaType.valueOf((String) redisStringTemplate.opsForHash().get(key, "mediaType"));
-    }
-
-    public record MediaUploadRequest(String objectName, MediaType mediaType) {}
-
-    public MediaUploadRequest getCachedMediaUploadRequest(String mediaUploadId) {
-        String key = "upload::" + mediaUploadId;
-        Object cached = redisStringTemplate.opsForHash().get(key, "objectName");
-
-        if (cached == null) return null;
-
-        return new MediaUploadRequest(
-                (String) cached,
-                MediaType.valueOf((String) redisStringTemplate.opsForHash().get(key, "mediaType"))
-        );
-    }
-
-    public void removeCacheMediaSessionRequest(String sessionId) {
+    private void addCacheFileUploadRequest(String sessionId, String uploadId, String objectName, String fileName) {
         String key = "upload::" + sessionId;
         redisStringTemplate.delete(key);
+        // ensure objectName starts first, separated by a delimiter before fileName value to safely extract objectName or fileName as fileName can contain anything
+        String value = objectName + ":|:" + fileName;
+        redisStringTemplate.opsForValue().set(uploadId, value, uploadSessionTimeout);
     }
 
-    private void addUploadSessionCacheLastAccess(String sessionId, Duration duration) {
+    private String getCachedFileUploadRequest(String uploadId) {
+        return redisStringTemplate.opsForValue().getAndExpire(uploadId, uploadSessionTimeout);
+    }
+
+    private void removeCacheFileUploadRequest(String uploadId) {
+        redisStringTemplate.delete(uploadId);
+    }
+
+    public String getCachedSessionRequest(String sessionId) {
         String key = "upload::" + sessionId;
-        redisStringTemplate.expire(key, duration);
+        return redisStringTemplate.opsForValue().get(key);
     }
 
-
-    private void validateMediaSessionInfoWithRequest(MediaUploadRequest request, String object, MediaType mediaType) {
-        if (request.mediaType != mediaType) {
-            throw new IllegalArgumentException("Mismatched media type: " + object);
-        }
-        if (!object.startsWith(request.objectName)) {
-            throw new IllegalArgumentException("Mismatched object name: " + object);
-        }
+    public static String getFileExtension(String name) {
+        if (name == null) return "";
+        name = name.toLowerCase();
+        int lastDotIndex = name.lastIndexOf(".");
+        if (lastDotIndex == -1) return "";
+        return name.substring(lastDotIndex);
     }
 
-    private String validateObject(String object) {
-        var validationResult = FileSystemValidator.isValidPath(object);
-        if (validationResult.errorMessage() != null) {
-            throw new IllegalArgumentException(validationResult.errorMessage());
-        }
-
-        return validationResult.validatedPath();
-    }
-
-    private void validateObjectWithMediaType(String object, MediaType mediaType) {
+    private boolean validateObjectWithMediaType(String object, MediaType mediaType) {
         MediaType detectedType = MediaType.detectMediaType(object);
-//        if (detectedType == MediaType.OTHER) {
-//            throw new IllegalArgumentException("Invalid support file type: " + object);
-//        }
-        if (mediaType == MediaType.VIDEO && detectedType != MediaType.VIDEO) {
-            throw new IllegalArgumentException("Invalid video type: " + object);
-        }
+        return detectedType == mediaType;
     }
 }

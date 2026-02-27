@@ -1,8 +1,10 @@
 package dev.chinh.streamingservice.filemanager.controller;
 
-import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.filemanager.service.FileService;
 import dev.chinh.streamingservice.filemanager.constant.SortBy;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
@@ -36,15 +38,22 @@ public class FileManagerController {
         return ResponseEntity.ok(fileService.findFilesInDirectory(id, page, sortBy, sortOrder));
     }
 
+
     @PostMapping("/vid/{fileId}")
     public ResponseEntity<?> addFileAsVideo(@PathVariable String fileId) {
-        return ResponseEntity.ok(fileService.addFileAsVideo(fileId));
+        return ResponseEntity.ok(fileService.addFileAsVideoMedia(fileId));
     }
 
     @PostMapping("/album/{fileId}")
     public ResponseEntity<?> addDirectoryAsAlbum(@PathVariable String fileId) {
-        return ResponseEntity.ok(fileService.addDirectoryAsAlbum(fileId));
+        return ResponseEntity.ok(fileService.addDirectoryAsAlbumMedia(fileId));
     }
+
+    @PostMapping("/grouper/{fileId}")
+    public ResponseEntity<?> addDirectoryAsGrouper(@PathVariable String fileId) {
+        return ResponseEntity.ok(fileService.addDirectoryAsGrouperMedia(fileId));
+    }
+
 
     @DeleteMapping("/{fileId}")
     public ResponseEntity<?> deleteFile(@PathVariable String fileId) {
@@ -52,11 +61,24 @@ public class FileManagerController {
         return ResponseEntity.ok().build();
     }
 
+    @DeleteMapping("/media/{mediaId}")
+    public ResponseEntity<?> deleteMedia(@PathVariable long mediaId) {
+        fileService.initiateDeleteMediaFile(mediaId);
+        return ResponseEntity.ok().build();
+    }
 
-    public record InitiateMultipartUploadRequest(String objectKey, MediaType mediaType) {}
 
+    public record CreateDirectoryRequest(@Size(max = 30) String parentId, @Size(max = 300) String directoryName) {}
+    @PostMapping
+    public ResponseEntity<Void> createDirectory(@RequestBody @Valid CreateDirectoryRequest request) {
+        fileService.createNewFolder(request.parentId, request.directoryName);
+        return ResponseEntity.ok().build();
+    }
+
+
+    public record InitiateMultipartUploadRequest(@NotBlank @Size(max = 1000) String filePath) {}
     @PostMapping("/upload/create-session")
-    public String initiateSession(@RequestBody InitiateMultipartUploadRequest request) {
-        return fileService.initiateUploadRequest(request.objectKey, request.mediaType);
+    public String initiateSession(@RequestBody @Valid InitiateMultipartUploadRequest request) {
+        return fileService.initiateUploadRequest(request.filePath);
     }
 }

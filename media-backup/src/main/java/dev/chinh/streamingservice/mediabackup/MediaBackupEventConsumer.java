@@ -1,13 +1,10 @@
 package dev.chinh.streamingservice.mediabackup;
 
 import dev.chinh.streamingservice.common.OSUtil;
-import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.mediabackup.config.KafkaRedPandaConfig;
-import io.minio.Result;
-import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,10 +17,7 @@ import org.springframework.stereotype.Service;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
 
 @Service
 @RequiredArgsConstructor
@@ -37,112 +31,91 @@ public class MediaBackupEventConsumer {
     @Value("${backup.enabled}")
     private String backupEnabled;
 
-    private void onMediaCreateBackup(MediaUpdateEvent.MediaCreatedReady event) throws Exception {
+    private void onCreateFile(MediaUpdateEvent.FileCreated event) throws Exception {
         if (!Boolean.parseBoolean(backupEnabled)) {
             return;
         }
-        System.out.println("Received media create backup event: " + event.absolutePath());
-
-        if (event.mediaType() == MediaType.VIDEO) {
-            String target = OSUtil.normalizePath(MEDIA_BACKUP_PATH, event.absolutePath());
+        System.out.println("Received create backup file event: " + event.fileName());
+        try {
+            String target = OSUtil.normalizePath(MEDIA_BACKUP_PATH + "/" + ContentMetaData.MEDIA_BUCKET, event.fileName());
             Path targetPath = Paths.get(target);
             if (Files.exists(targetPath)) {
                 System.err.println("File already exists: " + target);
                 return;
             }
-
-            try (InputStream inputStream = minIOService.getFile(event.bucket(), event.path())) {
+            try (InputStream inputStream = minIOService.getFile(event.bucket(), event.objectName())) {
                 Path parentPath = targetPath.getParent();
                 if (parentPath != null && !Files.exists(parentPath))
                     Files.createDirectories(parentPath);
 
                 Files.copy(inputStream, targetPath);
             } catch (FileAlreadyExistsException e) {
-                System.err.println("File already exists: " + event.path());
+                System.err.println("File already exists: " + event.fileName());
                 // do nothing - just log
-            } catch (Exception e) {
-                System.err.println("Failed to back up video: " + event.path());
-                throw e;
             }
-        }
-        else if (event.mediaType() == MediaType.ALBUM) {
-            try {
-                backupAlbum(event.bucket(), event.path(), event.absolutePath());
-            } catch (Exception e) {
-                System.err.println("Failed to backup album: " + event.path());
-                throw e;
-            }
-        } else if (event.mediaType() != MediaType.GROUPER) {
-            System.err.println("Unknown media type: " + event.mediaType());
-        }
-
-        if (event.thumbnail() != null)
-            createThumbnailBackup(event.thumbnail());
-    }
-
-    private void backupAlbum(String bucket, String albumPath, String absolutePath) throws Exception {
-        Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(bucket, albumPath);
-        for (Result<Item> result : results) {
-            String objectName = result.get().objectName();
-            try (InputStream inputStream = minIOService.getFile(bucket, objectName)) {
-                Path targetPath = Paths.get(OSUtil.normalizePath(MEDIA_BACKUP_PATH, mergePaths(absolutePath, objectName)));
-                Path parentPath = targetPath.getParent();
-
-                if (parentPath != null && !Files.exists(parentPath))
-                    Files.createDirectories(parentPath);
-
-                Files.copy(inputStream, targetPath);
-            } catch (FileAlreadyExistsException e) {
-                System.err.println("File already exists: " + e.getMessage());
-                // do nothing - skip - just log
-            }
+        } catch (Exception e) {
+            System.err.println("Failed to create backup file: " + event.fileName());
+            throw e;
         }
     }
 
-    public static String mergePaths(String absolute, String object) {
-        Path absPath = Paths.get(absolute);
-        Path objPath = Paths.get(object);
-
-        int objParts = objPath.getNameCount();
-
-        // We look for the longest sequence from the START of objPath
-        // that matches the END of absPath.
-        for (int i = objParts; i > 0; i--) {
-            // Get a sub-sequence from the start of the object path:
-            // e.g., "something1/something2", then "something1"
-            Path sub = objPath.subpath(0, i);
-
-            if (absPath.endsWith(sub)) {
-                // If it matches, take the absolute path and
-                // append only the REMAINING part of the object path.
-                Path remaining = objPath.subpath(i, objParts);
-                return absPath.resolve(remaining).toString().replace("\\", "/");
+    private void onDeleteFile(MediaUpdateEvent.FileDeleted event) throws IOException {
+        System.out.println("Received delete backup file");
+        try {
+            Path path = Path.of(OSUtil.normalizePath(MEDIA_BACKUP_PATH + "/", event.fileName()));
+            if (event.isNotDirectory()) {
+                Files.deleteIfExists(path);
+            } else {
+                FileUtils.deleteDirectory(new File(path.toString()));
             }
+        } catch (Exception e) {
+            System.err.println("Failed to delete backup file: " + event.fileName());
+            throw e;
         }
-
-        // If no overlap is found, might want to join them directly
-        // or handle it as a specific case.
-        return absPath.resolve(objPath).toString().replace("\\", "/");
     }
 
-    private void onMediaDeleteBackup(MediaUpdateEvent.MediaDeleted event) throws Exception {
+    private void onCreatedMedia(MediaUpdateEvent.MediaCreatedReady event) throws Exception {
+        System.out.println("Received media created ready event to backup thumbnail: " + event.mediaId() + ", thumbnail: " + event.thumbnail());
+        createThumbnailBackup(event.thumbnail());
+    }
+
+    private void onUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdatedReady event) throws Exception {
+        boolean sameName = event.newThumbnail().equals(event.oldThumbnail());
+        // overwrite old one if same name then no need to delete old thumbnail - passing null for old
+        updateThumbnail(event.mediaId(), sameName ? null : event.oldThumbnail(), event.newThumbnail());
+    }
+
+
+    private void onNameEntityCreated(MediaUpdateEvent.NameEntityCreated event) throws Exception {
+        System.out.println("Received name entity create backup event: " + event.nameEntityId());
+        if (event.thumbnailPath() != null)
+            createThumbnailBackup(event.thumbnailPath());
+    }
+
+    private void onUpdateNameEntity(MediaUpdateEvent.NameEntityUpdated event) throws Exception {
+        boolean sameName = event.newThumbnail().equals(event.oldThumbnail());
+        updateThumbnail(event.nameEntityId(), sameName ? null : event.oldThumbnail(), event.newThumbnail());
+    }
+
+    private void onNameEntityDeleted(MediaUpdateEvent.NameEntityDeleted event) {
+        System.out.println("Received name entity delete backup event: " + event.nameEntityId());
+        if (event.thumbnailPath() != null)
+            deleteThumbnailBackup(event.thumbnailPath());
+    }
+
+    private void updateThumbnail(long id, String oldThumbnail, String newThumbnail) throws Exception {
         if (!Boolean.parseBoolean(backupEnabled)) {
             return;
         }
-        System.out.println("Received media delete backup event: " + event.absolutePath());
-        Path path = Paths.get(MEDIA_BACKUP_PATH, event.absolutePath());
-        if (event.mediaType() == MediaType.VIDEO) {
-            Files.deleteIfExists(path);
-        } else if (event.mediaType() == MediaType.ALBUM) {
-            File directory = new File(path.toString());
-            FileUtils.deleteDirectory(directory);
-        } else {
-            System.err.println("Unknown media type: " + event.mediaType());
+        System.out.println("Received thumbnail update backup event: " + id + ", old: " + oldThumbnail + ", new: " + newThumbnail);
+        if (newThumbnail != null) {
+            createThumbnailBackup(newThumbnail);
         }
-
-        if (event.thumbnail() != null)
-            deleteThumbnailBackup(event.thumbnail());
+        if (oldThumbnail != null) {
+            deleteThumbnailBackup(oldThumbnail);
+        }
     }
+
 
     private void createThumbnailBackup(String newThumbnail) throws Exception {
         if (!Boolean.parseBoolean(backupEnabled)) {
@@ -151,17 +124,13 @@ public class MediaBackupEventConsumer {
         System.out.println("Received thumbnail create backup event: " + newThumbnail);
         String thumbnail = OSUtil.normalizePath(MEDIA_BACKUP_PATH + "/" + ContentMetaData.THUMBNAIL_BUCKET, newThumbnail);
         Path thumbnailPath = Paths.get(thumbnail);
-        if (Files.exists(thumbnailPath)) {
-            System.err.println("File thumbnail already exists: " + newThumbnail);
-            return;
-        }
 
         try (InputStream inputStream = minIOService.getFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnail)){
             Path parentPath = thumbnailPath.getParent();
             if (parentPath != null && !Files.exists(parentPath))
                 Files.createDirectories(parentPath);
 
-            Files.copy(inputStream, thumbnailPath);
+            Files.copy(inputStream, thumbnailPath, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception e) {
             System.err.println("Failed to back up thumbnail: " + newThumbnail);
             throw e;
@@ -181,59 +150,28 @@ public class MediaBackupEventConsumer {
         }
     }
 
-    private void updateThumbnail(long id, String oldThumbnail, String newThumbnail) throws Exception {
-        if (!Boolean.parseBoolean(backupEnabled)) {
-            return;
-        }
-        System.out.println("Received thumbnail update backup event: " + id + ", old: " + oldThumbnail + ", new: " + newThumbnail);
-        if (newThumbnail != null) {
-            createThumbnailBackup(newThumbnail);
-        }
-        if (oldThumbnail != null) {
-            deleteThumbnailBackup(oldThumbnail);
-        }
-    }
-
-    private void onUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdatedReady event) throws Exception {
-        updateThumbnail(event.mediaId(), event.oldThumbnail(), event.newThumbnail());
-    }
-
-    private void onUpdateNameEntityThumbnail(MediaUpdateEvent.NameEntityThumbnailUpdatedReady event) throws Exception {
-        updateThumbnail(event.nameEntityId(), event.oldThumbnail(), event.newThumbnail());
-    }
-
-    private void onNameEntityCreated(MediaUpdateEvent.NameEntityCreatedReady event) throws Exception {
-        System.out.println("Received name entity create backup event: " + event.nameEntityId());
-        if (event.thumbnailPath() != null)
-            createThumbnailBackup(event.thumbnailPath());
-    }
-
-    private void onNameEntityDeleted(MediaUpdateEvent.NameEntityDeleted event) {
-        System.out.println("Received name entity delete backup event: " + event.nameEntityId());
-        if (event.thumbnailPath() != null)
-            deleteThumbnailBackup(event.thumbnailPath());
-    }
-
 
     @KafkaListener(topics = {
-            EventTopics.MEDIA_ALL_TOPIC,
-            EventTopics.MEDIA_OBJECT_AND_BACKUP_TOPIC,
+            EventTopics.MEDIA_BACKUP_TOPIC,
+            EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
+            EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC,
+            EventTopics.MEDIA_FILE_UPLOAD_SEARCH_BACKUP_TOPIC,
             EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC,
-            EventTopics.MEDIA_SEARCH_BACKUP_AND_FILE_TOPIC,
-            EventTopics.MEDIA_SEARCH_BACKUP_AND_OBJECT_TOPIC
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws Exception {
         try {
             switch (event) {
-                case MediaUpdateEvent.MediaDeleted e -> onMediaDeleteBackup(e);
-                case MediaUpdateEvent.MediaCreatedReady e -> onMediaCreateBackup(e);
+                case MediaUpdateEvent.FileCreated e -> onCreateFile(e);
+                case MediaUpdateEvent.FileDeleted e -> onDeleteFile(e);
+                case MediaUpdateEvent.MediaCreatedReady e -> onCreatedMedia(e);
                 case MediaUpdateEvent.MediaThumbnailUpdatedReady e -> onUpdateMediaThumbnail(e);
-                case MediaUpdateEvent.NameEntityCreatedReady e -> onNameEntityCreated(e);
+
+                case MediaUpdateEvent.NameEntityCreated e -> onNameEntityCreated(e);
                 case MediaUpdateEvent.NameEntityDeleted e -> onNameEntityDeleted(e);
-                case MediaUpdateEvent.NameEntityThumbnailUpdatedReady e -> onUpdateNameEntityThumbnail(e);
+                case MediaUpdateEvent.NameEntityUpdated e -> onUpdateNameEntity(e);
                 default ->
                     // unknown event type → log and skip
-                    System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+                        System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
             }
             ack.acknowledge();
         } catch (Exception e) {
@@ -242,6 +180,7 @@ public class MediaBackupEventConsumer {
             throw e;
         }
     }
+
 
 
     // listen to DLQ and print out the event details for now
@@ -258,21 +197,24 @@ public class MediaBackupEventConsumer {
 
         // Accessing the POJO data directly
         switch (event) {
-            case MediaUpdateEvent.MediaDeleted e ->
-                    System.out.println("Received media delete backup event: " + e.absolutePath());
+            case MediaUpdateEvent.FileCreated e ->
+                    System.out.println("Received create backup file event: " + e.fileName());
+            case MediaUpdateEvent.FileDeleted e ->
+                    System.out.println("Received delete backup file: " + e.fileName());
             case MediaUpdateEvent.MediaCreatedReady e ->
-                    System.out.println("Received media create backup event: " + e.path());
+                    System.out.println("Received media created ready event to backup thumbnail: " + e.mediaId() + ", thumbnail: " + e.thumbnail());
             case MediaUpdateEvent.MediaThumbnailUpdatedReady e ->
-                    System.out.println("Received media thumbnail updated backup event: " + e.mediaId() + " old: " + e.oldThumbnail() + " new: " + e.newThumbnail());
-            case MediaUpdateEvent.NameEntityCreatedReady e ->
-                    System.out.println("Received name entity create backup event: " + e.nameEntityId());
+                    System.out.println("Received media thumbnail updated backup event: " + e.mediaId() +  " new: " + e.newThumbnail());
+
+            case MediaUpdateEvent.NameEntityCreated e ->
+                    System.out.println("Received name entity create backup event: " + e.nameEntityId() + " thumbnail: " + e.thumbnailPath());
             case MediaUpdateEvent.NameEntityDeleted e ->
-                    System.out.println("Received name entity delete backup event: " + e.nameEntityId());
-            case MediaUpdateEvent.NameEntityThumbnailUpdatedReady e ->
-                System.out.println("Received name entity thumbnail updated backup event: " + e.nameEntityId() + " old: " + e.oldThumbnail() + " new: " + e.newThumbnail());
+                    System.out.println("Received name entity delete backup event: " + e.nameEntityId() + " thumbnail: " + e.thumbnailPath());
+            case MediaUpdateEvent.NameEntityUpdated e ->
+                    System.out.println("Received name entity thumbnail updated backup event: " + e.nameEntityId() + " old: " + e.oldThumbnail() + " new: " + e.newThumbnail());
             default -> {
-                System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
-                ack.acknowledge(); // ack on poison event to skip it
+                    System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+                    //ack.acknowledge(); // ack on poison event to skip it
             }
         }
         System.out.println("======= =======");

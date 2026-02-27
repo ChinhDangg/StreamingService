@@ -25,8 +25,9 @@ public class ContentMetaData {
     // Classification
     public static final String ID = "id";
     public static final String BUCKET = "bucket";
-    public static final String PARENT_PATH = "parentPath";
+    public static final String MEDIA_TYPE = "mediaType";
     public static final String KEY = "key";
+    public static final String OBJECT_NAME = "objectName";
     public static final String THUMBNAIL = "thumbnail";
     public static final String PREVIEW = "preview";
     public static final String LENGTH = "length";
@@ -41,8 +42,13 @@ public class ContentMetaData {
 
     // Buckets
     public static final String MEDIA_BUCKET = "media";
-    public static final String THUMBNAIL_BUCKET = "thumbnails";
+    public static final String VIDEO_BUCKET = "video";
+    public static final String IMAGE_BUCKET = "image";
+    public static final String AUDIO_BUCKET = "audio";
+    public static final String OTHER_BUCKET = "other";
+    public static final String THUMBNAIL_BUCKET = "thumbnail";
     public static final String PREVIEW_BUCKET = "preview";
+    // remember to change minio access level to anonymous read for internal non-authenticated services
 
     // Redis stream key
     public static final String FFMPEG_VIDEO_QUEUE_KEY = "ffmpeg_video_stream";
