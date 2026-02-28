@@ -25,7 +25,6 @@ public abstract class MediaDescription implements MetaDataProvider {
     protected String title;
 
     @JsonProperty(ContentMetaData.BUCKET)
-    @Column(nullable = false)
     protected String bucket;
 
     @JsonProperty(ContentMetaData.KEY)

@@ -148,7 +148,11 @@ public class FileService {
         producer.publishEvent(new MediaFileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
-                        fileId, MediaType.VIDEO, item.getBucket(), item.getObjectName(), item.getName(), item.getUploadDate(), null, null)
+                        fileId, MediaType.VIDEO,
+                        item.getBucket(), item.getObjectName(),
+                        item.getName(), item.getUploadDate(),
+                        null, null,
+                        null, true)
         ));
         return "Processing as video";
     }
@@ -181,7 +185,11 @@ public class FileService {
         producer.publishEvent(new MediaFileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
-                        fileId, MediaType.ALBUM, first == null ? null : first.getBucket(), first == null ? null : first.getObjectName(), item.getName(), item.getUploadDate(), null, null)
+                        fileId, MediaType.ALBUM,
+                        first == null ? null : first.getBucket(), first == null ? null : first.getObjectName(),
+                        item.getName(), item.getUploadDate(),
+                        null, null,
+                        null, true)
         ));
         return "Processing as album";
     }
@@ -221,7 +229,11 @@ public class FileService {
         producer.publishEvent(new MediaFileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
-                        fileId, MediaType.GROUPER, first == null ? null : first.getBucket(), first == null ? null : first.getObjectName(), item.getName(), item.getUploadDate(), null, null)
+                        fileId, MediaType.GROUPER,
+                        first == null ? null : first.getBucket(), first == null ? null : first.getObjectName(),
+                        item.getName(), item.getUploadDate(),
+                        null, null,
+                        null, true)
         ));
         return "Processing as grouper";
     }

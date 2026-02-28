@@ -106,7 +106,7 @@ public class MediaUploadService {
         long size = minIOService.getObjectSize(bucket, objectName);
         eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
-                new MediaUpdateEvent.FileCreated(bucket, objectName, fileName, size)
+                new MediaUpdateEvent.FileCreated(bucket, objectName, fileName, size, null, null, null)
         ));
 
         removeCacheFileUploadRequest(uploadId);
@@ -135,9 +135,19 @@ public class MediaUploadService {
                 new MediaUploadRequest(ContentMetaData.VIDEO_BUCKET, objectName, fileName, MediaType.VIDEO, true),
                 basicInfo,
                 null,
-                null,
                 null
         );
+
+        String bucket = getBucketOnMediaType(fileName);
+        long size = minIOService.getObjectSize(bucket, objectName);
+        eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
+                new MediaUpdateEvent.FileCreated(
+                        bucket, objectName,
+                        fileName, size,
+                        savedId, MediaType.VIDEO,
+                        MediaUploadService.createMediaThumbnailString(MediaType.VIDEO, savedId, objectName))
+        ));
 
         removeCacheFileUploadRequest(uploadId);
 
@@ -145,7 +155,7 @@ public class MediaUploadService {
     }
 
     @Transactional
-    public long saveMedia(MediaUploadRequest upload, MediaBasicInfo basicInfo, String fileId, Long parentMediaId, Integer childNum) {
+    public long saveMedia(MediaUploadRequest upload, MediaBasicInfo basicInfo, Long parentMediaId, Integer childNum) {
         if (upload.mediaType == MediaType.OTHER || upload.mediaType == MediaType.IMAGE) {
             throw new IllegalArgumentException("Unsupported type to be a media: " + upload.mediaType);
         }
@@ -156,7 +166,7 @@ public class MediaUploadService {
         mediaMetaData.setBucket(upload.bucket);
         mediaMetaData.setMediaType(upload.mediaType);
         mediaMetaData.setAbsoluteFilePath(ContentMetaData.MEDIA_BUCKET + "/" + upload.fileName);
-        mediaMetaData.setThumbnail(MediaJobStatus.PROCESSING.name());
+        mediaMetaData.setThumbnail(null);
 
         mediaMetaData.setFormat(MediaJobStatus.PROCESSING.name());
         mediaMetaData.setSize(-1L);
@@ -172,8 +182,6 @@ public class MediaUploadService {
         MediaMetaData saved = mediaRepository.save(mediaMetaData);
         long savedId = saved.getId();
 
-        String thumbnailObject = createMediaThumbnailString(upload.mediaType, savedId, upload.objectName);
-
         if (parentMediaId != null) {
             MediaMetaData grouperMedia = mediaRepository.findById(parentMediaId).orElse(null);
             if (grouperMedia != null) {
@@ -185,21 +193,25 @@ public class MediaUploadService {
             }
         }
 
-        // upload service can send media enriched for a single file
-        // for multiple files as one media like ALBUM or GROUPER need file service to retrieve all contents
-        if (upload.mediaType == MediaType.VIDEO) {
-            eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
-                    EventTopics.MEDIA_OBJECT_TOPIC,
-                    new MediaUpdateEvent.MediaEnriched(
-                            savedId,
-                            upload.mediaType,
-                            thumbnailObject,
-                            upload.searchable,
-                            fileId,
-                            null, null)
-            ));
-        }
         return savedId;
+    }
+
+    public String addMediaToGrouper(long grouperMediaId, long mediaId, Integer childNum) {
+        MediaMetaData mediaMetaData = mediaRepository.findById(mediaId).orElse(null);
+        if (mediaMetaData == null) {
+            return "Media not found";
+        }
+        MediaMetaData grouperMedia = mediaRepository.findById(grouperMediaId).orElse(null);
+        if (grouperMedia == null) {
+            return "Grouper media not found";
+        }
+        MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
+        mediaGroupInfo.setGrouperMetaData(grouperMedia.getGroupInfo());
+        mediaGroupInfo.setMediaMetaData(mediaMetaData);
+        mediaGroupInfo.setNumInfo(childNum);
+        mediaMetaData.setGroupInfo(mediaGroupInfo);
+        mediaRepository.save(mediaMetaData);
+        return null;
     }
 
     public static String createMediaThumbnailString(MediaType mediaType, long mediaId, String objectName) {

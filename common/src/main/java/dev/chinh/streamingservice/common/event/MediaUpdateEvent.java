@@ -46,13 +46,13 @@ public interface MediaUpdateEvent {
 
 
     record MediaEnriched(
+            String fileId,
             long mediaId,
             MediaType mediaType,
             String thumbnailObject,
             boolean searchable,
-            String fileId,
-            Long size,
-            Integer length
+            long size,
+            int length
     ) implements MediaUpdateEvent {}
 
     record MediaThumbnailUpdated(
@@ -79,7 +79,10 @@ public interface MediaUpdateEvent {
             String bucket,
             String objectName,
             String fileName,
-            long size
+            long size,
+            Long mediaId,
+            MediaType mediaType,
+            String thumbnailObject
     ) implements MediaUpdateEvent {}
 
     record FileDeleted(
@@ -97,7 +100,9 @@ public interface MediaUpdateEvent {
             String fileName,
             Instant uploadDate,
             Long parentMediaId,
-            Integer childNum
+            Integer childNum,
+            Long childMediaId,
+            boolean searchable
     ) implements MediaUpdateEvent {}
 
     record DirectoryToMediaInitiated(

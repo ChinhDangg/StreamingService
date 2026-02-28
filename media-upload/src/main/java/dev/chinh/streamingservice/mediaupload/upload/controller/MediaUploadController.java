@@ -48,7 +48,7 @@ public class MediaUploadController {
     }
 
     @PostMapping("/end-session-file")
-    public ResponseEntity<Void> endSessionUnfinishedMedia(@RequestBody @Valid EndSessionRequest request) {
+    public ResponseEntity<Void> endSessionFile(@RequestBody @Valid EndSessionRequest request) {
         mediaUploadService.saveFile(request.uploadId, request.uploadedParts);
         return ResponseEntity.ok().build();
     }

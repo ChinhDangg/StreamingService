@@ -1,8 +1,4 @@
-import {
-    uploadFile,
-    startUploadSession,
-    endUploadSession,
-} from "/static/js/upload/upload-file.js";
+import {endFileSession, endVideoUploadSession, uploadFile,} from "/static/js/upload/upload-file.js";
 import {apiRequest} from "/static/js/common.js";
 
 const view = document.getElementById("file-view-container");
@@ -158,7 +154,7 @@ function displayFileItem(fileItems, clearNode = true, clearFileList = true) {
             fileNode.dataset.mid = item.mId;
             fileNode.style.backgroundColor = '#4f46e5';
         }
-        if (fileType === 'DIR' || fileType === 'ALBUM') {
+        if (fileType === 'DIR' || fileType === 'ALBUM' || fileType === 'GROUPER') {
             fileNode.addEventListener('click', async function () {
                 if (isProcessing) return;
                 isProcessing = true;
@@ -615,46 +611,38 @@ submitBtn.addEventListener('click', async function () {
 
 async function uploadFiles(fileList) {
     allVideo = allVideo && uploadAsVideoCheckbox.checked;
-    const mediaType = allVideo ? 'VIDEO' : savingPath ? 'ALBUM' : 'OTHER';
     const currentFullPath = getFullCurrentPath();
-    let sessionId = mediaType === 'ALBUM'
-        ? await startUploadSession(getDirPath(currentFullPath, savingPath), mediaType)
-        : null;
 
-    if (sessionId === null && mediaType === 'ALBUM') {
-        alert('Failed to start upload session');
-        return;
-    } else if (sessionId !== null && sessionId.startsWith('Error:') && !allVideo) {
-        displayFailTexts([sessionId]);
-        return;
+    const endVideoMediaSession = async (uploadId, uploadedParts, title) => {
+        const basicInfo = {
+            title: title,
+            year: new Date().getFullYear()
+        }
+        return await endVideoUploadSession(uploadId, uploadedParts, basicInfo); // media id or error message
     }
 
-    const endMediaSession = async (sessionId, title) => {
-        const basicInfo = {
-            sessionId: sessionId,
-            basicInfo: {
-                title: title,
-                year: new Date().getFullYear()
+    const endSession = async (fileInfo) => {
+        if (allVideo) {
+            const mediaId = fileInfo.mediaId ? fileInfo.mediaId : await endVideoMediaSession(fileInfo.uploadId, fileInfo.eTags, fileInfo.file.name.substring(fileInfo.file.name.lastIndexOf('/') + 1));
+            if (mediaId.startsWith('Error:')) {
+                displayFailTexts([mediaId]);
+                return null;
+            } else {
+                fileInfo.mediaId = mediaId;
+                const errorMess = await uploadNameEntityForMediaInBatch(mediaId);
+                if (errorMess.startsWith('Error:')) {
+                    displayFailTexts([errorMess]);
+                    return null;
+                }
+            }
+        } else {
+            const errorMess = await endFileSession(fileInfo.uploadId, fileInfo.eTags);
+            if (errorMess.startsWith('Error:')) {
+                displayFailTexts([errorMess]);
+                return null;
             }
         }
-        const responseText = await endUploadSession(basicInfo);
-        if (responseText.startsWith('Error:')) {
-            currentFailTexts.push(responseText);
-            return null;
-        }
-        return responseText; // media id
-    }
-
-    const endFileSession = async (sessionId) => {
-        const response = await apiRequest('/api/upload/media/end-session-file', {
-            method: 'POST',
-            body: sessionId
-        });
-        if (!response.ok) {
-            displayFailTexts(['Failed to end upload session']);
-            return null;
-        }
-        return response.text();
+        return true;
     }
 
     if (uploadingFiles.size) {
@@ -663,65 +651,45 @@ async function uploadFiles(fileList) {
             const fileName = getDirPath(currentFullPath, f.name);
             uploadingFile.chunks.partNumber = uploadingFile.partNumber;
             const passed = await uploadFile(
-                uploadingFile.sessionId, f, fileName, uploadingFile.mediaType, uploadingFiles, currentFailTexts,
+                uploadingFile.sessionId, f, fileName, uploadingFiles, currentFailTexts,
                 uploadingFile.chunks, uploadingFile.eTags, uploadingFile.uploadId,
                 showProgress
             );
             if (!passed) {
                 displayFailTexts(currentFailTexts);
-            } else if (mediaType !== 'ALBUM') {
-                const mediaId = allVideo
-                    ? await endMediaSession(uploadingFile.sessionId, f.name.substring(f.name.lastIndexOf('/') + 1))
-                    : await endFileSession(uploadingFile.sessionId);
-                const errorMess = await uploadNameEntityForMediaInBatch(mediaId);
-                if (errorMess) {
-                    displayFailTexts([errorMess]);
-                    currentFailTexts.push(errorMess);
-                }
             } else {
-                sessionId = uploadingFile.sessionId;
+                const noError = await endSession(uploadingFile);
+                if (!noError) {
+                    continue;
+                }
+                uploadingFiles.delete(f);
             }
         }
     } else {
         for (const file of fileList) {
             const fileName = getDirPath(currentFullPath, file.name);
-            const sId = sessionId === null ? await startUploadSession(fileName, mediaType) : sessionId;
-            if (!sId) {
-                displayFailTexts(['Failed to start upload session']);
-                return;
-            }
             const passed = await uploadFile(
-                sId, file.file, fileName, mediaType, uploadingFiles, currentFailTexts,
+                null, file.file, fileName, uploadingFiles, currentFailTexts,
                 null, null, null,
                 showProgress
             );
             if (!passed) {
-                uploadingFiles.get(file.file).sessionId = sId;
                 displayFailTexts(currentFailTexts);
-            } else if (mediaType !== 'ALBUM') {
-                const mediaId = allVideo
-                    ? await endMediaSession(sId, file.name.substring(file.name.lastIndexOf('/') + 1))
-                    : await endFileSession(sId);
-                const errorMess = await uploadNameEntityForMediaInBatch(mediaId);
-                if (errorMess) {
-                    displayFailTexts([errorMess]);
-                    currentFailTexts.push(errorMess);
+            } else {
+                const fileInfo = uploadingFiles.get(file.file);
+                const noError = await endSession(fileInfo);
+                if (!noError) {
+                    continue;
                 }
+                uploadingFiles.delete(file.file);
             }
         }
     }
 
-    if (uploadingFiles.size || currentFailTexts.length > 0) {
+    if (uploadingFiles.size) {
         submitBtn.textContent = 'Retry';
         currentFailTexts.length = 0;
         return;
-    }
-
-    if (mediaType === 'ALBUM') {
-        const response = endFileSession(sessionId);
-        if (response === null) {
-            return;
-        }
     }
 
     alert('Upload completed');
@@ -954,7 +922,7 @@ async function uploadNameEntityForMediaInBatch(mediaId) {
         body: JSON.stringify(body)
     });
     if (!response.ok) {
-        return `Failed to add name entity: ${await response.text()}`;
+        return `Error: Failed to add name entity: ${await response.text()}`;
     }
     return null;
 }
@@ -977,6 +945,7 @@ const customRightMenu = document.getElementById('custom-right-menu');
 const newFolderButton = customRightMenu.querySelector('.new-folder-btn');
 const addAsVideoButton = customRightMenu.querySelector('.add-as-video-btn');
 const addAsAlbumButton = customRightMenu.querySelector('.add-as-album-btn');
+const addAsGrouperButton = customRightMenu.querySelector('.add-as-grouper-btn');
 const openMediaButton = customRightMenu.querySelector('.open-media-btn');
 const deleteFileButton = customRightMenu.querySelector('.delete-file-btn');
 
@@ -999,9 +968,11 @@ fileViewContainer.addEventListener('contextmenu', (event) => {
 
     addAsVideoButton.disabled = true;
     addAsAlbumButton.disabled = true;
+    addAsGrouperButton.disabled = true;
     openMediaButton.disabled = true;
     addAsVideoButton.classList.add('invisible');
     addAsAlbumButton.classList.add('invisible');
+    addAsGrouperButton.classList.add('invisible');
     openMediaButton.classList.add('invisible');
 
     if (!targetNode) {
@@ -1020,10 +991,11 @@ fileViewContainer.addEventListener('contextmenu', (event) => {
         if (currentTargetNode.type === 'VIDEO') {
             addAsVideoButton.disabled = false;
             addAsVideoButton.classList.remove('invisible');
-        }
-        if (currentTargetNode.type === 'DIR') {
+        } else if (currentTargetNode.type === 'DIR') {
             addAsAlbumButton.disabled = false;
             addAsAlbumButton.classList.remove('invisible');
+            addAsGrouperButton.disabled = false;
+            addAsGrouperButton.classList.remove('invisible');
         }
     }
 
@@ -1079,6 +1051,21 @@ addAsAlbumButton.addEventListener('click', async function () {
     displayInfoMessage(await response.text());
 });
 
+addAsGrouperButton.addEventListener('click', async function () {
+    if (currentTargetNode.id === null) {
+        console.log('No target selected');
+        return;
+    }
+    const response = await apiRequest(`/api/file/grouper/${currentTargetNode.id}`, {
+        method: 'POST'
+    });
+    if (!response.ok) {
+        alert('Failed to add as grouper: ' + await response.text());
+        return;
+    }
+    displayInfoMessage(await response.text());
+})
+
 openMediaButton.addEventListener('click', async function () {
     if (currentTargetNode.mId === null) {
         console.log('No target selected');
@@ -1101,7 +1088,7 @@ deleteFileButton.addEventListener('click', async function () {
     const confirmDelete = confirm('Are you sure to delete this file?');
     if (!confirmDelete) return;
     if (currentTargetNode.mId) {
-        const response = await apiRequest(`/api/modify/media/${currentTargetNode.mId}`, {
+        const response = await apiRequest(`/api/file/media/${currentTargetNode.mId}`, {
             method: 'DELETE'
         });
         if (!response.ok) {
@@ -1133,3 +1120,37 @@ function displayInfoMessage(message, hasTimeout = true) {
     if (hasTimeout)
         setTimeout(() => infoMessageContainer.classList.add('hidden'), 5000);
 }
+
+
+const overlayTextPrompt = document.getElementById('overlay-text-prompt');
+overlayTextPrompt.querySelector('.cancel-btn').addEventListener('click', () => {
+    overlayTextPrompt.querySelector('.ok-btn').onclick = null;
+    overlayTextPrompt.classList.add('hidden');
+});
+
+function openOverlayTextPrompt(title, text, okFunc) {
+    overlayTextPrompt.querySelector('.title').textContent = title;
+    overlayTextPrompt.querySelector('.input-text').textContent = text;
+    overlayTextPrompt.querySelector('.ok-btn').onclick = okFunc;
+    overlayTextPrompt.classList.remove('hidden');
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

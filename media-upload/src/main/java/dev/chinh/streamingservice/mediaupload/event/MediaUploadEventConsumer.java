@@ -28,22 +28,49 @@ public class MediaUploadEventConsumer {
     private void onInitiateFileToMedia(MediaUpdateEvent.FileToMediaInitiated event) {
         System.out.println("Received file to media initiated event: " + event.fileId());
         try {
+            if (event.childMediaId() != null) {
+                if (event.mediaType() == MediaType.GROUPER) {
+                    String error = mediaUploadService.addMediaToGrouper(event.parentMediaId(), event.childMediaId(), event.childNum());
+                    if (error != null)
+                        System.err.println(error);
+                    return;
+                }
+                System.out.println("File event is given with media ID but not part of a grouper, skipping file to media");
+                return;
+            }
+
             MediaUploadService.MediaUploadRequest uploadRequest = new MediaUploadService.MediaUploadRequest(
-                    event.bucket(), event.objectName(), event.fileName(), event.mediaType(), event.parentMediaId() == null
+                    event.bucket(), event.objectName(), event.fileName(), event.mediaType(), event.searchable()
             );
             MediaBasicInfo mediaBasicInfo = new MediaBasicInfo(
-                    event.objectName(),
+                    event.fileName(),
                     (short) event.uploadDate().atOffset(ZoneOffset.UTC).getYear()
             );
-            long mediaId = mediaUploadService.saveMedia(uploadRequest, mediaBasicInfo, event.fileId(), event.parentMediaId(), event.childNum());
-            if (event.mediaType() == MediaType.ALBUM) {
+            long mediaId = mediaUploadService.saveMedia(uploadRequest, mediaBasicInfo, event.parentMediaId(), event.childNum());
+
+            // upload service can send media enriched for a single file
+            // for multiple files as one media like ALBUM or GROUPER need file service to retrieve all contents
+            if (event.mediaType() == MediaType.VIDEO) {
+                producer.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                        EventTopics.MEDIA_OBJECT_TOPIC,
+                        new MediaUpdateEvent.MediaEnriched(
+                                event.fileId(),
+                                mediaId,
+                                event.mediaType(),
+                                MediaUploadService.createMediaThumbnailString(event.mediaType(), mediaId, event.objectName()),
+                                event.searchable(),
+                                -1,
+                                -1
+                        )
+                ));
+            } else if (event.mediaType() == MediaType.ALBUM) {
                 producer.publishEvent(new MediaUploadEventProducer.EventWrapper(
                         EventTopics.MEDIA_FILE_TOPIC,
                         new MediaUpdateEvent.DirectoryToMediaInitiated(
                                 event.fileId(),
                                 mediaId,
                                 event.mediaType(),
-                                true,
+                                event.searchable(),
                                 MediaUploadService.createMediaThumbnailString(event.mediaType(), mediaId, event.objectName()),
                                 0,
                                 0

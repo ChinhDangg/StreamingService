@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <title>File Explorer Layout</title>
-    <link rel="stylesheet" th:href="@{/static/css/tailwind.css}" href="/static/css/tailwind.css">
+<!--    <link rel="stylesheet" th:href="@{/static/css/tailwind.css}" href="/static/css/tailwind.css">-->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .grid-view {
@@ -104,7 +104,6 @@
             height: 2rem;
             padding: 0 0.75rem; /* px-3 */
             gap: 0.5rem;
-            background-color: #1f2937; /* bg-gray-800 */
             border-radius: 0.5rem; /* rounded */
             cursor: pointer;
         }
@@ -449,6 +448,11 @@
             </button>
         </li>
         <li>
+            <button class="add-as-grouper-btn flex w-full items-center px-4 py-2 transition hover:bg-gray-800">
+                Add as Grouper
+            </button>
+        </li>
+        <li>
             <button class="open-media-btn flex w-full items-center px-4 py-2 transition hover:bg-gray-800">
                 Open Media
             </button>
@@ -460,6 +464,36 @@
             </button>
         </li>
     </ul>
+</div>
+
+<!-- Overlay -->
+<div id="overlay-text-prompt" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
+    <!-- Modal Box -->
+    <div class="bg-gray-800 w-full max-w-md rounded-2xl shadow-2xl p-6">
+
+        <!-- Title -->
+        <h2 class="title text-xl font-semibold text-gray-100 mb-4">
+            Enter Your Text
+        </h2>
+
+        <!-- Single Line Input -->
+        <input type="text"
+               placeholder="Type something..."
+               maxlength="300"
+               class="input-text w-full px-4 py-2 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg
+               placeholder-gray-400
+               focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"/>
+
+        <!-- Buttons -->
+        <div class="cancel-btn flex justify-end gap-3 mt-6">
+            <button class="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition">
+                Cancel
+            </button>
+            <button class="ok-btn px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">
+                Ok
+            </button>
+        </div>
+    </div>
 </div>
 
 

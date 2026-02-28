@@ -69,6 +69,21 @@ public class MediaFileEventConsumer {
                     .uploadDate(Instant.now())
                     .build();
             mongoTemplate.insert(fileItem);
+
+            if (event.mediaId() != null && event.mediaType() != null) {
+                producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+                        EventTopics.MEDIA_OBJECT_TOPIC,
+                        new MediaUpdateEvent.MediaEnriched(
+                                fileItem.getId(),
+                                event.mediaId(),
+                                event.mediaType(),
+                                event.thumbnailObject(),
+                                true,
+                                -1,
+                                -1
+                        )
+                ));
+            }
         } catch (Exception e) {
             throw new RuntimeException("Failed to create file", e);
         }
@@ -129,7 +144,7 @@ public class MediaFileEventConsumer {
             producer.publishEvent(new MediaFileEventProducer.EventWrapper(
                     EventTopics.MEDIA_OBJECT_TOPIC,
                     new MediaUpdateEvent.MediaEnriched(
-                            event.mediaId(), event.mediaType(), event.thumbnailObject(), event.searchable(), item.getId(), size, skip)
+                            item.getId(), event.mediaId(), event.mediaType(), event.thumbnailObject(), event.searchable(), size, skip)
             ));
         } catch (Exception e) {
             System.err.println("Failed to initiate directory to media");
@@ -167,7 +182,11 @@ public class MediaFileEventConsumer {
                     producer.publishEvent(new MediaFileEventProducer.EventWrapper(
                             EventTopics.MEDIA_UPLOAD_TOPIC,
                             new MediaUpdateEvent.FileToMediaInitiated(
-                                    child.getId(), event.childType(), null, null, child.getName(), child.getUploadDate(), event.mediaId(), childIndex)
+                                    child.getId(), event.childType(),
+                                    null, null,
+                                    child.getName(), child.getUploadDate(),
+                                    event.mediaId(), childIndex,
+                                    child.getMId(), event.childSearchable())
                     ));
                 }
             }
@@ -184,12 +203,11 @@ public class MediaFileEventConsumer {
                 return;
             }
 
-            Query updateQuery = Query.query(Criteria.where("id").is(item.getId()));
-            Update update = new Update()
-                    .set("length", skip + directChildren.size());
-            if (event.thumbnailObject() != null)
-                update.set("thumbnail", event.thumbnailObject());
-            mongoTemplate.updateFirst(updateQuery, update, FileSystemItem.class);
+            producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+                    EventTopics.MEDIA_OBJECT_TOPIC,
+                    new MediaUpdateEvent.MediaEnriched(
+                            item.getId(), event.mediaId(), event.parentType(), event.thumbnailObject(), true, -1, skip)
+            ));
         } catch (Exception e) {
             System.err.println("Failed to initiate nested directory to media");
             throw e;
@@ -402,14 +420,14 @@ public class MediaFileEventConsumer {
         switch (event) {
             case MediaUpdateEvent.FileCreated e ->
                 System.out.println("Received create file event: " + e.objectName());
+            case MediaUpdateEvent.FileDeleted e ->
+                    System.out.println("Received file delete event: " + e.fileId());
             case MediaUpdateEvent.DirectoryToMediaInitiated e ->
                 System.out.println("Received initiate directory to media initiated event: " + e.fileId());
             case MediaUpdateEvent.NestedDirectoryToMediaInitiated e ->
                 System.out.println("Received initiate nested directory to media initiated event: " + e.fileId());
             case MediaUpdateEvent.MediaCreatedReady e ->
                 System.out.println("Received create media event: " + e.mediaId());
-            case MediaUpdateEvent.FileDeleted e ->
-                System.out.println("Received file delete event: " + e.fileId());
             case MediaUpdateEvent.MediaThumbnailUpdateInitiated e ->
                 System.out.println("Received initiate update media thumbnail event: " + e.mediaId());
             case MediaUpdateEvent.MediaThumbnailUpdatedReady e ->
