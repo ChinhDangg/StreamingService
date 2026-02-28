@@ -123,8 +123,7 @@ public class MediaUploadService {
         }
 
         String fileName = combinedName.substring(combinedName.indexOf(":|:") + 3);
-        if (validateObjectWithMediaType(fileName, MediaType.VIDEO)) {
-            removeCacheFileUploadRequest(uploadId);
+        if (!validateObjectWithMediaType(fileName, MediaType.VIDEO)) {
             throw new IllegalArgumentException("Invalid video media type with object: " + fileName);
         }
 

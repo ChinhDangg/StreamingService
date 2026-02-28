@@ -32,7 +32,7 @@ export async function endFileSession(uploadId, uploadedParts){
     if (!response.ok) {
         return 'Error: Failed to finalize file upload: ' + await response.text();
     }
-    return response.text();
+    return "Success";
 }
 
 export async function uploadFile(sessionId, file, fileName,

@@ -613,32 +613,32 @@ async function uploadFiles(fileList) {
     allVideo = allVideo && uploadAsVideoCheckbox.checked;
     const currentFullPath = getFullCurrentPath();
 
-    const endVideoMediaSession = async (uploadId, uploadedParts, title) => {
+    const endVideoMediaSession = async (uploadId, uploadedParts, filename) => {
         const basicInfo = {
-            title: title,
+            title: filename.substring(filename.lastIndexOf('/') + 1),
             year: new Date().getFullYear()
         }
         return await endVideoUploadSession(uploadId, uploadedParts, basicInfo); // media id or error message
     }
 
-    const endSession = async (fileInfo) => {
+    const endSession = async (fileInfo, filename) => {
         if (allVideo) {
-            const mediaId = fileInfo.mediaId ? fileInfo.mediaId : await endVideoMediaSession(fileInfo.uploadId, fileInfo.eTags, fileInfo.file.name.substring(fileInfo.file.name.lastIndexOf('/') + 1));
+            const mediaId = fileInfo.mediaId ? fileInfo.mediaId : await endVideoMediaSession(fileInfo.uploadId, fileInfo.eTags, filename);
             if (mediaId.startsWith('Error:')) {
                 displayFailTexts([mediaId]);
                 return null;
             } else {
                 fileInfo.mediaId = mediaId;
                 const errorMess = await uploadNameEntityForMediaInBatch(mediaId);
-                if (errorMess.startsWith('Error:')) {
+                if (errorMess) {
                     displayFailTexts([errorMess]);
                     return null;
                 }
             }
         } else {
-            const errorMess = await endFileSession(fileInfo.uploadId, fileInfo.eTags);
-            if (errorMess.startsWith('Error:')) {
-                displayFailTexts([errorMess]);
+            const mess = await endFileSession(fileInfo.uploadId, fileInfo.eTags);
+            if (mess.startsWith('Error:')) {
+                displayFailTexts([mess]);
                 return null;
             }
         }
@@ -658,7 +658,7 @@ async function uploadFiles(fileList) {
             if (!passed) {
                 displayFailTexts(currentFailTexts);
             } else {
-                const noError = await endSession(uploadingFile);
+                const noError = await endSession(uploadingFile, fileName);
                 if (!noError) {
                     continue;
                 }
@@ -677,7 +677,7 @@ async function uploadFiles(fileList) {
                 displayFailTexts(currentFailTexts);
             } else {
                 const fileInfo = uploadingFiles.get(file.file);
-                const noError = await endSession(fileInfo);
+                const noError = await endSession(fileInfo, fileName);
                 if (!noError) {
                     continue;
                 }
