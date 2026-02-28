@@ -77,7 +77,7 @@ public class ThumbnailService {
                 pathList.add(item.getObjectName());
                 buckets.add(item.getBucket());
             }
-            if (hasCacheThumbnails(pathList.getLast())) {
+            if (hasCacheThumbnails(pathList.getLast().substring(pathList.getLast().lastIndexOf("/") + 1))) {
                 pathList.removeLast();
                 buckets.removeLast();
                 continue;
