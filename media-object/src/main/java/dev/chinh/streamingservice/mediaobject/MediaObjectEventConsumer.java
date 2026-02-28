@@ -100,6 +100,10 @@ public class MediaObjectEventConsumer {
         logger.info("Received media object delete event: {}: {} objects", event.bucket(), event.objectNames().size());
         try {
             List<DeleteObject> objects = event.objectNames().stream().map(DeleteObject::new).toList();
+            if (event.bucket() == null) {
+                System.err.println("Bucket is null, skipping delete objects");
+                return;
+            }
             minIOService.removeBulk(event.bucket(), objects);
         } catch (Exception e) {
             logger.error("Failed to delete objects: {}: {}", event.bucket(), event.objectNames().size());
