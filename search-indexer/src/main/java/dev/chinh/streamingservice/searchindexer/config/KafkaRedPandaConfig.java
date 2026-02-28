@@ -130,6 +130,7 @@ public class KafkaRedPandaConfig {
 
         // exceptions should NOT be retried:
         errorHandler.addNotRetryableExceptions(IllegalArgumentException.class);
+        errorHandler.addNotRetryableExceptions(NullPointerException.class);
 
         return errorHandler;
     }
