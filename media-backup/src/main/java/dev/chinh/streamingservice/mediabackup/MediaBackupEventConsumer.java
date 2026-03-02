@@ -76,6 +76,10 @@ public class MediaBackupEventConsumer {
 
     private void onCreatedMedia(MediaUpdateEvent.MediaCreatedReady event) throws Exception {
         System.out.println("Received media created ready event to backup thumbnail: " + event.mediaId() + ", thumbnail: " + event.thumbnail());
+        if (event.thumbnail() == null) {
+            System.out.println("Thumbnail is null, skipping thumbnail backup for media: " + event.mediaId());
+            return;
+        }
         createThumbnailBackup(event.thumbnail());
     }
 
@@ -83,6 +87,11 @@ public class MediaBackupEventConsumer {
         boolean sameName = event.newThumbnail().equals(event.oldThumbnail());
         // overwrite old one if same name then no need to delete old thumbnail - passing null for old
         updateThumbnail(event.mediaId(), sameName ? null : event.oldThumbnail(), event.newThumbnail());
+    }
+
+
+    private void onThumbnailDeleted(MediaUpdateEvent.ThumbnailDeleted event) {
+        deleteThumbnailBackup(event.objectName());
     }
 
 
@@ -156,6 +165,7 @@ public class MediaBackupEventConsumer {
             EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
             EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC,
             EventTopics.MEDIA_FILE_UPLOAD_SEARCH_BACKUP_TOPIC,
+            EventTopics.MEDIA_OBJECT_AND_BACKUP_TOPIC,
             EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC,
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws Exception {
@@ -165,6 +175,8 @@ public class MediaBackupEventConsumer {
                 case MediaUpdateEvent.FileDeleted e -> onDeleteFile(e);
                 case MediaUpdateEvent.MediaCreatedReady e -> onCreatedMedia(e);
                 case MediaUpdateEvent.MediaThumbnailUpdatedReady e -> onUpdateMediaThumbnail(e);
+
+                case MediaUpdateEvent.ThumbnailDeleted e -> onThumbnailDeleted(e);
 
                 case MediaUpdateEvent.NameEntityCreated e -> onNameEntityCreated(e);
                 case MediaUpdateEvent.NameEntityDeleted e -> onNameEntityDeleted(e);
@@ -205,6 +217,9 @@ public class MediaBackupEventConsumer {
                     System.out.println("Received media created ready event to backup thumbnail: " + e.mediaId() + ", thumbnail: " + e.thumbnail());
             case MediaUpdateEvent.MediaThumbnailUpdatedReady e ->
                     System.out.println("Received media thumbnail updated backup event: " + e.mediaId() +  " new: " + e.newThumbnail());
+
+            case MediaUpdateEvent.ThumbnailDeleted e ->
+                    System.out.println("Received thumbnail delete backup event: " + e.objectName());
 
             case MediaUpdateEvent.NameEntityCreated e ->
                     System.out.println("Received name entity create backup event: " + e.nameEntityId() + " thumbnail: " + e.thumbnailPath());

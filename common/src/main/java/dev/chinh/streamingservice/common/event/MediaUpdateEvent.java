@@ -74,6 +74,10 @@ public interface MediaUpdateEvent {
             List<String> objectNames
     ) implements MediaUpdateEvent {}
 
+    record ThumbnailDeleted(
+            String objectName
+    ) implements MediaUpdateEvent {}
+
 
     record FileCreated(
             String bucket,

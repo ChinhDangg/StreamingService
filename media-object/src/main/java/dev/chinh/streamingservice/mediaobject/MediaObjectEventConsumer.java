@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.mediaobject;
 
 import dev.chinh.streamingservice.common.constant.MediaType;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.mediaobject.config.KafkaRedPandaConfig;
@@ -80,7 +81,9 @@ public class MediaObjectEventConsumer {
             }
             mediaMetaDataRepository.save(mediaMetaData);
 
-            String topic = event.searchable() ? EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC : EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC;
+            String topic = event.searchable()
+                    ? EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC
+                    : EventTopics.MEDIA_FILE_TOPIC; // not searchable - no thumbnail - no backup to save the thumbnail
             eventPublisher.publishEvent(new MediaObjectEventProducer.EventWrapper(
                     topic,
                     new MediaUpdateEvent.MediaCreatedReady(
@@ -152,10 +155,21 @@ public class MediaObjectEventConsumer {
         );
     }
 
+    private void onDeleteThumbnail(MediaUpdateEvent.ThumbnailDeleted event) throws Exception {
+        System.out.println("Received delete thumbnail object: " + event.objectName());
+        try {
+            minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, event.objectName());
+        } catch (Exception e) {
+            System.err.println("Failed to delete thumbnail object: " + event.objectName());
+            throw e;
+        }
+    }
+
 
     @Transactional
     @KafkaListener(topics = {
-            EventTopics.MEDIA_OBJECT_TOPIC
+            EventTopics.MEDIA_OBJECT_TOPIC,
+            EventTopics.MEDIA_OBJECT_AND_BACKUP_TOPIC
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws Exception {
         try {
@@ -163,6 +177,7 @@ public class MediaObjectEventConsumer {
                 case MediaUpdateEvent.MediaEnriched e -> onMediaEnrich(e);
                 case MediaUpdateEvent.ObjectDeleted e -> onDeleteObject(e);
                 case MediaUpdateEvent.MediaThumbnailUpdated e -> onUpdateMediaThumbnail(e);
+                case MediaUpdateEvent.ThumbnailDeleted e -> onDeleteThumbnail(e);
                 default ->
                     // unknown event type → log and skip
                     System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
@@ -197,6 +212,8 @@ public class MediaObjectEventConsumer {
                 System.out.println("Received media object delete event: " + e.bucket() + " " + e.objectNames());
             case MediaUpdateEvent.MediaThumbnailUpdated e ->
                 System.out.println("Received media thumbnail update event: " + e.mediaId() + " " + e.num());
+            case MediaUpdateEvent.ThumbnailDeleted e ->
+                System.out.println("Received delete thumbnail object: " + e.objectName());
             default -> {
                 System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
                 //ack.acknowledge(); // ack on poison event to skip it

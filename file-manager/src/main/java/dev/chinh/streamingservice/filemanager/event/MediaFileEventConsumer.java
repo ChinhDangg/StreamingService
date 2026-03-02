@@ -372,8 +372,8 @@ public class MediaFileEventConsumer {
         ));
         if (fileItem.getThumbnail() != null)
             producer.publishEvent(new MediaFileEventProducer.EventWrapper(
-                    EventTopics.MEDIA_OBJECT_TOPIC,
-                    new MediaUpdateEvent.ObjectDeleted(ContentMetaData.THUMBNAIL_BUCKET, Collections.singletonList(fileItem.getThumbnail()))
+                    EventTopics.MEDIA_OBJECT_AND_BACKUP_TOPIC,
+                    new MediaUpdateEvent.ThumbnailDeleted(fileItem.getThumbnail())
             ));
     }
 
