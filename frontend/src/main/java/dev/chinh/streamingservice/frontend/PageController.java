@@ -52,11 +52,6 @@ public class PageController {
         return "upload/modify-name-page";
     }
 
-    @GetMapping("/upload/media")
-    public String uploadMediaPage() {
-        return "upload/media-upload-page";
-    }
-
 
     @GetMapping("/file")
     public String filePage() {
