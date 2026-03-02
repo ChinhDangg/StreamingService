@@ -11,6 +11,7 @@ public class EventTopics {
     public static final String MEDIA_SEARCH_AND_BACKUP_TOPIC = "media-search-and-backup-event";
 
     public static final String MEDIA_OBJECT_TOPIC = "media-object-event";
+    public static final String MEDIA_OBJECT_AND_BACKUP_TOPIC = "media-object-and-backup-event";
 
     public static final String MEDIA_UPLOAD_TOPIC = "media-upload-event";
 
