@@ -473,6 +473,8 @@ async function handleFolderFiles(files) {
 });
 
 fileDropZone.addEventListener("drop", async (e) => {
+    uploadContainer.classList.remove('hidden');
+
     const fileArray = [];
 
     const items = [...e.dataTransfer.items];
@@ -727,7 +729,7 @@ async function uploadFiles(fileList) {
         return;
     }
 
-    alert('Upload completed');
+    displayInfoMessage('Upload completed', false);
     clearUploadingList();
 }
 
