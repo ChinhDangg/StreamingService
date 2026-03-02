@@ -84,68 +84,6 @@
             </th:block>
         </div>
 
-        <th:block th:if="${modifyAllow}">
-            <div id="grouper-upload-container" class="hidden mb-4 space-y-2">
-                <div class="flex flex-col space-y-2">
-                    <label for="folder-input" class="font-medium text-gray-300">Album Upload:</label>
-                    <input id="folder-input"
-                           type="file"
-                           webkitdirectory
-                           directory
-                           class="block w-full border border-gray-700 rounded-lg p-2 text-sm bg-gray-900 text-gray-200 focus:outline-none focus:border-blue-500">
-                </div>
-                <!-- Saving Path -->
-                <div class="flex flex-col space-y-2">
-                    <label for="saving-path-input" class="font-medium text-gray-300">Saving Path:</label>
-                    <input id="saving-path-input"
-                           type="text"
-                           autocomplete="off"
-                           class="block w-full border border-gray-700 rounded-lg p-2 text-sm bg-gray-900 text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                           placeholder="/storage/path/">
-                </div>
-                <button id="submit-btn"
-                        type="submit"
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg shadow">
-                    Submit
-                </button>
-
-                <!-- Upload Progress Bar -->
-                <div id="upload-progress" class="hidden w-full max-w-md rounded-lg bg-slate-900 p-4 shadow-md">
-
-                    <div class="mb-2 flex items-center justify-between text-sm text-slate-300">
-                        <span>Upload Progress:</span>
-                        <span id="progress-percent">0%</span>
-                    </div>
-
-                    <div class="h-2 w-full overflow-hidden rounded-full bg-slate-700">
-                        <div id="progress-bar-fill"
-                             class="h-full w-0 rounded-full
-                bg-linear-to-r from-blue-500 to-blue-400
-                transition-[width] duration-150 ease-out">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- File List -->
-                <div>
-                    <h3 class="mb-2">Files will be added as album:</h3>
-                    <div id="file-list-container"
-                         class="flex flex-col gap-2 bg-gray-800 p-3 rounded-lg border border-gray-700 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
-                        <div class="file-item hidden flex items-center justify-between bg-gray-700/40 px-2 py-1 rounded">
-                            <span class="file-path text-gray-300">File 2</span>
-                            <button class="remove-btn text-red-400 hover:text-red-300">❌</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Error Message -->
-                <div id="error-message-container"
-                     class="hidden max-h-200 overflow-y-auto scrollbar-thin scrollbar-thumb-red-600 flex flex-col bg-red-900 border border-red-700 text-red-300 p-3 rounded-lg">
-                    <span>Error something</span>
-                </div>
-            </div> <!-- End of Grouper Upload Container -->
-        </th:block>
-
         <div class="flex gap-2">
             <span>Sorted: </span>
             <button id="sortOrderButton"
@@ -177,7 +115,6 @@
 
 <th:block th:if="${modifyAllow}">
     <script type="module" th:src="@{/static/js/upload/modify-media-metadata.js}" src="/static/js/upload/modify-media-metadata.js"></script>
-    <script type="module" th:src="@{/static/js/upload/upload-album-grouper.js}" src="/static/js/upload/upload-album-grouper.js"></script>
     <script type="module" th:src="@{/static/js/upload/modify-thumbnail.js}" src="/static/js/upload/modify-thumbnail.js"></script>
 </th:block>
 
