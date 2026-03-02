@@ -31,8 +31,8 @@ async function getRootDir() {
         return null;
     }
     const subFiles = await rootDir.json();
-    if (subFiles.children.hasNext)
-        nextPage = subFiles.children.pageable.pageNumber + 1;
+    if (subFiles.hasNext)
+        nextPage = subFiles.pageable.pageNumber + 1;
     else
         nextPage = -1;
     return subFiles;
@@ -52,46 +52,6 @@ async function getRootDir() {
     // ]
 }
 
-async function getFilesInDir(dirId) {
-    const files = await apiRequest('/api/file/dir?id=' + dirId);
-    if (!files.ok) {
-        alert('Failed to get files in directory');
-        return null;
-    }
-    const subFiles = await files.json();
-    if (subFiles.hasNext)
-        nextPage = subFiles.pageable.pageNumber + 1;
-    else
-        nextPage = -1;
-    return subFiles;
-    // return [
-    //     {
-    //         id: 3,
-    //         path: "media/vid",
-    //         name: "vid.mp4",
-    //         fileType: "VIDEO",
-    //     },
-    //     {
-    //         id: 4,
-    //         path: "media/vid",
-    //         name: "vid.jpg",
-    //         fileType: "IMAGE",
-    //     },
-    //     {
-    //         id: 5,
-    //         path: "media/vid",
-    //         name: "file.txt",
-    //         fileType: "FILE",
-    //     },
-    //     {
-    //         id: 6,
-    //         path: "media/vid",
-    //         name: "album1",
-    //         fileType: "ALBUM",
-    //     }
-    // ]
-}
-
 const fileViewContainer = document.getElementById('file-view-container');
 const fileNodeTem = fileViewContainer.querySelector('.file-node-wrapper');
 
@@ -102,6 +62,7 @@ function getIconNode(fileType) {
     if (fileType === 'DIR') iconNode = iconContainer.querySelector('.directory-icon');
     else if (fileType === 'IMAGE') iconNode =  iconContainer.querySelector('.photo-icon');
     else if (fileType === 'VIDEO') iconNode = iconContainer.querySelector('.video-icon');
+    else if (fileType === 'AUDIO') iconNode = iconContainer.querySelector('.audio-icon');
     else if (fileType === 'ALBUM') iconNode = iconContainer.querySelector('.album-icon');
     else if (fileType === 'FILE') iconNode = iconContainer.querySelector('.file-icon');
     if (iconNode) return helperCloneAndUnHideNode(iconNode);
@@ -152,17 +113,16 @@ function displayFileItem(fileItems, clearNode = true, clearFileList = true) {
         fileNode.dataset.type = fileType;
         if (item.mId) {
             fileNode.dataset.mid = item.mId;
-            fileNode.style.backgroundColor = '#4f46e5';
+            setMediaBgColor(fileNode, fileType);
         }
         if (fileType === 'DIR' || fileType === 'ALBUM' || fileType === 'GROUPER') {
             fileNode.addEventListener('click', async function () {
                 if (isProcessing) return;
-                isProcessing = true;
-                const subFiles = (await getFilesInDir(item.id)).content;
-                isProcessing = false;
+                setCurrentUri(item.id);
+                const subFiles = await fetchMoreFiles(item.id);
                 if (!subFiles) return;
                 displayFileItem(subFiles);
-                addToCurrentPath(item.id, item.name, fileType);
+                addToCurrentPath(item.id, item.name);
             });
         }
         fileViewContainer.appendChild(fileNode);
@@ -173,19 +133,33 @@ function displayFileItem(fileItems, clearNode = true, clearFileList = true) {
     }
 }
 
+function setMediaBgColor(fileNode, type) {
+    if (type === 'VIDEO') {
+        fileNode.style.backgroundColor = '#2b7fff';
+    } else if (type === 'AUDIO') {
+        fileNode.style.backgroundColor = '#162456';
+    } else if (type === 'ALBUM') {
+        fileNode.style.backgroundColor = '#4f39f6';
+    } else if (type === 'GROUPER') {
+        fileNode.style.backgroundColor = '#ad46ff';
+    }
+}
+
 const fileViewWrapper = document.getElementById('file-view-wrapper');
 const sortSelect = document.getElementById('file-sort-by-select');
 const sentinel = document.createElement("div");
 let observer;
 let nextPage = -1;
-async function fetchMoreFiles(subId, page = 0) {
+async function fetchMoreFiles(subId, page = 0, getParentInfo = false) {
     if (isProcessing) return false;
     isProcessing = true;
     const params = new URLSearchParams();
     if (subId) params.append('id', subId);
-    params.append('p', page);
-    params.append('by', sortSelect.value.substring(0, sortSelect.value.indexOf('-')));
-    params.append('order', sortSelect.value.includes('DESC') ? 'DESC' : 'ASC');
+    const sortSelectValue = getSortSelectValue();
+    params.append('p', page.toString());
+    params.append('by', sortSelectValue.by);
+    params.append('order', sortSelectValue.order);
+    if (getParentInfo) params.append('full', 'true');
 
     const url = subId ? '/api/file/dir' : '/api/file/root';
     const response = await apiRequest(url + '?' + params.toString());
@@ -195,23 +169,29 @@ async function fetchMoreFiles(subId, page = 0) {
         return null;
     }
     const subFiles = await response.json();
-    if (subId) {
-        if (subFiles.hasNext)
-            nextPage = subFiles.pageable.pageNumber + 1;
-        else
-            nextPage = -1;
-        isProcessing = false;
-        return subFiles.content;
-    }
-    if (subFiles.children.hasNext)
-        nextPage = subFiles.children.pageable.pageNumber + 1;
+    if (subFiles.hasNext)
+        nextPage = subFiles.pageable.pageNumber + 1;
     else
         nextPage = -1;
     isProcessing = false;
-    return subFiles.children.content;
+    if (getParentInfo)
+        return subFiles;
+    return subFiles.content;
+}
+
+function getSortSelectValue() {
+    return {
+        by: sortSelect.value.substring(0, sortSelect.value.indexOf('-')),
+        order: sortSelect.value.includes('DESC') ? 'DESC' : 'ASC'
+    }
 }
 
 sortSelect.addEventListener('change', async function () {
+    const currentPathStack = getCurrentPath();
+    const subId = currentPathStack.id;
+
+    setCurrentUri(subId);
+
     if (nextPage === -1) {
         // reached the end - should have all files with all info to sort locally
         const value = sortSelect.value;
@@ -232,12 +212,7 @@ sortSelect.addEventListener('change', async function () {
         displayFileItem(currentFileItems, true, false);
         return;
     }
-    const currentPathStack = getCurrentPath();
-    if (!currentPathStack) {
-        return;
-    }
-    const subId = currentPathStack.id;
-    if (!subId) return;
+
     const subFiles = await fetchMoreFiles(subId);
     if (!subFiles) return
     displayFileItem(subFiles);
@@ -259,6 +234,27 @@ function dynamicSortByField(key, order = 'ASC') {
             comparison = -1;
         }
         return (order === 'DESC') ? (comparison * -1) : comparison;
+    }
+}
+
+let previousSubId = null;
+function setCurrentUri(subId) {
+    const sortSelectValue = getSortSelectValue();
+    const params = new URLSearchParams();
+    if (subId) params.append('id', subId);
+    params.append('by', sortSelectValue.by);
+    params.append('order', sortSelectValue.order);
+
+    if (params.toString().length === 0) return;
+
+    const state = { pathId: subId ? subId : "root" };
+    const path = window.location.pathname + '?' + params.toString();
+
+    if (previousSubId !== subId) {
+        previousSubId = subId;
+        window.history.pushState(state, '', path);
+    } else {
+        window.history.replaceState(state, '', path);
     }
 }
 
@@ -295,7 +291,7 @@ const currentPathStack = [];
 const pathBar = document.getElementById('path-bar');
 const pathNodeTem = pathBar.querySelector('.path-node');
 const currentPathText = document.getElementById('current-path');
-function addToCurrentPath(id, name, fileType, isRoot = false) {
+function addToCurrentPath(id, name, isRoot = false) {
     const pathNode = helperCloneAndUnHideNode(pathNodeTem);
     pathNode.innerText = name;
     pathBar.appendChild(pathNode);
@@ -303,20 +299,20 @@ function addToCurrentPath(id, name, fileType, isRoot = false) {
     span.innerText = '/';
     pathBar.appendChild(span);
     currentPathText.innerText = name;
-    currentPathStack.push({id: id, name: name, fileType: fileType});
+    currentPathStack.push({id: id, name: name});
     const thisIndex = currentPathStack.length - 1;
-    console.log(thisIndex, currentPathStack[thisIndex]);
     pathNode.addEventListener('click', async function () {
         if (isProcessing) return;
-        isProcessing = true;
-        for (let i = thisIndex + 1; i < currentPathStack.length; i++) {
+        const end = currentPathStack.length;
+        for (let i = thisIndex + 1; i < end; i++) {
+            console.log('removing : ' + i);
             removeLastPathStack();
         }
         currentPathText.innerText = currentPathStack[thisIndex].name;
+        setCurrentUri(isRoot ? null : currentPathStack[thisIndex].id);
         const subFiles = isRoot
-            ? (await getRootDir()).children.content
-            : (await getFilesInDir(currentPathStack[thisIndex].id)).content;
-        isProcessing = false;
+            ? await fetchMoreFiles(null)
+            : await fetchMoreFiles(currentPathStack[thisIndex].id);
         if (!subFiles) return;
         displayFileItem(subFiles);
         console.log(thisIndex, currentPathStack[thisIndex]);
@@ -343,24 +339,45 @@ const pathBackBtn = document.getElementById('path-back-btn');
 pathBackBtn.addEventListener('click', async function () {
     if (isProcessing) return;
     if (currentPathStack.length <= 1) return;
-    isProcessing = true;
     removeLastPathStack();
     const lastPath = getCurrentPath();
     currentPathText.innerText = lastPath.name;
+    setCurrentUri(currentPathStack.length === 1 ? null : lastPath.id);
     const subFiles = currentPathStack.length === 1
-        ? (await getRootDir()).children.content
-        : (await getFilesInDir(lastPath.id)).content;
-    console.log(subFiles);
-    isProcessing = false;
+        ? await fetchMoreFiles(null)
+        : await fetchMoreFiles(lastPath.id);
     if (!subFiles) return;
     displayFileItem(subFiles);
 });
 
 async function initialize() {
-    const rootInfo = await getRootDir();
-    if (!rootInfo) return;
-    addToCurrentPath(rootInfo.rootId, rootInfo.rootName, 'DIR', true);
-    displayFileItem(rootInfo.children.content);
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    const subId = urlParams.get('id');
+    const sortBy = urlParams.get('by');
+    const sortOrder = urlParams.get('order');
+    if (subId || sortBy || sortOrder) {
+        const newValue = sortBy + '-' + sortOrder;
+        const exists = Array.from(sortSelect.options).some(opt => opt.value === newValue);
+        if (exists)
+            sortSelect.value = newValue;
+        else
+            sortSelect.value = 'NAME-ASC';
+        const subFiles = await fetchMoreFiles(subId, 0, true);
+        if (subFiles) {
+            if (subFiles.parentId) {
+                const parentIds = subFiles.parentId.split('/').filter(Boolean);
+                const parentNames = subFiles.parentName.split('/').filter(Boolean);
+                for (let i = 0; i < parentIds.length; i++) {
+                    addToCurrentPath(parentIds[i], parentNames[i]);
+                }
+            }
+            displayFileItem(subFiles.content);
+            return;
+        }
+    }
+
+    homeButton.click();
 }
 
 window.addEventListener('DOMContentLoaded', async function () {
@@ -368,6 +385,22 @@ window.addEventListener('DOMContentLoaded', async function () {
     initializeAddNameEntity();
     initializeEditArea();
     initializeObserveFileViewContainer();
+});
+
+const homeButton = document.getElementById('home-btn');
+homeButton.addEventListener('click', async function () {
+    if (isProcessing) return;
+    const end = currentPathStack.length;
+    for (let i = 0; i < end; i++) {
+        removeLastPathStack();
+    }
+
+    setCurrentUri(null);
+
+    const rootInfo = await getRootDir();
+    if (!rootInfo) return;
+    addToCurrentPath(rootInfo.parentId, rootInfo.parentName, true);
+    displayFileItem(rootInfo.content);
 });
 
 
@@ -525,11 +558,6 @@ function sortFileAndDisplayFileName(fileList) {
 const uploadAsVideoCheckbox = document.getElementById('upload-video-checkbox');
 let allVideo = true;
 function validateAllowFile(file) {
-    const currentPath = getCurrentPath();
-    if (currentPath && currentPath.fileType === 'ALBUM') {
-        uploadAsVideoCheckbox.disabled = true;
-        allVideo = false;
-    }
     if (validateAllowImage(file)) {
         uploadAsVideoCheckbox.disabled = true;
         allVideo = false;

@@ -201,7 +201,17 @@
 </div>
 
 <div class="px-2">
-    <div class="flex items-center mt-1">
+    <div class="flex items-center mt-1 space-x-2">
+        <button id="home-btn" class="bg-indigo-600 p-1 rounded-md cursor-pointer">
+            <svg class="home-icon h-8 w-8 text-white" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M3 10.5L12 3l9 7.5" />
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M5.25 9.75V19.5A2.25 2.25 0 007.5 21.75h9a2.25 2.25 0 002.25-2.25V9.75" />
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M10.5 21.75V14.25h3v7.5" />
+            </svg>
+        </button>
         <button id="upload-toggle-btn"
                 class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-2 rounded-md transition duration-200">
             <!-- Upload Icon (Heroicon SVG) -->
@@ -425,6 +435,14 @@
             <circle cx="90" cy="80" r="10" fill="#fbbf24"/>
             <path d="M70 130 L95 105 L115 125 L135 100 L160 130 Z" fill="#4ade80"/>
         </svg>
+        <svg class="audio-icon text-pink-400" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M5.25 9.75H9l4.5-3v12l-4.5-3H5.25A2.25 2.25 0 013 13.5v-3a2.25 2.25 0 012.25-2.25z" />
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M16.5 9.75a3 3 0 010 4.5" />
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M18.75 7.5a6 6 0 010 9" />
+        </svg>
     </div>
 </div>
 
@@ -496,6 +514,31 @@
     </div>
 </div>
 
+<div class="max-w-md shadow-lg rounded-xl px-6 pb-2">
+    <div class="space-y-1 text-white">
+        <div class="flex items-center space-x-4">
+            <div class="w-6 h-6 bg-blue-500 rounded"></div>
+            <span class="">Video</span>
+        </div>
+        <div class="flex items-center space-x-4 hidden">
+            <div class="w-6 h-6 bg-blue-950 rounded"></div>
+            <span class="">Audio</span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div class="w-6 h-6 bg-indigo-600 rounded"></div>
+            <span class="">Album</span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div class="w-6 h-6 bg-purple-500 rounded"></div>
+            <span class="">Grouper</span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div class="w-6 h-6 bg-gray-500 rounded"></div>
+            <span class="">File</span>
+        </div>
+
+    </div>
+</div>
 
 
 <script type="module" th:src="@{/static/js/file-manager/file-manager-page.js}" src="/static/js/file-manager/file-manager-page.js"></script>
