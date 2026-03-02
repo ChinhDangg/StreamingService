@@ -28,14 +28,16 @@ public class FileManagerController {
     }
 
     @GetMapping("/dir")
-    public ResponseEntity<?> getDirectoryContents(@RequestParam String id,
+    public ResponseEntity<?> getDirectoryContents(@RequestParam(required = false, name = "full") Boolean getParentInfo,
+                                                  @RequestParam String id,
                                                   @RequestParam(required = false, name = "p") Integer page,
                                                   @RequestParam(required = false, name = "by") SortBy sortBy,
                                                   @RequestParam(required = false, name = "order") Sort.Direction sortOrder) {
+        if (getParentInfo == null) getParentInfo = false;
         if (page == null) page = 0;
         if (sortBy == null) sortBy = SortBy.NAME;
         if (sortOrder == null) sortOrder = Sort.Direction.ASC;
-        return ResponseEntity.ok(fileService.findFilesInDirectory(id, page, sortBy, sortOrder));
+        return ResponseEntity.ok(fileService.findFilesInDirectory(getParentInfo, id, page, sortBy, sortOrder));
     }
 
 

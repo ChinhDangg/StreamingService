@@ -60,35 +60,37 @@ public class FileService {
     private static String ROOT_PATH = null;
     private static String ROOT_FOLDER_ID = null;
 
-    public record FileRootResult(String rootId, String rootName, Slice<FileSystemItem> children) {}
+    public record FileSearchResult(String parentId, String parentName, List<FileSystemItem> content, Pageable pageable, boolean hasNext) {}
 
-    public FileRootResult findFilesAtRoot(int page, SortBy sortBy, Sort.Direction sortOrder) {
+    public FileSearchResult findFilesAtRoot(int page, SortBy sortBy, Sort.Direction sortOrder) {
         Slice<FileSystemItem> items = fileSystemRepository.findByParentId(getROOT_FOLDER_ID(), getPageable(page, sortBy, sortOrder));
         List<FileSystemItem> itemInRoot = items.getContent();
         List<String> thumbnailName = thumbnailService.processThumbnail(itemInRoot);
         for (int i = 0; i < thumbnailName.size(); i++) {
             itemInRoot.get(i).setThumbnail(thumbnailName.get(i));
         }
-        Slice<FileSystemItem> updated = new SliceImpl<>(
-                itemInRoot,
-                items.getPageable(),
-                items.hasNext()
-        );
-        return new FileRootResult(getROOT_FOLDER_ID(), mediaPath, updated);
+
+        return new FileSearchResult(getROOT_FOLDER_ID(), mediaPath, itemInRoot, items.getPageable(), items.hasNext());
     }
 
-    public Slice<FileSystemItem> findFilesInDirectory(String parentId, int page, SortBy sortBy, Sort.Direction sortOrder) {
+    public FileSearchResult findFilesInDirectory(boolean getFullPathInfo, String parentId, int page, SortBy sortBy, Sort.Direction sortOrder) {
         Slice<FileSystemItem> items = fileSystemRepository.findByParentId(parentId, getPageable(page, sortBy, sortOrder));
-        List<FileSystemItem> itemInRoot = items.getContent();
-        List<String> thumbnailName = thumbnailService.processThumbnail(itemInRoot);
+        List<FileSystemItem> itemInDir = items.getContent();
+        List<String> thumbnailName = thumbnailService.processThumbnail(itemInDir);
         for (int i = 0; i < thumbnailName.size(); i++) {
-            itemInRoot.get(i).setThumbnail(thumbnailName.get(i));
+            itemInDir.get(i).setThumbnail(thumbnailName.get(i));
         }
-        return new SliceImpl<>(
-                itemInRoot,
-                items.getPageable(),
-                items.hasNext()
-        );
+
+        if (getFullPathInfo && !itemInDir.isEmpty()) {
+            String pathInId = itemInDir.getFirst().getPath();
+            FileSystemItem parentCraft = new FileSystemItem();
+            parentCraft.setPath(pathInId);
+            parentCraft.setName("unknown");
+            String pathInName = getFullPathInName(parentCraft);
+            return new FileSearchResult(pathInId, pathInName, itemInDir, items.getPageable(), items.hasNext());
+        }
+
+        return new FileSearchResult(parentId, null, itemInDir, items.getPageable(), items.hasNext());
     }
 
     private Pageable getPageable(int page, SortBy sortBy, Sort.Direction sortOrder) {
@@ -344,13 +346,13 @@ public class FileService {
         ));
     }
 
-    public String getFullPathInName(FileSystemItem root) {
-        String pathInId = root.getPath();
+    public String getFullPathInName(FileSystemItem item) {
+        String pathInId = item.getPath();
         List<String> pathIds = Arrays.stream(pathInId.split("/"))
                 .filter(s -> !s.isEmpty())
                 .toList();
 
-        if (pathIds.isEmpty()) return root.getName();
+        if (pathIds.isEmpty()) return item.getName();
 
         List<FileSystemItem> parents = mongoTemplate.find(new Query(Criteria.where("id").in(pathIds)), FileSystemItem.class);
 
@@ -358,7 +360,7 @@ public class FileService {
 
         return pathIds.stream()
                 .map(id -> nameMap.getOrDefault(id, "Unknown"))
-                .collect(Collectors.joining("/")) + "/" + root.getName();
+                .collect(Collectors.joining("/")) + "/" + item.getName();
     }
 
     // need the returning path to start and end with "/"
