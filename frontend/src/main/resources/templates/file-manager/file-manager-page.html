@@ -300,7 +300,7 @@
                 <span>Upload as Media Video(s)</span>
             </label>
 
-            <section id="edit-name-section" class="mt-4">
+            <section id="edit-name-section" class="mt-4 hidden">
                 <div id="add-name-entity-container" class="flex flex-col gap-1">
                     <div class="name-entity-item hidden flex items-center gap-2">
                         <button th:replace="~{upload/edit-name-section :: editButton('editUniverseBtn')}"></button>
@@ -367,7 +367,7 @@
 
         <div class="flex items-center gap-2 mt-2">
             <label for="file-sort-by-select">Sort by:</label>
-            <select id="file-sort-by-select" class="block w-56 rounded-md border border-gray-300 bg-gray-600 px-3 py-2 text-sm text-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <select id="file-sort-by-select" class="block w-56 rounded-md bg-gray-600 px-3 py-2 text-sm text-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                 <optgroup label="Name">
                     <option value="NAME-ASC" selected>Name (A → Z)</option>
                     <option value="NAME-DESC">Name (Z → A)</option>

@@ -556,6 +556,13 @@ function sortFileAndDisplayFileName(fileList) {
 }
 
 const uploadAsVideoCheckbox = document.getElementById('upload-video-checkbox');
+uploadAsVideoCheckbox.addEventListener('change', function () {
+    if (uploadAsVideoCheckbox.checked)
+        editNameSection.classList.remove('hidden');
+    else
+        editNameSection.classList.add('hidden');
+});
+
 let allVideo = true;
 function validateAllowFile(file) {
     if (validateAllowImage(file)) {
