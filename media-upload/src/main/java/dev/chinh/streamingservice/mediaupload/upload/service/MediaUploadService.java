@@ -181,6 +181,15 @@ public class MediaUploadService {
         MediaMetaData saved = mediaRepository.save(mediaMetaData);
         long savedId = saved.getId();
 
+        if (upload.mediaType == MediaType.GROUPER) {
+            MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
+            mediaGroupInfo.setGrouperMetaData(null);
+            mediaGroupInfo.setMediaMetaData(saved);
+            mediaGroupInfo.setNumInfo(-1);
+            saved.setGroupInfo(mediaGroupInfo);
+            mediaRepository.save(saved);
+        }
+
         if (parentMediaId != null) {
             MediaMetaData grouperMedia = mediaRepository.findById(parentMediaId).orElse(null);
             if (grouperMedia != null) {

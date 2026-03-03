@@ -29,7 +29,7 @@ public class MediaUploadEventConsumer {
         System.out.println("Received file to media initiated event: " + event.fileId());
         try {
             if (event.childMediaId() != null) {
-                if (event.mediaType() == MediaType.GROUPER) {
+                if (event.parentMediaId() != null) {
                     String error = mediaUploadService.addMediaToGrouper(event.parentMediaId(), event.childMediaId(), event.childNum());
                     if (error != null)
                         System.err.println(error);
