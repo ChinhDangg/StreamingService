@@ -62,6 +62,10 @@ public class FileService {
 
     public record FileSearchResult(String parentId, String parentName, List<FileSystemItem> content, Pageable pageable, boolean hasNext) {}
 
+    public Slice<FileSystemItem> findFilesInDirectory(String parentId, int page, SortBy sortBy, Sort.Direction sortOrder) {
+        return fileSystemRepository.findByParentId(parentId, getPageable(page, sortBy, sortOrder));
+    }
+
     public FileSearchResult findFilesAtRoot(int page, SortBy sortBy, Sort.Direction sortOrder) {
         Slice<FileSystemItem> items = fileSystemRepository.findByParentId(getROOT_FOLDER_ID(), getPageable(page, sortBy, sortOrder));
         List<FileSystemItem> itemInRoot = items.getContent();
