@@ -40,7 +40,6 @@ public class ScheduleService {
 
     @Scheduled(fixedDelay = 15 * 60 * 1000) // 15 mins
     public void scheduled15mins() {
-        removeAlbumCreationInfo();
         cleanThumbnails();
 
         trimJobStreams();
@@ -87,23 +86,6 @@ public class ScheduleService {
             } catch (Exception e) {
                 System.out.println("Failed to stop ffmpeg job: " + jobId);
             }
-        }
-    }
-
-    private void removeAlbumCreationInfo() {
-        long now = System.currentTimeMillis();
-        Set<ZSetOperations.TypedTuple<String>> lastAccessMediaJob = albumService.getAllAlbumCacheLastAccess(now);
-        for (ZSetOperations.TypedTuple<String> albumJob : lastAccessMediaJob) {
-            if (now - albumJob.getScore() < 60_000) {
-                break;
-            }
-
-            String albumJobId = Objects.requireNonNull(albumJob.getValue());
-            if (!albumJobId.endsWith(":album"))
-                continue;
-
-            albumService.removeAlbumCacheLastAccess(albumJobId);
-            albumService.removeCacheAlbumCreationInfo(albumJobId);
         }
     }
 

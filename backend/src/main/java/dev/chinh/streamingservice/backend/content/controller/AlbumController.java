@@ -18,32 +18,22 @@ public class AlbumController {
     @Value("${always-show-original-resolution}")
     private String alwaysShowOriginalResolution;
 
-    @GetMapping("/{id}/{resolution}")
-    public ResponseEntity<?> getAlbum(@PathVariable Long id,
-                                      @PathVariable Resolution resolution,
-                                      HttpServletRequest request) throws Exception {
+    @GetMapping("/{id}/{resolution}/{page}")
+    public ResponseEntity<?> checkResizedImage(@PathVariable Long id,
+                                                  @PathVariable Resolution resolution,
+                                                  @PathVariable Integer page,
+                                                  HttpServletRequest request) throws Exception {
         if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
             // if always show original - intercept the resolution parameter
             resolution = Resolution.original;
         }
-        return ResponseEntity.ok().body(albumService.getAllMediaUrlInAnAlbum(id, resolution, request));
+        return ResponseEntity.ok().body(albumService.getAlbumContent(id, resolution, page, 25, request));
     }
 
-    @GetMapping("/{id}/{resolution}/{offset}/check-resized")
-    public ResponseEntity<?> checkResizedImage(@PathVariable Long id,
-                                                  @PathVariable Resolution resolution,
-                                                  @PathVariable Integer offset,
-                                                  HttpServletRequest request) throws Exception {
-        if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
-            return ResponseEntity.ok().body("99999");
-        }
-        return ResponseEntity.ok().body(albumService.processResizedAlbumImagesInBatch(id, resolution, offset, 5, request));
-    }
-
-    @GetMapping("/{albumId}/{albumRes}/vid/{vidNum}/{vidRes}")
+    @GetMapping("/{albumId}/{albumRes}/vid/{vidRes}/{objectName}")
     public ResponseEntity<String> getAlbumVideoUrl(@PathVariable long albumId,
                                                    @PathVariable Resolution albumRes,
-                                                   @PathVariable int vidNum,
+                                                   @PathVariable String objectName,
                                                    @PathVariable Resolution vidRes,
                                                    HttpServletRequest request) throws Exception {
         if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
@@ -51,6 +41,6 @@ public class AlbumController {
             albumRes = Resolution.original;
             vidRes = Resolution.original;
         }
-        return ResponseEntity.ok().body(albumService.getAlbumPartialVideoUrl(albumId, albumRes, vidNum, vidRes, request));
+        return ResponseEntity.ok().body(albumService.getAlbumPartialVideoUrl(albumId, albumRes, objectName, vidRes, request));
     }
 }

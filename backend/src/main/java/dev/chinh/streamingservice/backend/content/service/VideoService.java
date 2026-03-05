@@ -2,7 +2,6 @@ package dev.chinh.streamingservice.backend.content.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.backend.MediaMapper;
-import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.constant.Resolution;
@@ -16,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
-import java.util.UUID;
 
 @Service
 public class VideoService extends MediaService {
@@ -46,9 +44,9 @@ public class VideoService extends MediaService {
         String cacheJobId = getCachePreviewJobId(videoId);
         addCacheVideoLastAccess(cacheJobId, null);
         String previewName = "preview_" + mediaDescription.getKey();
-        MediaJobDescription jobDescription = getMediaJobDescription(videoId, cacheJobId, null, "preview");
+        MediaJobDescription jobDescription = getMediaJobDescription(mediaDescription, cacheJobId, null, "preview");
         jobDescription.setPreview(previewName);
-        String status = addJobToFfmpegQueue(ffmpegQueueKey, cacheJobId, jobDescription);
+        String status = addJobToFfmpegQueue(ffmpegQueueKey, cacheJobId, "result", jobDescription);
         if (Arrays.stream(MediaJobStatus.values()).noneMatch(s -> s.name().equals(status))) {
             mediaRepository.updateMediaPreview(mediaDescription.getId(), previewName);
         }
@@ -59,9 +57,11 @@ public class VideoService extends MediaService {
         if (res == Resolution.original)
             return getOriginalVideoUrl(videoId);
 
+        MediaDescription mediaDescription = getMediaDescription(videoId);
+
         String cacheJobId = getCacheMediaJobId(videoId, res);
         addCacheVideoLastAccess(cacheJobId, null);
-        return addJobToFfmpegQueue(ffmpegQueueKey, cacheJobId, getMediaJobDescription(videoId, cacheJobId, res, "partial"));
+        return addJobToFfmpegQueue(ffmpegQueueKey, cacheJobId, "result", getMediaJobDescription(mediaDescription, cacheJobId, res, "partial"));
     }
 
     public void addCacheVideoLastAccess(String videoId, Long expiry) {

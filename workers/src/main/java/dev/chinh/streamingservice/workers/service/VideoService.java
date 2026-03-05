@@ -90,7 +90,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
     }
 
     private String getOriginalVideoUrl(MediaJobDescription mediaJobDescription) {
-        return minIOService.getRedirectObjectUrl(mediaJobDescription.getBucket(), mediaJobDescription.getPath());
+        return minIOService.getRedirectObjectUrl(mediaJobDescription.getBucket(), mediaJobDescription.getKey());
     }
 
     private String getPreviewVideoUrl(String tokenKey, MediaJobDescription mediaJobDescription) throws Exception {
@@ -162,7 +162,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
         )); // scale=-2:%d[v]
         String filterComplex = fc.toString();
 
-        String nginxUrl = minIOService.getObjectUrlForContainer(mediaJobDescription.getBucket(), mediaJobDescription.getPath());
+        String nginxUrl = minIOService.getObjectUrlForContainer(mediaJobDescription.getBucket(), mediaJobDescription.getKey());
 
         int segmentDuration = 4;
         String partialVideoJobId = UUID.randomUUID().toString();
@@ -240,7 +240,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
         OSUtil.createTempDir(videoDir);
 
-        String nginxUrl = minIOService.getObjectUrlForContainer(mediaJobDescription.getBucket(), mediaJobDescription.getPath());
+        String nginxUrl = minIOService.getObjectUrlForContainer(mediaJobDescription.getBucket(), mediaJobDescription.getKey());
 
         String scale = getFfmpegScaleString(
                 mediaJobDescription.getWidth(), mediaJobDescription.getHeight(), res.getResolution());

@@ -69,6 +69,7 @@ public class MediaObjectEventConsumer {
                     mediaMetaData.setWidth(imageMetadata.width());
                     mediaMetaData.setHeight(imageMetadata.height());
                     mediaMetaData.setFormat(imageMetadata.format());
+                    mediaMetaData.setFrameRate((short) 1);
                     mediaMetaData.setThumbnail(thumbnailService.copyAlbumObjectToThumbnailBucket(mediaMetaData.getBucket(), mediaMetaData.getKey(), event.thumbnailObject()));
                 } else if (thumbnailMediaType == MediaType.VIDEO) {
                     VideoMetadata videoMetadata = mediaProbe.parseMediaMetadata(mediaProbe.probeMediaInfo(mediaMetaData.getBucket(), mediaMetaData.getKey()), VideoMetadata.class);

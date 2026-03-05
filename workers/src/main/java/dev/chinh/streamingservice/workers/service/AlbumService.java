@@ -1,15 +1,15 @@
 package dev.chinh.streamingservice.workers.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.constant.Resolution;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
-import io.minio.Result;
-import io.minio.messages.Item;
+import dev.chinh.streamingservice.common.proto.FileItem;
+import dev.chinh.streamingservice.workers.internal.FileDiscoveryService;
+import io.grpc.StatusRuntimeException;
 import org.apache.coyote.BadRequestException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -18,32 +18,32 @@ import org.springframework.stereotype.Service;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class AlbumService extends MediaService implements ResourceCleanable {
 
     private final MemoryManager memoryManager;
     private final VideoService videoService;
+    private final FileDiscoveryService fileService;
 
     public AlbumService(@Qualifier("queueRedisTemplate") RedisTemplate<String, String> redisTemplate,
                         ObjectMapper objectMapper,
                         MinIOService minIOService,
                         WorkerRedisService workerRedisService,
                         MemoryManager memoryManager,
-                        VideoService videoService) {
+                        VideoService videoService,
+                        FileDiscoveryService fileService) {
         super(redisTemplate, objectMapper, minIOService, workerRedisService);
         this.memoryManager = memoryManager;
         this.videoService = videoService;
+        this.fileService = fileService;
     }
 
     public record MediaUrl(MediaType type, String url) {}
     public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, List<String> buckets, List<String> pathList) {}
-    public record AlbumUrlInfoWithSizeAndDimensions(AlbumUrlInfo albumUrlInfo, SizeAndDimensions sizeAndDimensions) {}
-    public record SizeAndDimensions(long size, int width, int height, int length) {}
 
     @Override
     public void handleJob(String tokenKey, MediaJobDescription description) {
@@ -56,18 +56,9 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             }
             switch (description.getJobType()) {
                 case "albumUrlList" -> {
-                    var mediaUrlList = getAllMediaUrlInAnAlbum(description);
+                    var mediaUrlList = processAlbumList(description);
                     String mediaUrlListString = objectMapper.writeValueAsString(mediaUrlList);
-                    workerRedisService.addResultToStatus(description.getWorkId(), "result", mediaUrlListString);
-                    workerRedisService.addResultToStatus(description.getWorkId(), "offset",
-                            objectMapper.writeValueAsString(List.of(description.getOffset() + description.getBatch(), mediaUrlList.size())));
-                    workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
-                    workerRedisService.releaseToken(tokenKey);
-                }
-                case "checkResized" -> {
-                    workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
-                    String offset = objectMapper.writeValueAsString(processResizedAlbumImagesInBatch(description));
-                    workerRedisService.addResultToStatus(description.getWorkId(), "offset", offset);
+                    workerRedisService.addResultToStatus(description.getWorkId(), "page::"+description.getOffset(), mediaUrlListString);
                     workerRedisService.releaseToken(tokenKey);
                 }
                 case "albumVideoUrl" -> {
@@ -77,176 +68,107 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                 }
                 default -> throw new BadRequestException("Invalid jobType: " + description.getJobType());
             }
-            workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.COMPLETED.name());
         } catch (Exception e) {
+            if (description.getJobType().equals("albumUrlList"))
+                workerRedisService.addResultToStatus(description.getWorkId(), "page::"+description.getOffset(), MediaJobStatus.FAILED.name());
             workerRedisService.releaseToken(tokenKey);
             throw new RuntimeException(e);
         }
     }
 
-    private List<MediaUrl> getAllMediaUrlInAnAlbum(MediaJobDescription mediaJobDescription) throws Exception {
+    private List<MediaUrl> processAlbumList(MediaJobDescription mediaJobDescription) throws Exception {
         long albumId = mediaJobDescription.getId();
         Resolution resolution = mediaJobDescription.getResolution();
 
-        String albumCreationId = getCacheMediaJobIdString(albumId, resolution);
-        List<MediaUrl> cacheUrls = getCacheAlbumCreatedUrl(albumId, albumCreationId);
-        if (cacheUrls != null) {
-            return cacheUrls;
-        }
-
-        var albumInfo = getAlbumInfoAndAddToCache(mediaJobDescription);
-        if (resolution != Resolution.original) {
-            mediaJobDescription.setOffset(0);
-            mediaJobDescription.setBatch(5);
-            processResizedAlbumImagesInBatch(mediaJobDescription);
-        }
-
-        return albumInfo.albumUrlInfo.mediaUrlList;
-    }
-
-    private AlbumUrlInfo getAlbumOriginalUrls(MediaJobDescription mediaJobDescription) throws Exception {
-        List<String> pathList = getCacheAlbumPathList(mediaJobDescription.getId());
-
-        if (pathList == null) {
-            String prefix = mediaJobDescription.getPath();
-            if (!prefix.endsWith("/"))
-                prefix += "/";
-            Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaJobDescription.getBucket(), prefix);
-            pathList = new ArrayList<>();
-            for (Result<Item> result : results)
-                pathList.add(result.get().objectName());
-        }
-
-        List<MediaUrl> albumUrls = new ArrayList<>();
-        for (String path : pathList) {
-            MediaType mediaType = MediaType.detectMediaType(path);
-            String originalVideoUrl = minIOService.getObjectUrl(mediaJobDescription.getBucket(), path);
-            albumUrls.add(new MediaUrl(mediaType, originalVideoUrl));
-        }
-        return new AlbumUrlInfo(albumUrls, new ArrayList<>(List.of(mediaJobDescription.getBucket())), pathList);
-    }
-
-    /**
-     * Return nginx urls for resized image - may not have actual image.
-     * Get the url list first then call for actual images or videos resize later.
-     */
-    private AlbumUrlInfo getAlbumResizedUrls(MediaJobDescription mediaJobDescription) throws Exception {
-        long albumId = mediaJobDescription.getId();
-        Resolution res = mediaJobDescription.getResolution();
-
-        String albumDir = "/stream/album/" + albumId + "/" + res.name();
-        String acceptHeader = mediaJobDescription.getAcceptHeader();
-
-        List<MediaUrl> albumUrlList = new ArrayList<>();
-        List<String> albumPathList = getCacheAlbumPathList(albumId);
-
-        if (albumPathList == null) {
-            albumPathList = new ArrayList<>();
-            String prefix = mediaJobDescription.getPath();
-            if (!prefix.endsWith("/"))
-                prefix += "/";
-            Iterable<Result<Item>> results = minIOService.getAllItemsInBucketWithPrefix(mediaJobDescription.getBucket(), prefix);
-            for (Result<Item> result : results) {
-                albumPathList.add(result.get().objectName());
+        boolean noFileId = false;
+        Map<Object, Object> albumInfo = getCacheAlbumJobInfo(albumId);
+        if (albumInfo.isEmpty()) {
+            noFileId = true;
+            try {
+                var response = fileService.findFileByMId(albumId);
+                if (response.getContentCount() > 0) {
+                    String fileId = response.getContent(0).getId();
+                    if (fileId.isBlank())
+                        throw new BadRequestException("No fileId found for albumId: " + albumId);
+                    albumInfo.put("fileId", fileId);
+                } else {
+                    throw new BadRequestException("No file found for albumId: " + albumId);
+                }
+            } catch (StatusRuntimeException e) {
+                System.err.println("Error fetching fileId for albumId: " + albumId);
+                throw e;
             }
         }
 
-        for (String path : albumPathList) {
-            String key = path.substring(path.lastIndexOf("/") + 1);
+        System.out.println(albumInfo);
+        var response = fileService.listFiles(albumInfo.get("fileId").toString(), mediaJobDescription.getOffset());
 
-            MediaType mediaType = MediaType.detectMediaType(key);
+        String albumDir = "/stream/album/" + albumId + "/" + resolution.name();
+        long size = 0;
+        boolean hasImage = false;
 
-            if (mediaType == MediaType.VIDEO) {
-                String videoDir = "/api/album/" + albumId + "/" + res + "/vid/" + albumUrlList.size();
-                albumUrlList.add(new MediaUrl(mediaType, videoDir));
-                continue;
+        List<MediaUrl> mediaUrlList = new ArrayList<>();
+        List<String> bucketList = new ArrayList<>();
+        List<String> pathList = new ArrayList<>();
+        for (FileItem f : response.getContentList()) {
+            String objectName = f.getObjectName();
+
+            bucketList.add(f.getBucket());
+            pathList.add(objectName);
+
+            MediaType mediaType = MediaType.detectMediaType(objectName);
+
+            if (resolution == Resolution.original) {
+                mediaUrlList.add(new MediaUrl(mediaType, minIOService.getObjectUrl(f.getBucket(), objectName)));
+            } else {
+                if (mediaType == MediaType.IMAGE) {
+                    String originalExtension = objectName.contains(".") ? objectName.substring(objectName.lastIndexOf(".") + 1)
+                            .toLowerCase() : "jpg";
+                    String format = (mediaJobDescription.getAcceptHeader() != null && mediaJobDescription.getAcceptHeader().contains("image/webp")) ? "webp" : originalExtension;
+                    String savedFileName = objectName + "_" + resolution + "." + format;
+                    String urlPath = OSUtil.normalizePath(albumDir, savedFileName);
+                    mediaUrlList.add(new MediaUrl(mediaType, urlPath));
+
+                    size += f.getSize();
+                    hasImage = true;
+                } else if (mediaType == MediaType.VIDEO) {
+                    String videoDir = "/api/album/" + albumId + "/" + resolution + "/vid/" + objectName;
+                    mediaUrlList.add(new MediaUrl(mediaType, videoDir));
+                }
+            }
+        }
+
+        if (resolution != Resolution.original && hasImage) {
+            if (!memoryManager.freeMemoryForSize(size)) {
+                return response.getContentList().stream()
+                        .map(i ->
+                                new MediaUrl(MediaType.detectMediaType(i.getObjectName()),
+                                        minIOService.getObjectUrl(i.getBucket(), i.getObjectName())))
+                        .toList();
             }
 
-            String originalExtension = key.contains(".") ? key.substring(key.lastIndexOf(".") + 1)
-                    .toLowerCase() : "jpg";
-            String format = (acceptHeader != null && acceptHeader.contains("image/webp")) ? "webp" : originalExtension;
-            String cacheFileName = albumUrlList.size() + "_" + res.getResolution() + "." + format;
-            String cachePath = OSUtil.normalizePath(albumDir, cacheFileName);
-            albumUrlList.add(new MediaUrl(mediaType, cachePath));
+            AlbumUrlInfo urlInfo = new AlbumUrlInfo(mediaUrlList, bucketList, pathList);
+            String saveDir = albumId + "/" + resolution.name();
+            int exitCode = processResizedImagesInBatch(urlInfo, resolution, saveDir, false);
+            if (exitCode != 0) {
+                System.err.println("Failed to resize images for albumId: " + albumId);
+                throw new RuntimeException("Failed to resize images for albumId: " + albumId);
+            }
         }
-        return new AlbumUrlInfo(albumUrlList, new ArrayList<>(List.of(mediaJobDescription.getBucket())), albumPathList);
+
+        if (noFileId || (resolution != Resolution.original && hasImage)) {
+            long previousSize = albumInfo.get("size") == null ? 0 : Long.parseLong(albumInfo.get("size").toString());
+            previousSize += size;
+            albumInfo.put("size", String.valueOf(previousSize));
+            albumInfo.putIfAbsent("width", String.valueOf(mediaJobDescription.getWidth()));
+            albumInfo.putIfAbsent("height", String.valueOf(mediaJobDescription.getHeight()));
+            addCacheAlbumJobInfo(albumId, albumInfo);
+        }
+
+        return mediaUrlList;
     }
 
-    private List<Integer> processResizedAlbumImagesInBatch(MediaJobDescription mediaJobDescription) throws Exception {
-        long albumId = mediaJobDescription.getId();
-        Resolution resolution = mediaJobDescription.getResolution();
-        int offset = mediaJobDescription.getOffset();
-        int batch = mediaJobDescription.getBatch();
-
-        if (resolution == Resolution.original)
-            throw new BadRequestException("Cannot process original images in batch");
-
-        String albumJobId = getCacheMediaJobIdString(albumId, resolution);
-
-        int previousProcessedOffset = getCacheAlbumJobInfo(albumId, albumJobId);
-        System.out.println("previousOffset: " + previousProcessedOffset);
-        if (previousProcessedOffset >= offset + batch) {
-            return List.of(previousProcessedOffset, -1);
-        }
-
-        List<MediaUrl> mediaUrlList = getCacheAlbumCreatedUrl(albumId, albumJobId);
-
-        AlbumUrlInfoWithSizeAndDimensions albumInfo = getCacheAlbumCreationInfoWithSizeAndDimensions(albumId);
-        if (albumInfo == null) {
-            System.out.println(("No cache found with albumId " + albumId));
-            albumInfo = getAlbumInfoAndAddToCache(mediaJobDescription);
-        }
-
-        if (mediaUrlList == null) {
-            mediaUrlList = albumInfo.albumUrlInfo.mediaUrlList;
-        }
-
-        AlbumUrlInfo albumUrlInfo = albumInfo.albumUrlInfo;
-
-        int size = albumUrlInfo.pathList.size();
-        if (offset >= size)
-            return List.of(size, size);
-
-        int stop = Math.min(size-1, previousProcessedOffset + batch);
-        List<Integer> notResized = new ArrayList<>();
-        for (int i = previousProcessedOffset; i <= stop; i++) {
-            if (MediaType.detectMediaType(albumUrlInfo.pathList.get(i)) != MediaType.IMAGE)
-                continue;
-            notResized.add(i);
-        }
-
-        if (notResized.isEmpty()) {
-            addCacheAlbumJobInfo(albumId, albumJobId, previousProcessedOffset + batch);
-            return List.of(previousProcessedOffset + batch, size);
-        }
-
-        AlbumUrlInfo notResizedAlbumUrlInfo = new AlbumUrlInfo(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
-        notResizedAlbumUrlInfo.buckets.add(albumUrlInfo.buckets.getFirst());
-        String albumDir = albumId + "/" + resolution;
-        for (int i : notResized) {
-            notResizedAlbumUrlInfo.mediaUrlList.add(new MediaUrl(mediaUrlList.get(i).type,
-                    OSUtil.normalizePath("/chunks/" + albumDir, mediaUrlList.get(i).url.substring(mediaUrlList.get(i).url.lastIndexOf("/") + 1))));
-            notResizedAlbumUrlInfo.pathList.add(albumUrlInfo.pathList.get(i));
-        }
-
-        SizeAndDimensions sizeAndDimensions = albumInfo.sizeAndDimensions;
-        long estimatedSize = notResized.size() * Resolution.getEstimatedSize(sizeAndDimensions.size, sizeAndDimensions.width, sizeAndDimensions.height, resolution) / size;
-        boolean enough = memoryManager.freeMemoryForSize(estimatedSize);
-        if (!enough) {
-            return List.of(previousProcessedOffset, size);
-        }
-
-        int exitCode = processResizedImagesInBatch(notResizedAlbumUrlInfo, resolution, albumDir, true);
-        if (exitCode != 0) {
-            throw new RuntimeException("Failed to resize images in batch for albumId " + albumId + " and resolution " + resolution + " with exit code " + exitCode);
-        }
-        addCacheAlbumJobInfo(albumId, albumJobId, previousProcessedOffset + notResized.size());
-
-        System.out.println("offset after: " + (previousProcessedOffset + notResized.size()));
-        return List.of(previousProcessedOffset + notResized.size(), size);
-    }
-
-    private int processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String albumDir, boolean isAlbum) throws InterruptedException, IOException {
+    private int processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String saveDir, boolean isAlbum) throws InterruptedException, IOException {
         // Start one persistent bash session inside ffmpeg container
         ProcessBuilder pb = new ProcessBuilder("docker", "exec", "-i", "ffmpeg", "bash").redirectErrorStream(true);
         Process process = pb.start();
@@ -254,11 +176,12 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8))) {
 
-            OSUtil.createTempDir(albumDir);
+            OSUtil.createTempDir(saveDir);
 
             String scale = getFfmpegScaleString(resolution, true);
             for (int i = 0; i < albumUrlInfo.mediaUrlList.size(); i++) {
                 String output = albumUrlInfo.mediaUrlList.get(i).url;
+                output = "/chunks/" + saveDir + "/" + output.substring(output.lastIndexOf("/") + 1);
 
                 String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(i);
                 String input = minIOService.getObjectUrlForContainer(bucket, albumUrlInfo.pathList.get(i));
@@ -289,40 +212,33 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         return exit;
     }
 
-    public String getAlbumVidCacheJobIdString(long albumId, int vidNum, Resolution resolution) {
-        return albumId + ":" + vidNum + ":" + resolution;
+    public String getAlbumVidCacheJobIdString(long albumId, String objectName, Resolution resolution) {
+        return albumId + ":" + objectName + ":" + resolution;
     }
 
     private String getAlbumPartialVideoUrl(String tokenKey, MediaJobDescription mediaJobDescription) throws Exception {
         long albumId = mediaJobDescription.getId();
         Resolution albumRes = mediaJobDescription.getResolution();
-        int vidNum = mediaJobDescription.getVidNum();
+        String objectName = mediaJobDescription.getKey();
         Resolution res = mediaJobDescription.getVidResolution();
 
-        AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumId);
-        if (albumUrlInfo == null) {
-            System.out.println(("No cache found with albumId " + albumId));
-            albumUrlInfo = getAlbumInfoAndAddToCache(mediaJobDescription).albumUrlInfo;
-        }
+        final String albumVidCacheJobId = getAlbumVidCacheJobIdString(albumId, objectName, res);
 
-        final String albumVidCacheJobId = getAlbumVidCacheJobIdString(albumId, vidNum, res);
+        if (MediaType.detectMediaType(objectName) != MediaType.VIDEO)
+            throw new BadRequestException("Invalid video path: " + objectName);
 
-        String videoPath = albumUrlInfo.pathList.get(vidNum);
-        if (MediaType.detectMediaType(albumUrlInfo.pathList.get(vidNum)) != MediaType.VIDEO)
-            throw new BadRequestException("Invalid video path: " + albumVidCacheJobId);
-
-        String bucket = albumUrlInfo.buckets.getFirst();
+        String bucket = ContentMetaData.VIDEO_BUCKET;
 
         if (res == Resolution.original) {
-            return minIOService.getObjectUrl(bucket, videoPath);
+            return minIOService.getObjectUrl(bucket, objectName);
         }
 
         List<String> streamUrlPaths = List.of(
                 "album-vid",
                 String.valueOf(albumId),
                 albumRes.name(),
-                String.valueOf(vidNum),
-                res.name()
+                res.name(),
+                objectName
         );
         String streamUrl = getNginxVideoStreamUrl(String.join("/", streamUrlPaths));
 
@@ -335,10 +251,10 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                 prevJobStopped = true;
         }
 
-        long objectSize = minIOService.getObjectSize(bucket, videoPath);
+        long objectSize = minIOService.getObjectSize(bucket, objectName);
         boolean enoughSpace = memoryManager.freeMemoryForSize(objectSize);
         if (!enoughSpace)
-            return minIOService.getObjectUrl(bucket, videoPath);
+            return minIOService.getObjectUrl(bucket, objectName);
 
         final String videoDir = albumVidCacheJobId.replace(":", "/");
         OSUtil.createTempDir(videoDir);
@@ -347,7 +263,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         String outPath = containerDir + masterFileName;
 
         String scale = getFfmpegScaleString(res, false);
-        String input = minIOService.getObjectUrlForContainer(bucket, videoPath);
+        String input = minIOService.getObjectUrlForContainer(bucket, objectName);
         String partialVideoJobId = videoService.createPartialVideo(tokenKey, input, scale, videoDir, outPath, prevJobStopped, albumVidCacheJobId);
 
         videoService.addCacheVideoJobStatus(albumVidCacheJobId, partialVideoJobId, objectSize, MediaJobStatus.RUNNING);
@@ -376,118 +292,23 @@ public class AlbumService extends MediaService implements ResourceCleanable {
 
     private final String albumLastAccessKey = "cache:lastAccess:album";
 
-    public void removeAlbumCacheLastAccess(String albumMediaCreatedId) {
-        removeCacheLastAccess(albumLastAccessKey, albumMediaCreatedId);
+    public void removeAlbumCacheLastAccess(String albumJobId) {
+        removeCacheLastAccess(albumLastAccessKey, albumJobId);
     }
 
     public Set<ZSetOperations.TypedTuple<String>> getAllAlbumCacheLastAccess(long max) {
         return getAllCacheLastAccess(albumLastAccessKey, max);
     }
 
-    private AlbumUrlInfoWithSizeAndDimensions getAlbumInfoAndAddToCache(MediaJobDescription mediaJobDescription) throws Exception {
-        long albumId = mediaJobDescription.getId();
-        Resolution resolution = mediaJobDescription.getResolution();
-
-        AlbumUrlInfo albumUrlInfo = (resolution == Resolution.original) ?
-                getAlbumOriginalUrls(mediaJobDescription) :
-                getAlbumResizedUrls(mediaJobDescription);
-        SizeAndDimensions sizeAndDimensions = new SizeAndDimensions(mediaJobDescription.getSize(), mediaJobDescription.getWidth(), mediaJobDescription.getHeight(), mediaJobDescription.getLength());
-        addCacheAlbumCreationInfo(albumId, albumUrlInfo, sizeAndDimensions);
-        addCacheAlbumCreatedUrl(albumId, getCacheMediaJobIdString(albumId, resolution), albumUrlInfo.mediaUrlList);
-        return new AlbumUrlInfoWithSizeAndDimensions(albumUrlInfo, sizeAndDimensions);
-    }
-
-    private AlbumUrlInfoWithSizeAndDimensions getCacheAlbumCreationInfoWithSizeAndDimensions(long albumId) throws JsonProcessingException {
-        AlbumUrlInfo albumUrlInfo = getCacheAlbumCreationInfo(albumId);
-        if (albumUrlInfo == null)
-            return null;
-
+    private void addCacheAlbumJobInfo(long albumId, Map<Object, Object> albumInfo) {
         String albumHashId = getAlbumCacheHashIdString(albumId);
-        Object sizeAndDimensionsValue = redisTemplate.opsForHash().get(albumHashId, albumId + ":sizeAndDimensions");
-        if (sizeAndDimensionsValue == null)
-            return new AlbumUrlInfoWithSizeAndDimensions(albumUrlInfo, null);
-        SizeAndDimensions sizeAndDimensions = objectMapper.readValue((String) sizeAndDimensionsValue, new TypeReference<>() {});
-        return new AlbumUrlInfoWithSizeAndDimensions(albumUrlInfo, sizeAndDimensions);
+        redisTemplate.opsForHash().putAll(albumHashId, albumInfo);
+        redisTemplate.expire(albumHashId, Duration.ofHours(1).toMillis(), TimeUnit.MILLISECONDS);
     }
 
-    private void addCacheAlbumJobInfo(long albumId, String albumJobId, int offset) {
+    private Map<Object, Object> getCacheAlbumJobInfo(long albumId) {
         String albumHashId = getAlbumCacheHashIdString(albumId);
-        redisTemplate.opsForHash().put(albumHashId, albumJobId + ":offset", String.valueOf(offset));
-    }
-
-    private int getCacheAlbumJobInfo(long albumId, String albumJobId) {
-        String albumHashId = getAlbumCacheHashIdString(albumId);
-        Object offset = redisTemplate.opsForHash().get(albumHashId, albumJobId + ":offset");
-        if (offset == null)
-            return 0;
-        return Integer.parseInt((String) offset);
-    }
-
-    private void removeCacheAlbumJobInfo(long albumId, String albumJobId) {
-        String albumHashId = getAlbumCacheHashIdString(albumId);
-        redisTemplate.opsForHash().delete(albumHashId, albumJobId + ":offset");
-    }
-
-    private void addCacheAlbumCreatedUrl(long albumId, String albumJobId, List<MediaUrl> mediaUrlList) throws JsonProcessingException {
-        String albumHashId = getAlbumCacheHashIdString(albumId);
-        String mediaUrlListString = objectMapper.writeValueAsString(mediaUrlList);
-        redisTemplate.opsForHash().put(albumHashId, albumJobId, mediaUrlListString);
-    }
-
-    private List<MediaUrl> getCacheAlbumCreatedUrl(long albumId, String albumJobId) throws JsonProcessingException {
-        String albumHashId = getAlbumCacheHashIdString(albumId);
-        Object value = redisTemplate.opsForHash().get(albumHashId, albumJobId);
-        if (value == null)
-            return null;
-        return objectMapper.readValue((String) value, new TypeReference<>() {});
-    }
-
-    private void removeCacheAlbumCreatedUrl(long albumId, String albumJobId) {
-        String albumHashId = getAlbumCacheHashIdString(albumId);
-        redisTemplate.opsForHash().delete(albumHashId, albumJobId);
-    }
-
-    private List<String> getCacheAlbumPathList(long albumId) throws JsonProcessingException {
-        Object pathListValue = redisTemplate.opsForHash().get(getAlbumCacheHashIdString(albumId), albumId + ":pathList");
-        if (pathListValue == null)
-            return null;
-        return objectMapper.readValue((String) pathListValue, new TypeReference<>() {});
-    }
-
-    private SizeAndDimensions getCacheAlbumSizeAndDimensions(long albumId) throws JsonProcessingException {
-        Object sizeAndDimensionsValue = redisTemplate.opsForHash().get(getAlbumCacheHashIdString(albumId), albumId + ":sizeAndDimensions");
-        if (sizeAndDimensionsValue == null)
-            return null;
-        return objectMapper.readValue((String) sizeAndDimensionsValue, new TypeReference<>() {});
-    }
-
-    private void addCacheAlbumCreationInfo(long albumId, AlbumUrlInfo albumUrlInfo, SizeAndDimensions sizeAndDimensions) throws JsonProcessingException {
-        String albumHashId = getAlbumCacheHashIdString(albumId);
-
-        redisTemplate.opsForHash().put(albumHashId, "bucket", albumUrlInfo.buckets.getFirst());
-
-        if (albumUrlInfo.pathList != null) {
-            String pathListString = objectMapper.writeValueAsString(albumUrlInfo.pathList);
-            redisTemplate.opsForHash().put(albumHashId, albumId + ":pathList", pathListString);
-        }
-
-        String sizeAndDimensionsString = objectMapper.writeValueAsString(sizeAndDimensions);
-        redisTemplate.opsForHash().put(albumHashId, albumId + ":sizeAndDimensions", sizeAndDimensionsString);
-    }
-
-    private AlbumUrlInfo getCacheAlbumCreationInfo(long albumId) throws JsonProcessingException {
-        String albumHashId = getAlbumCacheHashIdString(albumId);
-        Object pathListValue = redisTemplate.opsForHash().get(albumHashId, albumId + ":pathList");
-        if (pathListValue == null)
-            return null;
-        List<String> pathList = objectMapper.readValue((String) pathListValue, new TypeReference<>() {});
-        List<String> buckets = new ArrayList<>();
-        buckets.add((String) redisTemplate.opsForHash().get(albumHashId, "bucket"));
-        return new AlbumUrlInfo(new ArrayList<>(), buckets, pathList);
-    }
-
-    public void removeCacheAlbumCreationInfo(String albumHashId) {
-        redisTemplate.opsForHash().delete(albumHashId);
+        return redisTemplate.opsForHash().entries(albumHashId);
     }
 
     /**
@@ -543,10 +364,13 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             }
 
             try {
-                SizeAndDimensions sizeAndDimensions = getCacheAlbumSizeAndDimensions(albumId);
-                assert sizeAndDimensions != null;
-                long estimatedSize = Resolution.getEstimatedSize(
-                        sizeAndDimensions.size, sizeAndDimensions.width, sizeAndDimensions.height, resolution) / sizeAndDimensions.length;
+                Map<Object, Object> albumInfo = getCacheAlbumJobInfo(albumId);
+                long estimatedSize = albumInfo.get("size") == null ? 0 : Long.parseLong(albumInfo.get("size").toString());
+                estimatedSize = Resolution.getEstimatedSize(
+                        estimatedSize,
+                        Integer.parseInt(albumInfo.getOrDefault("width", 1).toString()),
+                        Integer.parseInt(albumInfo.getOrDefault("height", 1).toString()),
+                        resolution);
                 System.out.println("Estimated size: " + estimatedSize);
 
                 String mediaMemoryPath = mediaJobId.replace(":", "/");
@@ -559,8 +383,6 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                 System.out.println("Failed to get estimated size to estimate removing space");
             }
 
-            removeCacheAlbumJobInfo(albumId, mediaJobId);
-            removeCacheAlbumCreatedUrl(albumId, mediaJobId);
             removeAlbumCacheLastAccess(mediaJobId);
             removeJobStatus(mediaJobId);
         }

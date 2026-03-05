@@ -168,10 +168,10 @@ public class MediaUploadService {
         mediaMetaData.setThumbnail(null);
 
         mediaMetaData.setFormat(MediaJobStatus.PROCESSING.name());
-        mediaMetaData.setSize(-1L);
-        mediaMetaData.setWidth(-1);
-        mediaMetaData.setHeight(-1);
-        mediaMetaData.setLength(-1);
+        mediaMetaData.setSize(0L);
+        mediaMetaData.setWidth(0);
+        mediaMetaData.setHeight(0);
+        mediaMetaData.setLength(0);
         mediaMetaData.setKey(upload.objectName);
 
         if (upload.mediaType == MediaType.VIDEO) {

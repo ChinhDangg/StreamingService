@@ -18,14 +18,14 @@ public class MediaJobDescription {
     private String acceptHeader;
     private int offset;
     private int batch;
-    private int vidNum;
     private Resolution vidResolution;
 
     @JsonProperty(ContentMetaData.ID)
     private long id;
     @JsonProperty(ContentMetaData.BUCKET)
     private String bucket;
-    private String path;
+    @JsonProperty(ContentMetaData.KEY)
+    private String key;
     @JsonProperty(ContentMetaData.LENGTH)
     private int length;
     @JsonProperty(ContentMetaData.WIDTH)

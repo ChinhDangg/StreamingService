@@ -17,7 +17,7 @@ import org.springframework.data.redis.connection.stream.StreamRecords;
 import org.springframework.data.redis.core.RedisTemplate;
 
 import java.util.Collections;
-import java.util.Map;
+import java.util.Objects;
 
 @RequiredArgsConstructor
 public abstract class MediaService {
@@ -29,12 +29,12 @@ public abstract class MediaService {
     protected final MinIOService minIOService;
     protected final MediaSearchCacheService mediaSearchCacheService;
 
-    protected String addJobToFfmpegQueue(String queueKey, String cacheJobId, MediaJobDescription mediaJobDescription) throws JsonProcessingException {
-        Map<Object, Object> jobQueueStatus = getQueueJobStatus(cacheJobId);
-        if (!jobQueueStatus.isEmpty()) {
-            String status = (String) jobQueueStatus.get("status");
+    protected String addJobToFfmpegQueue(String queueKey, String cacheJobId, String resultField, MediaJobDescription mediaJobDescription) throws JsonProcessingException {
+        Object jobQueueStatus = getQueueJobStatus(cacheJobId);
+        if (jobQueueStatus != null) {
+            String status = (String) jobQueueStatus;
             if (status.equals(MediaJobStatus.RUNNING.name()) || status.equals(MediaJobStatus.COMPLETED.name())) {
-                return jobQueueStatus.get("result").toString();
+                return getQueueJobResult(cacheJobId, resultField).toString();
             } else if (status.equals(MediaJobStatus.PROCESSING.name())) {
                 return status;
             }
@@ -42,12 +42,11 @@ public abstract class MediaService {
 
         // no status or stopped
         addJobToQueue(queueKey, mediaJobDescription);
-        updateQueueJobStatus(cacheJobId, MediaJobStatus.PROCESSING.name());
+        updateQueueJobStatus(cacheJobId, MediaJobStatus.PROCESSING.name(), null);
         return MediaJobStatus.PROCESSING.name();
     }
 
-    protected MediaJobDescription getMediaJobDescription(long mediaId, String cacheJobId, Resolution resolution, String jobType) {
-        MediaDescription mediaDescription = getMediaDescription(mediaId);
+    protected MediaJobDescription getMediaJobDescription(MediaDescription mediaDescription, String cacheJobId, Resolution resolution, String jobType) {
         MediaJobDescription mediaJobDescription = mediaMapper.mapToJobDescription(mediaDescription);
         mediaJobDescription.setJobType(jobType);
         mediaJobDescription.setWorkId(cacheJobId);
@@ -55,12 +54,16 @@ public abstract class MediaService {
         return mediaJobDescription;
     }
 
-    protected Map<Object, Object> getQueueJobStatus(String cacheJobId) {
-        return redisStringTemplate.opsForHash().entries("ffmpeg_job_status:" + cacheJobId);
+    protected Object getQueueJobStatus(String cacheJobId) {
+        return redisStringTemplate.opsForHash().get("ffmpeg_job_status:" + cacheJobId, "status");
     }
 
-    protected void updateQueueJobStatus(String jobId, String status) {
-        redisStringTemplate.opsForHash().put("ffmpeg_job_status:" + jobId, "status", status);
+    protected Object getQueueJobResult(String cacheJobId, String resultField) {
+        return redisStringTemplate.opsForHash().get("ffmpeg_job_status:" + cacheJobId, resultField);
+    }
+
+    protected void updateQueueJobStatus(String jobId, String status, String differentField) {
+        redisStringTemplate.opsForHash().put("ffmpeg_job_status:" + jobId, Objects.requireNonNullElse(differentField, "status"), status);
     }
 
     public void addJobToQueue(String queueKey, MediaJobDescription mediaJobDescription) throws JsonProcessingException {
