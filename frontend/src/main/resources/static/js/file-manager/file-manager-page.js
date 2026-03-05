@@ -611,15 +611,7 @@ function addUploadingFile(name) {
     uploadingList.appendChild(listItem);
 }
 
-let savingPath = null;
 function validateAllowUpload(fileList) {
-    for (const file of fileList) {
-        if (savingPath === null && file.name.indexOf('/') !== -1) {
-            savingPath = file.name.substring(0, file.name.indexOf('/'));
-        }
-        totalProgress += file.file.size;
-    }
-
     if (fileList.length === 0) {
         alert('No file selected');
         return false;
@@ -642,6 +634,12 @@ submitBtn.addEventListener('click', async function () {
         isSubmitting = false;
         return;
     }
+    if (uploadingFiles.size === 0) { // no reuploading file - recalculate total progress
+        for (const file of fileList) {
+            totalProgress += file.file.size;
+        }
+    }
+    clearFailTexts();
     await uploadFiles(fileList);
     isSubmitting = false;
 });
@@ -685,17 +683,16 @@ async function uploadFiles(fileList) {
     if (uploadingFiles.size) {
         for (const f of uploadingFiles.keys()) {
             const uploadingFile = uploadingFiles.get(f);
-            const fileName = getDirPath(currentFullPath, f.name);
             uploadingFile.chunks.partNumber = uploadingFile.partNumber;
             const passed = await uploadFile(
-                uploadingFile.sessionId, f, fileName, uploadingFiles, currentFailTexts,
+                uploadingFile.sessionId, uploadingFile.file, uploadingFile.fileName, uploadingFiles, currentFailTexts,
                 uploadingFile.chunks, uploadingFile.eTags, uploadingFile.uploadId,
                 showProgress
             );
             if (!passed) {
                 displayFailTexts(currentFailTexts);
             } else {
-                const noError = await endSession(uploadingFile, fileName);
+                const noError = await endSession(uploadingFiles.get(f), uploadingFiles.get(f).fileName);
                 if (!noError) {
                     continue;
                 }
@@ -713,23 +710,24 @@ async function uploadFiles(fileList) {
             if (!passed) {
                 displayFailTexts(currentFailTexts);
             } else {
-                const fileInfo = uploadingFiles.get(file.file);
+                const fileInfo = uploadingFiles.get(fileName);
                 const noError = await endSession(fileInfo, fileName);
                 if (!noError) {
                     continue;
                 }
-                uploadingFiles.delete(file.file);
+                uploadingFiles.delete(fileName);
             }
         }
     }
 
     if (uploadingFiles.size) {
         submitBtn.textContent = 'Retry';
+        console.log(uploadingFiles);
         currentFailTexts.length = 0;
         return;
     }
 
-    displayInfoMessage('Upload completed', false);
+    displayInfoMessage('Upload completed', true, 30000);
     clearUploadingList();
 }
 
@@ -743,6 +741,11 @@ function displayFailTexts(failTexts) {
     });
     failTexts.length = 0;
     errorMessageContainer.classList.remove('hidden');
+}
+
+function clearFailTexts() {
+    errorMessageContainer.innerHTML = '';
+    errorMessageContainer.classList.add('hidden');
 }
 
 const progressContainer = document.getElementById("upload-progress");
@@ -781,7 +784,6 @@ function clearUploadingListNameText() {
 
 function clearUploadingList() {
     clearUploadingListNameText();
-    savingPath = null;
     fileList.length = 0;
     uploadAsVideoCheckbox.disabled = false;
     allVideo = true;
@@ -789,7 +791,7 @@ function clearUploadingList() {
     clearProgress();
     totalProgress = 0;
     currentFailTexts.length = 0;
-    errorMessageContainer.classList.add('hidden');
+    clearFailTexts();
     clearNameEntityMap();
 }
 
@@ -1150,12 +1152,12 @@ document.addEventListener('click', () => {
 });
 
 const infoMessageContainer = document.getElementById('info-message-container');
-function displayInfoMessage(message, hasTimeout = true) {
+function displayInfoMessage(message, hasTimeout = true, timeoutTime = 5000) {
     console.log(message);
     infoMessageContainer.querySelector('.info-message').textContent = message;
     infoMessageContainer.classList.remove('hidden');
     if (hasTimeout)
-        setTimeout(() => infoMessageContainer.classList.add('hidden'), 5000);
+        setTimeout(() => infoMessageContainer.classList.add('hidden'), timeoutTime);
 }
 
 
