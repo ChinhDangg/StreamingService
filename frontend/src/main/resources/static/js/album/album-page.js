@@ -171,7 +171,7 @@ function initializeResolutionSelector() {
         let isImageCount = 0;
         currentBatch = BATCH_SIZE;
         for (let i = 1; i < imageItems.length; i++) {
-            if (i >= currentBatch) {
+            if (i >= currentBatch+1) {
                 imageItems[i].remove();
                 continue;
             }
@@ -378,7 +378,7 @@ function showPreviousFullScreen() {
     const dashIndex = currentFullScreen.lastIndexOf('-')+1;
     const idStr = currentFullScreen.slice(dashIndex, currentFullScreen.length);
     const id = parseInt(idStr);
-    if (id <= 1) return;
+    if (id <= 0) return;
     const prevId = currentFullScreen.slice(0, dashIndex) + (id - 1);
     showFullScreen(prevId);
 }
