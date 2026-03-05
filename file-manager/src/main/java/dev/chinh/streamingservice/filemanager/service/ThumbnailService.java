@@ -41,11 +41,10 @@ public class ThumbnailService {
                 throw new RuntimeException("Failed to resize thumbnails");
             }
             long now = System.currentTimeMillis() + 60 * 60 * 1000;
-            for (String path : albumUrlInfo.pathList) {
-                addCacheThumbnails(path.substring(path.lastIndexOf("/") + 1), now);
+            for (String url : albumUrlInfo.mediaUrlList) {
+                addCacheThumbnails(url.substring(url.lastIndexOf("/") + 1), now);
             }
         } catch (Exception e) {
-            counter.incrementAndGet();
             System.err.println(e.getMessage());
         }
         counter.incrementAndGet();
@@ -77,7 +76,7 @@ public class ThumbnailService {
                 pathList.add(item.getObjectName());
                 buckets.add(item.getBucket());
             }
-            if (hasCacheThumbnails(pathList.getLast().substring(pathList.getLast().lastIndexOf("/") + 1))) {
+            if (hasCacheThumbnails(thumbnailFileName.substring(thumbnailFileName.lastIndexOf("/") + 1))) {
                 pathList.removeLast();
                 buckets.removeLast();
                 continue;

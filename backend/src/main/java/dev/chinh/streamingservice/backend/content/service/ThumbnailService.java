@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -32,18 +31,7 @@ public class ThumbnailService {
             return;
         counter.decrementAndGet();
         long now = System.currentTimeMillis() + 60 * 60 * 1000;
-        List<NameEntityDTO> newThumbnails = new ArrayList<>();
-        for (NameEntityDTO item : items) {
-            if (item.getThumbnail() == null)
-                continue;
-            String thumbnailFileName = Paths.get(getThumbnailPath(item.getName(), item.getThumbnail())).getFileName().toString();
-            if (!hasCacheThumbnails(thumbnailFileName)) {
-                newThumbnails.add(item);
-            }
-        }
-        if (newThumbnails.isEmpty())
-            return;
-        var albumUrlInfo = getThumbnailImagesAsAlbumUrls(newThumbnails);
+        var albumUrlInfo = getThumbnailImagesAsAlbumUrls(items);
         try {
             if (albumUrlInfo.mediaUrlList().isEmpty())
                 return;
@@ -51,11 +39,10 @@ public class ThumbnailService {
             if (exitCode != 0) {
                 throw new RuntimeException("Failed to resize thumbnails");
             }
-            for (String path : albumUrlInfo.pathList) {
-                addCacheThumbnails(path.substring(path.lastIndexOf("/") + 1), now);
+            for (String url : albumUrlInfo.mediaUrlList) {
+                addCacheThumbnails(url.substring(url.lastIndexOf("/") + 1), now);
             }
         } catch (Exception e) {
-            counter.incrementAndGet();
             System.err.println(e.getMessage());
         }
         counter.incrementAndGet();
@@ -65,18 +52,7 @@ public class ThumbnailService {
         if (counter.get() == 0)
             return;
         counter.decrementAndGet();
-        List<MediaDescription> newThumbnails = new ArrayList<>();
-        for (MediaDescription item : items) {
-            if (!item.hasThumbnail())
-                continue;
-            String thumbnailFileName = Paths.get(getThumbnailPath(item.getId(), item.getThumbnail())).getFileName().toString();
-            if (!hasCacheThumbnails(thumbnailFileName)) {
-                newThumbnails.add(item);
-            }
-        }
-        if (newThumbnails.isEmpty())
-            return;
-        var albumUrlInfo = getMixThumbnailImagesAsAlbumUrls(newThumbnails);
+        var albumUrlInfo = getMixThumbnailImagesAsAlbumUrls(items);
         try {
             if (albumUrlInfo.mediaUrlList().isEmpty())
                 return;
@@ -85,34 +61,32 @@ public class ThumbnailService {
                 throw new RuntimeException("Failed to resize thumbnails");
             }
             long now = System.currentTimeMillis() + 60 * 60 * 1000;
-            for (String path : albumUrlInfo.pathList) {
-                addCacheThumbnails(path.substring(path.lastIndexOf("/") + 1), now);
+            for (String url : albumUrlInfo.mediaUrlList) {
+                addCacheThumbnails(url.substring(url.lastIndexOf("/") + 1), now);
             }
         } catch (Exception e) {
-            counter.incrementAndGet();
             System.err.println(e.getMessage());
         }
         counter.incrementAndGet();
     }
 
-    private AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(List<MediaDescription> mediaDescriptionList) {
+    private AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(Collection<? extends MediaDescription> mediaDescriptionList) {
         List<String> pathList = new ArrayList<>();
         List<String> albumUrlList = new ArrayList<>();
-//        List<String> bucketList = new ArrayList<>();
         for (MediaDescription mediaDescription : mediaDescriptionList) {
             if (!mediaDescription.hasThumbnail())
                 continue;
 
-//            if (mediaDescription.getMediaType() == MediaType.VIDEO || mediaDescription.getMediaType() == MediaType.GROUPER)
-//                bucketList.add(ContentMetaData.THUMBNAIL_BUCKET);
-//            else
-//                bucketList.add(mediaDescription.getBucket());
+            String thumbnailFileName = getThumbnailPath(mediaDescription.getId(), mediaDescription.getThumbnail());
+            if (hasCacheThumbnails(thumbnailFileName.substring(thumbnailFileName.lastIndexOf("/") + 1))) {
+                continue;
+            }
+
             pathList.add(mediaDescription.getThumbnail());
 
-            String pathString = "/chunks" + getThumbnailPath(mediaDescription.getId(), mediaDescription.getThumbnail());
-            albumUrlList.add(pathString);
+            String urlString = "/chunks" + thumbnailFileName;
+            albumUrlList.add(urlString);
         }
-//        return new AlbumUrlInfo(albumUrlList, bucketList, pathList);
         return new AlbumUrlInfo(albumUrlList, List.of(ContentMetaData.THUMBNAIL_BUCKET), pathList);
     }
 
@@ -123,10 +97,15 @@ public class ThumbnailService {
             if (mediaNameEntry.getThumbnail() == null)
                 continue;
 
+            String thumbnailFileName = getThumbnailPath(mediaNameEntry.getName(), mediaNameEntry.getThumbnail());
+            if (hasCacheThumbnails(thumbnailFileName.substring(thumbnailFileName.lastIndexOf("/") + 1))) {
+                continue;
+            }
+
             pathList.add(mediaNameEntry.getThumbnail());
 
-            String pathString = "/chunks" + getThumbnailPath(mediaNameEntry.getName(), mediaNameEntry.getThumbnail());
-            albumUrlList.add(pathString);
+            String urlString = "/chunks" + thumbnailFileName;
+            albumUrlList.add(urlString);
         }
         return new AlbumUrlInfo(albumUrlList, List.of(ContentMetaData.THUMBNAIL_BUCKET), pathList);
     }
