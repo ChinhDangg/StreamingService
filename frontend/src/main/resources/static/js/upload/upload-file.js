@@ -49,7 +49,7 @@ export async function uploadFile(sessionId, file, fileName,
     console.log(chunks);
 
     if (uploadingFiles)
-        uploadingFiles.set(file, { sessionId: sessionId, uploadId: uploadId, chunks: chunks, eTags: eTags, partNumber: chunks.partNumber ? chunks.partNumber : 0 });
+        uploadingFiles.set(fileName, { file: file, sessionId: sessionId, uploadId: uploadId, fileName: fileName, chunks: chunks, eTags: eTags, partNumber: chunks.partNumber ? chunks.partNumber : 0 });
 
     const startUploadSession = async(filePath) => {
         const sessionResponse = await apiRequest('/api/file/upload/create-session', {
@@ -76,7 +76,7 @@ export async function uploadFile(sessionId, file, fileName,
     console.log('sessionId: ' + sessionId);
 
     if (uploadingFiles)
-        uploadingFiles.get(file).sessionId = sessionId;
+        uploadingFiles.get(fileName).sessionId = sessionId;
 
     const initiateUpload = async () => {
         const response = await apiRequest('/api/upload/media/initiate', {
@@ -102,7 +102,7 @@ export async function uploadFile(sessionId, file, fileName,
     console.log('uploadId: ' + uploadId);
 
     if (uploadingFiles)
-        uploadingFiles.get(file).uploadId = uploadId;
+        uploadingFiles.get(fileName).uploadId = uploadId;
 
     const start = chunks.partNumber ? chunks.partNumber : 0;
 
@@ -142,9 +142,8 @@ export async function uploadFile(sessionId, file, fileName,
             etag: res.headers.get('ETag').replace(/"/g, '')
         });
 
-        if (uploadingFiles) {
-            uploadingFiles.get(file).partNumber++;
-        }
+        if (uploadingFiles)
+            uploadingFiles.get(fileName).partNumber++;
 
         if (showProgressFn)
             showProgressFn(c.size);

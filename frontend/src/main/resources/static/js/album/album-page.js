@@ -4,7 +4,7 @@ import { displayContentInfo, helperCloneAndUnHideNode } from "/static/js/metadat
 import {apiRequest, setMediaId, setMediaLength} from "/static/js/common.js";
 
 let albumId = null;
-const BATCH_SIZE = 5;
+const BATCH_SIZE = 25;
 let currentBatch = 0;
 
 const RESOLUTION = Object.freeze({
@@ -15,7 +15,7 @@ const RESOLUTION = Object.freeze({
 });
 
 const albumResUrlMap = new Map();
-const albumCheckResizedMap = new Map();
+const albumUrlPageMap = new Map();
 let albumResolution = Object.keys(RESOLUTION)[3];
 
 const sentinel = document.createElement("div");
@@ -48,7 +48,7 @@ export async function initialize(id = null, albumInfo = null) {
     currentBatch = 0;
 
     albumResUrlMap.clear();
-    albumCheckResizedMap.clear();
+    albumUrlPageMap.clear();
     albumResolution = Object.keys(RESOLUTION)[3];
 
     currentFullScreen = null;
@@ -152,30 +152,6 @@ const addMediaItem = (start, end) => {
     }
 }
 
-const fetchCheckResized = async (albumId, start) => {
-    if (albumResolution === Object.keys(RESOLUTION)[0]) return true;
-    if (albumCheckResizedMap.get(albumResolution) >= start + BATCH_SIZE
-        || albumCheckResizedMap.get(albumResolution) >= albumResUrlMap.get(albumResolution).length) {
-        return true;
-    }
-    const fetchResizedCountUrl = `/api/album/${albumId}/${albumResolution}/${start}/check-resized`;
-    try {
-        const checkResizedPolling = pollPlaylistUrl(fetchResizedCountUrl);
-        const resizedCount = await checkResizedPolling.promise;
-        albumCheckResizedMap.set(albumResolution, Number.parseInt(resizedCount));
-        setMediaLength(Number.parseInt(resizedCount));
-        console.log(resizedCount);
-        return true;
-    } catch (err) {
-        if (err === 'timeout') {
-            setAlertStatus('Error', 'Time out');
-            return false;
-        }
-        setAlertStatus('Error', 'Failed to fetch resized count: ' + err);
-        throw new Error(err);
-    }
-};
-
 function initializeResolutionSelector() {
     const resolutionSelector = document.getElementById('resolution-select');
     resolutionSelector.innerHTML = '';
@@ -188,11 +164,9 @@ function initializeResolutionSelector() {
     resolutionSelector.value = albumResolution;
     resolutionSelector.addEventListener('change', async () => {
         albumResolution = resolutionSelector.value;
-        if (!albumResUrlMap.has(albumResolution)) {
-            const albumItems = await fetchAlbumItemUrlsByResolution(albumId, albumResolution);
-            if (!albumItems) return;
-            albumResUrlMap.set(albumResolution, albumItems);
-        }
+        const albumItems = await fetchAlbumItemUrlsByResolution(albumId, albumResolution);
+        if (!albumItems) return;
+
         const imageItems = imageContainer.querySelectorAll('.image-container-wrapper');
         let isImageCount = 0;
         currentBatch = BATCH_SIZE;
@@ -214,16 +188,26 @@ function initializeResolutionSelector() {
     });
 }
 
-async function fetchAlbumItemUrlsByResolution(albumId, resolution) {
-    const fetchAlbumUrls = `/api/album/${albumId}/${resolution}`;
+async function fetchAlbumItemUrlsByResolution(albumId, resolution, page = 0) {
+    if (albumUrlPageMap.get(albumResolution) === -1) return [];
+    const fetchAlbumUrls = `/api/album/${albumId}/${resolution}/${page}`;
     try {
         const urlPolling = pollPlaylistUrl(fetchAlbumUrls);
         const albumUrls = await urlPolling.promise;
-        return JSON.parse(albumUrls);
+        const urls = JSON.parse(albumUrls);
+
+        const previousPage = albumUrlPageMap.get(albumResolution) == null ? -1 : albumUrlPageMap.get(albumResolution);
+        const newPage = previousPage < page ? page : albumUrlPageMap.get(albumResolution); // ensure page is fetched sequentially otherwise it will skip some items - only stored the highest page fetched
+        if (!albumResUrlMap.get(albumResolution)) {
+            albumResUrlMap.set(albumResolution, urls);
+        } else if (newPage > previousPage)
+            albumResUrlMap.get(albumResolution).push(...urls);
+        albumUrlPageMap.set(albumResolution, urls.length === 25 ? newPage : -1); // -1 means no more items
+        return urls;
     } catch (err) {
         if (err === 'timeout') {
             setAlertStatus('Error', 'Time out');
-            return;
+            return null;
         }
         setAlertStatus('Error', 'Failed to fetch album items: ' + err);
         throw new Error(err);
@@ -233,7 +217,6 @@ async function fetchAlbumItemUrlsByResolution(albumId, resolution) {
 async function displayAlbumItems(albumId) {
     const albumItems = await fetchAlbumItemUrlsByResolution(albumId, albumResolution);
     if (!albumItems) return;
-    albumResUrlMap.set(albumResolution, albumItems);
 
     setMediaLength(albumItems.length);
 
@@ -267,32 +250,24 @@ async function displayAlbumItems(albumId) {
 
     addMediaItem(0, Math.min(BATCH_SIZE, albumItems.length));
 
-    if (currentBatch >= albumItems.length) {
-        return;
-    }
-
     document.getElementById('main-album-container').appendChild(sentinel);
 
     observer = new IntersectionObserver(async (entries) => {
         if (entries[0].isIntersecting) {
             console.log('intersecting');
-            if (currentBatch >= albumItems.length) {
+            if (albumUrlPageMap.get(albumResolution) === -1) {
                 //console.log('no more items');
                 observer.unobserve(sentinel);
                 return;
             }
-            const resized = await fetchCheckResized(albumId, currentBatch);
-            if (!resized) {
+            const nextUrls = await fetchAlbumItemUrlsByResolution(albumId, albumResolution, albumUrlPageMap.get(albumResolution) + 1);
+            if (!nextUrls) {
                 observer.unobserve(sentinel);
                 return;
             }
             const start = currentBatch;
-            const end = Math.min(currentBatch + BATCH_SIZE, albumItems.length);
+            const end = currentBatch + nextUrls.length;
             addMediaItem(start, end);
-            if (currentBatch >= albumItems.length) {
-                //console.log('looped and reached end')
-                observer.unobserve(sentinel);
-            }
         }
     }, { rootMargin: '1000px' }); // start prefetching before user reaches bottom
     observer.observe(sentinel);
@@ -376,15 +351,11 @@ async function showNextFullScreen() {
     const dashIndex = currentFullScreen.lastIndexOf('-')+1;
     const idStr = currentFullScreen.slice(dashIndex, currentFullScreen.length);
     const id = parseInt(idStr);
-    const albumLength = albumResUrlMap.get(albumResolution).length;
-    if (id >= albumLength) {
-        isShowingNextFullScreen = false;
-        return;
-    }
+
     const nextId = currentFullScreen.slice(0, dashIndex) + (id + 1);
     showFullScreen(nextId);
 
-    if (currentBatch >= albumLength) {
+    if (albumUrlPageMap.get(albumResolution) === -1) {
         isShowingNextFullScreen = false;
         return;
     }
@@ -392,13 +363,13 @@ async function showNextFullScreen() {
         isShowingNextFullScreen = false;
         return;
     }
-    const resized = await fetchCheckResized(albumId, currentBatch);
-    if (!resized) {
+    const nextUrls = await fetchAlbumItemUrlsByResolution(albumId, albumResolution, albumUrlPageMap.get(albumResolution) + 1);
+    if (!nextUrls) {
         isShowingNextFullScreen = false;
         return;
     }
     const start = currentBatch;
-    const end = Math.min(currentBatch + BATCH_SIZE, albumLength);
+    const end = currentBatch + nextUrls.length;
     addMediaItem(start, end);
     isShowingNextFullScreen = false;
 }
