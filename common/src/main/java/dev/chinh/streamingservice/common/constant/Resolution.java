@@ -43,6 +43,6 @@ public enum Resolution {
             return 426;
         else if (resolution == Resolution.p144)
             return 256;
-        return -1;
+        return 1;
     }
 }
