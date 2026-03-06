@@ -6,6 +6,7 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
@@ -41,9 +43,7 @@ public class ThumbnailService {
                 throw new RuntimeException("Failed to resize thumbnails");
             }
             long now = System.currentTimeMillis() + 60 * 60 * 1000;
-            for (String url : albumUrlInfo.mediaUrlList) {
-                addCacheThumbnails(url.substring(url.lastIndexOf("/") + 1), now);
-            }
+            addCacheThumbnails(albumUrlInfo.mediaUrlList, now, (name) -> name.substring(name.lastIndexOf("/") + 1));
         } catch (Exception e) {
             System.err.println(e.getMessage());
         }
@@ -51,37 +51,53 @@ public class ThumbnailService {
         return albumUrlInfo.fullUrlList;
     }
 
+    public record ShortFileInfo(String thumbnailName, String thumbnailObject, String bucket, String objectName) {}
+
     private AlbumUrlInfo getFileSystemItemThumbnailAsAlbumUrls(List<FileSystemItem> items) {
-        List<String> pathList = new ArrayList<>();
-        List<String> buckets = new ArrayList<>();
-        List<String> urlList = new ArrayList<>();
         List<String> fullUrlList = new ArrayList<>();
-        for (FileSystemItem item : items) {
+        List<ShortFileInfo> shortFileInfoList = new ArrayList<>();
+        for (var item : items) {
             if (item.getThumbnail() == null && item.getFileType() != FileType.IMAGE) {
                 fullUrlList.add(null);
                 continue;
             }
 
-            String thumbnailFileName = getThumbnailPath(
+            String thumbnailPath = getThumbnailPath(
                     item.getMId() == null ? item.getId() : item.getMId().toString(),
                     item.getThumbnail() == null ? item.getObjectName() : item.getThumbnail()
             );
-            fullUrlList.add(thumbnailFileName);
+            fullUrlList.add(thumbnailPath);
 
-            if (item.getThumbnail() != null) {
-                pathList.add(item.getThumbnail());
+            shortFileInfoList.add(new ShortFileInfo(thumbnailPath, item.getThumbnail(), item.getBucket(), item.getObjectName()));
+        }
+
+        // Batch check existence in Redis (The Pipeline)
+        List<Object> existenceResults = redisStringTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (var info : shortFileInfoList) {
+                String name = info.thumbnailName().substring(info.thumbnailName().lastIndexOf("/") + 1);
+                connection.zSetCommands().zScore("thumbnail-cache".getBytes(), name.getBytes());
+            }
+            return null;
+        });
+
+        List<String> pathList = new ArrayList<>();
+        List<String> buckets = new ArrayList<>();
+        List<String> urlList = new ArrayList<>();
+        for (int i = 0; i < shortFileInfoList.size(); i++) {
+            var item = shortFileInfoList.get(i);
+
+            if (existenceResults.get(i) != null) // has thumbnail already
+                continue;
+
+            if (item.thumbnailObject != null) {
+                pathList.add(item.thumbnailObject);
                 buckets.add(ContentMetaData.THUMBNAIL_BUCKET);
             }
             else {
-                pathList.add(item.getObjectName());
-                buckets.add(item.getBucket());
+                pathList.add(item.objectName);
+                buckets.add(item.bucket);
             }
-            if (hasCacheThumbnails(thumbnailFileName.substring(thumbnailFileName.lastIndexOf("/") + 1))) {
-                pathList.removeLast();
-                buckets.removeLast();
-                continue;
-            }
-            String urlString = "/chunks" + thumbnailFileName;
+            String urlString = "/chunks" + item.thumbnailName;
             urlList.add(urlString);
         }
         return new AlbumUrlInfo(urlList, buckets, pathList, fullUrlList);
@@ -97,12 +113,18 @@ public class ThumbnailService {
         return "/thumbnail-cache/" + thumbnailResolution;
     }
 
-    private void addCacheThumbnails(String thumbnailFileName, long expiry) {
-        redisStringTemplate.opsForZSet().add("thumbnail-cache", thumbnailFileName, expiry);
-    }
-
-    private boolean hasCacheThumbnails(String thumbnailFileName) {
-        return redisStringTemplate.opsForZSet().score("thumbnail-cache", thumbnailFileName) != null;
+    private void addCacheThumbnails(List<String> thumbnailFileNames, long expiry, Function<String, String> processThumbnailName) {
+        redisStringTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (String thumbnailFileName : thumbnailFileNames) {
+                String name = processThumbnailName == null ? thumbnailFileName : processThumbnailName.apply(thumbnailFileName);
+                connection.zSetCommands().zAdd(
+                        "thumbnail-cache".getBytes(),
+                        expiry,
+                        name.getBytes()
+                );
+            }
+            return null;
+        });
     }
 
     private int processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String albumDir, boolean isAlbum) throws InterruptedException, IOException {

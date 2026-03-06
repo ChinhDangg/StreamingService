@@ -6,6 +6,7 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.persistence.entity.MediaDescription;
 import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +14,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
@@ -27,95 +29,108 @@ public class ThumbnailService {
     public record AlbumUrlInfo(List<String> mediaUrlList, List<String> buckets, List<String> pathList) {}
 
     public void processThumbnails(List<NameEntityDTO> items) {
-        if (counter.get() == 0)
+        if (counter.get() == 0) {
+            System.out.println("Counter is 0, skipping thumbnail processing");
             return;
-        counter.decrementAndGet();
-        long now = System.currentTimeMillis() + 60 * 60 * 1000;
-        var albumUrlInfo = getThumbnailImagesAsAlbumUrls(items);
-        try {
-            if (albumUrlInfo.mediaUrlList().isEmpty())
-                return;
-            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), true);
-            if (exitCode != 0) {
-                throw new RuntimeException("Failed to resize thumbnails");
-            }
-            for (String url : albumUrlInfo.mediaUrlList) {
-                addCacheThumbnails(url.substring(url.lastIndexOf("/") + 1), now);
-            }
-        } catch (Exception e) {
-            System.err.println(e.getMessage());
         }
-        counter.incrementAndGet();
+        var albumUrlInfo = getThumbnailImagesAsAlbumUrls(items);
+        processThumbnails(albumUrlInfo);
     }
 
     public void processThumbnails(Collection<? extends MediaDescription> items) {
-        if (counter.get() == 0)
+        if (counter.get() == 0) {
+            System.out.println("Counter is 0, skipping thumbnail processing");
             return;
-        counter.decrementAndGet();
+        }
         var albumUrlInfo = getMixThumbnailImagesAsAlbumUrls(items);
+        processThumbnails(albumUrlInfo);
+    }
+
+    private void processThumbnails(AlbumUrlInfo albumUrlInfo) {
+        counter.decrementAndGet();
         try {
-            if (albumUrlInfo.mediaUrlList().isEmpty())
+            if (albumUrlInfo.mediaUrlList().isEmpty()) {
+                counter.incrementAndGet();
                 return;
+            }
             int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), true);
             if (exitCode != 0) {
                 throw new RuntimeException("Failed to resize thumbnails");
             }
             long now = System.currentTimeMillis() + 60 * 60 * 1000;
-            for (String url : albumUrlInfo.mediaUrlList) {
-                addCacheThumbnails(url.substring(url.lastIndexOf("/") + 1), now);
-            }
+            addCacheThumbnails(albumUrlInfo.mediaUrlList, now, (name) -> name.substring(name.lastIndexOf("/") + 1));
         } catch (Exception e) {
             System.err.println(e.getMessage());
         }
         counter.incrementAndGet();
     }
 
+    public record ShortThumbnailInfo(String thumbnailName, String thumbnailObject) {}
+
     private AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(Collection<? extends MediaDescription> mediaDescriptionList) {
-        List<String> pathList = new ArrayList<>();
-        List<String> albumUrlList = new ArrayList<>();
+        List<ShortThumbnailInfo> shortThumbnailInfoList = new ArrayList<>();
         for (MediaDescription mediaDescription : mediaDescriptionList) {
             if (!mediaDescription.hasThumbnail())
                 continue;
 
             String thumbnailFileName = getThumbnailPath(mediaDescription.getId(), mediaDescription.getThumbnail());
-            if (hasCacheThumbnails(thumbnailFileName.substring(thumbnailFileName.lastIndexOf("/") + 1))) {
-                continue;
-            }
-
-            pathList.add(mediaDescription.getThumbnail());
-
-            String urlString = "/chunks" + thumbnailFileName;
-            albumUrlList.add(urlString);
+            shortThumbnailInfoList.add(new ShortThumbnailInfo(thumbnailFileName, mediaDescription.getThumbnail()));
         }
-        return new AlbumUrlInfo(albumUrlList, List.of(ContentMetaData.THUMBNAIL_BUCKET), pathList);
+        return getThumbnailImagesAsAlbumUrlInfo(shortThumbnailInfoList);
     }
 
     private AlbumUrlInfo getThumbnailImagesAsAlbumUrls(List<NameEntityDTO> mediaNameEntryList) {
-        List<String> pathList = new ArrayList<>();
-        List<String> albumUrlList = new ArrayList<>();
+        List<ShortThumbnailInfo> shortThumbnailInfoList = new ArrayList<>();
         for (NameEntityDTO mediaNameEntry : mediaNameEntryList) {
             if (mediaNameEntry.getThumbnail() == null)
                 continue;
 
             String thumbnailFileName = getThumbnailPath(mediaNameEntry.getName(), mediaNameEntry.getThumbnail());
-            if (hasCacheThumbnails(thumbnailFileName.substring(thumbnailFileName.lastIndexOf("/") + 1))) {
+            shortThumbnailInfoList.add(new ShortThumbnailInfo(thumbnailFileName, mediaNameEntry.getThumbnail()));
+        }
+        return getThumbnailImagesAsAlbumUrlInfo(shortThumbnailInfoList);
+    }
+
+    private AlbumUrlInfo getThumbnailImagesAsAlbumUrlInfo(List<ShortThumbnailInfo> shortThumbnailInfoList) {
+        List<Object> existenceResults = checkHasCacheThumbnails(shortThumbnailInfoList);
+
+        List<String> pathList = new ArrayList<>();
+        List<String> albumUrlList = new ArrayList<>();
+        for (int i = 0; i < shortThumbnailInfoList.size(); i++) {
+            var info = shortThumbnailInfoList.get(i);
+            if (existenceResults.get(i) != null) // has thumbnail already
                 continue;
-            }
 
-            pathList.add(mediaNameEntry.getThumbnail());
+            pathList.add(info.thumbnailObject);
 
-            String urlString = "/chunks" + thumbnailFileName;
+            String urlString = "/chunks" + info.thumbnailName;
             albumUrlList.add(urlString);
         }
         return new AlbumUrlInfo(albumUrlList, List.of(ContentMetaData.THUMBNAIL_BUCKET), pathList);
     }
 
-    private void addCacheThumbnails(String thumbnailFileName, long expiry) {
-        redisStringTemplate.opsForZSet().add("thumbnail-cache", thumbnailFileName, expiry);
+    private List<Object> checkHasCacheThumbnails(List<ShortThumbnailInfo> shortThumbnailInfoList) {
+        return redisStringTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (var info : shortThumbnailInfoList) {
+                String name = info.thumbnailName().substring(info.thumbnailName().lastIndexOf("/") + 1);
+                connection.zSetCommands().zScore("thumbnail-cache".getBytes(), name.getBytes());
+            }
+            return null;
+        });
     }
 
-    private boolean hasCacheThumbnails(String thumbnailFileName) {
-        return redisStringTemplate.opsForZSet().score("thumbnail-cache", thumbnailFileName) != null;
+    private void addCacheThumbnails(List<String> thumbnailFileNames, long expiry, Function<String, String> processThumbnailName) {
+        redisStringTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (String thumbnailFileName : thumbnailFileNames) {
+                String name = processThumbnailName == null ? thumbnailFileName : processThumbnailName.apply(thumbnailFileName);
+                connection.zSetCommands().zAdd(
+                        "thumbnail-cache".getBytes(),
+                        expiry,
+                        name.getBytes()
+                );
+            }
+            return null;
+        });
     }
 
     public static String getThumbnailPath(String id, String thumbnail) {
