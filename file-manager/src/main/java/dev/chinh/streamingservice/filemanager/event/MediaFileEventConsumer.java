@@ -6,6 +6,7 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.filemanager.config.KafkaConfig;
+import dev.chinh.streamingservice.filemanager.constant.FileStatus;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import dev.chinh.streamingservice.filemanager.service.FileService;
@@ -69,6 +70,11 @@ public class MediaFileEventConsumer {
                     .uploadDate(Instant.now())
                     .build();
             mongoTemplate.insert(fileItem);
+
+            // unmark parent folders got or created to not in use anymore, getOrCreateFolder mark the folder as in use
+            Query query = new Query(Criteria.where("id").in(folderIdMap.values()));
+            Update update = new Update().unset("statusCode");
+            mongoTemplate.updateMulti(query, update, FileSystemItem.class);
 
             if (event.mediaId() != null && event.mediaType() != null) {
                 producer.publishEvent(new MediaFileEventProducer.EventWrapper(
@@ -299,6 +305,7 @@ public class MediaFileEventConsumer {
                 .setOnInsert("parentId", parentId)
                 .setOnInsert("path", currentPath)
                 .setOnInsert("fileType", fileType)
+                .setOnInsert("statusCode", FileStatus.IN_USE.getValue())
                 .setOnInsert("uploadDate", LocalDateTime.now());
 
         // upsert to create and return in one operation - atomic
@@ -419,19 +426,19 @@ public class MediaFileEventConsumer {
 
         switch (event) {
             case MediaUpdateEvent.FileCreated e ->
-                System.out.println("Received create file event: " + e.objectName());
+                    System.out.println("Received create file event: " + e.objectName());
             case MediaUpdateEvent.FileDeleted e ->
                     System.out.println("Received file delete event: " + e.fileId());
             case MediaUpdateEvent.DirectoryToMediaInitiated e ->
-                System.out.println("Received initiate directory to media initiated event: " + e.fileId());
+                    System.out.println("Received initiate directory to media initiated event: " + e.fileId());
             case MediaUpdateEvent.NestedDirectoryToMediaInitiated e ->
-                System.out.println("Received initiate nested directory to media initiated event: " + e.fileId());
+                    System.out.println("Received initiate nested directory to media initiated event: " + e.fileId());
             case MediaUpdateEvent.MediaCreatedReady e ->
-                System.out.println("Received create media event: " + e.mediaId());
+                    System.out.println("Received create media event: " + e.mediaId());
             case MediaUpdateEvent.MediaThumbnailUpdateInitiated e ->
-                System.out.println("Received initiate update media thumbnail event: " + e.mediaId());
+                    System.out.println("Received initiate update media thumbnail event: " + e.mediaId());
             case MediaUpdateEvent.MediaThumbnailUpdatedReady e ->
-                System.out.println("Received update media thumbnail name: " + e.mediaId());
+                    System.out.println("Received update media thumbnail name: " + e.mediaId());
             default -> {
                 System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
                 ack.acknowledge();

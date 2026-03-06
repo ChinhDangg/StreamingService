@@ -6,8 +6,8 @@ import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
-import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
 import dev.chinh.streamingservice.common.validation.FileSystemValidator;
+import dev.chinh.streamingservice.filemanager.constant.FileStatus;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
 import dev.chinh.streamingservice.filemanager.constant.SortBy;
 import dev.chinh.streamingservice.filemanager.data.FileResult;
@@ -132,6 +132,7 @@ public class FileService {
     // using codeStatus as file status:
     // -1 - processing to be added as media
     // -2 - marked as deleted
+    // -3 - in-use being written into
 
     @Retryable(
             retryFor = { QueryTimeoutException.class, MongoTransactionException.class },
@@ -146,7 +147,11 @@ public class FileService {
         if (item.getMId() != null && item.getMId() != 0) {
             return "Item is already marked as video";
         }
-        UpdateResult result = updateStatusCode(fileId, -1L);
+        String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
+        if (statusCodeStr != null) {
+            return statusCodeStr;
+        }
+        UpdateResult result = updateStatusCode(fileId, FileStatus.PROCESSING);
         if (result.getModifiedCount() == 0) {
             return "Item is already marked as processing";
         }
@@ -179,7 +184,11 @@ public class FileService {
         if (item.getMId() != null && item.getMId() != 0) {
             return "Item is already marked as media";
         }
-        UpdateResult result = updateStatusCode(fileId, -1L);
+        String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
+        if (statusCodeStr != null) {
+            return statusCodeStr;
+        }
+        UpdateResult result = updateStatusCode(fileId, FileStatus.PROCESSING);
         if (result.getModifiedCount() == 0) {
             return "Item is already marked as processing";
         }
@@ -216,7 +225,11 @@ public class FileService {
         if (item.getMId() != null && item.getMId() != 0) {
             return "Item is already marked as media";
         }
-        UpdateResult result = updateStatusCode(fileId, -1L);
+        String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
+        if (statusCodeStr != null) {
+            return statusCodeStr;
+        }
+        UpdateResult result = updateStatusCode(fileId, FileStatus.PROCESSING);
         if (result.getModifiedCount() == 0) {
             return "Item is already marked as processing";
         }
@@ -244,9 +257,9 @@ public class FileService {
         return "Processing as grouper";
     }
 
-    private UpdateResult updateStatusCode(String fileId, long code) {
+    private UpdateResult updateStatusCode(String fileId, FileStatus status) {
         Query query = new Query(Criteria.where("id").is(fileId));
-        Update update = new Update().set("statusCode", code);
+        Update update = new Update().set("statusCode", status.getValue());
         return mongoTemplate.updateFirst(query, update, FileSystemItem.class);
     }
 
@@ -280,27 +293,12 @@ public class FileService {
         return mongoTemplate.insert(item);
     }
 
-
-    @Retryable(
-            retryFor = { QueryTimeoutException.class, MongoTransactionException.class },
-            maxAttempts = 3,
-            backoff = @Backoff(delay = 1000, multiplier = 2)
-    )
-    public UpdateResult updateFileMetadataAsMedia(String fileId, long mediaId, FileType fileType, String thumbnailObject, int length) {
-        Query query = new Query(Criteria.where("id").is(fileId));
-        Update update = new Update()
-                .set("mId", mediaId)
-                .set("fileType", fileType)
-                .set("thumbnail", thumbnailObject)
-                .set("length", length)
-                .unset("statusCode");
-        return mongoTemplate.updateFirst(query, update, FileSystemItem.class);
-    }
-
     public void initiateDeleteFile(String fileId) {
         FileSystemItem item = getFileSystemItem(fileId);
-        if (item.getStatusCode() != null && item.getStatusCode() == -2)
-            return;
+        String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
+        if (statusCodeStr != null) {
+            throw new IllegalArgumentException(statusCodeStr);
+        }
         if (!FileType.isNotDir(item.getFileType())) { // if a directory
             String parentPath = Pattern.quote(getPathForFileItem(item.getPath(), item.getId()));
             boolean anyChildMedia = mongoTemplate.exists(
@@ -312,7 +310,7 @@ public class FileService {
                 throw new IllegalArgumentException("Directory is not empty - include media item");
             }
         }
-        updateStatusCode(fileId, -2L);
+        updateStatusCode(fileId, FileStatus.DELETING);
         if (item.getMId() != null && item.getMId() > 0) {
             throw new IllegalArgumentException("File is already marked as media - delete through media file item instead: " + item.getMId());
         }
@@ -328,8 +326,10 @@ public class FileService {
         if (item == null) {
             throw new IllegalArgumentException("Media file not found: " + mediaId);
         }
-        if (item.getStatusCode() != null && item.getStatusCode() == -2)
-            return;
+        String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
+        if (statusCodeStr != null) {
+            throw new IllegalArgumentException(statusCodeStr);
+        }
         if (!FileType.isNotDir(item.getFileType())) { // if a directory
             String parentPath = Pattern.quote(getPathForFileItem(item.getPath(), item.getId()));
             boolean anyChildMedia = mongoTemplate.exists(
@@ -341,13 +341,30 @@ public class FileService {
                 throw new IllegalArgumentException("Media is not empty - include nested media item");
             }
         }
-        updateStatusCode(item.getId(), -2L);
+        updateStatusCode(item.getId(), FileStatus.DELETING);
 
         producer.publishEvent(new MediaFileEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_UPLOAD_SEARCH_BACKUP_TOPIC,
                 new MediaUpdateEvent.FileDeleted(
                         item.getId(), getFullPathInName(item), FileType.isNotDir(item.getFileType()), item.getMId())
         ));
+    }
+
+
+    @Retryable(
+            retryFor = { QueryTimeoutException.class, MongoTransactionException.class },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2)
+    )
+    public UpdateResult updateFileMetadataAsMedia(String fileId, long mediaId, FileType fileType, String thumbnailObject, int length) {
+        Query query = new Query(Criteria.where("id").is(fileId));
+        Update update = new Update()
+                .set("mId", mediaId)
+                .set("fileType", fileType)
+                .set("thumbnail", thumbnailObject)
+                .set("length", length)
+                .unset("statusCode");
+        return mongoTemplate.updateFirst(query, update, FileSystemItem.class);
     }
 
     public String getFullPathInName(FileSystemItem item) {

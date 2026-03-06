@@ -2,6 +2,7 @@ package dev.chinh.streamingservice.filemanager.data;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
+import dev.chinh.streamingservice.filemanager.constant.FileStatus;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
 import lombok.*;
 import org.springframework.data.annotation.Id;
@@ -60,4 +61,12 @@ public class FileSystemItem {
     private Instant uploadDate;
 
     private Short statusCode;
+
+    public static String getStatusCodeAsString(Short statusCode) {
+        if (statusCode == null) return null;
+        if (statusCode == FileStatus.PROCESSING.getValue()) return "Processing as media in progress";
+        if (statusCode == FileStatus.DELETING.getValue()) return "Deleting in progress";
+        if (statusCode == FileStatus.IN_USE.getValue()) return "In use";
+        return null;
+    }
 }
