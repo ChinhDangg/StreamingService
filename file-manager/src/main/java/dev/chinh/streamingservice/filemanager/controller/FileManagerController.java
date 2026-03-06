@@ -70,11 +70,10 @@ public class FileManagerController {
     }
 
 
-    public record CreateDirectoryRequest(@Size(max = 30) String parentId, @Size(max = 300) String directoryName) {}
-    @PostMapping
-    public ResponseEntity<Void> createDirectory(@RequestBody @Valid CreateDirectoryRequest request) {
-        fileService.createNewFolder(request.parentId, request.directoryName);
-        return ResponseEntity.ok().build();
+    public record CreateDirectoryRequest(@Size(max = 30) String parentId, @Size(max = 300) String name) {}
+    @PostMapping("/folder")
+    public ResponseEntity<?> createDirectory(@RequestBody @Valid CreateDirectoryRequest request) {
+        return ResponseEntity.ok().body(fileService.createNewFolder(request.parentId, request.name));
     }
 
 

@@ -256,7 +256,7 @@ public class FileService {
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
     @Transactional
-    public void createNewFolder(String parentId, String newFolderName) {
+    public FileSystemItem createNewFolder(String parentId, String newFolderName) {
         String error = FileSystemValidator.isValidName(newFolderName);
         if (error != null)
             throw new IllegalArgumentException(error);
@@ -277,7 +277,7 @@ public class FileService {
                 .name(newFolderName)
                 .uploadDate(Instant.now())
                 .build();
-        mongoTemplate.insert(item);
+        return mongoTemplate.insert(item);
     }
 
 
@@ -384,7 +384,7 @@ public class FileService {
 
     private FileSystemItem getFileSystemItem(String id) {
         return fileSystemRepository.findById(id).orElseThrow(() ->
-                new ResourceNotFoundException("File not found with id: " + id)
+                new IllegalArgumentException("File not found with id: " + id)
         );
     }
 

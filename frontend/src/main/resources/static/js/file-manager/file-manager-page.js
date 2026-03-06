@@ -72,7 +72,7 @@ function getIconNode(fileType) {
 let isProcessing = false;
 const currentFileItems = [];
 
-function displayFileItem(fileItems, clearNode = true, clearFileList = true) {
+function displayFileItem(fileItems, clearNode = true, clearFileList = true, pushFileList = true) {
     if (clearNode) {
         const first = fileViewContainer.firstElementChild;
         if (first) fileViewContainer.replaceChildren(first);
@@ -93,7 +93,7 @@ function displayFileItem(fileItems, clearNode = true, clearFileList = true) {
     }
 
     fileItems.forEach(item => {
-        if (clearFileList)
+        if (pushFileList)
             currentFileItems.push(item);
 
         const fileNode = helperCloneAndUnHideNode(fileNodeTem);
@@ -209,7 +209,7 @@ sortSelect.addEventListener('change', async function () {
         else
             order = 'ASC';
         currentFileItems.sort(dynamicSortByField(key, order));
-        displayFileItem(currentFileItems, true, false);
+        displayFileItem(currentFileItems, true, false, false);
         return;
     }
 
@@ -1147,6 +1147,48 @@ deleteFileButton.addEventListener('click', async function () {
     displayInfoMessage("Processing to delete file");
 })
 
+newFolderButton.addEventListener('click', async function () {
+    const sendCreateNewFolderRequest = async (name) => {
+        const currentPath = getCurrentPath();
+        if (currentPath == null) {
+            alert('Failed to get current path');
+            return;
+        }
+        const currentFolderId = currentPath.id;
+        if (currentFolderId === null) {
+            alert('Failed to get current folder id');
+            return;
+        }
+        if (name.length === 0) {
+            alert('Folder name cannot be empty');
+            return;
+        }
+        const newFolderName = name.trim();
+        if (newFolderName.length === 0) {
+            alert('Folder name cannot be empty');
+            return;
+        }
+        const response = await apiRequest(`/api/file/folder`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                parentId: currentFolderId,
+                name: newFolderName
+            })
+        });
+        if (!response.ok) {
+            alert('Failed to create folder: ' + await response.text());
+            return;
+        }
+        const fileInfo = await response.json();
+        displayFileItem([fileInfo], false, false, true);
+        displayInfoMessage(`Created folder: ${name}`, true, 30000);
+    }
+    openOverlayTextPrompt('New Folder', 'Untitled Folder', sendCreateNewFolderRequest);
+});
+
 document.addEventListener('click', () => {
     customRightMenu.style.display = 'none';
 });
@@ -1169,9 +1211,12 @@ overlayTextPrompt.querySelector('.cancel-btn').addEventListener('click', () => {
 
 function openOverlayTextPrompt(title, text, okFunc) {
     overlayTextPrompt.querySelector('.title').textContent = title;
-    overlayTextPrompt.querySelector('.input-text').textContent = text;
-    overlayTextPrompt.querySelector('.ok-btn').onclick = okFunc;
+    const inputText = overlayTextPrompt.querySelector('.input-text');
+    inputText.value = text;
+    overlayTextPrompt.querySelector('.ok-btn').onclick = () => okFunc(inputText.value);
     overlayTextPrompt.classList.remove('hidden');
+    inputText.focus();
+    inputText.select();
 }
 
 
