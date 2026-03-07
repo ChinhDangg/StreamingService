@@ -16,6 +16,8 @@ import dev.chinh.streamingservice.filemanager.event.MediaFileEventProducer;
 import dev.chinh.streamingservice.filemanager.repository.FileSystemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.domain.*;
 import org.springframework.data.mongodb.MongoTransactionException;
@@ -261,6 +263,21 @@ public class FileService {
         Query query = new Query(Criteria.where("id").is(fileId));
         Update update = new Update().set("statusCode", status.getValue());
         return mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+    }
+
+    public void removeFileStatus(String fileId) {
+        Query query = new Query(Criteria.where("id").is(fileId));
+        Update update = new Update().unset("statusCode");
+        mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+    }
+
+    // since directories get set as in-use in caching for folder upload - reset all at startup for dangling status
+    @EventListener(ApplicationReadyEvent.class)
+    public void resetAllFileInUseStatus() {
+        mongoTemplate.updateMulti(
+                Query.query(Criteria
+                        .where("statusCode").is(FileStatus.IN_USE.getValue())),
+                new Update().unset("statusCode"), FileSystemItem.class);
     }
 
     @Retryable(

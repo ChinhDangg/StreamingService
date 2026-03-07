@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.filemanager.event;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import com.mongodb.client.result.UpdateResult;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
@@ -36,32 +37,33 @@ public class MediaFileEventConsumer {
     private final MongoTemplate mongoTemplate;
     private final FileService fileService;
     private final MediaFileEventProducer producer;
+    private final Cache<String, String> directoryIdCache;
 
     private void onCreateFile(MediaUpdateEvent.FileCreated event) {
         System.out.println("Received create file event");
         try {
-            HashMap<String, String> folderIdMap = new HashMap<>();
-
             String rootId = fileService.getROOT_FOLDER_ID();
-            String currentPath = "/" + rootId + "/";
+            StringBuilder currentPath = new StringBuilder("/" + rootId + "/");
             String[] parts = event.fileName().split("/");
             String parentId = rootId;
             if (parts.length > 1) {
                 for (int i = 0; i < parts.length - 1; i++) {
                     String key = parts[i] + "|" + parentId;
-                    String folderId = folderIdMap.getOrDefault(
-                            key,
-                            getOrCreateFolder(parts[i], parentId, currentPath, FileType.DIR)
-                    );
-                    folderIdMap.putIfAbsent(key, folderId);
+
+                    String finalParentId = parentId;
+                    String finalName = parts[i];
+                    String finalCurrentPath = currentPath.toString();
+                    String folderId = directoryIdCache.get(key, _ ->
+                            getOrCreateFolder(finalName, finalParentId, finalCurrentPath, FileType.DIR));
+
                     parentId = folderId;
-                    currentPath += folderId + "/";
+                    currentPath.append(folderId).append("/");
                 }
             }
             String fileName = parts[parts.length - 1];
             FileSystemItem fileItem = FileSystemItem.builder()
                     .parentId(parentId)
-                    .path(currentPath)
+                    .path(currentPath.toString())
                     .bucket(event.bucket())
                     .objectName(event.objectName())
                     .name(fileName)
@@ -70,11 +72,6 @@ public class MediaFileEventConsumer {
                     .uploadDate(Instant.now())
                     .build();
             mongoTemplate.insert(fileItem);
-
-            // unmark parent folders got or created to not in use anymore, getOrCreateFolder mark the folder as in use
-            Query query = new Query(Criteria.where("id").in(folderIdMap.values()));
-            Update update = new Update().unset("statusCode");
-            mongoTemplate.updateMulti(query, update, FileSystemItem.class);
 
             if (event.mediaId() != null && event.mediaType() != null) {
                 producer.publishEvent(new MediaFileEventProducer.EventWrapper(
@@ -294,6 +291,7 @@ public class MediaFileEventConsumer {
 
 
     private String getOrCreateFolder(String name, String parentId, String currentPath, FileType fileType) {
+        System.out.println("getting folder: " + name + " in " + parentId);
         Query query = new Query(Criteria
                 .where("parentId").is(parentId)
                 .and("name").is(name)
