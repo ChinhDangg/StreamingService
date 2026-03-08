@@ -85,6 +85,7 @@ public class KafkaRedPandaConfig {
         mappings.put("dev.chinh.streamingservice.common.event.MediaUpdateEvent$MediaEnriched", MediaUpdateEvent.MediaEnriched.class);
         mappings.put("dev.chinh.streamingservice.common.event.MediaUpdateEvent$ObjectDeleted", MediaUpdateEvent.ObjectDeleted.class);
         mappings.put("dev.chinh.streamingservice.common.event.MediaUpdateEvent$MediaThumbnailUpdated", MediaUpdateEvent.MediaThumbnailUpdated.class);
+        mappings.put("dev.chinh.streamingservice.common.event.MediaUpdateEvent$ThumbnailDeleted", MediaUpdateEvent.ThumbnailDeleted.class);
 
         typeMapper.setIdClassMapping(mappings);
         typeMapper.setTypePrecedence(Jackson2JavaTypeMapper.TypePrecedence.TYPE_ID);

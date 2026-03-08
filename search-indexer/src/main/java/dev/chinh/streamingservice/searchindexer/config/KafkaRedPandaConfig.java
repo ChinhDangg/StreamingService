@@ -125,7 +125,7 @@ public class KafkaRedPandaConfig {
                         ));
 
         // retry every 2s, up to 5 times
-        FixedBackOff backOff = new FixedBackOff(2000, 5);
+        FixedBackOff backOff = new FixedBackOff(2000, 3);
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, backOff);
 
         // exceptions should NOT be retried:

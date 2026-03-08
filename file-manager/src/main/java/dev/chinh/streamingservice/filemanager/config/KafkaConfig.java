@@ -116,7 +116,7 @@ public class KafkaConfig {
                         )
                 );
 
-        FixedBackOff fixedBackOff = new FixedBackOff(5000L, 5);
+        FixedBackOff fixedBackOff = new FixedBackOff(3000L, 3);
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, fixedBackOff);
 
         errorHandler.addNotRetryableExceptions(IllegalArgumentException.class);
