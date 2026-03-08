@@ -80,14 +80,14 @@ public class MediaMetadataModifyService {
     ) {}
 
     @Transactional
-    public void updateNameEntityInMediaInBatch(List<UpdateList> updateLists, long mediaId) {
+    public void updateNameEntityInMediaInBatch(List<UpdateList> updateLists, long mediaId, boolean publishSearchUpdate) {
         for (UpdateList updateList : updateLists) {
-            updateNameEntityInMedia(updateList, mediaId);
+            updateNameEntityInMedia(updateList, mediaId, publishSearchUpdate);
         }
     }
 
     @Transactional
-    public List<NameEntityDTO> updateNameEntityInMedia(UpdateList updateList, long mediaId) {
+    public List<NameEntityDTO> updateNameEntityInMedia(UpdateList updateList, long mediaId, boolean publishSearchUpdate) {
         if ((updateList.adding == null || updateList.adding.isEmpty()) && (updateList.removing == null || updateList.removing.isEmpty())) return new ArrayList<>();
 
         List<NameEntityDTO> uniqueAdding = updateList.adding == null ? new ArrayList<>() : new ArrayList<>(updateList.adding.stream().distinct().toList());
@@ -108,10 +108,11 @@ public class MediaMetadataModifyService {
         }
         List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(mediaId, updateList.nameEntity);
 
-        eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
-                EventTopics.MEDIA_SEARCH_TOPIC,
-                new MediaUpdateEvent.MediaNameEntityUpdated(mediaId, updateList.nameEntity)
-        ));
+        if (publishSearchUpdate)
+            eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                    EventTopics.MEDIA_SEARCH_TOPIC,
+                    new MediaUpdateEvent.MediaNameEntityUpdated(mediaId, updateList.nameEntity)
+            ));
 
         mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
         return updatedMediaNameEntityList;

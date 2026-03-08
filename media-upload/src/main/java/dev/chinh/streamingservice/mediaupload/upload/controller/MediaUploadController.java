@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.mediaupload.upload.controller;
 
 import dev.chinh.streamingservice.mediaupload.MediaBasicInfo;
+import dev.chinh.streamingservice.mediaupload.modify.service.MediaMetadataModifyService;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaUploadService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -43,12 +44,13 @@ public class MediaUploadController {
             String uploadId,
             List<MediaUploadService.UploadedPart> uploadedParts,
             MediaBasicInfo basicInfo,
-            boolean isLast
+            boolean isLast,
+            List<MediaMetadataModifyService.UpdateList> nameUpdateList
     ) {}
 
     @PostMapping("/end-session-video")
     public ResponseEntity<Long> endSession(@RequestBody EndSessionRequest request, @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok().body(mediaUploadService.saveAsVideoMedia(request.uploadId, request.basicInfo, request.uploadedParts, jwt.getSubject(), request.isLast));
+        return ResponseEntity.ok().body(mediaUploadService.saveAsVideoMedia(request.uploadId, request.basicInfo, request.uploadedParts, request.nameUpdateList, jwt.getSubject(), request.isLast));
     }
 
     @PostMapping("/end-session-file")

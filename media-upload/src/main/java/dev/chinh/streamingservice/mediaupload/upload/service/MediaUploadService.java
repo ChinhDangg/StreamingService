@@ -8,6 +8,7 @@ import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.mediaupload.MediaBasicInfo;
 import dev.chinh.streamingservice.mediaupload.event.MediaUploadEventProducer;
+import dev.chinh.streamingservice.mediaupload.modify.service.MediaMetadataModifyService;
 import dev.chinh.streamingservice.persistence.entity.*;
 import dev.chinh.streamingservice.persistence.repository.*;
 import jakarta.validation.constraints.Max;
@@ -31,6 +32,7 @@ public class MediaUploadService {
 
     private final ObjectUploadService objectUploadService;
     private final MinIOService minIOService;
+    private final MediaMetadataModifyService mediaMetadataModifyService;
 
     private final ApplicationEventPublisher eventPublisher;
 
@@ -116,7 +118,7 @@ public class MediaUploadService {
     public record MediaUploadRequest(String bucket, String objectName, String fileName, MediaType mediaType, boolean searchable) {}
 
     @Transactional
-    public long saveAsVideoMedia(String uploadId, MediaBasicInfo basicInfo, List<UploadedPart> parts, String userId, boolean isLast) {
+    public long saveAsVideoMedia(String uploadId, MediaBasicInfo basicInfo, List<UploadedPart> parts, List<MediaMetadataModifyService.UpdateList> nameUpdateList, String userId, boolean isLast) {
         String combinedName = getCachedFileUploadRequest(uploadId);
         if (combinedName == null) {
             throw new IllegalArgumentException("Invalid upload ID: " + uploadId);
@@ -139,6 +141,10 @@ public class MediaUploadService {
 
         String bucket = getBucketOnMediaType(fileName);
         long size = minIOService.getObjectSize(bucket, objectName);
+
+        if (nameUpdateList != null)
+            mediaMetadataModifyService.updateNameEntityInMediaInBatch(nameUpdateList, savedId, false);
+
         eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
                 new MediaUpdateEvent.FileCreated(
