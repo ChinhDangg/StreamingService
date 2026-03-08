@@ -80,13 +80,7 @@ public class KafkaRedPandaConfig {
                         .config("retention.ms", "604800000")
                         .config("segment.bytes", "100048576")
                         .build(),
-                TopicBuilder.name(EventTopics.MEDIA_FILE_UPLOAD_SEARCH_BACKUP_TOPIC)
-                        .partitions(1)
-                        .replicas(1)
-                        .config("retention.ms", "604800000")
-                        .config("segment.bytes", "100048576")
-                        .build(),
-                TopicBuilder.name(EventTopics.MEDIA_FILE_UPLOAD_SEARCH_BACKUP_TOPIC)
+                TopicBuilder.name(EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC)
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000")

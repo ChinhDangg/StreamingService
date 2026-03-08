@@ -361,7 +361,7 @@ public class FileService {
         updateStatusCode(item.getId(), FileStatus.DELETING);
 
         producer.publishEvent(new MediaFileEventProducer.EventWrapper(
-                EventTopics.MEDIA_FILE_UPLOAD_SEARCH_BACKUP_TOPIC,
+                EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC,
                 new MediaUpdateEvent.FileDeleted(
                         item.getId(), getFullPathInName(item), FileType.isNotDir(item.getFileType()), item.getMId())
         ));
