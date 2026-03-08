@@ -1,6 +1,6 @@
 import {apiRequest} from "/static/js/common.js";
 
-export async function endVideoUploadSession(uploadId, uploadedParts, basicInfo, isLast = false) {
+export async function endVideoUploadSession(uploadId, uploadedParts, basicInfo, nameUpdateList, isLast = false) {
     const endResponse = await apiRequest('/api/upload/media/end-session-video', {
         method: 'POST',
         headers: {
@@ -10,7 +10,8 @@ export async function endVideoUploadSession(uploadId, uploadedParts, basicInfo, 
             uploadId: uploadId,
             uploadedParts: uploadedParts,
             basicInfo: basicInfo,
-            isLast: isLast
+            isLast: isLast,
+            nameUpdateList: nameUpdateList
         })
     });
     if (!endResponse.ok) {

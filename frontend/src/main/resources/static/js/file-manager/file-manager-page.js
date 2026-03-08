@@ -648,27 +648,22 @@ async function uploadFiles(fileList) {
     allVideo = allVideo && uploadAsVideoCheckbox.checked;
     const currentFullPath = getFullCurrentPath();
 
+    const mediaNameEntities = getNameEntityForMediaUpload();
+
     const endVideoMediaSession = async (uploadId, uploadedParts, filename, isLast) => {
         const basicInfo = {
             title: filename.substring(filename.lastIndexOf('/') + 1),
             year: new Date().getFullYear()
         }
-        return await endVideoUploadSession(uploadId, uploadedParts, basicInfo, isLast); // media id or error message
+        return await endVideoUploadSession(uploadId, uploadedParts, basicInfo, mediaNameEntities, isLast); // media id or error message
     }
 
     const endSession = async (fileInfo, filename, isLast = false) => {
         if (allVideo) {
-            const mediaId = fileInfo.mediaId ? fileInfo.mediaId : await endVideoMediaSession(fileInfo.uploadId, fileInfo.eTags, filename, isLast);
-            if (mediaId.startsWith('Error:')) {
-                displayFailTexts([mediaId]);
+            const mess = await endVideoMediaSession(fileInfo.uploadId, fileInfo.eTags, filename, isLast);
+            if (mess.startsWith('Error:')) {
+                displayFailTexts([mess]);
                 return null;
-            } else {
-                fileInfo.mediaId = mediaId;
-                const errorMess = await uploadNameEntityForMediaInBatch(mediaId);
-                if (errorMess) {
-                    displayFailTexts([errorMess]);
-                    return null;
-                }
             }
         } else {
             const mess = await endFileSession(fileInfo.uploadId, fileInfo.eTags, isLast);
@@ -824,6 +819,7 @@ const NameEntities = Object.freeze({
     Tags: 'tags'
 });
 let currentNameEntity = null;
+const nameEntityNodeList = [];
 let currentNameEntityNode = null;
 const nameEntityEditMap = new Map();
 
@@ -841,13 +837,14 @@ function initializeAddNameEntity() {
             editAreaContainer.querySelector('.current-edit-name-title').textContent = value;
             editAreaContainer.classList.remove('hidden');
         });
+        nameEntityNodeList.push(nameEntity);
         nameEntityEditMap.set(key, new Map());
         addNameEntityContainer.appendChild(nameEntity);
     });
 }
 
 function loadCurrentNameEntityToEditArea() {
-    clearNameEntityDisplayNode();
+    clearNameEntityDisplayNode(currentNameEntityNode);
     nameEntityEditMap.get(currentNameEntity).forEach((value, key) => {
         addNameEntity(currentNameEntityNode, currentNameEntity, value, key);
     });
@@ -948,7 +945,7 @@ function addNameEntity(nameEntityNode, nameEntity, name, nameId) {
     editAreaContainer.querySelector('#currentArea').appendChild(tempEditNode);
 }
 
-async function uploadNameEntityForMediaInBatch(mediaId) {
+function getNameEntityForMediaUpload() {
     const body = [];
     nameEntityEditMap.forEach((value, key) => {
         const adding = [];
@@ -957,27 +954,18 @@ async function uploadNameEntityForMediaInBatch(mediaId) {
             body.push({nameEntity: key.toUpperCase(), adding: adding});
     });
     if (body.length === 0) return null;
-    const response = await apiRequest(`/api/modify/media/update-batch/${mediaId}`, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-    });
-    if (!response.ok) {
-        return `Error: Failed to add name entity: ${await response.text()}`;
-    }
-    return null;
+    return body;
 }
 
 function clearNameEntityMap() {
-    clearNameEntityDisplayNode();
+    for (const nameEntityNode of nameEntityNodeList)
+        clearNameEntityDisplayNode(nameEntityNode);
     nameEntityEditMap.forEach((value, _) => value.clear());
 }
 
-function clearNameEntityDisplayNode() {
-    if (currentNameEntityNode === null) return;
-    const infoContainer = currentNameEntityNode.querySelector('.info-container');
+function clearNameEntityDisplayNode(nameEntityNode) {
+    if (nameEntityNode === null) return;
+    const infoContainer = nameEntityNode.querySelector('.info-container');
     const first = infoContainer.firstElementChild;
     if (first) infoContainer.replaceChildren(first);
     editAreaContainer.querySelector('#currentArea').textContent = '';
