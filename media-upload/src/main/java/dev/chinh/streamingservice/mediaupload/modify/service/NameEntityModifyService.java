@@ -12,6 +12,7 @@ import dev.chinh.streamingservice.persistence.entity.*;
 import dev.chinh.streamingservice.persistence.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,13 +79,18 @@ public class NameEntityModifyService {
         name = validateNameEntity(name);
         mediaNameEntity.setName(name);
 
-        T added = repository.save(mediaNameEntity);
-        long id = added.getId();
+        try {
+            T added = repository.save(mediaNameEntity);
+            long id = added.getId();
 
-        eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
-                EventTopics.MEDIA_SEARCH_TOPIC,
-                new MediaUpdateEvent.NameEntityCreated(mediaNameEntityConstant, id, null)
-        ));
+
+            eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                    EventTopics.MEDIA_SEARCH_TOPIC,
+                    new MediaUpdateEvent.NameEntityCreated(mediaNameEntityConstant, id, null)
+            ));
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalArgumentException("Name already exists: " + name);
+        }
     }
 
     @Transactional
@@ -130,6 +136,9 @@ public class NameEntityModifyService {
             } catch (Exception deleteEx) {
                 System.err.println("CRITICAL: Failed to clean up orphan file: " + thumbnailPath);
             }
+            if (e instanceof DataIntegrityViolationException) {
+                throw new IllegalArgumentException("Name already exists: " + request.getName());
+            }
             throw new RuntimeException("Entity creation failed after file upload.", e);
         }
     }
@@ -164,7 +173,12 @@ public class NameEntityModifyService {
         if (nameEntity.getName().equals(name))
             return;
         nameEntity.setName(name);
-        repository.save(nameEntity);
+
+        try {
+            repository.save(nameEntity);
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalArgumentException("Name already exists: " + name);
+        }
 
         eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_SEARCH_TOPIC,
@@ -210,7 +224,11 @@ public class NameEntityModifyService {
             if (thumbnailChanged) nameEntity.setThumbnail(newThumbnailPath);
 
             if (nameChanged || thumbnailChanged) {
-                repository.save(nameEntity);
+                try {
+                    repository.save(nameEntity);
+                } catch (DataIntegrityViolationException e) {
+                    throw new IllegalArgumentException("Name already exists: " + newName);
+                }
 
                 String topic = newThumbnailPath != null // new file has uploaded
                         ? EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC
@@ -234,6 +252,7 @@ public class NameEntityModifyService {
                     System.err.println("CRITICAL: Failed to clean up orphan new uploaded file: " + newThumbnailPath);
                 }
             }
+            throw e;
         }
     }
 
