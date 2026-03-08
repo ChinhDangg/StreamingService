@@ -11,7 +11,7 @@ services:
       MINIO_API_STALE_UPLOADS_EXPIRY: 1h
       MINIO_API_STALE_UPLOADS_CLEANUP_INTERVAL: 1h  # check hourly
     volumes:
-      - ./minio-data:/data
+      - ${MINIO_VOLUME}:/data
     command: server /data --console-address ":9001"
 
   minio-init:
@@ -38,7 +38,7 @@ services:
       - ffmpeg
     volumes:
       - ./nginx/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
-      - chunks:/chunks
+      - chunks:/chunks # use shared tmpfs volume
     extra_hosts:
       - "host.docker.internal:host-gateway"
     # docker exec -it nginx nginx -V #check for config being applied or not - --config-path=
@@ -71,7 +71,7 @@ services:
       - "9200:9200"
       - "9600:9600"
     volumes:
-      - ./opensearch-data:/usr/share/opensearch/data
+      - ${OPENSEARCH_VOLUME}:/usr/share/opensearch/data
 
   redis:
     image: redis:7.4.7-alpine
@@ -96,7 +96,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./postgres_data:/var/lib/postgresql
+      - ${POSTGRES_VOLUME}:/var/lib/postgresql
       - ./postgres/initdb.d:/docker-entrypoint-initdb.d
 
   bootstrap:
@@ -129,6 +129,39 @@ services:
       - --reserve-memory=0M
       - --node-id=0
       - --check=false
+    volumes:
+      - ${REDPANDA_VOLUME}:/var/lib/redpanda/data
+
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: strongpassword
+      MONGO_INITDB_DATABASE: media_catalog
+    # Starts mongo with replica set mode enabled
+    command: [ "--replSet", "rs0", "--bind_ip_all", "--keyFile", "/data/configdb/mongo-keyfile" ]
+    healthcheck:
+      test: [ "CMD", "mongosh", "--username", "admin", "--password", "strongpassword", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ${MONGODB_VOLUME}:/data/db
+      - ./mongo/mongo-keyfile:/data/configdb/mongo-keyfile
+
+  mongo-init:
+    image: mongo:7
+    container_name: mongo-init
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    entrypoint: [ "/bin/bash", "/scripts/init.sh", "admin", "strongpassword" ]
+    volumes:
+      - ./mongo/init:/scripts
+
 
 volumes:
   chunks:
@@ -137,25 +170,3 @@ volumes:
       type: tmpfs
       device: tmpfs
       o: size=${RAM_VOLUME_BYTES}
-
-#  logstash:
-#    image: docker.elastic.co/logstash/logstash:8.17.10
-#    container_name: logstash
-#    volumes:
-#      - ./pipeline:/usr/share/logstash/pipeline   # mount config files
-#      - ./drivers:/usr/share/logstash/drivers     # mount JDBC driver
-#    environment:
-#      - LS_JAVA_OPTS=-Xms512m -Xmx512m
-#    depends_on:
-#      - opensearch
-#      - postgres
-
-#  postgres:
-#    image: postgres:18
-#    container_name: postgres
-#    environment:
-#      POSTGRES_USER: myuser
-#      POSTGRES_PASSWORD: secret
-#      POSTGRES_DB: media_db
-#    ports:
-#      - "5432:5432"

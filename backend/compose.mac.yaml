@@ -11,7 +11,7 @@ services:
       MINIO_API_STALE_UPLOADS_EXPIRY: 1h
       MINIO_API_STALE_UPLOADS_CLEANUP_INTERVAL: 1h  # check hourly
     volumes:
-      - ./minio-data:/data
+      - ${MINIO_VOLUME}:/data
     command: server /data --console-address ":9001"
 
   minio-init:
@@ -39,7 +39,7 @@ services:
       - ffmpeg
     volumes:
       - ./nginx/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
-      - /Volumes/RAMDISK:/chunks
+      - ${RAM_VOLUME}:/chunks
     extra_hosts:
       - "host.docker.internal:host-gateway"
     # docker exec -it nginx nginx -V #check for config being applied or not - --config-path=
@@ -52,7 +52,7 @@ services:
     entrypoint: [ "/bin/sh", "-c" ]   # replace ffmpeg with a shell
     command: [ "tail -f /dev/null" ]  # keep alive
     volumes:
-      - /Volumes/RAMDISK:/chunks      # mount same RAM disk
+      - ${RAM_VOLUME}:/chunks      # mount same RAM disk
       - ${THUMBNAIL_DISK}:/disk    # to generate thumbnails and then move to minio
 
   opensearch:
@@ -72,7 +72,7 @@ services:
       - "9200:9200"
       - "9600:9600"
     volumes:
-      - ./opensearch-data:/usr/share/opensearch/data
+      - ${OPENSEARCH_VOLUME}:/usr/share/opensearch/data
 
   redis:
     image: redis:7.4.7-alpine
@@ -97,7 +97,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./postgres_data:/var/lib/postgresql
+      - ${POSTGRES_VOLUME}:/var/lib/postgresql
       - ./postgres/initdb.d:/docker-entrypoint-initdb.d
 
   postgres-init:
@@ -130,6 +130,8 @@ services:
       - --reserve-memory=0M
       - --node-id=0
       - --check=false
+    volumes:
+      - ${REDPANDA_VOLUME}:/var/lib/redpanda/data
 
   mongodb:
     image: mongo:7
@@ -148,7 +150,7 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - ./mongo_data:/data/db
+      - ${MONGODB_VOLUME}:/data/db
       - ./mongo/mongo-keyfile:/data/configdb/mongo-keyfile
 
   mongo-init:

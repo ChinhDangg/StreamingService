@@ -94,20 +94,6 @@ services:
       - --save ""
       - --appendonly no
 
-  postgres:
-    image: postgres:18
-    user: "999:999"
-    container_name: postgres
-    environment:
-      POSTGRES_USER: ${DB_USERNAME}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: media_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - /media/file_pool/postgres:/var/lib/postgresql
-      - ./postgres/initdb.d:/docker-entrypoint-initdb.d
-
   redpanda:
     image: redpandadata/redpanda:v25.2.12
     container_name: redpanda_kafka
@@ -123,8 +109,24 @@ services:
       - --reserve-memory=0M
       - --node-id=0
       - --check=false
+    volumes:
+      - ${REDPANDA_VOLUME}:/var/lib/redpanda/data
 
-  bootstrap:
+  postgres:
+    image: postgres:18
+    user: "999:999"
+    container_name: postgres
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: media_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - /media/file_pool/postgres:/var/lib/postgresql
+      - ./postgres/initdb.d:/docker-entrypoint-initdb.d
+
+  postgres-init:
     image: postgres:18
     depends_on:
       - postgres
@@ -138,3 +140,33 @@ services:
       DB_SUPERUSER_PASSWORD: ${DB_PASSWORD}
     volumes:
       - ./postgres/initdb.d:/scripts
+
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: strongpassword
+      MONGO_INITDB_DATABASE: media_catalog
+    # Starts mongo with replica set mode enabled
+    command: [ "--replSet", "rs0", "--bind_ip_all", "--keyFile", "/data/configdb/mongo-keyfile" ]
+    healthcheck:
+      test: [ "CMD", "mongosh", "--username", "admin", "--password", "strongpassword", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - /media/file_pool/mongodb:/data/db
+      - ./mongo/mongo-keyfile:/data/configdb/mongo-keyfile
+
+  mongo-init:
+    image: mongo:7
+    container_name: mongo-init
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    entrypoint: [ "/bin/bash", "/scripts/init.sh", "admin", "strongpassword" ]
+    volumes:
+      - ./mongo/init:/scripts
