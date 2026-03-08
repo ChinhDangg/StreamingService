@@ -42,12 +42,6 @@ public class MediaMetadataModifyController {
         mediaMetadataModifyService.updateNameEntityInMediaInBatch(updateLists, id);
         return ResponseEntity.ok().build();
     }
-//
-//    @DeleteMapping("/{id}")
-//    public ResponseEntity<Void> deleteMedia(@PathVariable long id) {
-//        mediaMetadataModifyService.deleteMedia(id);
-//        return ResponseEntity.ok().build();
-//    }
 
     @PutMapping(value = "/thumbnail/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Void> updateMediaThumbnail(@PathVariable long id,
