@@ -248,13 +248,11 @@ async function initializeEdit() {
         allNameEntityMap.get(currentNameEntity).get('adding').clear();
         allNameEntityMap.get(currentNameEntity).get('removing').clear();
         const updatedNameEntities = await response.json();
-        const names = [];
-        for (const { id, name } of updatedNameEntities) {
-            names.push(name);
-            allNameEntityMap.get(currentNameEntity).get('current').set(id, name);
+        for (const updated of updatedNameEntities) {
+            allNameEntityMap.get(currentNameEntity).get('current').set(updated.id, updated.name);
         }
         const mediaInfoTemp = {
-            [currentNameEntity]: names,
+            [currentNameEntity]: updatedNameEntities,
         };
         const mainContainer = document.getElementById(document.body.dataset.mainContainerId);
         displayContentInfo(mediaInfoTemp, mainContainer);
