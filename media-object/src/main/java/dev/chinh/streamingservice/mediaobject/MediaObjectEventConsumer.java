@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
+import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
@@ -201,9 +202,9 @@ public class MediaObjectEventConsumer {
     )
     public void handleDlq(@Payload MediaUpdateEvent event,
                           Acknowledgment ack,
-                          @Header(name = "x-exception-message", required = false) String errorMessage) {
+                          @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) byte[] errorMessage) {
         System.out.println("======= DLQ EVENT DETECTED =======");
-        System.out.printf("Error Message: %s\n", errorMessage);
+        System.out.printf("Error Message: %s\n", errorMessage == null ? "No error message found" : new String(errorMessage));
 
         // Accessing the POJO data directly
         switch (event) {

@@ -427,7 +427,7 @@ public class MediaFileEventConsumer {
             EventTopics.MEDIA_FILE_TOPIC,
             EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
             EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC,
-            EventTopics.MEDIA_FILE_UPLOAD_SEARCH_BACKUP_TOPIC
+            EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC
     }, groupId = KafkaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) {
         try {

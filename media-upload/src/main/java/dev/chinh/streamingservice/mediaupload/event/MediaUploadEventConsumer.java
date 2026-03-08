@@ -113,7 +113,7 @@ public class MediaUploadEventConsumer {
 
     @KafkaListener(topics = {
             EventTopics.MEDIA_UPLOAD_TOPIC,
-            EventTopics.MEDIA_FILE_UPLOAD_SEARCH_BACKUP_TOPIC
+            EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) {
         try {

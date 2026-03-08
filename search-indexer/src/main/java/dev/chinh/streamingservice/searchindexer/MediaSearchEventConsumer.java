@@ -5,6 +5,7 @@ import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.persistence.projection.MediaGroupInfo;
+import dev.chinh.streamingservice.persistence.projection.MediaNameSearchItem;
 import dev.chinh.streamingservice.persistence.projection.MediaSearchItem;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
@@ -14,6 +15,7 @@ import dev.chinh.streamingservice.searchindexer.config.KafkaRedPandaConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
+import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
@@ -173,7 +175,7 @@ public class MediaSearchEventConsumer {
             EventTopics.MEDIA_SEARCH_TOPIC,
             EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC,
             EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC,
-            EventTopics.MEDIA_FILE_UPLOAD_SEARCH_BACKUP_TOPIC,
+            EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC,
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) {
         try {
@@ -210,9 +212,9 @@ public class MediaSearchEventConsumer {
     )
     public void handleDlq(@Payload MediaUpdateEvent event,
                           Acknowledgment ack,
-                          @Header(name = "x-exception-message", required = false) String errorMessage) {
+                          @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) byte[] errorMessage) {
         System.out.println("======= DLQ EVENT DETECTED =======");
-        System.out.printf("Error Message: %s\n", errorMessage);
+        System.out.printf("Error Message: %s\n", errorMessage == null ? "No error message found" : new String(errorMessage));
 
         // Accessing the POJO data directly
         switch (event) {
