@@ -86,7 +86,9 @@ public interface MediaUpdateEvent {
             long size,
             Long mediaId,
             MediaType mediaType,
-            String thumbnailObject
+            String thumbnailObject,
+            String userId,
+            boolean isLast
     ) implements MediaUpdateEvent {}
 
     record FileDeleted(

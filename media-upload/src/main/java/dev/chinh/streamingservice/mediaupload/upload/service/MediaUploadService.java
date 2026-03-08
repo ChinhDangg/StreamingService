@@ -96,7 +96,7 @@ public class MediaUploadService {
 
 
     @Transactional(readOnly = true)
-    public void saveFile(String uploadId, List<UploadedPart> parts) {
+    public void saveFile(String uploadId, List<UploadedPart> parts, String userId, boolean isLast) {
         String combinedName = completeUpload(uploadId, parts);
 
         String objectName = combinedName.substring(0, combinedName.indexOf(":|:"));
@@ -106,7 +106,7 @@ public class MediaUploadService {
         long size = minIOService.getObjectSize(bucket, objectName);
         eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
-                new MediaUpdateEvent.FileCreated(bucket, objectName, fileName, size, null, null, null)
+                new MediaUpdateEvent.FileCreated(bucket, objectName, fileName, size, null, null, null, userId, isLast)
         ));
 
         removeCacheFileUploadRequest(uploadId);
@@ -116,7 +116,7 @@ public class MediaUploadService {
     public record MediaUploadRequest(String bucket, String objectName, String fileName, MediaType mediaType, boolean searchable) {}
 
     @Transactional
-    public long saveAsVideoMedia(String uploadId, MediaBasicInfo basicInfo, List<UploadedPart> parts) {
+    public long saveAsVideoMedia(String uploadId, MediaBasicInfo basicInfo, List<UploadedPart> parts, String userId, boolean isLast) {
         String combinedName = getCachedFileUploadRequest(uploadId);
         if (combinedName == null) {
             throw new IllegalArgumentException("Invalid upload ID: " + uploadId);
@@ -145,7 +145,9 @@ public class MediaUploadService {
                         bucket, objectName,
                         fileName, size,
                         savedId, MediaType.VIDEO,
-                        MediaUploadService.createMediaThumbnailString(MediaType.VIDEO, savedId, objectName))
+                        MediaUploadService.createMediaThumbnailString(MediaType.VIDEO, savedId, objectName),
+                        userId, isLast
+                )
         ));
 
         removeCacheFileUploadRequest(uploadId);

@@ -7,6 +7,8 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -40,16 +42,18 @@ public class MediaUploadController {
             @Size(max = 256, message = "Invalid Upload ID length")
             String uploadId,
             List<MediaUploadService.UploadedPart> uploadedParts,
-            MediaBasicInfo basicInfo) {}
+            MediaBasicInfo basicInfo,
+            boolean isLast
+    ) {}
 
     @PostMapping("/end-session-video")
-    public ResponseEntity<Long> endSession(@RequestBody EndSessionRequest request) {
-        return ResponseEntity.ok().body(mediaUploadService.saveAsVideoMedia(request.uploadId, request.basicInfo, request.uploadedParts));
+    public ResponseEntity<Long> endSession(@RequestBody EndSessionRequest request, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().body(mediaUploadService.saveAsVideoMedia(request.uploadId, request.basicInfo, request.uploadedParts, jwt.getSubject(), request.isLast));
     }
 
     @PostMapping("/end-session-file")
-    public ResponseEntity<Void> endSessionFile(@RequestBody @Valid EndSessionRequest request) {
-        mediaUploadService.saveFile(request.uploadId, request.uploadedParts);
+    public ResponseEntity<Void> endSessionFile(@RequestBody @Valid EndSessionRequest request, @AuthenticationPrincipal Jwt jwt) {
+        mediaUploadService.saveFile(request.uploadId, request.uploadedParts, jwt.getSubject(), request.isLast);
         return ResponseEntity.ok().build();
     }
 

@@ -648,17 +648,17 @@ async function uploadFiles(fileList) {
     allVideo = allVideo && uploadAsVideoCheckbox.checked;
     const currentFullPath = getFullCurrentPath();
 
-    const endVideoMediaSession = async (uploadId, uploadedParts, filename) => {
+    const endVideoMediaSession = async (uploadId, uploadedParts, filename, isLast) => {
         const basicInfo = {
             title: filename.substring(filename.lastIndexOf('/') + 1),
             year: new Date().getFullYear()
         }
-        return await endVideoUploadSession(uploadId, uploadedParts, basicInfo); // media id or error message
+        return await endVideoUploadSession(uploadId, uploadedParts, basicInfo, isLast); // media id or error message
     }
 
-    const endSession = async (fileInfo, filename) => {
+    const endSession = async (fileInfo, filename, isLast = false) => {
         if (allVideo) {
-            const mediaId = fileInfo.mediaId ? fileInfo.mediaId : await endVideoMediaSession(fileInfo.uploadId, fileInfo.eTags, filename);
+            const mediaId = fileInfo.mediaId ? fileInfo.mediaId : await endVideoMediaSession(fileInfo.uploadId, fileInfo.eTags, filename, isLast);
             if (mediaId.startsWith('Error:')) {
                 displayFailTexts([mediaId]);
                 return null;
@@ -671,7 +671,7 @@ async function uploadFiles(fileList) {
                 }
             }
         } else {
-            const mess = await endFileSession(fileInfo.uploadId, fileInfo.eTags);
+            const mess = await endFileSession(fileInfo.uploadId, fileInfo.eTags, isLast);
             if (mess.startsWith('Error:')) {
                 displayFailTexts([mess]);
                 return null;
@@ -681,7 +681,10 @@ async function uploadFiles(fileList) {
     }
 
     if (uploadingFiles.size) {
+        let i = -1;
+        const total = uploadingFiles.size;
         for (const f of uploadingFiles.keys()) {
+            i++;
             const uploadingFile = uploadingFiles.get(f);
             uploadingFile.chunks.partNumber = uploadingFile.partNumber;
             const passed = await uploadFile(
@@ -692,7 +695,7 @@ async function uploadFiles(fileList) {
             if (!passed) {
                 displayFailTexts(currentFailTexts);
             } else {
-                const noError = await endSession(uploadingFiles.get(f), uploadingFiles.get(f).fileName);
+                const noError = await endSession(uploadingFiles.get(f), uploadingFiles.get(f).fileName, i >= total);
                 if (!noError) {
                     continue;
                 }
@@ -700,7 +703,8 @@ async function uploadFiles(fileList) {
             }
         }
     } else {
-        for (const file of fileList) {
+        for (let i = 0; i < fileList.length; i++) {
+            const file = fileList[i];
             const fileName = getDirPath(currentFullPath, file.name);
             const passed = await uploadFile(
                 null, file.file, fileName, uploadingFiles, currentFailTexts,
@@ -711,7 +715,7 @@ async function uploadFiles(fileList) {
                 displayFailTexts(currentFailTexts);
             } else {
                 const fileInfo = uploadingFiles.get(fileName);
-                const noError = await endSession(fileInfo, fileName);
+                const noError = await endSession(fileInfo, fileName, i >= fileList.length - 1);
                 if (!noError) {
                     continue;
                 }

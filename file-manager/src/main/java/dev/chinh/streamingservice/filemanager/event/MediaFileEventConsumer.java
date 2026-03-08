@@ -6,6 +6,7 @@ import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
+import dev.chinh.streamingservice.filemanager.config.ApplicationConfig;
 import dev.chinh.streamingservice.filemanager.config.KafkaConfig;
 import dev.chinh.streamingservice.filemanager.constant.FileStatus;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
@@ -28,6 +29,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 @Service
@@ -37,7 +39,7 @@ public class MediaFileEventConsumer {
     private final MongoTemplate mongoTemplate;
     private final FileService fileService;
     private final MediaFileEventProducer producer;
-    private final Cache<String, String> directoryIdCache;
+    private final Cache<String, ApplicationConfig.EntryCached> directoryIdCache;
 
     private void onCreateFile(MediaUpdateEvent.FileCreated event) {
         System.out.println("Received create file event");
@@ -48,13 +50,34 @@ public class MediaFileEventConsumer {
             String parentId = rootId;
             if (parts.length > 1) {
                 for (int i = 0; i < parts.length - 1; i++) {
-                    String key = parts[i] + "|" + parentId;
+                    String dirKey = "DIR_" + parts[i] + "|" + parentId;
 
                     String finalParentId = parentId;
                     String finalName = parts[i];
                     String finalCurrentPath = currentPath.toString();
-                    String folderId = directoryIdCache.get(key, _ ->
-                            getOrCreateFolder(finalName, finalParentId, finalCurrentPath, FileType.DIR));
+                    ApplicationConfig.DirectoryCached directoryCached = (ApplicationConfig.DirectoryCached) directoryIdCache.asMap().compute(dirKey, (_, existing) -> {
+                        if (existing == null) {
+                            String fileId = getOrCreateFolder(finalName, finalParentId, finalCurrentPath, FileType.DIR);
+                            Set<String> users = ConcurrentHashMap.newKeySet();
+                            return new ApplicationConfig.DirectoryCached(fileId, users);
+                        } else {
+                            ((ApplicationConfig.DirectoryCached) existing).userUsing().add(event.userId());
+                            return existing;
+                        }
+                    });
+
+                    String folderId = directoryCached.dirId();
+
+                    directoryIdCache.asMap().compute(event.userId(), (_, existing) -> {
+                       if (existing == null) {
+                           Set<String> dirUserUsing = ConcurrentHashMap.newKeySet();
+                           dirUserUsing.add(dirKey); // add dirKey to get dir info from cache back (not using the dirId)
+                           return new ApplicationConfig.UserDirUsing(dirUserUsing);
+                       } else {
+                           ((ApplicationConfig.UserDirUsing) existing).dirUserUsing().add(dirKey);
+                           return existing;
+                       }
+                    });
 
                     parentId = folderId;
                     currentPath.append(folderId).append("/");
@@ -72,6 +95,24 @@ public class MediaFileEventConsumer {
                     .uploadDate(Instant.now())
                     .build();
             mongoTemplate.insert(fileItem);
+
+            if (event.isLast()) {
+                directoryIdCache.asMap().computeIfPresent(event.userId(), (_, value) -> {
+                    for (String dirKey : ((ApplicationConfig.UserDirUsing) value).dirUserUsing()) {
+                        directoryIdCache.asMap().computeIfPresent(dirKey, (_, dirValue) -> {
+                            var dirCached = (ApplicationConfig.DirectoryCached) dirValue;
+                            dirCached.userUsing().remove(event.userId());
+
+                            if (dirCached.userUsing().isEmpty()) {
+                                fileService.removeFileStatus(dirCached.dirId());
+                                return null; // null to remove the key
+                            }
+                            return dirValue;
+                        });
+                    }
+                    return null;
+                });
+            }
 
             if (event.mediaId() != null && event.mediaType() != null) {
                 producer.publishEvent(new MediaFileEventProducer.EventWrapper(
@@ -291,7 +332,6 @@ public class MediaFileEventConsumer {
 
 
     private String getOrCreateFolder(String name, String parentId, String currentPath, FileType fileType) {
-        System.out.println("getting folder: " + name + " in " + parentId);
         Query query = new Query(Criteria
                 .where("parentId").is(parentId)
                 .and("name").is(name)

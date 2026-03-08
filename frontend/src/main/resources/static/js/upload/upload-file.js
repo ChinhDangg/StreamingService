@@ -1,6 +1,6 @@
 import {apiRequest} from "/static/js/common.js";
 
-export async function endVideoUploadSession(uploadId, uploadedParts, basicInfo) {
+export async function endVideoUploadSession(uploadId, uploadedParts, basicInfo, isLast = false) {
     const endResponse = await apiRequest('/api/upload/media/end-session-video', {
         method: 'POST',
         headers: {
@@ -9,7 +9,8 @@ export async function endVideoUploadSession(uploadId, uploadedParts, basicInfo) 
         body: JSON.stringify({
             uploadId: uploadId,
             uploadedParts: uploadedParts,
-            basicInfo: basicInfo
+            basicInfo: basicInfo,
+            isLast: isLast
         })
     });
     if (!endResponse.ok) {
@@ -18,7 +19,7 @@ export async function endVideoUploadSession(uploadId, uploadedParts, basicInfo) 
     return endResponse.text();
 }
 
-export async function endFileSession(uploadId, uploadedParts){
+export async function endFileSession(uploadId, uploadedParts, isLast = false){
     const response = await apiRequest('/api/upload/media/end-session-file', {
         method: 'POST',
         headers: {
@@ -26,7 +27,8 @@ export async function endFileSession(uploadId, uploadedParts){
         },
         body: JSON.stringify({
             uploadId: uploadId,
-            uploadedParts: uploadedParts
+            uploadedParts: uploadedParts,
+            isLast: isLast
         })
     });
     if (!response.ok) {
