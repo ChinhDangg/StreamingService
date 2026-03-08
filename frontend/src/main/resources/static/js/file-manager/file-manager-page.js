@@ -365,15 +365,15 @@ async function initialize() {
             sortSelect.value = 'NAME-ASC';
         const subFiles = await fetchMoreFiles(subId, 0, true);
         if (subFiles) {
-            if (subFiles.parentId) {
+            if (subFiles.parentId && subFiles.parentName) {
                 const parentIds = subFiles.parentId.split('/').filter(Boolean);
                 const parentNames = subFiles.parentName.split('/').filter(Boolean);
                 for (let i = 0; i < parentIds.length; i++) {
                     addToCurrentPath(parentIds[i], parentNames[i]);
                 }
+                displayFileItem(subFiles.content);
+                return;
             }
-            displayFileItem(subFiles.content);
-            return;
         }
     }
 
@@ -972,7 +972,7 @@ async function uploadNameEntityForMediaInBatch(mediaId) {
 
 function clearNameEntityMap() {
     clearNameEntityDisplayNode();
-    nameEntityEditMap.forEach((value, key) => value.clear());
+    nameEntityEditMap.forEach((value, _) => value.clear());
 }
 
 function clearNameEntityDisplayNode() {

@@ -96,7 +96,7 @@ public class FileService {
             return new FileSearchResult(pathInId, pathInName, itemInDir, items.getPageable(), items.hasNext());
         }
 
-        return new FileSearchResult(parentId, null, itemInDir, items.getPageable(), items.hasNext());
+        return new FileSearchResult(itemInDir.isEmpty() ? null : itemInDir.getFirst().getParentId(), null, itemInDir, items.getPageable(), items.hasNext());
     }
 
     private Pageable getPageable(int page, SortBy sortBy, Sort.Direction sortOrder) {
