@@ -66,7 +66,9 @@ public class MediaSearchEventConsumer {
         System.out.println("Received update media name entity event: " + event.mediaId());
         List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(
                 event.mediaId(), event.nameEntityConstant());
-        List<String> nameEntityList = updatedMediaNameEntityList.stream().map(NameEntityDTO::getName).toList();
+        List<MediaNameSearchItem> nameEntityList = updatedMediaNameEntityList.stream()
+                .map(n -> new MediaNameSearchItem(n.getId(), n.getName()))
+                .toList();
         try {
             openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, event.mediaId(), Map.of(event.nameEntityConstant().getName(), nameEntityList));
         } catch (IOException e) {
