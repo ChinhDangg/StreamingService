@@ -10,7 +10,7 @@
     </parent>
     <groupId>dev.chinh.streamingservice</groupId>
     <artifactId>file-manager</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>file-manager</name>
     <description>file-manager</description>
     <url/>
@@ -117,7 +117,7 @@
         <dependency>
             <groupId>dev.chinh.streamingservice</groupId>
             <artifactId>common</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.0</version>
             <scope>compile</scope>
         </dependency>
 

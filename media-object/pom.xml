@@ -10,7 +10,7 @@
     </parent>
     <groupId>dev.chinh.streamingservice</groupId>
     <artifactId>media-object</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>media-object</name>
     <description>media-object</description>
     <url/>
@@ -70,13 +70,13 @@
         <dependency>
             <groupId>dev.chinh.streamingservice</groupId>
             <artifactId>common</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>dev.chinh.streamingservice</groupId>
             <artifactId>media-persistence</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>1.0.0</version>
             <scope>compile</scope>
         </dependency>
 
