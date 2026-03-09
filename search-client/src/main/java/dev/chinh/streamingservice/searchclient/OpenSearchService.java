@@ -8,10 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.opensearch.client.json.JsonData;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.opensearch._types.*;
-import org.opensearch.client.opensearch._types.query_dsl.BoolQuery;
-import org.opensearch.client.opensearch._types.query_dsl.Query;
-import org.opensearch.client.opensearch._types.query_dsl.RangeQuery;
-import org.opensearch.client.opensearch._types.query_dsl.TextQueryType;
+import org.opensearch.client.opensearch._types.query_dsl.*;
 import org.opensearch.client.opensearch.core.*;
 import org.springframework.stereotype.Service;
 
@@ -118,22 +115,85 @@ public class OpenSearchService {
 
     public SearchResponse<Object> search(String index, Object text, int page, int size, SortBy sortBy,
                                     SortOrder sortOrder) throws IOException {
-        Query multiMatch = Query.of(q -> q
-                .multiMatch(m -> m
-                        .query(text.toString())
-                        .fields(
-                                ContentMetaData.TITLE + "^3.0",
-                                ContentMetaData.UNIVERSES + ".search^2.0",
-                                ContentMetaData.CHARACTERS + ".search^2.0",
-                                ContentMetaData.TAGS + ".search^1.5",
-                                ContentMetaData.AUTHORS + ".search^1.0"
+        Query multiMatchNested = Query.of(q -> q
+                .bool(b -> b
+                        // Root level field (Title)
+                        .should(s -> s
+                                .match(m -> m
+                                        .field(ContentMetaData.TITLE)
+                                        .query(FieldValue.of(text.toString()))
+                                        .boost(3.0f)
+                                        .fuzziness("AUTO")
+                                        .prefixLength(1)
+                                )
                         )
-                        .prefixLength(1)
-                        .fuzziness("AUTO")
-                        .type(TextQueryType.BestFields)
+                        // Nested Field: Universes
+                        .should(s -> s
+                                .nested(n -> n
+                                        .path(ContentMetaData.UNIVERSES)
+                                        .query(nq -> nq
+                                                .match(m -> m
+                                                        .field(ContentMetaData.UNIVERSES + ".name")
+                                                        .query(FieldValue.of(text.toString()))
+                                                        .fuzziness("AUTO")
+                                                        .prefixLength(1)
+                                                )
+                                        )
+                                        .scoreMode(ChildScoreMode.Max)
+                                        .boost(2.0f)
+                                )
+                        )
+                        // Nested Field: Characters
+                        .should(s -> s
+                                .nested(n -> n
+                                        .path(ContentMetaData.CHARACTERS)
+                                        .query(nq -> nq
+                                                .match(m -> m
+                                                        .field(ContentMetaData.CHARACTERS + ".name")
+                                                        .query(FieldValue.of(text.toString()))
+                                                        .fuzziness("AUTO")
+                                                        .prefixLength(1)
+                                                )
+                                        )
+                                        .scoreMode(ChildScoreMode.Max)
+                                        .boost(2.0f)
+                                )
+                        )
+                        // Nested Field: Tags
+                        .should(s -> s
+                                .nested(n -> n
+                                        .path(ContentMetaData.TAGS)
+                                        .query(nq -> nq
+                                                .match(m -> m
+                                                        .field(ContentMetaData.TAGS + ".name")
+                                                        .query(FieldValue.of(text.toString()))
+                                                        .fuzziness("AUTO")
+                                                        .prefixLength(1)
+                                                )
+                                        )
+                                        .scoreMode(ChildScoreMode.Max)
+                                        .boost(2.0f)
+                                )
+                        )
+                        // Nested Field: Authors
+                        .should(s -> s
+                                .nested(n -> n
+                                        .path(ContentMetaData.AUTHORS)
+                                        .query(nq -> nq
+                                                .match(m -> m
+                                                        .field(ContentMetaData.AUTHORS + ".name")
+                                                        .query(FieldValue.of(text.toString()))
+                                                        .fuzziness("AUTO")
+                                                        .prefixLength(1)
+                                                )
+                                        )
+                                        .scoreMode(ChildScoreMode.Max)
+                                        .boost(2.0f)
+                                )
+                        )
                 )
         );
-        return searchWithQuery(index, multiMatch, page, size, sortBy, sortOrder, true);
+        return searchWithQuery(index, multiMatchNested, page, size, sortBy, sortOrder, true);
     }
 
     /**
