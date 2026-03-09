@@ -651,8 +651,9 @@ async function uploadFiles(fileList) {
     const mediaNameEntities = getNameEntityForMediaUpload();
 
     const endVideoMediaSession = async (uploadId, uploadedParts, filename, isLast) => {
+        let base = filename.substring(filename.lastIndexOf('/') + 1);
         const basicInfo = {
-            title: filename.substring(filename.lastIndexOf('/') + 1),
+            title: base.substring(0, base.lastIndexOf('.') >>> 0 || base.length),
             year: new Date().getFullYear()
         }
         return await endVideoUploadSession(uploadId, uploadedParts, basicInfo, mediaNameEntities, isLast); // media id or error message

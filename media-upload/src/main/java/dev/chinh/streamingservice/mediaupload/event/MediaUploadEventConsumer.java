@@ -42,8 +42,10 @@ public class MediaUploadEventConsumer {
             MediaUploadService.MediaUploadRequest uploadRequest = new MediaUploadService.MediaUploadRequest(
                     event.bucket(), event.objectName(), event.fileName(), event.mediaType(), event.searchable()
             );
+            int lastDotIndex = event.fileName().lastIndexOf(".");
+            lastDotIndex = lastDotIndex == -1 ? event.fileName().length() : lastDotIndex;
             MediaBasicInfo mediaBasicInfo = new MediaBasicInfo(
-                    event.fileName(),
+                    event.fileName().substring(0, lastDotIndex).replaceAll("[-_]", " "),
                     (short) event.uploadDate().atOffset(ZoneOffset.UTC).getYear()
             );
             long mediaId = mediaUploadService.saveMedia(uploadRequest, mediaBasicInfo, event.parentMediaId(), event.childNum());
