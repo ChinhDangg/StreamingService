@@ -1,12 +1,12 @@
 package dev.chinh.streamingservice.backend;
 
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
-import dev.chinh.streamingservice.persistence.projection.MediaNameSearchItem;
-import dev.chinh.streamingservice.persistence.projection.MediaSearchItem;
+import dev.chinh.streamingservice.mediapersistence.projection.MediaNameSearchItem;
+import dev.chinh.streamingservice.mediapersistence.projection.MediaSearchItem;
 import dev.chinh.streamingservice.backend.search.data.MediaSearchItemResponse;
 import dev.chinh.streamingservice.backend.serve.data.MediaDisplayContent;
-import dev.chinh.streamingservice.persistence.entity.MediaDescription;
-import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
+import dev.chinh.streamingservice.mediapersistence.entity.MediaDescription;
+import dev.chinh.streamingservice.mediapersistence.entity.MediaMetaData;
 import org.mapstruct.Builder;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

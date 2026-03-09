@@ -3,7 +3,7 @@ package dev.chinh.streamingservice.mediaupload.modify.controller;
 import dev.chinh.streamingservice.mediaupload.modify.dto.MediaUpdateThumbnailRequest;
 import dev.chinh.streamingservice.mediaupload.modify.service.MediaMetadataModifyService;
 import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
-import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
+import dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;

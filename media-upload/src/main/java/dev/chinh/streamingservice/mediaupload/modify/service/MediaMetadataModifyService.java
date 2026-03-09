@@ -11,11 +11,11 @@ import dev.chinh.streamingservice.mediaupload.upload.service.MediaDisplayService
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaSearchCacheService;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaUploadService;
 import dev.chinh.streamingservice.mediaupload.upload.service.MinIOService;
-import dev.chinh.streamingservice.persistence.entity.MediaGroupMetaData;
-import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
-import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
-import dev.chinh.streamingservice.persistence.repository.MediaGroupMetaDataRepository;
-import dev.chinh.streamingservice.persistence.repository.MediaMetaDataRepository;
+import dev.chinh.streamingservice.mediapersistence.entity.MediaGroupMetaData;
+import dev.chinh.streamingservice.mediapersistence.entity.MediaMetaData;
+import dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO;
+import dev.chinh.streamingservice.mediapersistence.repository.MediaGroupMetaDataRepository;
+import dev.chinh.streamingservice.mediapersistence.repository.MediaMetaDataRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;

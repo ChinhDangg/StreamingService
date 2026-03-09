@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.backend.serve.service.MediaDisplayService;
-import dev.chinh.streamingservice.persistence.projection.MediaNameSearchItem;
+import dev.chinh.streamingservice.mediapersistence.projection.MediaNameSearchItem;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

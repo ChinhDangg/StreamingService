@@ -1,9 +1,9 @@
-package dev.chinh.streamingservice.persistence.projection;
+package dev.chinh.streamingservice.mediapersistence.projection;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
-import dev.chinh.streamingservice.persistence.entity.MediaDescription;
+import dev.chinh.streamingservice.mediapersistence.entity.MediaDescription;
 import lombok.*;
 
 import java.util.List;

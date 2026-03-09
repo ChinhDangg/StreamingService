@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.persistence.entity;
+package dev.chinh.streamingservice.mediapersistence.entity;
 
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import jakarta.persistence.*;
@@ -10,10 +10,10 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = ContentMetaData.CHARACTERS)
-public class MediaCharacter extends MediaNameEntityWithThumbnail {
+@Table(name = ContentMetaData.UNIVERSES)
+public class MediaUniverse extends MediaNameEntityWithThumbnail {
 
-    public MediaCharacter(String name) {
+    public MediaUniverse(String name) {
         this.name = name;
     }
 }

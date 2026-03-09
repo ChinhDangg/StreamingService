@@ -1,6 +1,6 @@
-package dev.chinh.streamingservice.persistence.repository;
+package dev.chinh.streamingservice.mediapersistence.repository;
 
-import dev.chinh.streamingservice.persistence.entity.MediaTag;
+import dev.chinh.streamingservice.mediapersistence.entity.MediaTag;
 import org.springframework.stereotype.Repository;
 
 @Repository

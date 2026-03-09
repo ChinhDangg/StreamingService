@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.persistence.projection;
+package dev.chinh.streamingservice.mediapersistence.projection;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.common.data.ContentMetaData;

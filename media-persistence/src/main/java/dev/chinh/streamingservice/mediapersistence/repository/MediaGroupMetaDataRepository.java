@@ -1,6 +1,6 @@
-package dev.chinh.streamingservice.persistence.repository;
+package dev.chinh.streamingservice.mediapersistence.repository;
 
-import dev.chinh.streamingservice.persistence.entity.MediaGroupMetaData;
+import dev.chinh.streamingservice.mediapersistence.entity.MediaGroupMetaData;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;

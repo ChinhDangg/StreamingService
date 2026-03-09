@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.persistence.entity;
+package dev.chinh.streamingservice.mediapersistence.entity;
 
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import jakarta.persistence.*;
@@ -10,10 +10,10 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = ContentMetaData.AUTHORS)
-public class MediaAuthor extends MediaNameEntity{
+@Table(name = ContentMetaData.CHARACTERS)
+public class MediaCharacter extends MediaNameEntityWithThumbnail {
 
-    public MediaAuthor(String name) {
+    public MediaCharacter(String name) {
         this.name = name;
     }
 }

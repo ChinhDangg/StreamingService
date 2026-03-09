@@ -1,6 +1,6 @@
-package dev.chinh.streamingservice.persistence.entity;
+package dev.chinh.streamingservice.mediapersistence.entity;
 
-import dev.chinh.streamingservice.persistence.projection.MediaNameSearchItem;
+import dev.chinh.streamingservice.mediapersistence.projection.MediaNameSearchItem;
 
 import java.util.List;
 

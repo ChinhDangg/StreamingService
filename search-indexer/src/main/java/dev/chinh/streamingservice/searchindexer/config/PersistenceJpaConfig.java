@@ -6,10 +6,10 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @Configuration
 @EnableJpaRepositories(
-        basePackages = "dev.chinh.streamingservice.persistence.repository"
+        basePackages = "dev.chinh.streamingservice.mediapersistence.repository"
 )
 @EntityScan(
-        basePackages = "dev.chinh.streamingservice.persistence.entity"
+        basePackages = "dev.chinh.streamingservice.mediapersistence.entity"
 )
 public class PersistenceJpaConfig {
 }

@@ -1,7 +1,7 @@
-package dev.chinh.streamingservice.persistence.repository;
+package dev.chinh.streamingservice.mediapersistence.repository;
 
-import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
-import dev.chinh.streamingservice.persistence.projection.NameEntityDTO;
+import dev.chinh.streamingservice.mediapersistence.entity.MediaMetaData;
+import dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -87,7 +87,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     int updateMediaThumbnail(long id, String thumbnail);
 
     @Query("""
-        SELECT new dev.chinh.streamingservice.persistence.projection.NameEntityDTO(a.id, a.name)
+        SELECT new dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO(a.id, a.name)
         FROM MediaMetaData m
         JOIN m.authors a
         WHERE m.id = :mediaId
@@ -95,7 +95,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     List<NameEntityDTO> findAuthorsByMediaId(long mediaId);
 
     @Query("""
-        SELECT new dev.chinh.streamingservice.persistence.projection.NameEntityDTO(c.id, c.name)
+        SELECT new dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO(c.id, c.name)
         FROM MediaMetaData m
         JOIN m.characters c
         WHERE m.id = :mediaId
@@ -103,7 +103,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     List<NameEntityDTO> findCharactersByMediaId(long mediaId);
 
     @Query("""
-        SELECT new dev.chinh.streamingservice.persistence.projection.NameEntityDTO(u.id, u.name)
+        SELECT new dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO(u.id, u.name)
         FROM MediaMetaData m
         JOIN m.universes u
         WHERE m.id = :mediaId
@@ -111,7 +111,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     List<NameEntityDTO> findUniversesByMediaId(long mediaId);
 
     @Query("""
-        SELECT new dev.chinh.streamingservice.persistence.projection.NameEntityDTO(t.id, t.name)
+        SELECT new dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO(t.id, t.name)
         FROM MediaMetaData m
         JOIN m.tags t
         WHERE m.id = :mediaId

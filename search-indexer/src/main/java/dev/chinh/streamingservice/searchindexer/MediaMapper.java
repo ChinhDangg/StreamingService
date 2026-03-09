@@ -1,7 +1,7 @@
 package dev.chinh.streamingservice.searchindexer;
 
-import dev.chinh.streamingservice.persistence.entity.MediaMetaData;
-import dev.chinh.streamingservice.persistence.projection.MediaSearchItem;
+import dev.chinh.streamingservice.mediapersistence.entity.MediaMetaData;
+import dev.chinh.streamingservice.mediapersistence.projection.MediaSearchItem;
 import org.mapstruct.Builder;
 import org.mapstruct.Mapper;
 

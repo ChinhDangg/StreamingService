@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.persistence.entity;
+package dev.chinh.streamingservice.mediapersistence.entity;
 
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import jakarta.persistence.*;

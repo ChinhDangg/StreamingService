@@ -1,8 +1,8 @@
-package dev.chinh.streamingservice.persistence.entity;
+package dev.chinh.streamingservice.mediapersistence.entity;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
-import dev.chinh.streamingservice.persistence.projection.MediaNameSearchItem;
+import dev.chinh.streamingservice.mediapersistence.projection.MediaNameSearchItem;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
