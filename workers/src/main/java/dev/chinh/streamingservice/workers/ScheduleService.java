@@ -6,6 +6,7 @@ import dev.chinh.streamingservice.workers.service.AlbumService;
 import dev.chinh.streamingservice.workers.service.ThumbnailService;
 import dev.chinh.streamingservice.workers.service.VideoService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
@@ -23,8 +24,10 @@ import java.util.Set;
 public class ScheduleService {
 
     private final VideoService videoService;
-    private final AlbumService albumService;
     private final ThumbnailService thumbnailService;
+
+    @Value("${ffmpeg-name}")
+    private String ffmpegName;
 
     private final RedisTemplate<String, String> queueRedisTemplate;
 
@@ -32,7 +35,7 @@ public class ScheduleService {
     public void scheduled() {
         stopNonViewingVideoRunningJob();
         try {
-            OSUtil.refreshUsableMemory();
+            OSUtil.refreshUsableMemory(ffmpegName);
         } catch (Exception e) {
             System.out.println("Failed to refresh memory usage");
         }
@@ -103,7 +106,7 @@ public class ScheduleService {
             System.out.println("Removing: " + thumbnailFileName);
             String path = ThumbnailService.getThumbnailParentPath() + "/" + thumbnailFileName;
             try {
-                OSUtil.deleteForceMemoryDirectory(path);
+                OSUtil.deleteForceMemoryDirectory(path, ffmpegName);
             } catch (IOException e) {
                 System.err.println("Failed to delete memory path: " + path);
             }

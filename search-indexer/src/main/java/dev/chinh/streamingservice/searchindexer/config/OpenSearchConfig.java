@@ -14,16 +14,24 @@ import org.opensearch.client.json.jackson.JacksonJsonpMapper;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.transport.OpenSearchTransport;
 import org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class OpenSearchConfig {
 
+    @Value( "${opensearch.scheme}")
+    private String scheme;
+    @Value( "${opensearch.host}")
+    private String hostname;
+    @Value( "${opensearch.port}")
+    private int port;
+
     @Bean
     public OpenSearchClient createClient(ObjectMapper objectMapper) {
 
-        HttpHost host = new HttpHost("http", "localhost", 9200);
+        HttpHost host = new HttpHost(scheme, hostname, port);
 
         BasicCredentialsProvider credsProvider = new BasicCredentialsProvider();
         credsProvider.setCredentials(

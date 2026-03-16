@@ -12,7 +12,6 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,8 +36,13 @@ public class ThumbnailService {
             timeInSeconds = videoLength - 1;
         }
 
-        List<String> command = Arrays.asList(
-                "docker", "exec", "ffmpeg",
+        List<String> command = new ArrayList<>();
+        String ffmpegName = System.getenv("FFMPEG_NAME");
+        if (ffmpegName != null && !ffmpegName.isEmpty()) {
+            command.addAll(List.of("docker", "exec", ffmpegName));
+        }
+
+        command.addAll(List.of(
                 "ffmpeg",
                 "-v", "error",
                 "-ss", String.valueOf(timeInSeconds), // Seek before input (Fast Seek)
@@ -49,7 +53,7 @@ public class ThumbnailService {
                 "-f", "image2",                // Force output format
                 "-update", "1",                // Ensure it writes a single file
                 OSUtil.replaceHostRAMDiskWithContainer(thumbnailOutput)
-        );
+        ));
 
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.redirectErrorStream(true); // merge STDOUT + STDERR

@@ -26,8 +26,8 @@ public class MediaBackupEventConsumer {
 
     private final MinIOService minIOService;
 
-    @Value( "${media.backup.path}")
-    private String MEDIA_BACKUP_PATH;
+    @Value( "${media.backup.location}")
+    private String MEDIA_BACKUP_LOCATION;
 
     @Value("${backup.enabled}")
     private String backupEnabled;
@@ -38,7 +38,7 @@ public class MediaBackupEventConsumer {
         }
         System.out.println("Received create backup file event: " + event.fileName());
         try {
-            String target = OSUtil.normalizePath(MEDIA_BACKUP_PATH + "/" + ContentMetaData.MEDIA_BUCKET, event.fileName());
+            String target = OSUtil.normalizePath(MEDIA_BACKUP_LOCATION + "/" + ContentMetaData.MEDIA_BUCKET, event.fileName());
             Path targetPath = Paths.get(target);
             if (Files.exists(targetPath)) {
                 System.err.println("File already exists: " + target);
@@ -63,7 +63,7 @@ public class MediaBackupEventConsumer {
     private void onDeleteFile(MediaUpdateEvent.FileDeleted event) throws IOException {
         System.out.println("Received delete backup file");
         try {
-            Path path = Path.of(OSUtil.normalizePath(MEDIA_BACKUP_PATH + "/", event.fileName()));
+            Path path = Path.of(OSUtil.normalizePath(MEDIA_BACKUP_LOCATION + "/", event.fileName()));
             if (event.isNotDirectory()) {
                 Files.deleteIfExists(path);
             } else {
@@ -132,7 +132,7 @@ public class MediaBackupEventConsumer {
             return;
         }
         System.out.println("Received thumbnail create backup event: " + newThumbnail);
-        String thumbnail = OSUtil.normalizePath(MEDIA_BACKUP_PATH + "/" + ContentMetaData.THUMBNAIL_BUCKET, newThumbnail);
+        String thumbnail = OSUtil.normalizePath(MEDIA_BACKUP_LOCATION + "/" + ContentMetaData.THUMBNAIL_BUCKET, newThumbnail);
         Path thumbnailPath = Paths.get(thumbnail);
 
         try (InputStream inputStream = minIOService.getFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnail)){
@@ -153,7 +153,7 @@ public class MediaBackupEventConsumer {
         }
         System.out.println("Received thumbnail delete backup event, old: " + oldThumbnail);
         try {
-            Path path = Paths.get(MEDIA_BACKUP_PATH + "/" + ContentMetaData.THUMBNAIL_BUCKET, oldThumbnail);
+            Path path = Paths.get(MEDIA_BACKUP_LOCATION + "/" + ContentMetaData.THUMBNAIL_BUCKET, oldThumbnail);
             System.out.println("Deleted: " + Files.deleteIfExists(path));
         } catch (IOException e) {
             System.err.println("Failed to delete thumbnail file: " + oldThumbnail);

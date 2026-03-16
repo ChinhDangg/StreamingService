@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.mediabackup.config;
 
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -33,7 +34,12 @@ public class KafkaRedPandaConfig {
 
     public static final String MEDIA_GROUP_ID = "media-backup-service";
 
-    public static final String MEDIA_BACKUP_TOPIC = "media-backup-events";
+    @Bean
+    public KafkaAdmin kafkaAdmin() {
+        return new KafkaAdmin(Map.of(
+                AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS
+        ));
+    }
 
     @Bean
     public ConsumerFactory<String, MediaUpdateEvent> consumerFactory() {

@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.filemanager.config;
 
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -32,6 +33,13 @@ public class KafkaConfig {
     private String BOOTSTRAP_SERVERS;
 
     public static final String MEDIA_GROUP_ID = "media-file-service";
+
+    @Bean
+    public KafkaAdmin kafkaAdmin() {
+        return new KafkaAdmin(Map.of(
+                AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS
+        ));
+    }
 
     @Bean
     public DefaultKafkaConsumerFactory<String, MediaUpdateEvent> consumerFactory() {

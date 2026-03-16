@@ -9,23 +9,23 @@ import org.springframework.context.annotation.Bean;
 @SpringBootApplication
 public class StreamingServiceApplication {
 
-    static {
-        try {
-            String ramBytesStr = System.getenv("RAM_VOLUME_BYTES");
-            long ramBytes;
-            try {
-                ramBytes = Math.max(536_870_912L, Long.parseLong(ramBytesStr));
-            } catch (Exception _) {
-                ramBytes = 536_870_912L;
-            }
-
-            OSUtil._init();
-            OSUtil._createRamDisk(ramBytes);
-            OSUtil.startDockerCompose();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to start init OSUtil", e);
-        }
-    }
+//    static {
+//        try {
+//            String ramBytesStr = System.getenv("RAM_SIZE_BYTES");
+//            long ramBytes;
+//            try {
+//                ramBytes = Math.max(536_870_912L, Long.parseLong(ramBytesStr));
+//            } catch (Exception _) {
+//                ramBytes = 536_870_912L;
+//            }
+//
+//            OSUtil._init();
+//            OSUtil._createRamDisk(ramBytes);
+//            OSUtil.startDockerCompose();
+//        } catch (Exception e) {
+//            throw new RuntimeException("Failed to start init OSUtil", e);
+//        }
+//    }
 
     public static void main(String[] args) {
         SpringApplication.run(StreamingServiceApplication.class, args);

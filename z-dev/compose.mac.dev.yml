@@ -1,7 +1,7 @@
-services:
+services: # docker compose -f compose.mac.dev.yml --env-file .env.dev -p ss-dev up -d
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
-    container_name: minio
+    container_name: ${PREFIX_NAME}-minio
     ports:
       - "9000:9000"   # S3 API
       - "9001:9001"   # Web console
@@ -16,29 +16,32 @@ services:
 
   minio-init:
     image: minio/mc
+    container_name: ${PREFIX_NAME}-minio-init
     depends_on:
       - minio
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     volumes:
-      - ./minio/minio-init.sh:/minio-init.sh:ro
+      - ../.docker/minio/minio-init.sh:/minio-init.sh:ro
     entrypoint: [ "/bin/sh", "/minio-init.sh" ]
 
   # docker compose -f compose.mac.yaml build nginx
   nginx:
     build:
-      context: ./nginx
+      context: ../nginx
       dockerfile: Dockerfile
     image: my-nginx/openresty:1.27.1.2-0-bookworm-fat
-    container_name: nginx
+    container_name: ${PREFIX_NAME}-nginx
     ports:
       - "80:80"
     depends_on:
       - minio
       - ffmpeg
     volumes:
-      - ./nginx/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - ../.docker/nginx/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - ../.docker/nginx/proxy.conf:/usr/local/openresty/nginx/conf/proxy.conf:ro
+      - ../.docker/nginx/streamingservice.dev.conf:/usr/local/openresty/nginx/conf/conf.d/streamingservice.dev.conf:ro
       - ${RAM_VOLUME}:/chunks
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -46,7 +49,7 @@ services:
 
   ffmpeg:
     image: linuxserver/ffmpeg:arm64v8-version-8.0-cli
-    container_name: ffmpeg
+    container_name: ${PREFIX_NAME}-ffmpeg
     depends_on:
       - minio
     entrypoint: [ "/bin/sh", "-c" ]   # replace ffmpeg with a shell
@@ -57,7 +60,7 @@ services:
 
   opensearch:
     image: opensearchproject/opensearch:3.3.2
-    container_name: opensearch
+    container_name: ${PREFIX_NAME}-opensearch
     environment:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
@@ -76,7 +79,7 @@ services:
 
   redis:
     image: redis:7.4.7-alpine
-    container_name: redis
+    container_name: ${PREFIX_NAME}-redis
     ports:
       - "6379:6379"
     environment:
@@ -89,7 +92,7 @@ services:
 
   postgres:
     image: postgres:18
-    container_name: postgres
+    container_name: ${PREFIX_NAME}-postgres
     environment:
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -98,10 +101,10 @@ services:
       - "5432:5432"
     volumes:
       - ${POSTGRES_VOLUME}:/var/lib/postgresql
-      - ./postgres/initdb.d:/docker-entrypoint-initdb.d
 
   postgres-init:
     image: postgres:18
+    container_name: ${PREFIX_NAME}-postgres-init
     depends_on:
       - postgres
     restart: "no"
@@ -113,11 +116,11 @@ services:
       DB_SUPERUSER: ${DB_USERNAME}
       DB_SUPERUSER_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - ./postgres/initdb.d:/scripts
+      - ../.docker/postgres/initdb.d:/scripts
 
   redpanda:
     image: redpandadata/redpanda:v25.2.12
-    container_name: redpanda_kafka
+    container_name: ${PREFIX_NAME}-redpanda_kafka
     ports:
       - "9092:9092"       # Kafka API
       - "9644:9644"       # Admin API
@@ -130,38 +133,42 @@ services:
       - --reserve-memory=0M
       - --node-id=0
       - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
     volumes:
       - ${REDPANDA_VOLUME}:/var/lib/redpanda/data
 
   mongodb:
     image: mongo:7
-    container_name: mongodb
+    container_name: ${PREFIX_NAME}-mongodb
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: strongpassword
-      MONGO_INITDB_DATABASE: media_catalog
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGODB_DATABASE}
+      MONGODB_USERNAME: ${MONGODB_USERNAME}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD}
+      MONGODB_AUTH_SOURCE: ${MONGODB_AUTH_SOURCE}
     # Starts mongo with replica set mode enabled
     command: [ "--replSet", "rs0", "--bind_ip_all", "--keyFile", "/data/configdb/mongo-keyfile" ]
-    healthcheck:
-      test: [ "CMD", "mongosh", "--username", "admin", "--password", "strongpassword", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
     volumes:
       - ${MONGODB_VOLUME}:/data/db
-      - ./mongo/mongo-keyfile:/data/configdb/mongo-keyfile
+      - ../.docker/mongo/mongo-keyfile:/data/configdb/mongo-keyfile
 
   mongo-init:
     image: mongo:7
-    container_name: mongo-init
+    container_name: ${PREFIX_NAME}-mongo-init
     depends_on:
       mongodb:
         condition: service_healthy
-    entrypoint: [ "/bin/bash", "/scripts/init.sh", "admin", "strongpassword" ]
+    environment:
+      - MONGODB_HOST=${MONGODB_HOST}
+      - MONGODB_USERNAME=${MONGODB_USERNAME}
+      - MONGODB_PASSWORD=${MONGODB_PASSWORD}
+    entrypoint: [ "/bin/bash", "/scripts/init.sh" ]
     volumes:
-      - ./mongo/init:/scripts
+      - ../.docker/mongo/init:/scripts
 
 #  logstash:
 #    image: docker.elastic.co/logstash/logstash:8.17.10

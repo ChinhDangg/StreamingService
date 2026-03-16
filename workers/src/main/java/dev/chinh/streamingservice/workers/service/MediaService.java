@@ -60,8 +60,7 @@ public abstract class MediaService {
         workerRedisService.removeStatus(jobId);
     }
 
-    public List<String> getLogsFromInputStream(InputStream inputStream) {
-        List<String> logs = new ArrayList<>();
+    public void getLogsFromInputStream(List<String> logs, InputStream inputStream) {
         try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream))) {
             String line;
             while ((line = br.readLine()) != null) {
@@ -70,7 +69,6 @@ public abstract class MediaService {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        return logs;
     }
 
     /**

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -128,14 +129,37 @@ public class ThumbnailService {
     }
 
     private int processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String albumDir, boolean isAlbum) throws InterruptedException, IOException {
+        String ffmpegName = System.getenv("FFMPEG_NAME");
+        String[] shellCmd;
+        if (ffmpegName == null || ffmpegName.isEmpty()) {
+            // PROD: Start a local bash session
+            shellCmd = new String[]{"sh"};
+        } else {
+            // DEV: Start a bash session inside the ffmpeg container
+            shellCmd = new String[]{"docker", "exec", "-i", ffmpegName, "sh"};
+        }
         // Start one persistent bash session inside ffmpeg container
-        ProcessBuilder pb = new ProcessBuilder("docker", "exec", "-i", "ffmpeg", "bash").redirectErrorStream(true);
+        ProcessBuilder pb = new ProcessBuilder(shellCmd).redirectErrorStream(true);
         Process process = pb.start();
+
+        // Capture ffmpeg combined logs in a thread-safe list
+        List<String> logs = Collections.synchronizedList(new ArrayList<>());
+        Thread logConsumer = new Thread(() -> {
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    logs.add("[ffmpeg] " + line);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        logConsumer.start();
 
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8))) {
 
-            OSUtil.createTempDir(albumDir);
+            OSUtil.createTempDir(albumDir, ffmpegName);
 
             String scale = getFfmpegScaleString(resolution, true);
             for (int i = 0; i < albumUrlInfo.mediaUrlList.size(); i++) {
@@ -157,20 +181,9 @@ public class ThumbnailService {
             writer.write("exit\n");
             writer.flush();
         } catch (Exception e) {
-            System.err.println("Failed to execute ffmpeg command");
-            throw new RuntimeException(e);
-        }
-
-        // Capture ffmpeg combined logs
-        List<String> logs = new ArrayList<>();
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                logs.add("[ffmpeg] " + line);
-            }
-        } catch (Exception e) {
-            System.err.println("Failed to read ffmpeg logs");
-            throw new RuntimeException(e);
+            process.destroy();
+            e.printStackTrace();
+            System.err.println("Failed to execute ffmpeg command: " + e.getMessage());
         }
 
         int exit = process.waitFor();

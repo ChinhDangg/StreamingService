@@ -3,24 +3,36 @@
 **StreamingService** is a modular, self-hosted media streaming platform built with **Spring Boot**.  
 It supports authenticated media upload, on-demand and cached HLS streaming, background transcoding, full-text search, and both server-rendered and single-page web UIs.
 
-The platform is designed to serve **media assets (videos and images) at multiple resolutions**.  
+The platform is designed to serve **media assets (videos and images) at multiple resolutions at runtime rather than pre-generating them and storing them on disk to save space**.  
 When a requested resolution does not already exist, the system performs **live transcoding** from the original stored media, generating **HLS chunks in real time**, storing them **in memory (RAM)**, and **streaming them immediately to the user** without writing intermediate data to disk.
 
 The system is built around **clear service responsibilities**, **event-driven workflows**, and **high-performance media delivery** using RAM-backed storage and an **nginx/OpenResty edge** for secure, low-latency streaming.
 
+Support a filesystem structure similar to a traditional file server like Google Drive over the web to organize your media files. Pick videos to put them in the streaming service to browse and add tags for searching. Pick group of images or videos to create an album and view them 
+in a single scrollable page like a photo gallery or comic webcomic. Group of albums can be put together to become a grouper - to share common tags and get searched together like a multiple chapters comic.
+
+---
+
+If you don't care about the architecture or want to run in development phase but only want to use the service immediately,
+access the build version with docker image at [https://hub.docker.com/r/kamikaze/streaming-service](https://hub.docker.com/r/kamikaze/streaming-service).
+
+---
+
+Read below for the stack and architecture details and how to run the project locally to updating the code.
 
 ---
 
 ## Core technologies
 
-- **Java 25 / Spring Boot 3.5.x**
+- **Java 25 / Spring Boot 3.5.9**
 - **MinIO** (S3-compatible object storage)
 - **PostgreSQL** (metadata & relational data)
+- **MongoDB** (file structure & metadata)
 - **Redis** (streams, caching, coordination)
 - **Kafka / Redpanda** (event backbone)
 - **OpenSearch** (search & indexing)
 - **FFmpeg** (HLS + thumbnails)
-- **OpenResty (nginx + Lua)** (edge proxy & streaming gateway)
+- **OpenResty (nginx + Lua)** (edge proxy & streaming gateway & rate limiting & edge auth for some static assets)
 - **Docker + Docker Compose**
 
 ---
@@ -29,13 +41,14 @@ The system is built around **clear service responsibilities**, **event-driven wo
 
 <pre>StreamingService 
 ├── auth-service/ # Authentication & JWT issuing 
-├── backend/ # Core API + infra bootstrap + orchestration 
-├── frontend/ # Spring MVC / Thymeleaf web UI 
+├── backend/ # Core API + infra bootstrap for development + orchestration (call searching and send transcoding jobs)
+├── frontend/ # Spring MVC / Thymeleaf web UI
+├── file-service/ # handle allowed upload, maintain file structure and file metadata to managed all file upload
 ├── media-upload/ # Upload & mutation API 
-├── workers/ # Background FFmpeg workers 
-├── search-indexer/ # Kafka → OpenSearch indexer 
+├── workers/ # Background FFmpeg workers for videos, albums and thumbnails 
+├── search-indexer/ # OpenSearch indexer 
 ├── media-object/ # MinIO object-event processing 
-├── media-backup/ # Optional MinIO backup jobs 
+├── media-backup/ # Optional file backup jobs
 ├── media-persistence/ # Shared JPA entities & repositories 
 ├── search-client/ # OpenSearch client abstraction 
 └── common/ # Shared DTOs, enums, utilities 
@@ -51,7 +64,7 @@ Each directory (except shared modules) is a **standalone Spring Boot application
 ### Request flow (simplified)
 
 1. Client requests a page, API, or stream
-2. **OpenResty** validates access and routes the request
+2. **OpenResty** validates only static access and routes the request
 3. **Spring services** handle business logic
 4. **Workers** generate or serve media asynchronously
 5. **Events** propagate changes via Kafka
@@ -63,14 +76,14 @@ Media objects are **never exposed directly**—all access flows through OpenRest
 ## Environment variables & configuration ownership
 
 All services in this repository **share a single environment configuration**, which is
-**owned by the `backend` module**.
+**owned by the `backend` module in development phase**.
 
 ### Key rule
 
 > **Every service (auth-service, frontend, workers, media-upload, search-indexer, etc.)
 > expects its environment variables to be defined in the `backend` module.**
 
-No service maintains its own `.env` file.
+No service maintains its own `.env` file for consistency.
 
 ---
 
@@ -153,8 +166,19 @@ Handles **authentication and token lifecycle**.
 - Access token issuance (JWT)
 - Refresh token rotation
 - JWKS endpoint for public key distribution
+- Other services can **authenticate** using the public key
 
 Other services **never issue tokens**—they only validate them.
+
+---
+
+### `file-service`
+
+Handles **Initiate file upload and maintain file structure and file metadata**.
+
+**Responsibilities:**
+- Allow what file to upload or what folder to create
+- Maintain file structure and file metadata
 
 ---
 

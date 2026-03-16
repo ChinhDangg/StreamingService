@@ -19,6 +19,9 @@ public class MinIOConfig {
     @Value("${minio.url}")
     private String minioUrl;
 
+    @Value("${minio.external-url}")
+    private String externalUrl;
+
     @Value("${minio.access-key}")
     private String accessKey;
 
@@ -52,7 +55,7 @@ public class MinIOConfig {
     @Bean
     public S3Presigner s3Presigner() {
         return S3Presigner.builder()
-                .endpointOverride(URI.create(minioUrl))
+                .endpointOverride(URI.create(externalUrl))
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(accessKey, secretKey)
                 ))

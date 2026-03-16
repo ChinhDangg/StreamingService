@@ -10,12 +10,10 @@ import dev.chinh.streamingservice.common.validation.FileSystemValidator;
 import dev.chinh.streamingservice.filemanager.constant.FileStatus;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
 import dev.chinh.streamingservice.filemanager.constant.SortBy;
-import dev.chinh.streamingservice.filemanager.data.FileResult;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import dev.chinh.streamingservice.filemanager.event.MediaFileEventProducer;
 import dev.chinh.streamingservice.filemanager.repository.FileSystemRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.QueryTimeoutException;
@@ -26,18 +24,11 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.lang.NonNull;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -47,9 +38,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class FileService {
-
-    @Value("${media.backup.path}")
-    private String filePath;
 
     private final RedisTemplate<String, String> redisStringTemplate;
     private final FileSystemRepository fileSystemRepository;
@@ -465,44 +453,5 @@ public class FileService {
 
         UpdateResult result = mongoTemplate.upsert(query, update, FileSystemItem.class);
         if (!result.wasAcknowledged()) throw new RuntimeException("Failed to create root folder");
-    }
-
-
-    public List<FileResult> getFilesAtRoot() throws IOException {
-        return visitDirectory(Path.of(filePath, mediaPath));
-    }
-
-    public List<FileResult> getFilesInDirectory(String directory) throws IOException {
-        var validationResult = FileSystemValidator.isValidPath(directory);
-        if (validationResult.errorMessage() != null) {
-            throw new IllegalArgumentException(validationResult.errorMessage());
-        }
-        return visitDirectory(Path.of(filePath, mediaPath, directory));
-    }
-
-    private List<FileResult> visitDirectory(Path path) throws IOException {
-        List<FileResult> fileVisited = new ArrayList<>();
-        Files.walkFileTree(path, new SimpleFileVisitor<>() {
-            @Override
-            public @NonNull FileVisitResult preVisitDirectory(@NonNull Path dir, @NonNull BasicFileAttributes attrs) {
-                if (dir.equals(path))
-                    return FileVisitResult.CONTINUE;
-                fileVisited.add(new FileResult(
-                        FileType.DIR,
-                        dir.getFileName().toString()
-                ));
-                return FileVisitResult.SKIP_SUBTREE;
-            }
-
-            @Override
-            public @NonNull FileVisitResult visitFile(@NonNull Path file, @NonNull BasicFileAttributes attrs) {
-                fileVisited.add(new FileResult(
-                        FileType.FILE,
-                        file.getFileName().toString()
-                ));
-                return FileVisitResult.CONTINUE;
-            }
-        });
-        return fileVisited;
     }
 }

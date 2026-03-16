@@ -11,8 +11,8 @@ import java.nio.file.Paths;
 @Component
 public class AppStartRunner implements ApplicationRunner {
 
-    @Value("${media.backup.path}")
-    private String backupPath;
+    @Value("${media.backup.location}")
+    private String backupLocation;
 
     @Value("${backup.enabled}")
     private String backupEnabled;
@@ -24,7 +24,7 @@ public class AppStartRunner implements ApplicationRunner {
             return;
         }
 
-        if (Files.notExists(Paths.get(backupPath))) {
+        if (Files.notExists(Paths.get(backupLocation))) {
             throw new RuntimeException("Media backup path does not exist");
         } else {
             System.out.println("Media backup path exists");

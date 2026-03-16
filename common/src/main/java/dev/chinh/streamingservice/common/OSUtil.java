@@ -1,6 +1,5 @@
 package dev.chinh.streamingservice.common;
 
-import jakarta.annotation.PostConstruct;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
@@ -20,129 +19,130 @@ public class OSUtil {
     }
 
     private static final String BASE_DIR = "/chunks";
-    private static final String CONTAINER = "nginx";
 
     private static OS currentOS = null;
     private static String RAMDISK = null;
     public static long MEMORY_TOTAL = 0;
     public static AtomicLong MEMORY_USABLE;
 
-    public static void _init() {
-        currentOS = _detectOS();
-        RAMDISK = _getRAMDISKName();
-    }
-
-    private static OS _detectOS() {
-        String osName = System.getProperty("os.name").toLowerCase();
+    private static OS _getDetectedOS() {
+        if (currentOS != null)
+            return currentOS;
+        String osName = System.getenv("OS_NAME");
+        if (osName == null || osName.isEmpty())
+            osName = System.getProperty("os.name");
+       osName = osName.toLowerCase();
         if (osName.contains("win")) {
-            return OS.WINDOWS;
+            currentOS = OS.WINDOWS;
         } else if (osName.contains("mac")) {
-            return OS.MAC;
+            currentOS = OS.MAC;
         } else if (osName.contains("nux") || osName.contains("nix")) {
-            return OS.LINUX;
+            currentOS = OS.LINUX;
         } else {
-            return OS.OTHER;
+           currentOS = OS.OTHER;
         }
+        return currentOS;
     }
 
     private static String _getRAMDISKName() {
-        if (currentOS == OS.WINDOWS) {
-            return "R:";
-        } else if (currentOS == OS.MAC) {
-            return "/Volumes/RAMDISK";
-        } else if (currentOS == OS.LINUX) {
-            return "/mnt/ramdisk";
-        }
-        throw new RuntimeException("Unsupported OS: " + currentOS);
+        if (RAMDISK != null)
+            return RAMDISK;
+        RAMDISK = System.getenv("RAM_DISK_NAME");
+        if (RAMDISK == null || RAMDISK.isEmpty())
+            return BASE_DIR;
+        return RAMDISK;
     }
 
-    public static void _createRamDisk(long ramBytes) throws Exception {
-        if (currentOS != OS.LINUX && Files.exists(Paths.get(RAMDISK))) {
-            System.out.println("Ramdisk already exists");
-            return;
-        }
+//    public static void _createRamDisk(long ramBytes) throws Exception {
+//        if (currentOS != OS.LINUX && Files.exists(Paths.get(RAMDISK))) {
+//            System.out.println("Ramdisk already exists");
+//            return;
+//        }
+//
+//        if (currentOS == OS.WINDOWS) {
+//            // skipping windows ramdisk as can't be mounted as volume
+//            return;
+//        }
+//
+//        String[] command = switch (currentOS) {
+//            case OS.MAC -> new String[]{"/bin/bash", "-c",
+////                    "diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://1048576`"};
+//                    "diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://" + (ramBytes / 512) + "`"};
+//            case OS.LINUX -> new String[]{
+//                    // chinh ALL=(root) NOPASSWD: /bin/mkdir, /bin/mount, /bin/umount
+//                    // "mkdir -p /mnt/ramdisk && mount -t tmpfs -o size=512m tmpfs /mnt/ramdisk"};
+//                    "/bin/bash", "-c",
+//                    """
+//                    if ! findmnt -n -o FSTYPE /mnt/ramdisk | grep -q 'tmpfs'; then
+//                        sudo mkdir -p /mnt/ramdisk && \
+//                        sudo mount -t tmpfs -o size=%d tmpfs /mnt/ramdisk;
+//                    fi
+//                    """.formatted(ramBytes)
+//            };
+//            case OS.WINDOWS -> new String[]{
+//                    "OSFMount.com",
+//                    "-a",          // add new disk
+//                    "-t", "vm",    // type: virtual memory (RAM)
+//                    "-s", "512M",  // size
+//                    "-m", "R:",    // mount point
+//                    "-o", "format:ntfs" // auto-format NTFS
+//            }; // to remove: OSFMount.com -d -m R:
+//            default -> throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+//        };
+//
+//        try {
+//            runCommandAndLog(command, null);
+//        } catch (Exception e) {
+//            throw new Exception("Fail to create RAM DISK");
+//        }
+//
+//        System.out.println("RAMDisk creation finished");
+//    }
 
-        if (currentOS == OS.WINDOWS) {
-            // skipping windows ramdisk as can't be mounted as volume
-            return;
-        }
-
-        String[] command = switch (currentOS) {
-            case OS.MAC -> new String[]{"/bin/bash", "-c",
-//                    "diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://1048576`"};
-                    "diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://" + (ramBytes / 512) + "`"};
-            case OS.LINUX -> new String[]{
-                    // chinh ALL=(root) NOPASSWD: /bin/mkdir, /bin/mount, /bin/umount
-                    // "mkdir -p /mnt/ramdisk && mount -t tmpfs -o size=512m tmpfs /mnt/ramdisk"};
-                    "/bin/bash", "-c",
-                    """
-                    if ! findmnt -n -o FSTYPE /mnt/ramdisk | grep -q 'tmpfs'; then
-                        sudo mkdir -p /mnt/ramdisk && \
-                        sudo mount -t tmpfs -o size=%d tmpfs /mnt/ramdisk;
-                    fi
-                    """.formatted(ramBytes)
-            };
-            case OS.WINDOWS -> new String[]{
-                    "OSFMount.com",
-                    "-a",          // add new disk
-                    "-t", "vm",    // type: virtual memory (RAM)
-                    "-s", "512M",  // size
-                    "-m", "R:",    // mount point
-                    "-o", "format:ntfs" // auto-format NTFS
-            }; // to remove: OSFMount.com -d -m R:
-            default -> throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
-        };
-
-        try {
-            runCommandAndLog(command, null);
-        } catch (Exception e) {
-            throw new Exception("Fail to create RAM DISK");
-        }
-
-        System.out.println("RAMDisk creation finished");
+    public static void _initializeRAMInfo(String containerName) throws IOException, InterruptedException {
+        if (containerName == null || containerName.isEmpty())
+            containerName = "nginx";
+        MEMORY_TOTAL = getMemoryTotalSpace(containerName);
+        MEMORY_USABLE = new AtomicLong(getActualMemoryUsableSpace(containerName));
     }
 
-    public static void _initializeRAMInfo() throws IOException, InterruptedException {
-        MEMORY_TOTAL = getMemoryTotalSpace();
-        MEMORY_USABLE = new AtomicLong(getActualMemoryUsableSpace());
-    }
+//    public static void startDockerCompose() throws IOException, InterruptedException {
+//        String composeFile = switch (currentOS) {
+//            case OS.MAC -> "compose.mac.yaml";
+//            case OS.LINUX -> "compose.linux.yaml";
+//            case OS.WINDOWS -> "compose.windows.yaml";
+//            default -> "compose.yaml";
+//        };
+//        ProcessBuilder pb = new ProcessBuilder(
+//                "docker", "compose", "-f", composeFile, "up", "-d"
+//        );
+//        pb.inheritIO();
+//        Process process = pb.start();
+//        int exit = process.waitFor();
+//
+//        if (exit != 0) {
+//            throw new RuntimeException("docker compose failed with code " + exit);
+//        }
+//        System.out.println("docker compose finished with exit code: " + exit);
+//    }
 
-    public static void startDockerCompose() throws IOException, InterruptedException {
-        String composeFile = switch (currentOS) {
-            case OS.MAC -> "compose.mac.yaml";
-            case OS.LINUX -> "compose.linux.yaml";
-            case OS.WINDOWS -> "compose.windows.yaml";
-            default -> "compose.yaml";
-        };
-        ProcessBuilder pb = new ProcessBuilder(
-                "docker", "compose", "-f", composeFile, "up", "-d"
-        );
-        pb.inheritIO();
-        Process process = pb.start();
-        int exit = process.waitFor();
-
-        if (exit != 0) {
-            throw new RuntimeException("docker compose failed with code " + exit);
-        }
-        System.out.println("docker compose finished with exit code: " + exit);
-    }
-
-    private static long getMemoryTotalSpace() throws IOException, InterruptedException {
-        if  (currentOS == OS.WINDOWS) {
-            return getMemoryTotalFromContainer();
-        } else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
+    private static long getMemoryTotalSpace(String containerName) throws IOException, InterruptedException {
+        OS os = _getDetectedOS();
+        if (os == OS.MAC || os == OS.LINUX || checkServiceIsInContainer()) {
             return getMemoryTotalFromRAMDisk();
+        } else if  (os == OS.WINDOWS) {
+            return getMemoryTotalFromContainer(containerName);
         }
-        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+        throw new UnsupportedOperationException("Unsupported OS: " + os);
     }
 
     private static long getMemoryTotalFromRAMDisk() throws IOException {
-        FileStore store = Files.getFileStore(Paths.get(RAMDISK));
+        FileStore store = Files.getFileStore(Paths.get(_getRAMDISKName()));
         return store.getTotalSpace();
     }
 
-    private static long getMemoryTotalFromContainer() throws InterruptedException, IOException {
-        Process process = new ProcessBuilder("docker", "exec", "nginx", "df", "-B1", "/chunks")
+    private static long getMemoryTotalFromContainer(String containerName) throws InterruptedException, IOException {
+        Process process = new ProcessBuilder("docker", "exec", containerName, "df", "-B1", "/chunks")
                 .start();
         String output = new String(process.getInputStream().readAllBytes());
         process.waitFor();
@@ -156,22 +156,23 @@ public class OSUtil {
         throw new RuntimeException("Unable to get RAM total from container");
     }
 
-    public static long getActualMemoryUsableSpace() throws IOException, InterruptedException {
-        if (currentOS == OS.WINDOWS) {
-            return getActualMemoryUsableSpaceFromContainer();
-        }  else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
+    private static long getActualMemoryUsableSpace(String containerName) throws IOException, InterruptedException {
+        OS os = _getDetectedOS();
+        if (os == OS.MAC || os == OS.LINUX || checkServiceIsInContainer()) {
             return getActualMemoryUsableSpaceFromRAMDisk();
+        } else if (os == OS.WINDOWS) {
+            return getActualMemoryUsableSpaceFromContainer(containerName);
         }
-        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+        throw new UnsupportedOperationException("Unsupported OS: " + os);
     }
 
     private static long getActualMemoryUsableSpaceFromRAMDisk() throws IOException {
-        FileStore store = Files.getFileStore(Paths.get(RAMDISK));
+        FileStore store = Files.getFileStore(Paths.get(_getRAMDISKName()));
         return store.getUsableSpace();
     }
 
-    private static long getActualMemoryUsableSpaceFromContainer() throws IOException, InterruptedException {
-        ProcessBuilder pb = new ProcessBuilder("docker", "exec", "nginx", "df", "-B1", "/chunks");
+    private static long getActualMemoryUsableSpaceFromContainer(String containerName) throws IOException, InterruptedException {
+        ProcessBuilder pb = new ProcessBuilder("docker", "exec", containerName, "df", "-B1", "/chunks");
         Process process = pb.start();
         String output = new String(process.getInputStream().readAllBytes());
         process.waitFor();
@@ -193,22 +194,21 @@ public class OSUtil {
         MEMORY_USABLE.addAndGet(used);
     }
 
-    public static void refreshUsableMemory() throws IOException, InterruptedException {
-        MEMORY_USABLE.set(getActualMemoryUsableSpace());
+    public static void refreshUsableMemory(String containerName) throws IOException, InterruptedException {
+        if (containerName == null || containerName.isEmpty())
+            containerName = "nginx";
+        MEMORY_USABLE.set(getActualMemoryUsableSpace(containerName));
     }
 
 
     public static String createDirInRAMDiskElseDisk(String otherDisk, String dir) throws IOException {
-        if (currentOS == null)
-            currentOS = _detectOS();
-        if (RAMDISK == null)
-            RAMDISK = _getRAMDISKName();
-        if (currentOS == OS.WINDOWS) {
-            String path = OSUtil.normalizePath(otherDisk, dir);
+        OS os = _getDetectedOS();
+        if (os == OS.LINUX || os == OS.MAC || checkServiceIsInContainer()) {
+            String path = OSUtil.normalizePath(_getRAMDISKName(), dir);
             Files.createDirectories(Path.of(path));
             return path;
-        } else if (currentOS == OS.LINUX || currentOS == OS.MAC) {
-            String path = OSUtil.normalizePath(RAMDISK, dir);
+        } else if (os == OS.WINDOWS) {
+            String path = OSUtil.normalizePath(otherDisk, dir);
             Files.createDirectories(Path.of(path));
             return path;
         }
@@ -216,25 +216,24 @@ public class OSUtil {
     }
 
     public static String replaceHostRAMDiskWithContainer(String path) {
-        if (RAMDISK == null)
-            RAMDISK = _getRAMDISKName();
-        if (path.startsWith(RAMDISK))
-            return path.replace(RAMDISK, BASE_DIR);
+        if (path.startsWith(_getRAMDISKName()))
+            return path.replace(_getRAMDISKName(), BASE_DIR);
         return path;
     }
 
 
-    public static boolean deleteForceMemoryDirectory(String dir) throws IOException {
-        if (currentOS == OS.WINDOWS) {
-            return deleteForceDirectoryInContainer(dir);
-        } else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
+    public static boolean deleteForceMemoryDirectory(String dir, String containerName) throws IOException {
+        OS os = _getDetectedOS();
+        if (os == OS.MAC || os == OS.LINUX || checkServiceIsInContainer()) {
             return deleteForceDirectoryForRAMDisk(dir);
+        } else if (os == OS.WINDOWS) {
+            return deleteForceDirectoryInContainer(dir, containerName);
         }
-        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+        throw new UnsupportedOperationException("Unsupported OS: " + os);
     }
 
     private static boolean deleteForceDirectoryForRAMDisk(String pathString) throws IOException {
-        pathString = normalizePath(RAMDISK, pathString);
+        pathString = normalizePath(_getRAMDISKName(), pathString);
         Path path = Paths.get(pathString);
 
         // 1. Check if it exists at all
@@ -245,13 +244,13 @@ public class OSUtil {
         // 2. Perform the deletion
         if (Files.isDirectory(path)) {
             Files.walkFileTree(path, new SimpleFileVisitor<>() {
-                @Override
+                @Override @NonNull
                 public FileVisitResult visitFile(@NonNull Path file, @NonNull BasicFileAttributes attrs) throws IOException {
                     Files.delete(file);
                     return FileVisitResult.CONTINUE;
                 }
 
-                @Override
+                @Override @NonNull
                 public FileVisitResult postVisitDirectory(@NonNull Path dir, IOException exc) throws IOException {
                     Files.delete(dir);
                     return FileVisitResult.CONTINUE;
@@ -264,7 +263,7 @@ public class OSUtil {
         return true; // Something was deleted
     }
 
-    private static boolean deleteForceDirectoryInContainer(String path) {
+    private static boolean deleteForceDirectoryInContainer(String path, String containerName) {
         path = normalizePath(BASE_DIR, path);
 
         // This shell script runs INSIDE the container:
@@ -277,7 +276,7 @@ public class OSUtil {
         );
 
         // wrap it in a shell (sh -c) for complex command like if else
-        String[] cmd = {"docker", "exec", CONTAINER, "sh", "-c", shellCommand};
+        String[] cmd = {"docker", "exec", containerName, "sh", "-c", shellCommand};
 
         try {
             // Assuming runCommandAndLog returns or logs the output stream
@@ -297,18 +296,18 @@ public class OSUtil {
     }
 
 
-    public static String readPlayListFromTempDir(String videoDir) throws IOException, InterruptedException {
-        if  (currentOS == OS.WINDOWS) {
-            return readPlaylistFromContainer(videoDir);
-        } else if (currentOS == OS.MAC) {
+    public static String readPlayListFromTempDir(String videoDir, String containerName) throws IOException, InterruptedException {
+        OS os = _getDetectedOS();
+        if (os == OS.MAC || os == OS.LINUX || checkServiceIsInContainer()) {
             return readPlaylistFromRAMDisk(videoDir);
+        } else if  (os == OS.WINDOWS) {
+            return readPlaylistFromContainer(videoDir, containerName);
         }
-        throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
+        throw new UnsupportedOperationException("Unsupported OS: " + os);
     }
 
     private static String readPlaylistFromRAMDisk(String videoDir) throws IOException {
-        // Base directory for macOS RAMDISK mount — adjust if needed
-        Path playlistPath = Paths.get(RAMDISK, videoDir, "master.m3u8");
+        Path playlistPath = Paths.get(_getRAMDISKName(), videoDir, "master.m3u8");
         if (!Files.exists(playlistPath)) {
             return null;
         }
@@ -325,9 +324,9 @@ public class OSUtil {
         return String.join("\n", lastLines);
     }
 
-    private static String readPlaylistFromContainer(String videoDir) throws IOException, InterruptedException {
+    private static String readPlaylistFromContainer(String videoDir, String containerName) throws IOException, InterruptedException {
         Process process = new ProcessBuilder(
-                "docker", "exec", CONTAINER, "cat", "/chunks/" + videoDir + "/master.m3u8"
+                "docker", "exec", containerName, "cat", "/chunks/" + videoDir + "/master.m3u8"
         ).redirectErrorStream(true).start();
 
         // Only keep the last 2 lines
@@ -348,19 +347,20 @@ public class OSUtil {
     }
 
 
-    public static boolean checkTempFileExists(String fileName) {
-        if (currentOS == OS.MAC || currentOS == OS.LINUX) {
-            File playlist = new File(normalizePath(RAMDISK, fileName));
+    public static boolean checkTempFileExists(String fileName, String containerName) {
+        OS os = _getDetectedOS();
+        if (os == OS.MAC || os == OS.LINUX || checkServiceIsInContainer()) {
+            File playlist = new File(normalizePath(_getRAMDISKName(), fileName));
             return playlist.exists();
         }
-        return containerFileExists(fileName);
+        return containerFileExists(fileName, containerName);
     }
 
-    private static boolean containerFileExists(String relativePath) {
+    private static boolean containerFileExists(String relativePath, String containerName) {
         String targetPath = normalizePath(BASE_DIR, relativePath);
 
         String[] commands = {
-                "docker", "exec", CONTAINER,
+                "docker", "exec", containerName,
                 "test", "-e", targetPath
         };
 
@@ -373,25 +373,26 @@ public class OSUtil {
     }
 
 
-    public static boolean writeTextToTempFile(String relativePath, List<String> lines, boolean createDir) throws Exception {
+    public static boolean writeTextToTempFile(String relativePath, List<String> lines, boolean createDir, String containerName) throws Exception {
         int dot = relativePath.lastIndexOf('.');
         if (dot == -1 || dot == 0 || dot == relativePath.length() - 1) {
             System.out.println(("Invalid relative file path: " + relativePath));
             return false;
         }
 
-        if (currentOS == OS.WINDOWS) {
-            return writeTextToContainer(relativePath, lines, createDir);
-        } else if (currentOS == OS.MAC || currentOS == OS.LINUX) {
-            return writeTextToRAMDISK(relativePath, lines, createDir);
+        OS os = _getDetectedOS();
+        if (os == OS.MAC || os == OS.LINUX || checkServiceIsInContainer()) {
+            return writeTextToRAMDISK(relativePath, lines, createDir, containerName);
+        } else if (os == OS.WINDOWS) {
+            return writeTextToContainer(relativePath, lines, createDir, containerName);
         }
         return false;
     }
 
-    private static boolean writeTextToRAMDISK(String relativePath, List<String> lines, boolean createDir) throws Exception {
-        String targetPath = normalizePath(RAMDISK, relativePath);
+    private static boolean writeTextToRAMDISK(String relativePath, List<String> lines, boolean createDir, String containerName) throws Exception {
+        String targetPath = normalizePath(_getRAMDISKName(), relativePath);
         if (createDir) {
-            createTempDir(relativePath.substring(0, relativePath.lastIndexOf('/')));
+            createTempDir(relativePath.substring(0, relativePath.lastIndexOf('/')), containerName);
             File concatList = new File(targetPath);
             try (PrintWriter pw = new PrintWriter(concatList)) {
                 for (String part : lines) {
@@ -415,11 +416,11 @@ public class OSUtil {
      * No host file is created (pure RAM inside container).
      * RelativePath must be file path and not a directory.
      */
-    private static boolean writeTextToContainer(String relativePath, List<String> lines, boolean createDir) throws Exception {
+    private static boolean writeTextToContainer(String relativePath, List<String> lines, boolean createDir, String containerName) throws Exception {
 
         if (createDir) {
             String parentDir = relativePath.substring(0, relativePath.lastIndexOf('/'));
-            createDirectoryInContainer(parentDir);
+            createDirectoryInContainer(parentDir, containerName);
         }
 
         // Normalize target path inside /chunks
@@ -427,7 +428,7 @@ public class OSUtil {
 
         // Build docker exec command
         ProcessBuilder pb = new ProcessBuilder(
-                "docker", "exec", "-i", CONTAINER,
+                "docker", "exec", "-i", containerName,
                 "sh", "-c", "cat >> " + targetPath
         );
 
@@ -447,21 +448,22 @@ public class OSUtil {
             throw new IOException("Failed to write to container file: " + targetPath);
         }
 
-        System.out.println("Wrote text directly to " + targetPath + " in " + CONTAINER);
+        System.out.println("Wrote text directly to " + targetPath);
         return true;
     }
 
 
-    public static void createTempDir(String dir) throws Exception {
-        if (currentOS == OS.MAC ||  currentOS == OS.LINUX) {
+    public static void createTempDir(String dir, String containerName) throws Exception {
+        OS os = _getDetectedOS();
+        if (os == OS.MAC || os == OS.LINUX || checkServiceIsInContainer()) {
             createPathInRAMDisk(dir);
         } else {
-            createDirectoryInContainer(dir);
+            createDirectoryInContainer(dir, containerName);
         }
     }
 
     /**
-     * Create a path inside Mac RAMDISK located at Volumes/RAMDISK/ since Mac RAMDISK can be mounted
+     * Create a path inside Mac/Linux RAMDISK located at Volumes/RAMDISK/ since Mac/Linux RAMDISK can be mounted
      * as volume for docker. Making this write as simple as a normal file write.
      * Does not copy the content of the file. Only create the path if it doesn't exist.
      *
@@ -469,7 +471,7 @@ public class OSUtil {
      * if the path is written, otherwise throw IOException
      */
     private static void createPathInRAMDisk(String path) throws IOException {
-        File dir = new File(normalizePath(RAMDISK, path));
+        File dir = new File(normalizePath(_getRAMDISKName(), path));
         if (!dir.exists()) {
             if (!dir.mkdirs()) {
                 throw new IOException("Failed to create path: " + path);
@@ -480,14 +482,19 @@ public class OSUtil {
     /**
      * Create a directory directly inside the container under /chunks.
      */
-    private static void createDirectoryInContainer(String relativeDir) throws Exception {
+    private static void createDirectoryInContainer(String relativeDir, String containerName) throws Exception {
         String dirPath = normalizePath(BASE_DIR, relativeDir);
 
         try {
-            runCommandAndLog(new String[]{"docker", "exec", CONTAINER, "mkdir", "-p", dirPath}, null);
+            runCommandAndLog(new String[]{"docker", "exec", containerName, "mkdir", "-p", dirPath}, null);
         } catch (Exception e) {
-            throw new IOException("Failed to create directory: " + dirPath, e);
+            throw new IOException("Failed to create directory: " + dirPath + ": " + e.getMessage(), e);
         }
+    }
+
+    private static boolean checkServiceIsInContainer() {
+        String serviceInContainer = System.getenv("SERVICE_NOT_IN_CONTAINER");
+        return serviceInContainer == null || serviceInContainer.equals("false");
     }
 
 

@@ -6,6 +6,8 @@ import dev.chinh.streamingservice.mediaobject.MinIOService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Component
@@ -16,16 +18,22 @@ public class MediaProbe {
     private final ObjectMapper objectMapper;
 
     public JsonNode probeMediaInfo(String bucket, String object) throws Exception {
+        List<String> command = new ArrayList<>();
+        String ffmpegName = System.getenv("FFMPEG_NAME");
+        if (ffmpegName != null && !ffmpegName.isEmpty()) {
+            command.addAll(List.of("docker", "exec", ffmpegName));
+        }
+
         String inputUrl = minIOService.getObjectUrlForContainer(bucket, object);
-        ProcessBuilder pb = new ProcessBuilder(
-                "docker", "exec", "ffmpeg",
+        command.addAll(List.of(
                 "ffprobe",
                 "-v", "error",
                 "-print_format", "json",
                 "-show_format",
                 "-show_streams",
                 inputUrl
-        );
+        ));
+        ProcessBuilder pb = new ProcessBuilder(command);
         //pb.redirectErrorStream(true);
         Process process = pb.start();
 

@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # Assign arguments to variables
-USER=$1
-PASS=$2
+USER=${MONGODB_USERNAME}
+PASS=${MONGODB_PASSWORD}
+MONGO_HOST=${MONGODB_HOST}
 AUTH_DB="admin" # Usually 'admin' for root users
 
 # 1. Wait for MongoDB using credentials
@@ -23,6 +24,6 @@ echo "MongoDB is up! Initiating Replica Set..."
 mongosh --host mongodb:27017 \
     -u "$USER" -p "$PASS" \
     --authenticationDatabase "$AUTH_DB" \
-    --eval 'rs.initiate({_id:"rs0", members:[{_id:0, host:"localhost:27017"}]})'
+    --eval "rs.initiate({_id:'rs0', members:[{_id:0, host:'$MONGO_HOST:27017'}]})"
 
 echo "Replica set 'rs0' initialized successfully."

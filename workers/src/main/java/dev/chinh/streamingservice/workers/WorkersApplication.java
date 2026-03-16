@@ -18,8 +18,7 @@ public class WorkersApplication {
     @Bean
     CommandLineRunner startWorkers(ApplicationContext ctx) {
         return _ -> {
-            OSUtil._init();
-            OSUtil._initializeRAMInfo();
+            OSUtil._initializeRAMInfo(System.getenv("FFMPEG_NAME"));
 
             WorkerRedisService workerRedisService = ctx.getBean(WorkerRedisService.class);
             workerRedisService.initializeTokens(VideoWorker.TOKEN_KEY, 2);

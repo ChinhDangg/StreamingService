@@ -12,6 +12,7 @@ import dev.chinh.streamingservice.workers.internal.FileDiscoveryService;
 import io.grpc.StatusRuntimeException;
 import org.apache.coyote.BadRequestException;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,9 @@ public class AlbumService extends MediaService implements ResourceCleanable {
     private final MemoryManager memoryManager;
     private final VideoService videoService;
     private final FileDiscoveryService fileService;
+
+    @Value("${ffmpeg-name}")
+    private String ffmpegName;
 
     public AlbumService(@Qualifier("queueRedisTemplate") RedisTemplate<String, String> redisTemplate,
                         ObjectMapper objectMapper,
@@ -169,14 +173,27 @@ public class AlbumService extends MediaService implements ResourceCleanable {
     }
 
     private int processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String saveDir, boolean isAlbum) throws InterruptedException, IOException {
+        String[] shellCmd;
+        if (ffmpegName == null || ffmpegName.isEmpty()) {
+            // PROD: Start a local bash session
+            shellCmd = new String[]{"sh"};
+        } else {
+            // DEV: Start a bash session inside the ffmpeg container
+            shellCmd = new String[]{"docker", "exec", "-i", ffmpegName, "sh"};
+        }
         // Start one persistent bash session inside ffmpeg container
-        ProcessBuilder pb = new ProcessBuilder("docker", "exec", "-i", "ffmpeg", "bash").redirectErrorStream(true);
+        ProcessBuilder pb = new ProcessBuilder(shellCmd).redirectErrorStream(true);
         Process process = pb.start();
+
+        // Setup thread-safe list to hold logs
+        List<String> logs = Collections.synchronizedList(new ArrayList<>());
+        Thread logConsumer = new Thread(() -> getLogsFromInputStream(logs, process.getInputStream()));
+        logConsumer.start();
 
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8))) {
 
-            OSUtil.createTempDir(saveDir);
+            OSUtil.createTempDir(saveDir, ffmpegName);
 
             String scale = getFfmpegScaleString(resolution, true);
             for (int i = 0; i < albumUrlInfo.mediaUrlList.size(); i++) {
@@ -199,10 +216,9 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             writer.write("exit\n");
             writer.flush();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            process.destroy();
+            System.err.println("Error processing resized images: " + e.getMessage());
         }
-
-        List<String> logs = getLogsFromInputStream(process.getInputStream());
 
         int exit = process.waitFor();
         System.out.println("ffmpeg Resizing Images exited with code " + exit);
@@ -257,7 +273,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             return minIOService.getObjectUrl(bucket, objectName);
 
         final String videoDir = albumVidCacheJobId.replace(":", "/");
-        OSUtil.createTempDir(videoDir);
+        OSUtil.createTempDir(videoDir, ffmpegName);
 
         String containerDir = "/chunks/" + videoDir;
         String outPath = containerDir + masterFileName;
@@ -374,7 +390,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                 System.out.println("Estimated size: " + estimatedSize);
 
                 String mediaMemoryPath = mediaJobId.replace(":", "/");
-                boolean deleted = OSUtil.deleteForceMemoryDirectory(mediaMemoryPath);
+                boolean deleted = OSUtil.deleteForceMemoryDirectory(mediaMemoryPath, ffmpegName);
                 if (deleted)
                     removingSpace -= estimatedSize;
             } catch (IOException e) {

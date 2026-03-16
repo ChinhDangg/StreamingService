@@ -11,6 +11,7 @@ import jakarta.annotation.PostConstruct;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,9 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
     @Qualifier("ffmpegExecutor")
     private final ExecutorService ffmpegExecutor;
+
+    @Value("${ffmpeg-name}")
+    private String ffmpegName;
 
     private final MemoryManager memoryManager;
 
@@ -123,7 +127,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
             return getPartialVideoUrl(tokenKey, mediaJobDescription, resolution);
         }
 
-        OSUtil.createTempDir(videoDir);
+        OSUtil.createTempDir(videoDir, ffmpegName);
 
         long estimatedSize = (long) (Resolution.getEstimatedSize(
                 mediaJobDescription.getSize(), mediaJobDescription.getWidth(), mediaJobDescription.getHeight(), resolution)
@@ -166,13 +170,15 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
         int segmentDuration = 4;
         String partialVideoJobId = UUID.randomUUID().toString();
-        List<String> command = new ArrayList<>(List.of(
-                "docker", "exec", "ffmpeg",
-                "ffmpeg", "-y", "-hide_banner"
-        ));
+        List<String> command = new ArrayList<>();
+        if (ffmpegName != null && !ffmpegName.isEmpty()) {
+            command.addAll(List.of("docker", "exec", ffmpegName));
+        }
+        command.add("ffmpeg");
+        command.addAll(List.of("-y", "-hide_banner"));
 
         if (prevJobStopped) {
-            String playListLines = OSUtil.readPlayListFromTempDir(videoDir);
+            String playListLines = OSUtil.readPlayListFromTempDir(videoDir, ffmpegName);
             if (playListLines != null && !playListLines.isEmpty()) {
                 int lastSegment = findLastSegmentFromPlayList(playListLines);
                 if (lastSegment > 0) {
@@ -238,7 +244,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
         if (!enoughSpace)
             return getOriginalVideoUrl(mediaJobDescription);
 
-        OSUtil.createTempDir(videoDir);
+        OSUtil.createTempDir(videoDir, ffmpegName);
 
         String nginxUrl = minIOService.getObjectUrlForContainer(mediaJobDescription.getBucket(), mediaJobDescription.getKey());
 
@@ -270,15 +276,19 @@ public class VideoService extends MediaService implements ResourceCleanable {
             String output = OSUtil.createDirInRAMDiskElseDisk("disk", "preview-generated") +
                     "/" + videoId + "_preview_full_output.mp4";
 
-            List<String> commands = List.of(
-                    "docker", "exec", "ffmpeg",
+            List<String> commands = new ArrayList<>();
+            if (ffmpegName != null && !ffmpegName.isEmpty()) {
+                commands.addAll(List.of("docker", "exec", ffmpegName));
+            }
+            commands.addAll(List.of(
                     "ffmpeg",
+                    "-y",
                     "-v", "error",
                     "-i", inputPath,
                     "-c", "copy",
                     "-bsf:a:m:codec:aac", "aac_adtstoasc",
                     OSUtil.replaceHostRAMDiskWithContainer(output)
-            );
+            ));
 
             OSUtil.runCommandAndLog(commands.toArray(new String[0]), null);
 
@@ -295,14 +305,15 @@ public class VideoService extends MediaService implements ResourceCleanable {
                                      boolean prevJobStopped, String cacheJobId) throws Exception {
         final int segmentDuration = 4;
         String partialVideoJobId = UUID.randomUUID().toString();
-        // 4. ffmpeg command
-        List<String> command = new ArrayList<>(List.of(
-                "docker", "exec", "ffmpeg",     // run inside ffmpeg container
-                "ffmpeg", "-y"                  // call ffmpeg, overwrite outputs if they exist
-        ));
+
+        List<String> command = new ArrayList<>();
+        if (ffmpegName != null && !ffmpegName.isEmpty()) {
+            command.addAll(List.of("docker", "exec", ffmpegName));
+        }
+        command.addAll(List.of("ffmpeg", "-y"));
 
         if (prevJobStopped) {
-            String playListLines = OSUtil.readPlayListFromTempDir(videoDir);
+            String playListLines = OSUtil.readPlayListFromTempDir(videoDir, ffmpegName);
             if (playListLines != null && !playListLines.isEmpty()) {
                 int lastSegment = findLastSegmentFromPlayList(playListLines);
                 if (lastSegment > 0) {
@@ -338,10 +349,10 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
     public void checkPlaylistCreated(String playlist) throws InterruptedException {
         int retries = 100;
-        while (!OSUtil.checkTempFileExists(playlist) && retries-- > 0) {
+        while (!OSUtil.checkTempFileExists(playlist, ffmpegName) && retries-- > 0) {
             Thread.sleep(100);
         }
-        if (!OSUtil.checkTempFileExists(playlist)) {
+        if (!OSUtil.checkTempFileExists(playlist, ffmpegName)) {
             throw new RuntimeException("ffmpeg did not create playlist in time: " + playlist);
         }
     }
@@ -366,13 +377,14 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
         // Start a new thread
         ffmpegExecutor.submit(() -> {
-            List<String> logs = getLogsFromInputStream(process.getInputStream());
+            List<String> logs = Collections.synchronizedList(new ArrayList<>());
+            getLogsFromInputStream(logs, process.getInputStream());
             try {
                 int exit = process.waitFor();
                 System.out.println("ffmpeg video " + videoMasterFilePath + " exited with code " + exit);
                 // mark as completed
                 if (exit == 0) {
-                    boolean wrote = OSUtil.writeTextToTempFile(videoMasterFilePath.replaceFirst("/chunks/", ""), List.of("#EXT-X-ENDLIST"), false);
+                    boolean wrote = OSUtil.writeTextToTempFile(videoMasterFilePath.replaceFirst("/chunks/", ""), List.of("#EXT-X-ENDLIST"), false, ffmpegName);
                     if (!wrote) {
                         System.err.println("Failed to write to file: " + videoMasterFilePath);
                     }
@@ -397,10 +409,13 @@ public class VideoService extends MediaService implements ResourceCleanable {
     }
 
     public void stopFfmpegJob(String videoJobId, String jobId) throws Exception {
-        OSUtil.runCommandAndLog(new String[]{
-                "docker", "exec", "ffmpeg",
-                "pkill", "-INT", "-f", "job_id=" + jobId
-        }, List.of(255));
+        List<String> stopCmd = new ArrayList<>();
+        if (ffmpegName != null && !ffmpegName.isEmpty()) {
+            stopCmd.addAll(List.of("docker", "exec", ffmpegName));
+        }
+        // use pkill -INT to gracefully stop ffmpeg (so it finishes the file header)
+        stopCmd.addAll(List.of("pkill", "-INT", "-f", "job_id=" + jobId));
+        OSUtil.runCommandAndLog(stopCmd.toArray(new String[0]), List.of(255));
         workerRedisService.updateStatus(videoJobId, MediaJobStatus.STOPPED.name());
         addCacheVideoJobStatus(videoJobId, null, null, MediaJobStatus.STOPPED);
         workerRedisService.releaseToken(VideoWorker.TOKEN_KEY);
@@ -507,7 +522,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
             String mediaMemoryPath = mediaJobId.replace(":", "/");
             try {
-                boolean deleted = OSUtil.deleteForceMemoryDirectory(mediaMemoryPath);
+                boolean deleted = OSUtil.deleteForceMemoryDirectory(mediaMemoryPath, ffmpegName);
                 if (deleted)
                     removingSpace = removingSpace - estimatedSize;
             } catch (IOException e) {

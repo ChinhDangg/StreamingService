@@ -2,6 +2,7 @@ package dev.chinh.streamingservice.mediaobject.config;
 
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.header.Headers;
@@ -60,12 +61,19 @@ public class KafkaRedPandaConfig {
 //        );
 //    }
 
+    @Bean
+    public KafkaAdmin kafkaAdmin() {
+        return new KafkaAdmin(Map.of(
+                AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS
+        ));
+    }
 
     @Bean
     public ConsumerFactory<String, Object> consumerFactory() {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, MEDIA_GROUP_ID);
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
 
         // Use a custom mapper that handles "ClassNotFound" generally

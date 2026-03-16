@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.searchindexer.config;
 
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -15,7 +16,6 @@ import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
-import org.springframework.kafka.support.mapping.DefaultJackson2JavaTypeMapper;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
@@ -31,6 +31,13 @@ public class KafkaRedPandaConfig {
     private String BOOTSTRAP_SERVERS;
 
     public static final String MEDIA_GROUP_ID = "media-search-indexer-service";
+
+    @Bean
+    public KafkaAdmin kafkaAdmin() {
+        return new KafkaAdmin(Map.of(
+                AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS
+        ));
+    }
 
     @Bean
     public DefaultKafkaConsumerFactory<String, MediaUpdateEvent> consumerFactory() {

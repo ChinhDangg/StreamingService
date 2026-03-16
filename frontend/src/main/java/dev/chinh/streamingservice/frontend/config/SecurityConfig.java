@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.frontend.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -18,10 +19,13 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    @Value("${auth-server}")
+    private String AUTH_SERVER;
+
     @Bean
     JwtDecoder jwtDecoder() {
         return NimbusJwtDecoder
-                .withJwkSetUri("http://localhost:8084/.well-known/jwks.json")
+                .withJwkSetUri(AUTH_SERVER + "/.well-known/jwks.json")
                 .build();
     }
 
