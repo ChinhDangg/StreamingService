@@ -13,12 +13,20 @@ in a single scrollable page like a photo gallery or comic webcomic. Group of alb
 
 ---
 
-If you don't care about the architecture or want to run in development phase but only want to use the service immediately,
-access the build version with docker image at [https://hub.docker.com/r/kamikaze/streaming-service](https://hub.docker.com/r/kamikaze/streaming-service).
+## Reqiurements
+- Java 25
+- Docker running
 
 ---
 
-Read below for the stack and architecture details and how to run the project locally to updating the code.
+To run the project, have java 25 installed and docker running. Download the project. 
+- To start without any configuration, run the startup.sh script in ./z-prod-general.
+- To start with a custom configuration, edit the .env file or even the docker-compose.yml file.
+- Future update may create a single docker compose file for all services that pulls in all the necessary services.
+So user can just run docker compose up on a public url with default configuration
+---
+
+Read below for the stack and architecture details and how to run the project locally to update the code.
 
 ---
 
@@ -37,11 +45,21 @@ Read below for the stack and architecture details and how to run the project loc
 
 ---
 
+## Prerequisites
+
+- Java 25
+- Docker + Docker Compose
+- Node.js / npm (frontend assets)
+- Adequate RAM (RAM disk is heavily used if transcoding is enabled)
+
+---
+
+
 ## Repository layout
 
 <pre>StreamingService 
 ├── auth-service/ # Authentication & JWT issuing 
-├── backend/ # Core API + infra bootstrap for development + orchestration (call searching and send transcoding jobs)
+├── backend/ # Core API + orchestration (call searching and send transcoding jobs)
 ├── frontend/ # Spring MVC / Thymeleaf web UI
 ├── file-service/ # handle allowed upload, maintain file structure and file metadata to managed all file upload
 ├── media-upload/ # Upload & mutation API 
@@ -56,6 +74,12 @@ Read below for the stack and architecture details and how to run the project loc
 
 
 Each directory (except shared modules) is a **standalone Spring Boot application**.
+All services are **self-contained** and can be run independently.
+All services use the .env file to configure their behavior.
+- For development, to use host RAMDISK (only for MACOS and Linux), create the RAMDISK and set the name in .env file. 
+Start docker compose to get all data services running. Then start all logic services.
+- The `start-dev-mac.sh` script is a convenience script to do all of the above.
+- 
 
 ---
 
@@ -73,68 +97,13 @@ Each directory (except shared modules) is a **standalone Spring Boot application
 Media objects are **never exposed directly**—all access flows through OpenResty.
 
 
-## Environment variables & configuration ownership
-
-All services in this repository **share a single environment configuration**, which is
-**owned by the `backend` module in development phase**.
-
-### Key rule
-
-> **Every service (auth-service, frontend, workers, media-upload, search-indexer, etc.)
-> expects its environment variables to be defined in the `backend` module.**
-
-No service maintains its own `.env` file for consistency.
-
----
-
-### Why this design exists
-
-- The `backend` service is responsible for:
-    - Detecting the host OS
-    - Creating and mounting the RAM disk
-    - Selecting the correct Docker Compose file
-    - Starting Docker infrastructure
-- Centralizing environment variables avoids:
-    - Duplicate configuration
-    - Drift between services
-    - Port mismatches and secret inconsistencies
-
----
-
-### How it works in practice
-
-1. Environment variables are defined **once**, in the backend module:
-    - via exported shell variables, or
-    - via a `.env` file located in `backend/`
-2. `backend` starts Docker Compose using these variables
-3. **All other Spring Boot services inherit the same environment**
-4. Each service reads only the variables it needs from that shared set
-
----
-
-### What NOT to do
-
-- ❌ Do not create `.env` files in individual service directories
-- ❌ Do not redefine ports or secrets per service
-- ❌ Do not start services before backend is running
-
----
-
-### When adding a new service
-
-If you add a new service:
-1. Define its required environment variables in the backend environment
-2. Reference them in that service’s `application.properties`
-3. Do **not** introduce a separate env file
-
-
 ---
 
 ## Service responsibilities
 
-### `backend` (core coordinator)
+### `backend`
 
-The **backend** is the central brain of the system.
+The **backend** is the main reading - search and decide transcoding jobs.
 
 **Responsibilities:**
 - Acts as the **primary API** for:
@@ -143,17 +112,10 @@ The **backend** is the central brain of the system.
     - Search queries
 - Coordinates **transcoding jobs**
     - Decides when a video needs HLS generation
-    - Dispatches jobs to workers via Redis/Kafka
+    - Dispatches jobs to workers via Redis
 - Performs **search queries**
     - Uses `search-client` to query OpenSearch
     - Falls back to the database when appropriate
-- Hosts infrastructure bootstrap logic
-    - Detects host OS (Linux / macOS / Windows)
-    - Creates and mounts a RAM disk or tmpfs
-    - Starts the correct Docker Compose file
-- Owns nginx/OpenResty configuration
-
-⚠️ **Backend must be started first**.
 
 ---
 
@@ -299,32 +261,3 @@ Background backup service.
     - MinIO (cached output)
 
 This avoids persistent disk I/O and enables fast startup.
-
----
-
-## Prerequisites
-
-- Java 25
-- Docker + Docker Compose
-- Node.js / npm (frontend assets)
-- Adequate RAM (RAM disk is heavily used)
-
----
-
-## Local development (required startup order)
-
-### 1️⃣ Start Docker
-
-Docker **must be running** before anything else.
-
----
-
-### 2️⃣ Start `backend` FIRST (mandatory)
-
-Backend performs infrastructure bootstrap.
-
-**What it does:**
-1. Detects your OS
-2. Creates a RAM disk or tmpfs
-3. Selects the correct compose file
-4. Starts Docker Compose automatically
