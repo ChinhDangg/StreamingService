@@ -423,7 +423,9 @@ services:
       - ${REDPANDA_VOLUME}:/var/lib/redpanda/data
 
   mongodb:
-    image: mongo:7
+    build:
+      context: ../.docker/mongo
+      dockerfile: Dockerfile
     container_name: mongodb
     ports:
       - "27017:27017"
@@ -434,8 +436,6 @@ services:
       MONGODB_USERNAME: ${MONGODB_USERNAME}
       MONGODB_PASSWORD: ${MONGODB_PASSWORD}
       MONGODB_AUTH_SOURCE: ${MONGODB_AUTH_SOURCE}
-    # Starts mongo with replica set mode enabled
-    command: [ "--replSet", "rs0", "--bind_ip_all", "--keyFile", "/data/configdb/mongo-keyfile" ]
     healthcheck:
       test: mongosh --username "$MONGODB_USERNAME" --password "$MONGODB_PASSWORD" --authenticationDatabase "$MONGODB_AUTH_SOURCE" --eval "db.adminCommand('ping')"
       interval: 5s
@@ -443,7 +443,6 @@ services:
       retries: 5
     volumes:
       - ${MONGODB_VOLUME}:/data/db
-      - ../.docker/mongo/mongo-keyfile:/data/configdb/mongo-keyfile
 
   mongo-init:
     image: mongo:7
