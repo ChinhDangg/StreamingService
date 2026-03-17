@@ -107,7 +107,7 @@ public class FileService {
         }
         String validatedPath = validatedFile.validatedPath();
         int firstSlash = validatedPath.indexOf("/");
-        String firstName = validatedPath.substring(firstSlash + 1);
+        String firstName = validatedPath.substring(0, firstSlash == -1 ? validatedPath.length() : firstSlash);
 
         boolean exists = mongoTemplate.exists(new Query(Criteria
                         .where("parentId").is(getROOT_FOLDER_ID())
