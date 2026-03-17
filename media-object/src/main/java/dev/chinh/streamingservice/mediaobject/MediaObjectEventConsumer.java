@@ -144,7 +144,6 @@ public class MediaObjectEventConsumer {
                 mediaMetaData.setHeight(videoMetadata.height());
             }
         } else if (!sameName) {
-            thumbnailService.copyAlbumObjectToThumbnailBucket(event.bucket(), event.thumbnailObject(), event.thumbnailObject());
             minIOService.removeFile(event.bucket(), mediaMetaData.getThumbnail());
 
             mediaMetaDataRepository.updateMediaThumbnail(mediaMetaData.getId(), event.thumbnailObject());

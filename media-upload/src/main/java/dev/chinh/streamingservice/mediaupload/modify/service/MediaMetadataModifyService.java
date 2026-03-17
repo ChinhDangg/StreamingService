@@ -206,7 +206,7 @@ public class MediaMetadataModifyService {
             if (newThumbnail != null && !newThumbnail.equals(mediaMetaData.getThumbnail())) {
                 eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                         EventTopics.MEDIA_OBJECT_TOPIC,
-                        new MediaUpdateEvent.MediaThumbnailUpdated(mediaId, mediaType, num, mediaMetaData.getBucket(), newThumbnail)
+                        new MediaUpdateEvent.MediaThumbnailUpdated(mediaId, mediaType, null, mediaMetaData.getBucket(), newThumbnail)
                 ));
             }
         } else if (mediaType == MediaType.VIDEO || mediaType == MediaType.ALBUM) {

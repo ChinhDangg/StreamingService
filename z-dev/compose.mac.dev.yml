@@ -35,9 +35,6 @@ services: # docker compose -f compose.mac.dev.yml --env-file .env.dev -p ss-dev 
     container_name: ${PREFIX_NAME}-nginx
     ports:
       - "80:80"
-    depends_on:
-      - minio
-      - ffmpeg
     volumes:
       - ../.docker/nginx/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
       - ../.docker/nginx/proxy.conf:/usr/local/openresty/nginx/conf/proxy.conf:ro
@@ -50,8 +47,6 @@ services: # docker compose -f compose.mac.dev.yml --env-file .env.dev -p ss-dev 
   ffmpeg:
     image: linuxserver/ffmpeg:arm64v8-version-8.0-cli
     container_name: ${PREFIX_NAME}-ffmpeg
-    depends_on:
-      - minio
     entrypoint: [ "/bin/sh", "-c" ]   # replace ffmpeg with a shell
     command: [ "tail -f /dev/null" ]  # keep alive
     volumes:
@@ -160,8 +155,7 @@ services: # docker compose -f compose.mac.dev.yml --env-file .env.dev -p ss-dev 
     image: mongo:7
     container_name: ${PREFIX_NAME}-mongo-init
     depends_on:
-      mongodb:
-        condition: service_healthy
+      - mongodb
     environment:
       - MONGODB_HOST=${MONGODB_HOST}
       - MONGODB_USERNAME=${MONGODB_USERNAME}
