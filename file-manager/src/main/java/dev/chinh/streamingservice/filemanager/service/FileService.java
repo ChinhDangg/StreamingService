@@ -75,11 +75,18 @@ public class FileService {
             itemInDir.get(i).setThumbnail(thumbnailName.get(i));
         }
 
-        if (getFullPathInfo && !itemInDir.isEmpty()) {
-            String pathInId = itemInDir.getFirst().getPath();
+        if (getFullPathInfo) {
             FileSystemItem parentCraft = new FileSystemItem();
+            String pathInId;
+            if (itemInDir.isEmpty()) {
+                FileSystemItem parent = getFileSystemItem(parentId);
+                pathInId = parent.getPath() + parent.getId() + "/";
+                parentCraft.setName(parent.getName());
+            } else {
+                pathInId = itemInDir.getFirst().getPath();
+                parentCraft.setName("unknown");
+            }
             parentCraft.setPath(pathInId);
-            parentCraft.setName("unknown");
             String pathInName = getFullPathInName(parentCraft);
             return new FileSearchResult(pathInId, pathInName, itemInDir, items.getPageable(), items.hasNext());
         }
@@ -290,7 +297,7 @@ public class FileService {
             throw new IllegalArgumentException("Folder already exists: " + newFolderName);
         FileSystemItem item = FileSystemItem.builder()
                 .parentId(parentId)
-                .path(parent.getPath())
+                .path(parent.getPath() + parentId + "/")
                 .fileType(FileType.DIR)
                 .name(newFolderName)
                 .uploadDate(Instant.now())
