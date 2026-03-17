@@ -830,11 +830,36 @@ function displaySearchItems(searchItems) {
     const horizontalItemTem = searchItemsContainer.querySelector('.horizontal-item');
     const verticalItemTem = searchItemsContainer.querySelector('.vertical-item');
 
-    searchItems.forEach((item, index) => {
-        const itemContainer = (item.width >= item.height) ? helperCloneAndUnHideNode(horizontalItemTem)
-                                        : helperCloneAndUnHideNode(verticalItemTem);
-        if (item.thumbnail)
+    const loadImage = (imgElement, src) => {
+        return new Promise((resolve, reject) => {
+            imgElement.onload = () => {
+                resolve(imgElement);
+            };
+            imgElement.onerror = () => {
+                reject(new Error(`Failed to load image: ${src}`));
+            };
+            // start fetching the image data
+            imgElement.src = src;
+        });
+    }
+
+    searchItems.forEach(async (item, index) => {
+        let itemContainer;
+        if (item.thumbnail != null && !item.thumbnail.endsWith('null')) {
+            const loadedImage = document.createElement('img');
+            await loadImage(loadedImage, item.thumbnail);
+
+            const horizontal = loadedImage.naturalWidth >= loadedImage.naturalHeight;
+            itemContainer = (horizontal) ? helperCloneAndUnHideNode(horizontalItemTem)
+                : helperCloneAndUnHideNode(verticalItemTem);
+            const itemNodeImg = itemContainer.querySelector('img');
+            loadedImage.className = itemNodeImg.className;
+            loadedImage.style.cssText = itemNodeImg.style.cssText;
+            itemNodeImg.replaceWith(loadedImage);
             itemContainer.querySelector('.thumbnail-image').src = item.thumbnail;
+        } else {
+            itemContainer = helperCloneAndUnHideNode(horizontalItemTem);
+        }
         itemContainer.querySelector('.resolution-note').textContent = (item.width && item.height) ? `${item.width}x${item.height}` : '';
         itemContainer.querySelector('.media-title').textContent = item.title;
         itemContainer.querySelector('.date-note').textContent = item.uploadDate;
