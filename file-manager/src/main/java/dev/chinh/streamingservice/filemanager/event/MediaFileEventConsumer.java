@@ -10,6 +10,7 @@ import dev.chinh.streamingservice.filemanager.config.ApplicationConfig;
 import dev.chinh.streamingservice.filemanager.config.KafkaConfig;
 import dev.chinh.streamingservice.filemanager.constant.FileStatus;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
+import dev.chinh.streamingservice.filemanager.data.FileItemField;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import dev.chinh.streamingservice.filemanager.service.FileService;
 import lombok.AllArgsConstructor;
@@ -155,10 +156,10 @@ public class MediaFileEventConsumer {
 
             String parentPath = Pattern.quote(fileService.getPathForFileItem(item.getPath(), item.getId()));
             Query query = Query.query(Criteria
-                            .where("path").regex("^" + parentPath))
+                            .where(FileItemField.PATH).regex("^" + parentPath))
                     .limit(batchSize)
                     .skip(skip);
-            query.fields().include("id", "size");
+            query.fields().include("id", FileItemField.SIZE);
             List<FileSystemItem> batch = mongoTemplate.find(query, FileSystemItem.class);
 
             size += batch.stream()
@@ -177,9 +178,9 @@ public class MediaFileEventConsumer {
                 return;
             }
 
-            Update update = new Update().set("size", size);
+            Update update = new Update().set(FileItemField.SIZE, size);
             if (event.thumbnailObject() != null)
-                update.set("thumbnail", event.thumbnailObject());
+                update.set(FileItemField.THUMBNAIL, event.thumbnailObject());
             mongoTemplate.updateFirst(
                     Query.query(Criteria.where("id").is(item.getId())),
                     update,
@@ -215,8 +216,8 @@ public class MediaFileEventConsumer {
 
             int batchSize = 1000;
             int skip = event.offset();
-            Query query = Query.query(Criteria.where("parentId").is(item.getId()))
-                    .with(Sort.by(Sort.Direction.ASC, "name"))
+            Query query = Query.query(Criteria.where(FileItemField.PARENT_ID).is(item.getId()))
+                    .with(Sort.by(Sort.Direction.ASC, FileItemField.NAME))
                     .limit(batchSize)
                     .skip(skip);
             List<FileSystemItem> directChildren = mongoTemplate.find(query, FileSystemItem.class);
@@ -291,9 +292,9 @@ public class MediaFileEventConsumer {
             if (!FileType.isNotDir(item.getFileType())) {
                 String parentPath = Pattern.quote(fileService.getPathForFileItem(item.getPath(), item.getId()));
                 Query query = Query.query(Criteria
-                                .where("path").regex("^" + parentPath)
-                                .and("fileType").in(FileType.IMAGE, FileType.VIDEO))
-                        .with(Sort.by(Sort.Direction.ASC, "name"))
+                                .where(FileItemField.PATH).regex("^" + parentPath)
+                                .and(FileItemField.FILE_TYPE).in(FileType.IMAGE, FileType.VIDEO))
+                        .with(Sort.by(Sort.Direction.ASC, FileItemField.NAME))
                         .skip(event.num() - 1)
                         .limit(1);
                 FileSystemItem numItem = mongoTemplate.findOne(query, FileSystemItem.class);
@@ -323,9 +324,9 @@ public class MediaFileEventConsumer {
     private void onUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdatedReady event) {
         System.out.println("Received update media thumbnail name: " + event.mediaId());
         try {
-            Query query = Query.query(Criteria.where("mId").is(event.mediaId()));
+            Query query = Query.query(Criteria.where(FileItemField.MEDIA_ID).is(event.mediaId()));
             Update update = new Update()
-                    .set("thumbnail", event.newThumbnail());
+                    .set(FileItemField.THUMBNAIL, event.newThumbnail());
             mongoTemplate.updateFirst(query, update, FileSystemItem.class);
         } catch (Exception e) {
             throw new RuntimeException("Failed to update thumbnail name for media " + event.mediaId(), e);
@@ -335,18 +336,18 @@ public class MediaFileEventConsumer {
 
     private String getOrCreateFolder(String name, String parentId, String currentPath, FileType fileType) {
         Query query = new Query(Criteria
-                .where("parentId").is(parentId)
-                .and("name").is(name)
-                .and("fileType").in(FileType.DIR, FileType.ALBUM)
+                .where(FileItemField.PARENT_ID).is(parentId)
+                .and(FileItemField.NAME).is(name)
+                .and(FileItemField.FILE_TYPE).in(FileType.DIR, FileType.ALBUM)
         );
 
         Update update = new Update()
-                .setOnInsert("name", name)
-                .setOnInsert("parentId", parentId)
-                .setOnInsert("path", currentPath)
-                .setOnInsert("fileType", fileType)
-                .setOnInsert("statusCode", FileStatus.IN_USE.getValue())
-                .setOnInsert("uploadDate", LocalDateTime.now());
+                .setOnInsert(FileItemField.NAME, name)
+                .setOnInsert(FileItemField.PARENT_ID, parentId)
+                .setOnInsert(FileItemField.PATH, currentPath)
+                .setOnInsert(FileItemField.FILE_TYPE, fileType)
+                .setOnInsert(FileItemField.STATUS_CODE, FileStatus.IN_USE.getValue())
+                .setOnInsert(FileItemField.UPLOAD_DATE, LocalDateTime.now());
 
         // upsert to create and return in one operation - atomic
         FindAndModifyOptions options = new FindAndModifyOptions().upsert(true).returnNew(true);
@@ -372,7 +373,7 @@ public class MediaFileEventConsumer {
                 FileSystemItem parent = fileService.findById(fileItem.getParentId());
                 if (parent != null && parent.getFileType() == FileType.GROUPER) {
                     Query query = new Query(Criteria.where("id").is(parent.getId()));
-                    Update update = new Update().set("length", parent.getLength() - 1);
+                    Update update = new Update().set(FileItemField.LENGTH, parent.getLength() - 1);
                     mongoTemplate.updateFirst(query, update, FileSystemItem.class);
                 }
             }
@@ -390,7 +391,7 @@ public class MediaFileEventConsumer {
         while (hasMore) {
             String parentPath = Pattern.quote(fileService.getPathForFileItem(fileItem.getPath(), fileItem.getId()));
             List<FileSystemItem> batch = mongoTemplate.find(Query.query(Criteria
-                    .where("path").regex("^" + parentPath)).limit(batchSize), FileSystemItem.class);
+                    .where(FileItemField.PATH).regex("^" + parentPath)).limit(batchSize), FileSystemItem.class);
 
             hasMore = batch.size() == batchSize;
 

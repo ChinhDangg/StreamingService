@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.Instant;
 
@@ -28,7 +29,9 @@ import java.time.Instant;
         // SortBy.SIZE: Smallest or Largest (1 covers both)
         @CompoundIndex(name = "parent_size_idx", def = "{'parentId': 1, 'size': 1}"),
         // SortBy.LENGTH:
-        @CompoundIndex(name = "parent_length_idx", def = "{'parentId': 1, 'length': 1}")
+        @CompoundIndex(name = "parent_length_idx", def = "{'parentId': 1, 'length': 1}"),
+        // SortBy.RESOLUTION: (Usually want the largest area to be first)
+        @CompoundIndex(name = "res_area_width_idx", def = "{'res.a': -1, 'res.w': -1}")
 })
 public class FileSystemItem {
 
@@ -51,25 +54,41 @@ public class FileSystemItem {
     @Id
     private String id;
 
+    @Field(FileItemField.PARENT_ID)
     private String parentId;
 
+    @Field(FileItemField.PATH)
     @Indexed
     private String path;
 
+    @Field(FileItemField.FILE_TYPE)
     private FileType fileType;
 
+    @Field(FileItemField.MEDIA_ID)
     @Indexed
     private Long mId;
+
+    @Field(FileItemField.NAME)
     @JsonProperty(ContentMetaData.NAME)
     private String name;
+
+    @Field(FileItemField.BUCKET)
     @JsonProperty(ContentMetaData.BUCKET)
     private String bucket;
+
+    @Field(FileItemField.OBJECT_NAME)
     @JsonProperty(ContentMetaData.OBJECT_NAME)
     private String objectName;
+
+    @Field(FileItemField.THUMBNAIL)
     @JsonProperty(ContentMetaData.THUMBNAIL)
     private String thumbnail;
+
+    @Field(FileItemField.SIZE)
     @JsonProperty(ContentMetaData.SIZE)
     private Long size;
+
+    @Field(FileItemField.LENGTH)
     @JsonProperty(ContentMetaData.LENGTH)
     private Integer length;
 
@@ -80,6 +99,7 @@ public class FileSystemItem {
     @JsonProperty(ContentMetaData.UPLOAD_DATE)
     private Instant uploadDate;
 
+    @Field(FileItemField.STATUS_CODE)
     private Short statusCode;
 
     public static String getStatusCodeAsString(Short statusCode) {
