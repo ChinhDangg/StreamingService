@@ -266,7 +266,9 @@ public class MediaFileEventConsumer {
                     event.mediaId(),
                     FileType.detectFileTypeFromMediaType(event.mediaType()),
                     event.thumbnail(),
-                    event.length()
+                    event.length(),
+                    event.width(),
+                    event.height()
             );
             if (result.getModifiedCount() != 1)
                 throw new RuntimeException("Failed to update file to media");

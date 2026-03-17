@@ -136,7 +136,9 @@ public interface MediaUpdateEvent {
             long mediaId,
             MediaType mediaType,
             String thumbnail,
-            int length
+            int length,
+            int width,
+            int height
     ) implements MediaUpdateEvent{}
 
     record MediaThumbnailUpdatedReady(

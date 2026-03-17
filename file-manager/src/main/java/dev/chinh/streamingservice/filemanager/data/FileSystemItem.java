@@ -32,6 +32,21 @@ import java.time.Instant;
 })
 public class FileSystemItem {
 
+    public record ResolutionInfo(
+            @Field(FileItemField.WIDTH)
+            int width,
+
+            @Field(FileItemField.HEIGHT)
+            int height,
+
+            @Field(FileItemField.AREA)
+            @Indexed long area) {
+        // Custom constructor to auto-calculate the area 'a'
+        public ResolutionInfo(int width, int height) {
+            this(width, height, (long) width * height);
+        }
+    }
+
     @JsonProperty(ContentMetaData.ID)
     @Id
     private String id;
@@ -57,6 +72,11 @@ public class FileSystemItem {
     private Long size;
     @JsonProperty(ContentMetaData.LENGTH)
     private Integer length;
+
+    @Field(FileItemField.RESOLUTION_INFO)
+    private ResolutionInfo resolutionInfo;
+
+    @Field(FileItemField.UPLOAD_DATE)
     @JsonProperty(ContentMetaData.UPLOAD_DATE)
     private Instant uploadDate;
 
@@ -68,5 +88,21 @@ public class FileSystemItem {
         if (statusCode == FileStatus.DELETING.getValue()) return "Deleting in progress";
         if (statusCode == FileStatus.IN_USE.getValue()) return "In use";
         return null;
+    }
+
+    public void setResolutionInfo(int w, int h) {
+        this.resolutionInfo = new ResolutionInfo(w, h);
+    }
+
+    public int getWidth() {
+        return resolutionInfo.width;
+    }
+
+    public int getHeight() {
+        return resolutionInfo.height;
+    }
+
+    public long getArea() {
+        return resolutionInfo.area;
     }
 }

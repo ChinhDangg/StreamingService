@@ -93,7 +93,10 @@ public class MediaObjectEventConsumer {
                             event.mediaId(),
                             event.mediaType(),
                             mediaMetaData.getThumbnail(),
-                            mediaMetaData.getLength())
+                            mediaMetaData.getLength(),
+                            mediaMetaData.getWidth(),
+                            mediaMetaData.getHeight()
+                    )
             ));
         } catch (Exception e) {
             logger.error("Failed to update media enrichment: {} {}", event.mediaId(), event.mediaType());
