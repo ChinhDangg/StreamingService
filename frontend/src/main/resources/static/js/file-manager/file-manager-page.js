@@ -125,6 +125,23 @@ function displayFileItem(fileItems, clearNode = true, clearFileList = true, push
                 addToCurrentPath(item.id, item.name);
             });
         }
+        const sortingInfo = fileNode.querySelector('.sorting-info');
+        const sortInfo = getItemKeyFromSortSelectValue(getSortSelectValue().by);
+        if (sortInfo && item[sortInfo] && sortInfo !== 'name') {
+            if (sortInfo.startsWith('resolution')) {
+                sortingInfo.innerText = item.resolution.width + 'x' + item.resolution.height;
+            } else if (sortInfo === 'length') {
+                sortingInfo.innerText = fileType === 'VIDEO' ? formatDuration(item.length) : item[sortInfo];
+            } else if (sortInfo === 'size') {
+                sortingInfo.innerText = formatSize(item.size);
+            } else if (sortInfo === 'uploadDate') {
+                sortingInfo.innerText = formatDate(item[sortInfo]);
+            } else
+                sortingInfo.innerText = item[sortInfo];
+            sortingInfo.classList.remove('hidden');
+        } else {
+            sortingInfo.classList.add('hidden');
+        }
         fileViewContainer.appendChild(fileNode);
     });
 
@@ -143,6 +160,37 @@ function setMediaBgColor(fileNode, type) {
     } else if (type === 'GROUPER') {
         fileNode.style.backgroundColor = '#ad46ff';
     }
+}
+
+function formatSize(bytes) {
+    if (bytes >= 1073741824) { return (bytes / 1073741824).toFixed(2) + " GB"; }
+    if (bytes >= 1048576)    { return (bytes / 1048576).toFixed(2) + " MB"; }
+    if (bytes >= 1024)       { return (bytes / 1024).toFixed(2) + " KB"; }
+    return bytes + " Bytes";
+}
+
+function formatDuration(totalSeconds) {
+    if (totalSeconds < 60) {
+        return totalSeconds + "s";
+    }
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    if (seconds === 0)
+        return minutes + "m";
+    return minutes + "m " + seconds + "s";
+}
+
+function formatDate(isoString) {
+    // isoString: "2026-03-18T19:47:37.151Z"
+    // Positions:  012345678901234567890123
+
+    const year = isoString.slice(0, 4);
+    const month = isoString.slice(5, 7);
+    const day = isoString.slice(8, 10);
+    const hours = isoString.slice(11, 13);
+    const minutes = isoString.slice(14, 16);
+
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
 }
 
 const fileViewWrapper = document.getElementById('file-view-wrapper');
@@ -194,22 +242,11 @@ sortSelect.addEventListener('change', async function () {
 
     if (nextPage === -1) {
         // reached the end - should have all files with all info to sort locally
-        const value = sortSelect.value;
-        let key; let order;
-        if (value.includes('NAME'))
-            key = 'name';
-        else if (value.includes('SIZE'))
-            key = 'size';
-        else if (value.includes('LENGTH'))
-            key = 'length';
-        else if (value.includes('RESOLUTION'))
-            key = 'resolution.width';
-        else if (value.includes('UPLOAD'))
-            key = 'uploadDate';
-        if (value.includes('DESC'))
-            order = 'DESC';
-        else
-            order = 'ASC';
+        const sortSelectValue = getSortSelectValue();
+        let key = getItemKeyFromSortSelectValue(sortSelectValue.by);
+        if (key === 'resolution')
+            key = 'resolution.area';
+        const order = sortSelectValue.order;
         currentFileItems.sort(dynamicSortByField(key, order));
         displayFileItem(currentFileItems, true, false, false);
         return;
@@ -221,6 +258,20 @@ sortSelect.addEventListener('change', async function () {
     if (observer)
         observer.observe(sentinel);
 });
+
+function getItemKeyFromSortSelectValue(value) {
+    if (value === 'NAME')
+        return 'name';
+    else if (value === 'SIZE')
+        return 'size';
+    else if (value === 'LENGTH')
+        return 'length';
+    else if (value === 'RESOLUTION')
+        return 'resolution';
+    else if (value === 'UPLOAD')
+        return 'uploadDate';
+    return null;
+}
 
 function dynamicSortByField(key, order = 'ASC') {
     const getValue = (obj, path) => {
@@ -439,7 +490,8 @@ async function handleFiles(files) {
             file: file
         });
     }
-    sortFileAndDisplayFileName(fileList);
+    sortUploadFileAndDisplayFileName(fileList);
+    fileInput.value = '';
 }
 
 folderInput.addEventListener('change', async (e) => {
@@ -457,7 +509,8 @@ async function handleFolderFiles(files) {
             file: file
         });
     }
-    sortFileAndDisplayFileName(fileList);
+    sortUploadFileAndDisplayFileName(fileList);
+    folderInput.value = '';
 }
 
 // prevent default drag behavior
@@ -505,7 +558,7 @@ async function handleFileArray(fileArray) {
             file: file.file
         });
     }
-    sortFileAndDisplayFileName(fileList);
+    sortUploadFileAndDisplayFileName(fileList);
 }
 
 async function traverseEntry(entry, filesArray, path = "") {
@@ -533,18 +586,18 @@ async function traverseEntry(entry, filesArray, path = "") {
     }
 }
 
-const sortSelection = document.getElementById('sort-file-upload-select');
-sortSelection.addEventListener('change', function () {
-    sortFileAndDisplayFileName(fileList);
+const sortUploadSelection = document.getElementById('sort-file-upload-select');
+sortUploadSelection.addEventListener('change', function () {
+    sortUploadFileAndDisplayFileName(fileList);
 })
 
-function sortFileAndDisplayFileName(fileList) {
+function sortUploadFileAndDisplayFileName(fileList) {
     if (fileList.length === 0) return;
     else if (fileList.length === 1) {
         addUploadingFile(fileList[0].name);
         return;
     }
-    const sortSelectionValue = sortSelection.value;
+    const sortSelectionValue = sortUploadSelection.value;
     switch (sortSelectionValue) {
         case 'name-asc':
             fileList.sort((a, b) => a.name.localeCompare(b.name));
