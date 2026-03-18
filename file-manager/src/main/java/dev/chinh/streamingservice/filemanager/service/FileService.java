@@ -113,20 +113,28 @@ public class FileService {
         return PageRequest.of(page, pageSize, sort);
     }
 
-    public String initiateUploadRequest(String filePath) {
+    public String initiateUploadRequest(String filePath, String userId) {
         var validatedFile = FileSystemValidator.isValidPath(filePath);
         if (validatedFile.errorMessage() != null) {
             throw new IllegalArgumentException(validatedFile.errorMessage());
         }
         String validatedPath = validatedFile.validatedPath();
-        int firstSlash = validatedPath.indexOf("/");
-        String firstName = validatedPath.substring(0, firstSlash == -1 ? validatedPath.length() : firstSlash);
+        String[] pathParts = validatedPath.split("/");
+        int partLength = pathParts.length;
+        String parentId = getROOT_FOLDER_ID();
+        for (int i = 0; i < partLength-1; i++) {
+            String dirId = getCachedElseDbDirectoryId(parentId, pathParts[i], userId);
+            if (dirId == null) {
+                return addCacheMediaUploadRequest(validatedPath);
+            }
+            parentId = dirId;
+        }
 
         boolean exists = mongoTemplate.exists(new Query(Criteria
-                        .where(FileItemField.PARENT_ID).is(getROOT_FOLDER_ID())
-                        .and(FileItemField.NAME).is(firstName)),
+                        .where(FileItemField.PARENT_ID).is(parentId)
+                        .and(FileItemField.NAME).is(pathParts[partLength-1])),
                 FileSystemItem.class);
-        if (exists) throw new IllegalArgumentException(firstSlash == -1 ? "File" : "Folder" + " already exists: " + validatedPath);
+        if (exists) throw new IllegalArgumentException("File already exists: " + validatedPath);
         return addCacheMediaUploadRequest(validatedPath);
     }
 
@@ -161,11 +169,7 @@ public class FileService {
         if (statusCodeStr != null) {
             return statusCodeStr;
         }
-        UpdateResult result = updateStatusCode(fileId, FileStatus.PROCESSING);
-        if (result.getModifiedCount() == 0) {
-            return "Item is already marked as processing";
-        }
-
+        updateStatusCodeAndGet(fileId, FileStatus.PROCESSING);
         producer.publishEvent(new MediaFileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
@@ -198,10 +202,7 @@ public class FileService {
         if (statusCodeStr != null) {
             return statusCodeStr;
         }
-        UpdateResult result = updateStatusCode(fileId, FileStatus.PROCESSING);
-        if (result.getModifiedCount() == 0) {
-            return "Item is already marked as processing";
-        }
+        updateStatusCodeAndGet(fileId, FileStatus.PROCESSING);
         String parentPath = Pattern.quote(getPathForFileItem(item.getPath(), item.getId()));
         FileSystemItem first = mongoTemplate.findOne(new Query(Criteria
                 .where(FileItemField.PATH).regex("^" + parentPath)
@@ -239,10 +240,7 @@ public class FileService {
         if (statusCodeStr != null) {
             return statusCodeStr;
         }
-        UpdateResult result = updateStatusCode(fileId, FileStatus.PROCESSING);
-        if (result.getModifiedCount() == 0) {
-            return "Item is already marked as processing";
-        }
+        updateStatusCodeAndGet(fileId, FileStatus.PROCESSING);
         boolean anyDirectFile = mongoTemplate.exists(Query.query(Criteria
                         .where(FileItemField.PARENT_ID).is(fileId)
                         .and(FileItemField.FILE_TYPE).nin(FileType.DIR, FileType.ALBUM, FileType.GROUPER)),
@@ -267,10 +265,10 @@ public class FileService {
         return "Processing as grouper";
     }
 
-    private UpdateResult updateStatusCode(String fileId, FileStatus status) {
+    private void updateStatusCodeAndGet(String fileId, FileStatus status) {
         Query query = new Query(Criteria.where("id").is(fileId));
         Update update = new Update().set(FileItemField.STATUS_CODE, status.getValue());
-        return mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+        mongoTemplate.updateFirst(query, update, FileSystemItem.class);
     }
 
     public void removeFileStatus(String fileId) {
@@ -360,7 +358,7 @@ public class FileService {
                 throw new IllegalArgumentException("Directory is not empty - include media item");
             }
         }
-        updateStatusCode(fileId, FileStatus.DELETING);
+        updateStatusCodeAndGet(fileId, FileStatus.DELETING);
         if (item.getMId() != null && item.getMId() > 0) {
             throw new IllegalArgumentException("File is already marked as media - delete through media file item instead: " + item.getMId());
         }
@@ -391,7 +389,7 @@ public class FileService {
                 throw new IllegalArgumentException("Media is not empty - include nested media item");
             }
         }
-        updateStatusCode(item.getId(), FileStatus.DELETING);
+        updateStatusCodeAndGet(item.getId(), FileStatus.DELETING);
 
         producer.publishEvent(new MediaFileEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC,
@@ -443,8 +441,25 @@ public class FileService {
         return OSUtil.normalizePath(getROOT_PATH(), parentPath + "/" + currentPath + "/");
     }
 
-    public ApplicationConfig.DirectoryCached getCachedDirectory(String dirKey) {
-        return (ApplicationConfig.DirectoryCached) directoryIdCache.asMap().get(dirKey);
+    public String getCachedElseDbDirectoryId(String parentId, String dirName, String userId) {
+        String dirKey = "DIR_" + dirName + "|" + parentId;
+        var cached = (ApplicationConfig.DirectoryCached) directoryIdCache.asMap().get(dirKey);
+        if (cached == null) {
+            Query query = Query.query(Criteria
+                    .where(FileItemField.PARENT_ID).is(parentId)
+                    .and(FileItemField.NAME).is(dirName));
+            Update update = new Update().set(FileItemField.STATUS_CODE, FileStatus.IN_USE.getValue());
+            FileSystemItem dir = mongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), FileSystemItem.class);
+            if (dir == null)
+                return null;
+            directoryIdCache.asMap().computeIfAbsent(dirKey, k -> {
+                Set<String> users = ConcurrentHashMap.newKeySet();
+                users.add(userId);
+                return new ApplicationConfig.DirectoryCached(dir.getId(), users);
+            });
+            return dir.getId();
+        }
+        return cached.dirId();
     }
 
     public ApplicationConfig.DirectoryCached getCachedOrCreateDirectory(String dirKey, String dirName, String dirParentId, String dirPath, String userId) {
@@ -452,6 +467,7 @@ public class FileService {
             if (existing == null) {
                 String fileId = getOrCreateFolder(dirName, dirParentId, dirPath, FileType.DIR);
                 Set<String> users = ConcurrentHashMap.newKeySet();
+                users.add(userId);
                 return new ApplicationConfig.DirectoryCached(fileId, users);
             } else {
                 ((ApplicationConfig.DirectoryCached) existing).userUsing().add(userId);

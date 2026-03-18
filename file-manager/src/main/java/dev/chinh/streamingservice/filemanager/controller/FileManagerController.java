@@ -8,6 +8,8 @@ import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
@@ -79,7 +81,7 @@ public class FileManagerController {
 
     public record InitiateMultipartUploadRequest(@NotBlank @Size(max = 1000) String filePath) {}
     @PostMapping("/upload/create-session")
-    public String initiateSession(@RequestBody @Valid InitiateMultipartUploadRequest request) {
-        return fileService.initiateUploadRequest(request.filePath);
+    public String initiateSession(@RequestBody @Valid InitiateMultipartUploadRequest request, @AuthenticationPrincipal Jwt jwt) {
+        return fileService.initiateUploadRequest(request.filePath, jwt.getSubject());
     }
 }

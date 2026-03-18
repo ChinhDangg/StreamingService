@@ -1,6 +1,5 @@
 package dev.chinh.streamingservice.filemanager.event;
 
-import com.github.benmanes.caffeine.cache.Cache;
 import com.mongodb.client.result.UpdateResult;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
@@ -8,14 +7,12 @@ import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.filemanager.config.ApplicationConfig;
 import dev.chinh.streamingservice.filemanager.config.KafkaConfig;
-import dev.chinh.streamingservice.filemanager.constant.FileStatus;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
 import dev.chinh.streamingservice.filemanager.data.FileItemField;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import dev.chinh.streamingservice.filemanager.service.FileService;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -28,9 +25,7 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 @Service
@@ -40,7 +35,6 @@ public class MediaFileEventConsumer {
     private final MongoTemplate mongoTemplate;
     private final FileService fileService;
     private final MediaFileEventProducer producer;
-    private final Cache<String, ApplicationConfig.EntryCached> directoryIdCache;
 
     private void onCreateFile(MediaUpdateEvent.FileCreated event) {
         System.out.println("Received create file event");
@@ -53,33 +47,11 @@ public class MediaFileEventConsumer {
                 for (int i = 0; i < parts.length - 1; i++) {
                     String dirKey = "DIR_" + parts[i] + "|" + parentId;
 
-                    String finalParentId = parentId;
-                    String finalName = parts[i];
-                    String finalCurrentPath = currentPath.toString();
-                    ApplicationConfig.DirectoryCached directoryCached = (ApplicationConfig.DirectoryCached) directoryIdCache.asMap().compute(dirKey, (_, existing) -> {
-                        if (existing == null) {
-                            String fileId = getOrCreateFolder(finalName, finalParentId, finalCurrentPath, FileType.DIR);
-                            Set<String> users = ConcurrentHashMap.newKeySet();
-                            return new ApplicationConfig.DirectoryCached(fileId, users);
-                        } else {
-                            ((ApplicationConfig.DirectoryCached) existing).userUsing().add(event.userId());
-                            return existing;
-                        }
-                    });
+                    ApplicationConfig.DirectoryCached directoryCached = fileService.getCachedOrCreateDirectory(dirKey, parts[i], parentId, currentPath.toString(), event.userId());
+
+                    fileService.addDirectoryToUserUsingList(event.userId(), dirKey);
 
                     String folderId = directoryCached.dirId();
-
-                    directoryIdCache.asMap().compute(event.userId(), (_, existing) -> {
-                       if (existing == null) {
-                           Set<String> dirUserUsing = ConcurrentHashMap.newKeySet();
-                           dirUserUsing.add(dirKey); // add dirKey to get dir info from cache back (not using the dirId)
-                           return new ApplicationConfig.UserDirUsing(dirUserUsing);
-                       } else {
-                           ((ApplicationConfig.UserDirUsing) existing).dirUserUsing().add(dirKey);
-                           return existing;
-                       }
-                    });
-
                     parentId = folderId;
                     currentPath.append(folderId).append("/");
                 }
@@ -98,21 +70,7 @@ public class MediaFileEventConsumer {
             mongoTemplate.insert(fileItem);
 
             if (event.isLast()) {
-                directoryIdCache.asMap().computeIfPresent(event.userId(), (_, value) -> {
-                    for (String dirKey : ((ApplicationConfig.UserDirUsing) value).dirUserUsing()) {
-                        directoryIdCache.asMap().computeIfPresent(dirKey, (_, dirValue) -> {
-                            var dirCached = (ApplicationConfig.DirectoryCached) dirValue;
-                            dirCached.userUsing().remove(event.userId());
-
-                            if (dirCached.userUsing().isEmpty()) {
-                                fileService.removeFileStatus(dirCached.dirId());
-                                return null; // null to remove the key
-                            }
-                            return dirValue;
-                        });
-                    }
-                    return null;
-                });
+                fileService.removeAllDirectoriesUserUsing(event.userId());
             }
 
             if (event.mediaId() != null && event.mediaType() != null) {
@@ -331,32 +289,6 @@ public class MediaFileEventConsumer {
         } catch (Exception e) {
             throw new RuntimeException("Failed to update thumbnail name for media " + event.mediaId(), e);
         }
-    }
-
-
-    private String getOrCreateFolder(String name, String parentId, String currentPath, FileType fileType) {
-        Query query = new Query(Criteria
-                .where(FileItemField.PARENT_ID).is(parentId)
-                .and(FileItemField.NAME).is(name)
-                .and(FileItemField.FILE_TYPE).in(FileType.DIR, FileType.ALBUM)
-        );
-
-        Update update = new Update()
-                .setOnInsert(FileItemField.NAME, name)
-                .setOnInsert(FileItemField.PARENT_ID, parentId)
-                .setOnInsert(FileItemField.PATH, currentPath)
-                .setOnInsert(FileItemField.FILE_TYPE, fileType)
-                .setOnInsert(FileItemField.STATUS_CODE, FileStatus.IN_USE.getValue())
-                .setOnInsert(FileItemField.UPLOAD_DATE, LocalDateTime.now());
-
-        // upsert to create and return in one operation - atomic
-        FindAndModifyOptions options = new FindAndModifyOptions().upsert(true).returnNew(true);
-
-        FileSystemItem dir = mongoTemplate.findAndModify(query, update, options, FileSystemItem.class);
-
-        if (dir == null) throw new RuntimeException("Failed to create folder");
-
-        return dir.getId();
     }
 
     private void onDeleteFile(MediaUpdateEvent.FileDeleted event) {
