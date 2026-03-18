@@ -1047,12 +1047,14 @@ const currentTargetNode = {
     id: null,
     type: null,
     mId: null,
+    node: null
 }
 
 function clearTargetNode() {
     currentTargetNode.id = null;
     currentTargetNode.type = null;
     currentTargetNode.mId = null;
+    currentTargetNode.node = null;
 }
 
 fileViewContainer.addEventListener('contextmenu', (event) => {
@@ -1077,6 +1079,7 @@ fileViewContainer.addEventListener('contextmenu', (event) => {
     currentTargetNode.id = targetNode.getAttribute('data-id');
     currentTargetNode.type = targetNode.getAttribute('data-type');
     currentTargetNode.mId = targetNode.getAttribute('data-mId');
+    currentTargetNode.node = targetNode;
 
     if (currentTargetNode.mId) {
         openMediaButton.disabled = false;
@@ -1187,20 +1190,23 @@ deleteFileButton.addEventListener('click', async function () {
         });
         if (!response.ok) {
             alert('Failed to delete media: ' + await response.text());
-            return
+            return;
         }
         displayInfoMessage("Processing to delete media");
-        return;
+    } else {
+        const response = await apiRequest(`/api/file/${currentTargetNode.id}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            alert('Failed to delete file: ' + await response.text());
+            return;
+        }
+        displayInfoMessage("Processing to delete file");
     }
-    const response = await apiRequest(`/api/file/${currentTargetNode.id}`, {
-        method: 'DELETE'
-    });
-    if (!response.ok) {
-        alert('Failed to delete file: ' + await response.text());
-        return
-    }
-    displayInfoMessage("Processing to delete file");
-})
+    currentTargetNode.node.remove();
+    const index = currentFileItems.findIndex(item => item.id === currentTargetNode.id);
+    if (index !== -1) currentFileItems.splice(index, 1);
+});
 
 newFolderButton.addEventListener('click', async function () {
     const sendCreateNewFolderRequest = async (name) => {
