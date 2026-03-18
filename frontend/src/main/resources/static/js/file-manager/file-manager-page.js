@@ -202,6 +202,8 @@ sortSelect.addEventListener('change', async function () {
             key = 'size';
         else if (value.includes('LENGTH'))
             key = 'length';
+        else if (value.includes('RESOLUTION'))
+            key = 'resolution.width';
         else if (value.includes('UPLOAD'))
             key = 'uploadDate';
         if (value.includes('DESC'))
@@ -221,16 +223,23 @@ sortSelect.addEventListener('change', async function () {
 });
 
 function dynamicSortByField(key, order = 'ASC') {
+    const getValue = (obj, path) => {
+        // Splitting by dot and reducing through the object
+        return path.split('.').reduce((acc, part) => acc?.[part], obj);
+    };
+
     return function innerSort(a, b) {
-        if (!a.hasOwnProperty(key) || !b.hasOwnProperty(key)) {
+        let varA = getValue(a, key);
+        let varB = getValue(b, key);
+        if (!varA || !varB) {
             return 0;
         }
-        const varA = (typeof a[key] === 'string') ? a[key].toUpperCase() : a[key];
-        const varB = (typeof b[key] === 'string') ? b[key].toUpperCase() : b[key];
+        const valA = (typeof varA === 'string') ? varA.toUpperCase() : varA;
+        const valB = (typeof varB === 'string') ? varB.toUpperCase() : varB;
         let comparison = 0;
-        if (varA > varB) {
+        if (valA > valB) {
             comparison = 1;
-        } else if (varA < varB) {
+        } else if (valA < valB) {
             comparison = -1;
         }
         return (order === 'DESC') ? (comparison * -1) : comparison;

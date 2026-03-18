@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.filemanager.service;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import com.mongodb.client.result.UpdateResult;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
@@ -7,6 +8,7 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.validation.FileSystemValidator;
+import dev.chinh.streamingservice.filemanager.config.ApplicationConfig;
 import dev.chinh.streamingservice.filemanager.constant.FileStatus;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
 import dev.chinh.streamingservice.filemanager.constant.SortBy;
@@ -20,6 +22,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.domain.*;
 import org.springframework.data.mongodb.MongoTransactionException;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -32,7 +35,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -44,6 +49,8 @@ public class FileService {
     private final FileSystemRepository fileSystemRepository;
     private final MongoTemplate mongoTemplate;
     private final ThumbnailService thumbnailService;
+
+    private final Cache<String, ApplicationConfig.EntryCached> directoryIdCache;
 
     private final MediaFileEventProducer producer;
 
@@ -97,9 +104,14 @@ public class FileService {
 
     private Pageable getPageable(int page, SortBy sortBy, Sort.Direction sortOrder) {
         final int pageSize = 25;
-        return PageRequest.of(page, pageSize, Sort.by(sortOrder, sortBy.getField()));
-    }
 
+        Sort sort = Sort.by(sortOrder, sortBy.getField());
+        if (sortBy == SortBy.RESOLUTION) {
+            // Automatically add the width tie-breaker
+            sort = sort.and(Sort.by(sortOrder, ContentMetaData.RESOLUTION + "." + ContentMetaData.WIDTH));
+        }
+        return PageRequest.of(page, pageSize, sort);
+    }
 
     public String initiateUploadRequest(String filePath) {
         var validatedFile = FileSystemValidator.isValidPath(filePath);
@@ -306,6 +318,31 @@ public class FileService {
         return mongoTemplate.insert(item);
     }
 
+    private String getOrCreateFolder(String name, String parentId, String currentPath, FileType fileType) {
+        Query query = new Query(Criteria
+                .where(FileItemField.PARENT_ID).is(parentId)
+                .and(FileItemField.NAME).is(name)
+                .and(FileItemField.FILE_TYPE).in(FileType.DIR, FileType.ALBUM)
+        );
+
+        Update update = new Update()
+                .setOnInsert(FileItemField.NAME, name)
+                .setOnInsert(FileItemField.PARENT_ID, parentId)
+                .setOnInsert(FileItemField.PATH, currentPath)
+                .setOnInsert(FileItemField.FILE_TYPE, fileType)
+                .setOnInsert(FileItemField.STATUS_CODE, FileStatus.IN_USE.getValue())
+                .setOnInsert(FileItemField.UPLOAD_DATE, LocalDateTime.now());
+
+        // upsert to create and return in one operation - atomic
+        FindAndModifyOptions options = new FindAndModifyOptions().upsert(true).returnNew(true);
+
+        FileSystemItem dir = mongoTemplate.findAndModify(query, update, options, FileSystemItem.class);
+
+        if (dir == null) throw new RuntimeException("Failed to create folder");
+
+        return dir.getId();
+    }
+
     public void initiateDeleteFile(String fileId) {
         FileSystemItem item = getFileSystemItem(fileId);
         String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
@@ -406,6 +443,53 @@ public class FileService {
         return OSUtil.normalizePath(getROOT_PATH(), parentPath + "/" + currentPath + "/");
     }
 
+    public ApplicationConfig.DirectoryCached getCachedDirectory(String dirKey) {
+        return (ApplicationConfig.DirectoryCached) directoryIdCache.asMap().get(dirKey);
+    }
+
+    public ApplicationConfig.DirectoryCached getCachedOrCreateDirectory(String dirKey, String dirName, String dirParentId, String dirPath, String userId) {
+        return (ApplicationConfig.DirectoryCached) directoryIdCache.asMap().compute(dirKey, (_, existing) -> {
+            if (existing == null) {
+                String fileId = getOrCreateFolder(dirName, dirParentId, dirPath, FileType.DIR);
+                Set<String> users = ConcurrentHashMap.newKeySet();
+                return new ApplicationConfig.DirectoryCached(fileId, users);
+            } else {
+                ((ApplicationConfig.DirectoryCached) existing).userUsing().add(userId);
+                return existing;
+            }
+        });
+    }
+
+    public void addDirectoryToUserUsingList(String userId, String dirKey) {
+        directoryIdCache.asMap().compute(userId, (_, existing) -> {
+            if (existing == null) {
+                Set<String> dirUserUsing = ConcurrentHashMap.newKeySet();
+                dirUserUsing.add(dirKey); // add dirKey to get dir info from cache back (not using the dirId)
+                return new ApplicationConfig.UserDirUsing(dirUserUsing);
+            } else {
+                ((ApplicationConfig.UserDirUsing) existing).dirUserUsing().add(dirKey);
+                return existing;
+            }
+        });
+    }
+
+    public void removeAllDirectoriesUserUsing(String userId) {
+        directoryIdCache.asMap().computeIfPresent(userId, (_, value) -> {
+            for (String dirKey : ((ApplicationConfig.UserDirUsing) value).dirUserUsing()) {
+                directoryIdCache.asMap().computeIfPresent(dirKey, (_, dirValue) -> {
+                    var dirCached = (ApplicationConfig.DirectoryCached) dirValue;
+                    dirCached.userUsing().remove(userId);
+
+                    if (dirCached.userUsing().isEmpty()) {
+                        removeFileStatus(dirCached.dirId());
+                        return null; // null to remove the key
+                    }
+                    return dirValue;
+                });
+            }
+            return null;
+        });
+    }
 
 
 

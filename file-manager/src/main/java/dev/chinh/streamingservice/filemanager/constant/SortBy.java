@@ -8,7 +8,8 @@ public enum SortBy {
     UPLOAD(ContentMetaData.UPLOAD_DATE),
     NAME(ContentMetaData.NAME),
     SIZE(ContentMetaData.SIZE),
-    LENGTH(ContentMetaData.LENGTH);
+    LENGTH(ContentMetaData.LENGTH),
+    RESOLUTION(ContentMetaData.RESOLUTION + "." + ContentMetaData.AREA);
 
     private final String field;
 

@@ -33,6 +33,7 @@ public class ContentMetaData {
     public static final String LENGTH = "length";
     public static final String RESOLUTION = "resolution";
     public static final String SIZE = "size";
+    public static final String AREA = "area";
     public static final String GROUP_INFO = "groupInfo";
     // Group Info
     public static final String GROUPER_ID = "grouperId";

@@ -37,12 +37,15 @@ public class FileSystemItem {
 
     public record ResolutionInfo(
             @Field(FileItemField.WIDTH)
+            @JsonProperty(ContentMetaData.WIDTH)
             int width,
 
             @Field(FileItemField.HEIGHT)
+            @JsonProperty(ContentMetaData.HEIGHT)
             int height,
 
             @Field(FileItemField.AREA)
+            @JsonProperty(ContentMetaData.AREA)
             @Indexed long area) {
         // Custom constructor to auto-calculate the area 'a'
         public ResolutionInfo(int width, int height) {
@@ -93,7 +96,8 @@ public class FileSystemItem {
     private Integer length;
 
     @Field(FileItemField.RESOLUTION_INFO)
-    private ResolutionInfo resolutionInfo;
+    @JsonProperty(ContentMetaData.RESOLUTION)
+    private ResolutionInfo resolution;
 
     @Field(FileItemField.UPLOAD_DATE)
     @JsonProperty(ContentMetaData.UPLOAD_DATE)
@@ -110,19 +114,19 @@ public class FileSystemItem {
         return null;
     }
 
-    public void setResolutionInfo(int w, int h) {
-        this.resolutionInfo = new ResolutionInfo(w, h);
+    public void setResolution(int w, int h) {
+        this.resolution = new ResolutionInfo(w, h);
     }
 
     public int getWidth() {
-        return resolutionInfo.width;
+        return resolution.width;
     }
 
     public int getHeight() {
-        return resolutionInfo.height;
+        return resolution.height;
     }
 
     public long getArea() {
-        return resolutionInfo.area;
+        return resolution.area;
     }
 }
