@@ -84,14 +84,6 @@ function displayFileItem(fileItems, clearNode = true, clearFileList = true, push
 
     fileViewWrapper.querySelector('.end-of-file-text').classList.add('hidden');
 
-    if (fileItems.length === 0) {
-        const emptyNode = document.createElement('div');
-        emptyNode.classList.add('flex', 'w-full', 'h-full', 'justify-center', 'items-center', 'absolute', 'text-lg')
-        emptyNode.innerText = 'No files found';
-        fileViewContainer.appendChild(emptyNode);
-        return;
-    }
-
     fileItems.forEach(item => {
         if (pushFileList)
             currentFileItems.push(item);
@@ -146,7 +138,12 @@ function displayFileItem(fileItems, clearNode = true, clearFileList = true, push
     });
 
     if (nextPage === -1) {
-        fileViewWrapper.querySelector('.end-of-file-text').classList.remove('hidden');
+        const endOfFileText = fileViewWrapper.querySelector('.end-of-file-text');
+        if (fileItems.length === 0)
+            endOfFileText.innerText = 'No files found';
+        else
+            endOfFileText.innerText = 'End of file list';
+        endOfFileText.classList.remove('hidden');
     }
 }
 
@@ -1057,7 +1054,7 @@ function clearTargetNode() {
     currentTargetNode.node = null;
 }
 
-fileViewContainer.addEventListener('contextmenu', (event) => {
+fileDropZone.addEventListener('contextmenu', (event) => {
     event.preventDefault();
     clearTargetNode();
     const targetNode = event.target.closest('.file-node-wrapper');
