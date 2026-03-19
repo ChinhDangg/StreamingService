@@ -78,6 +78,11 @@ public class FileManagerController {
         return ResponseEntity.ok().body(fileService.createNewFolder(request.parentId, request.name));
     }
 
+    @PutMapping("/rename")
+    public ResponseEntity<?> renameFile(@RequestBody @Valid CreateDirectoryRequest request) {
+        return ResponseEntity.ok().body(fileService.renameFileItem(request.parentId, request.name));
+    }
+
 
     public record InitiateMultipartUploadRequest(@NotBlank @Size(max = 1000) String filePath) {}
     @PostMapping("/upload/create-session")

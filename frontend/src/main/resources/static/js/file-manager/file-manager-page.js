@@ -1034,6 +1034,7 @@ function clearNameEntityDisplayNode(nameEntityNode) {
 
 const customRightMenu = document.getElementById('custom-right-menu');
 const newFolderButton = customRightMenu.querySelector('.new-folder-btn');
+const renameButton = customRightMenu.querySelector('.rename-btn');
 const addAsVideoButton = customRightMenu.querySelector('.add-as-video-btn');
 const addAsAlbumButton = customRightMenu.querySelector('.add-as-album-btn');
 const addAsGrouperButton = customRightMenu.querySelector('.add-as-grouper-btn');
@@ -1247,17 +1248,53 @@ newFolderButton.addEventListener('click', async function () {
     openOverlayTextPrompt('New Folder', 'Untitled Folder', sendCreateNewFolderRequest);
 });
 
+renameButton.addEventListener('click', async function () {
+    const currentFileItem = currentFileItems.find(item => item.id === currentTargetNode.id);
+    if (currentFileItem === undefined) {
+        console.log('No current file item');
+        return;
+    }
+    const sendRenameRequest = async (newName) => {
+        if (currentFileItem.name === newName) {
+            displayInfoMessage('New name is the same as current name');
+            return;
+        }
+        const response = await apiRequest(`/api/file/rename`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                parentId: currentFileItem.id,
+                name: newName
+            })
+        });
+        if (!response.ok) {
+            alert('Failed to rename file: ' + await response.text());
+            return;
+        }
+        currentFileItem.name = newName;
+        currentTargetNode.node.querySelector('.name').textContent = await response.text();
+        displayInfoMessage(`Renamed: ${newName}`, true, 30000);
+    }
+    openOverlayTextPrompt('Rename', currentFileItem.name, sendRenameRequest);
+});
+
 document.addEventListener('click', () => {
     customRightMenu.style.display = 'none';
 });
 
 const infoMessageContainer = document.getElementById('info-message-container');
+let infoMessageTimer = null;
 function displayInfoMessage(message, hasTimeout = true, timeoutTime = 5000) {
-    console.log(message);
     infoMessageContainer.querySelector('.info-message').textContent = message;
     infoMessageContainer.classList.remove('hidden');
-    if (hasTimeout)
-        setTimeout(() => infoMessageContainer.classList.add('hidden'), timeoutTime);
+    if (hasTimeout) {
+        clearTimeout(infoMessageTimer);
+        infoMessageTimer = setTimeout(() => {
+            infoMessageContainer.classList.add('hidden');
+        }, timeoutTime);
+    }
 }
 
 
@@ -1273,8 +1310,12 @@ function openOverlayTextPrompt(title, text, okFunc) {
     inputText.value = text;
     overlayTextPrompt.querySelector('.ok-btn').onclick = () => okFunc(inputText.value);
     overlayTextPrompt.classList.remove('hidden');
+    const dotIndex = text.lastIndexOf('.');
     inputText.focus();
-    inputText.select();
+    if (dotIndex === -1 || dotIndex === 0)
+        inputText.select();
+    else
+        inputText.setSelectionRange(0, dotIndex);
 }
 
 

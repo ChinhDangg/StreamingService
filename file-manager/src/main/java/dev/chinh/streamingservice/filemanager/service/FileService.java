@@ -265,27 +265,6 @@ public class FileService {
         return "Processing as grouper";
     }
 
-    private void updateStatusCodeAndGet(String fileId, FileStatus status) {
-        Query query = new Query(Criteria.where("id").is(fileId));
-        Update update = new Update().set(FileItemField.STATUS_CODE, status.getValue());
-        mongoTemplate.updateFirst(query, update, FileSystemItem.class);
-    }
-
-    public void removeFileStatus(String fileId) {
-        Query query = new Query(Criteria.where("id").is(fileId));
-        Update update = new Update().unset(FileItemField.STATUS_CODE);
-        mongoTemplate.updateFirst(query, update, FileSystemItem.class);
-    }
-
-    // since directories get set as in-use in caching for folder upload - reset all at startup for dangling status
-    @EventListener(ApplicationReadyEvent.class)
-    public void resetAllFileInUseStatus() {
-        mongoTemplate.updateMulti(
-                Query.query(Criteria
-                        .where(FileItemField.STATUS_CODE).is(FileStatus.IN_USE.getValue())),
-                new Update().unset(FileItemField.STATUS_CODE), FileSystemItem.class);
-    }
-
     @Retryable(
             retryFor = { QueryTimeoutException.class, MongoTransactionException.class },
             maxAttempts = 3,
@@ -339,6 +318,25 @@ public class FileService {
         if (dir == null) throw new RuntimeException("Failed to create folder");
 
         return dir.getId();
+    }
+
+    public String renameFileItem(String fileId, String newName) {
+        FileSystemItem item = getFileSystemItem(fileId);
+        String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
+        if (statusCodeStr != null) {
+            throw new IllegalArgumentException(statusCodeStr);
+        }
+        String error = FileSystemValidator.isValidName(newName);
+        if (error != null) {
+            throw new IllegalArgumentException(error);
+        }
+        if (item.getName().equals(newName)) {
+            return newName;
+        }
+        Query query = new Query(Criteria.where("id").is(fileId));
+        Update update = new Update().set(FileItemField.NAME, newName);
+        mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+        return newName;
     }
 
     public void initiateDeleteFile(String fileId) {
@@ -461,6 +459,29 @@ public class FileService {
         }
         return cached.dirId();
     }
+
+
+    private void updateStatusCodeAndGet(String fileId, FileStatus status) {
+        Query query = new Query(Criteria.where("id").is(fileId));
+        Update update = new Update().set(FileItemField.STATUS_CODE, status.getValue());
+        mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+    }
+
+    public void removeFileStatus(String fileId) {
+        Query query = new Query(Criteria.where("id").is(fileId));
+        Update update = new Update().unset(FileItemField.STATUS_CODE);
+        mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+    }
+
+    // since directories get set as in-use in caching for folder upload - reset all at startup for dangling status
+    @EventListener(ApplicationReadyEvent.class)
+    public void resetAllFileInUseStatus() {
+        mongoTemplate.updateMulti(
+                Query.query(Criteria
+                        .where(FileItemField.STATUS_CODE).is(FileStatus.IN_USE.getValue())),
+                new Update().unset(FileItemField.STATUS_CODE), FileSystemItem.class);
+    }
+
 
     public ApplicationConfig.DirectoryCached getCachedOrCreateDirectory(String dirKey, String dirName, String dirParentId, String dirPath, String userId) {
         return (ApplicationConfig.DirectoryCached) directoryIdCache.asMap().compute(dirKey, (_, existing) -> {
