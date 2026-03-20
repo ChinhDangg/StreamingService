@@ -146,4 +146,10 @@ public interface MediaUpdateEvent {
             String oldThumbnail,
             String newThumbnail
     ) implements MediaUpdateEvent {}
+
+    record DirectoryMoved(
+            String fileId,
+            String parentId,
+            String oldPath
+    ) implements MediaUpdateEvent {}
 }

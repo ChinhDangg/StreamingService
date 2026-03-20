@@ -357,6 +357,15 @@ public class MediaFileEventConsumer {
             ));
     }
 
+    private void onMoveFile(MediaUpdateEvent.DirectoryMoved event) {
+        System.out.println("Received file move event: from: " + event.fileId() + " to: " + event.parentId());
+        try {
+            fileService.moveDirectory(event.fileId(), event.parentId(), event.oldPath());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to move file", e);
+        }
+    }
+
 
     @KafkaListener(topics = {
             EventTopics.MEDIA_FILE_TOPIC,
@@ -374,6 +383,7 @@ public class MediaFileEventConsumer {
                 case MediaUpdateEvent.MediaCreatedReady e -> onCompleteFileToMedia(e);
                 case MediaUpdateEvent.MediaThumbnailUpdateInitiated e -> onInitiateUpdateMediaThumbnail(e);
                 case MediaUpdateEvent.MediaThumbnailUpdatedReady e -> onUpdateMediaThumbnail(e);
+                case MediaUpdateEvent.DirectoryMoved e -> onMoveFile(e);
                 default ->
                     System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
             }
@@ -412,6 +422,8 @@ public class MediaFileEventConsumer {
                     System.out.println("Received initiate update media thumbnail event: " + e.mediaId());
             case MediaUpdateEvent.MediaThumbnailUpdatedReady e ->
                     System.out.println("Received update media thumbnail name: " + e.mediaId());
+            case MediaUpdateEvent.DirectoryMoved e ->
+                    System.out.println("Received file move event: from: " + e.fileId() + " to: " + e.parentId());
             default -> {
                 System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
                 ack.acknowledge();

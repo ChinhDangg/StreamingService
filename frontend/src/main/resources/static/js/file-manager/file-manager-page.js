@@ -1039,6 +1039,7 @@ const addAsVideoButton = customRightMenu.querySelector('.add-as-video-btn');
 const addAsAlbumButton = customRightMenu.querySelector('.add-as-album-btn');
 const addAsGrouperButton = customRightMenu.querySelector('.add-as-grouper-btn');
 const openMediaButton = customRightMenu.querySelector('.open-media-btn');
+const moveButton = customRightMenu.querySelector('.move-btn');
 const deleteFileButton = customRightMenu.querySelector('.delete-file-btn');
 
 const currentTargetNode = {
@@ -1064,10 +1065,12 @@ fileDropZone.addEventListener('contextmenu', (event) => {
     addAsAlbumButton.disabled = true;
     addAsGrouperButton.disabled = true;
     openMediaButton.disabled = true;
+    renameButton.disabled = true;
     addAsVideoButton.classList.add('invisible');
     addAsAlbumButton.classList.add('invisible');
     addAsGrouperButton.classList.add('invisible');
     openMediaButton.classList.add('invisible');
+    renameButton.classList.add('invisible');
 
     if (!targetNode) {
         showCustomRightMenu(event.clientX, event.clientY);
@@ -1093,6 +1096,8 @@ fileDropZone.addEventListener('contextmenu', (event) => {
             addAsGrouperButton.classList.remove('invisible');
         }
     }
+    renameButton.disabled = false;
+    renameButton.classList.remove('invisible');
 
     showCustomRightMenu(event.clientX, event.clientY);
 });
@@ -1279,6 +1284,68 @@ renameButton.addEventListener('click', async function () {
     }
     openOverlayTextPrompt('Rename', currentFileItem.name, sendRenameRequest);
 });
+
+const movingFileBanner = document.getElementById('moving-file-banner');
+moveButton.addEventListener('click', async function () {
+    const currentFileItem = currentFileItems.find(item => item.id === currentTargetNode.id);
+    const currentId = currentFileItem?.id;
+    const currentParentId = currentFileItem?.parentId;
+    if (currentId === null) {
+        alert('No target selected');
+        return;
+    }
+    const moveFile = async () => {
+        const currentPath = getCurrentPath();
+        if (currentPath == null) {
+            alert('Failed to get current path');
+            return;
+        }
+        const currentFolderId = currentPath.id;
+        if (currentFolderId === null) {
+            alert('Failed to get current folder id');
+            return;
+        }
+        console.log('current id: ' + currentId);
+        console.log('current parent id: ' + currentParentId);
+        console.log('current folder id: ' + currentFolderId);
+        if (currentParentId === currentFolderId) {
+            alert('Cannot move item to the same folder');
+            return;
+        }
+        const response = await apiRequest(`/api/file/move`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                fileId: currentId,
+                parentId: currentFolderId
+            })
+        });
+        if (!response.ok) {
+            alert('Failed to move file: ' + await response.text());
+            return;
+        }
+        movingFileBanner.querySelector('.cancel-btn').click();
+        const fileInfo = await response.json();
+        displayFileItem([fileInfo], false, false, true);
+        displayInfoMessage(`Moved: ${fileInfo.name}`, true, 30000);
+    }
+    const currentFullPath = getFullCurrentPath() + currentFileItem.name;
+    openMovingFileBanner(currentFullPath, moveFile);
+});
+
+function openMovingFileBanner(pathname, moveFunc) {
+    movingFileBanner.querySelector('.moving-path-text').textContent = pathname;
+    movingFileBanner.querySelector('.move-btn').onclick = () => moveFunc();
+    movingFileBanner.classList.remove('hidden');
+}
+
+movingFileBanner.querySelector('.cancel-btn').onclick = () => {
+    movingFileBanner.querySelector('.moving-path-text').textContent = '';
+    movingFileBanner.querySelector('.move-btn').onclick = null;
+    movingFileBanner.classList.add('hidden');
+}
 
 document.addEventListener('click', () => {
     customRightMenu.style.display = 'none';

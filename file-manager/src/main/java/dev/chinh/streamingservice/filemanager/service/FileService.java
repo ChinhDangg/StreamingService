@@ -14,6 +14,7 @@ import dev.chinh.streamingservice.filemanager.constant.FileType;
 import dev.chinh.streamingservice.filemanager.constant.SortBy;
 import dev.chinh.streamingservice.filemanager.data.FileItemField;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
+import dev.chinh.streamingservice.filemanager.data.FolderLocks;
 import dev.chinh.streamingservice.filemanager.event.MediaFileEventProducer;
 import dev.chinh.streamingservice.filemanager.repository.FileSystemRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,8 @@ import org.springframework.data.domain.*;
 import org.springframework.data.mongodb.MongoTransactionException;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.AggregationUpdate;
+import org.springframework.data.mongodb.core.aggregation.StringOperators;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -202,6 +205,10 @@ public class FileService {
         if (statusCodeStr != null) {
             return statusCodeStr;
         }
+        FolderLocks folderIsLocked = checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()));
+        if (folderIsLocked != null) {
+            throw new IllegalArgumentException("File is locked: " + folderIsLocked.getId());
+        }
         updateStatusCodeAndGet(fileId, FileStatus.PROCESSING);
         String parentPath = Pattern.quote(getPathForFileItem(item.getPath(), item.getId()));
         FileSystemItem first = mongoTemplate.findOne(new Query(Criteria
@@ -239,6 +246,10 @@ public class FileService {
         String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
         if (statusCodeStr != null) {
             return statusCodeStr;
+        }
+        FolderLocks folderIsLocked = checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()));
+        if (folderIsLocked != null) {
+            throw new IllegalArgumentException("File is locked: " + folderIsLocked.getId());
         }
         updateStatusCodeAndGet(fileId, FileStatus.PROCESSING);
         boolean anyDirectFile = mongoTemplate.exists(Query.query(Criteria
@@ -396,6 +407,123 @@ public class FileService {
         ));
     }
 
+    @Transactional
+    public FileSystemItem initiateMoveFileItem(String fileId, String newParentId, String userId) {
+        FileSystemItem item = getFileSystemItem(fileId);
+        String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
+        if (statusCodeStr != null) {
+            throw new IllegalArgumentException(statusCodeStr);
+        }
+        if (item.getParentId().equals(newParentId)) {
+            throw new IllegalArgumentException("Cannot move file to same parent");
+        }
+        FileSystemItem parent = findById(newParentId);
+        if (parent == null) {
+            throw new IllegalArgumentException("Parent folder not found: " + newParentId);
+        }
+        String statusCodeStr2 = FileSystemItem.getStatusCodeAsString(parent.getStatusCode());
+        if (statusCodeStr2 != null) {
+            throw new IllegalArgumentException("Parent is busy: " + statusCodeStr2);
+        }
+        if (FileType.isNotDir(parent.getFileType())) {
+            throw new IllegalArgumentException("Parent is not a directory: " + newParentId);
+        }
+        Set<String> commonIds = getCommonIds(item.getPath() + item.getId() + parent.getPath() + parent.getId());
+        FolderLocks folderIsLocked = checkIfFileItemInLock(commonIds);
+        if (folderIsLocked != null) {
+            throw new IllegalArgumentException("File is locked: " + folderIsLocked.getId());
+        }
+
+        Query query = new Query(Criteria.where("id").is(fileId));
+        Update update = new Update()
+                .set(FileItemField.PARENT_ID, newParentId)
+                .set(FileItemField.PATH, parent.getPath() + parent.getId() + "/");
+        FileSystemItem moved = mongoTemplate.findAndModify(query, update, FileSystemItem.class);
+
+        if (!FileType.isNotDir(item.getFileType())) { // if a directory
+            lockFileItem(userId, commonIds);
+            producer.publishEventListener(new MediaFileEventProducer.EventWrapper(
+                    EventTopics.MEDIA_FILE_TOPIC,
+                    new MediaUpdateEvent.DirectoryMoved(fileId, newParentId, item.getPath())
+            ));
+        }
+
+        if (moved != null) {
+            String thumbnailPath = ThumbnailService.getThumbnailPath(
+                    item.getMId() == null ? item.getId() : item.getMId().toString(),
+                    item.getThumbnail() == null ? item.getObjectName() : item.getThumbnail()
+            );
+            moved.setThumbnail(thumbnailPath);
+        }
+
+        return moved;
+    }
+
+    @Transactional
+    public void moveDirectory(String fileId, String newParentId, String oldPath) {
+        FileSystemItem item = findById(fileId);
+        if (item == null) {
+            System.err.println("File not found. Skipping...");
+            return;
+        }
+        if (FileType.isNotDir(item.getFileType())) {
+            System.err.println("File is not a directory. Moving single file is handled at initiation already. Skipping...");
+            return;
+        }
+        FileSystemItem parent = findById(newParentId);
+        if (parent == null) {
+            System.err.println("Parent not found. Skipping...");
+            return;
+        }
+        if (FileType.isNotDir(parent.getFileType())) {
+            System.err.println("Parent is not a directory. Skipping...");
+            return;
+        }
+
+        // needing oldPath since item or source dir path is already updated to reflect changes
+        // item is the source directory, we need to get all children and update their paths
+        String childrenIdPrefix = oldPath + item.getId() + "/"; // all children in the directory
+        String newIdPrefix = parent.getPath() + parent.getId() + "/";
+
+        String anchoredRegex = "^" + Pattern.quote(childrenIdPrefix);
+        Query query = new Query(Criteria.where(FileItemField.PATH).regex(anchoredRegex)); // find children
+        AggregationUpdate update = AggregationUpdate.update()
+                .set(FileItemField.PATH)
+                .toValue(StringOperators.ReplaceOne.valueOf(FileItemField.PATH)
+                        .find(oldPath) // find old path prefix and replace with new path prefix
+                        .replacement(newIdPrefix));
+        mongoTemplate.updateMulti(query, update, FileSystemItem.class);
+
+        Set<String> commonIds = getCommonIds(item.getPath() + item.getId() + parent.getPath() + parent.getId());
+        releaseLockFileItem(commonIds);
+    }
+
+    private Set<String> getCommonIds(String idPath) {
+        String[] idList = idPath.split("/");
+        Set<String> commonIds = new HashSet<>(Arrays.asList(idList));
+        commonIds.remove("");
+        commonIds.remove(getROOT_FOLDER_ID());
+        return commonIds;
+    }
+
+    private void lockFileItem(String userId, Set<String> fileIds) {
+        if (fileIds.isEmpty()) return;
+        List<FolderLocks> folderLocks = fileIds.stream().map(i -> new FolderLocks(i, userId)).toList();
+        mongoTemplate.insert(folderLocks, FolderLocks.class);
+    }
+
+    private void releaseLockFileItem(Set<String> fileIds) {
+        if (fileIds.isEmpty()) return;
+        Query query = new Query(Criteria.where(FileItemField.ID).in(fileIds));
+        mongoTemplate.remove(query, FolderLocks.class);
+    }
+
+    private FolderLocks checkIfFileItemInLock(Set<String> fileIds) {
+        if (fileIds.isEmpty()) return null;
+        Query query = new Query(Criteria.where("id").in(fileIds));
+        return mongoTemplate.findOne(query, FolderLocks.class);
+    }
+
 
     @Retryable(
             retryFor = { QueryTimeoutException.class, MongoTransactionException.class },
@@ -432,11 +560,14 @@ public class FileService {
                 .collect(Collectors.joining("/")) + "/" + item.getName();
     }
 
-    // need the returning path to start and end with "/"
+    /**
+     *  need the returning path to start and end with "/"
+     */
     public String getPathForFileItem(String parentPath, String currentPath) {
-        if (parentPath.startsWith(getROOT_PATH()))
-            return OSUtil.normalizePath(parentPath, currentPath + "/");
-        return OSUtil.normalizePath(getROOT_PATH(), parentPath + "/" + currentPath + "/");
+        String path = OSUtil.normalizePath(parentPath, currentPath + "/");
+        if (path.startsWith(getROOT_PATH()))
+            return path;
+        return getROOT_PATH() + path;
     }
 
     public String getCachedElseDbDirectoryId(String parentId, String dirName, String userId) {

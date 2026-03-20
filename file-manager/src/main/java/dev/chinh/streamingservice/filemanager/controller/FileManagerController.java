@@ -83,6 +83,12 @@ public class FileManagerController {
         return ResponseEntity.ok().body(fileService.renameFileItem(request.parentId, request.name));
     }
 
+    public record MoveFileRequest(@Size(max = 30) String fileId, @Size(max = 30) String parentId) {}
+    @PutMapping("/move")
+    public ResponseEntity<?> moveFile(@RequestBody @Valid MoveFileRequest request, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().body(fileService.initiateMoveFileItem(request.fileId, request.parentId, jwt.getSubject()));
+    }
+
 
     public record InitiateMultipartUploadRequest(@NotBlank @Size(max = 1000) String filePath) {}
     @PostMapping("/upload/create-session")

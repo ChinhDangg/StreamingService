@@ -105,6 +105,8 @@ public class ThumbnailService {
     }
 
     public static String getThumbnailPath(String id, String thumbnail) {
+        if (id == null || thumbnail == null)
+            return null;
         String originalExtension = thumbnail.contains(".") ? thumbnail.substring(thumbnail.lastIndexOf(".") + 1)
                 .toLowerCase() : "jpg";
         return getThumbnailParentPath() + "/" + id + "_" + thumbnailResolution + "." + originalExtension;
