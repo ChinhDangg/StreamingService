@@ -291,10 +291,7 @@ public class FileService {
             throw new IllegalArgumentException("Parent folder not found: " + parentId);
         if (parent.getFileType() != FileType.DIR)
             throw new IllegalArgumentException("Parent folder is not a directory: " + parentId);
-        Query query = new Query(Criteria
-                .where(FileItemField.NAME).is(newFolderName)
-                .and(FileItemField.PARENT_ID).is(parentId));
-        if (mongoTemplate.exists(query, FileSystemItem.class))
+        if (itemWithNameExists(parentId, newFolderName))
             throw new IllegalArgumentException("Folder already exists: " + newFolderName);
         FileSystemItem item = FileSystemItem.builder()
                 .parentId(parentId)
@@ -313,6 +310,7 @@ public class FileService {
                 .and(FileItemField.FILE_TYPE).in(FileType.DIR, FileType.ALBUM)
         );
 
+        // setOnInsert to create if not exists
         Update update = new Update()
                 .setOnInsert(FileItemField.NAME, name)
                 .setOnInsert(FileItemField.PARENT_ID, parentId)
@@ -343,6 +341,9 @@ public class FileService {
         }
         if (item.getName().equals(newName)) {
             return newName;
+        }
+        if (itemWithNameExists(item.getParentId(), newName)) {
+            throw new IllegalArgumentException("File already exists with name: " + newName);
         }
         Query query = new Query(Criteria.where("id").is(fileId));
         Update update = new Update().set(FileItemField.NAME, newName);
@@ -524,6 +525,13 @@ public class FileService {
         return mongoTemplate.findOne(query, FolderLocks.class);
     }
 
+
+    private boolean itemWithNameExists(String parentId, String name) {
+        Query query = new Query(Criteria
+                .where(FileItemField.PARENT_ID).is(parentId)
+                .and(FileItemField.NAME).is(name));
+        return mongoTemplate.exists(query, FileSystemItem.class);
+    }
 
     @Retryable(
             retryFor = { QueryTimeoutException.class, MongoTransactionException.class },
