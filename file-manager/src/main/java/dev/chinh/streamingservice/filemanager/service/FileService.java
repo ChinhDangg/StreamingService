@@ -416,7 +416,7 @@ public class FileService {
             throw new IllegalArgumentException(statusCodeStr);
         }
         if (item.getParentId().equals(newParentId)) {
-            throw new IllegalArgumentException("Cannot move file to same parent");
+            throw new IllegalArgumentException("Cannot move item to same parent");
         }
         FileSystemItem parent = findById(newParentId);
         if (parent == null) {
@@ -428,6 +428,12 @@ public class FileService {
         }
         if (FileType.isNotDir(parent.getFileType())) {
             throw new IllegalArgumentException("Parent is not a directory: " + newParentId);
+        }
+        if (item.getId().equals(newParentId)) {
+            throw new IllegalArgumentException("Cannot move item to itself");
+        }
+        if (parent.getPath().contains(item.getId())) {
+            throw new IllegalArgumentException("Cannot move item to a child of itself");
         }
         Set<String> commonIds = getCommonIds(item.getPath() + item.getId() + parent.getPath() + parent.getId());
         FolderLocks folderIsLocked = checkIfFileItemInLock(commonIds);
