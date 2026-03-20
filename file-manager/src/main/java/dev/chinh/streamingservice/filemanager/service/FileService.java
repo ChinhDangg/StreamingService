@@ -495,7 +495,7 @@ public class FileService {
                         .replacement(newIdPrefix));
         mongoTemplate.updateMulti(query, update, FileSystemItem.class);
 
-        Set<String> commonIds = getCommonIds(item.getPath() + item.getId() + parent.getPath() + parent.getId());
+        Set<String> commonIds = getCommonIds(oldPath + item.getId() + parent.getPath() + parent.getId());
         releaseLockFileItem(commonIds);
     }
 
