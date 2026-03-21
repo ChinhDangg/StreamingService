@@ -1240,6 +1240,11 @@ newFolderButton.addEventListener('click', async function () {
             alert('Folder name cannot be empty');
             return;
         }
+        const sameNameItem = currentFileItems.find(item => item.name === name);
+        if (sameNameItem) {
+            alert('Folder name already exists');
+            return;
+        }
         const response = await apiRequest(`/api/file/folder`, {
             method: 'POST',
             headers: {
@@ -1270,6 +1275,11 @@ renameButton.addEventListener('click', async function () {
     const sendRenameRequest = async (newName) => {
         if (currentFileItem.name === newName) {
             displayInfoMessage('New name is the same as current name');
+            return;
+        }
+        const sameNameItem = currentFileItems.find(item => item.name === newName);
+        if (sameNameItem) {
+            alert('An item the same name already exists');
             return;
         }
         const response = await apiRequest(`/api/file/rename`, {
@@ -1352,12 +1362,15 @@ moveButton.addEventListener('click', async function () {
         displayFileItem([fileInfo], false, false, true);
         displayInfoMessage(`Moved: ${fileInfo.name}`, true, 30000);
     }
-    const currentFullPath = getFullCurrentPath() + currentFileItem.name;
+    const currentFullPath = currentFileItem.name;
     openMovingFileBanner(currentFullPath, moveFile);
 });
 
-function openMovingFileBanner(pathname, moveFunc) {
-    movingFileBanner.querySelector('.moving-path-text').textContent = pathname;
+function openMovingFileBanner(name, moveFunc) {
+    const movingPathText = movingFileBanner.querySelector('.moving-path-text');
+    movingPathText.textContent = getFullCurrentPath() + name;
+    movingPathText.title = name;
+
     movingFileBanner.querySelector('.move-btn').onclick = () => moveFunc();
     movingFileBanner.classList.remove('hidden');
 }
