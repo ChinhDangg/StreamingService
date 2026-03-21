@@ -2,7 +2,9 @@ package dev.chinh.streamingservice.mediaobject;
 
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -21,7 +23,14 @@ public class ThumbnailService {
 
     private final MinIOService minIOService;
 
-    private static final String diskDir = "disk";
+    @Value("${thumbnail.disk}")
+    private String diskDir;
+
+    @PostConstruct
+    public void init() {
+        if (!diskDir.endsWith("disk"))
+            diskDir = OSUtil.normalizePath(diskDir, "disk");
+    }
 
     public String generateThumbnailFromVideo(String bucket, String objectName, String thumbnailObject, double videoLength, Double timeInSeconds) throws Exception {
         String thumbnailName = UUID.randomUUID() + "_" + thumbnailObject.substring(thumbnailObject.lastIndexOf("/") + 1);

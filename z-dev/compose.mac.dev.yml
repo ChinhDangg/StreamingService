@@ -29,7 +29,7 @@ services: # docker compose -f compose.mac.dev.yml --env-file .env.dev -p ss-dev 
   # docker compose -f compose.mac.yaml build nginx
   nginx:
     build:
-      context: ../nginx
+      context: ../.docker/nginx
       dockerfile: Dockerfile
     image: my-nginx/openresty:1.27.1.2-0-bookworm-fat
     container_name: ${PREFIX_NAME}-nginx

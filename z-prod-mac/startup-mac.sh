@@ -57,9 +57,9 @@ set -a
 source "$ENV_FILE"
 set +a
 
-RAM_VOLUME_NAME="${RAM_VOLUME:-/Volumes/RAMDISK}"
+RAM_DISK_NAME="${RAM_VOLUME_NAME}"
 
-if [ ! -d "$RAM_VOLUME_NAME" ]; then
+if [ ! -d "/Volumes/$RAM_DISK_NAME" ]; then
     : "${RAM_SIZE_BYTES:=536870912}"
 
     SECTORS=$((RAM_SIZE_BYTES / 512))
@@ -71,9 +71,9 @@ if [ ! -d "$RAM_VOLUME_NAME" ]; then
     DEVICE=$(echo "$RAW_DEVICE" | awk '{print $1}')
 
     if [ -n "$DEVICE" ]; then
-        echo "Step 2: Erasing volume on $DEVICE and naming it $RAM_VOLUME_NAME..."
+        echo "Step 2: Erasing volume on $DEVICE and naming it $RAM_DISK_NAME..."
         # We use 'quiet' to avoid unnecessary output and ensure it works
-        diskutil erasevolume HFS+ "$RAM_VOLUME_NAME" "$DEVICE"
+        diskutil erasevolume HFS+ "$RAM_DISK_NAME" "$DEVICE"
     else
         echo "❌ Failed to capture device path from hdiutil."
         exit 1

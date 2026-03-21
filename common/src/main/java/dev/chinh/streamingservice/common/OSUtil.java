@@ -47,7 +47,7 @@ public class OSUtil {
     private static String _getRAMDISKName() {
         if (RAMDISK != null)
             return RAMDISK;
-        RAMDISK = System.getenv("RAM_DISK_NAME");
+        RAMDISK = System.getenv("RAM_MOUNT_NAME");
         if (RAMDISK == null || RAMDISK.isEmpty())
             return BASE_DIR;
         return RAMDISK;

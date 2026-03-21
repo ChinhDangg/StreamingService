@@ -3,7 +3,7 @@
 RAM_DISK_NAME="RAMDISK"
 
 if [ ! -d "/Volumes/$RAM_DISK_NAME" ]; then
-    : "${RAM_SIZE_BYTES:=3500000000}"
+    : "${RAM_SIZE_BYTES:=2500000000}"
 
     SECTORS=$((RAM_SIZE_BYTES / 512))
     echo "Step 1: Attaching RAM device..."

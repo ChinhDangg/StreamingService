@@ -70,7 +70,7 @@ if mountpoint -q "$RAM_VOLUME_NAME"; then
     sudo umount "$RAM_VOLUME_NAME"
 fi
 
-echo "Mounting tmpfs (${RAM_SIZE_BYTES}MB)..."
+echo "Mounting tmpfs (${RAM_SIZE_BYTES}B)..."
 sudo mount -t tmpfs -o size="${RAM_SIZE_BYTES}" tmpfs "$RAM_VOLUME_NAME"
 
 # Verify mount

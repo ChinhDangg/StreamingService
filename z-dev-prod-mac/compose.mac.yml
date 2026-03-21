@@ -69,7 +69,7 @@ services:
       # Features
       - ALWAYS_SHOW_ORIGINAL_RESOLUTION=${ALWAYS_SHOW_ORIGINAL_RESOLUTION}
       - OS_NAME=${OS_NAME}
-      - RAM_DISK_NAME=${RAM_DISK_NAME}
+      - RAM_MOUNT_NAME=${RAM_MOUNT_NAME}
     depends_on:
       postgres:
         condition: service_healthy
@@ -127,7 +127,7 @@ services:
       - KAFKA_BOOTSTRAP_SERVER=${KAFKA_BOOTSTRAP_SERVER}
 
       - OS_NAME=${OS_NAME}
-      - RAM_DISK_NAME=${RAM_DISK_NAME}
+      - RAM_MOUNT_NAME=${RAM_MOUNT_NAME}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -160,7 +160,8 @@ services:
       - KAFKA_BOOTSTRAP_SERVER=${KAFKA_BOOTSTRAP_SERVER}
 
       - OS_NAME=${OS_NAME}
-      - RAM_DISK_NAME=${RAM_DISK_NAME}
+      - RAM_MOUNT_NAME=${RAM_MOUNT_NAME}
+      - THUMBNAIL_DISK=${THUMBNAIL_DISK}
     depends_on:
       postgres:
         condition: service_healthy
@@ -258,7 +259,7 @@ services:
 
       - GRPC_FILE_PROVIDER_ADDRESS=static://file-manager:9090
       - OS_NAME=${OS_NAME}
-      - RAM_DISK_NAME=${RAM_DISK_NAME}
+      - RAM_MOUNT_NAME=${RAM_MOUNT_NAME}
     depends_on:
       redpanda:
         condition: service_started

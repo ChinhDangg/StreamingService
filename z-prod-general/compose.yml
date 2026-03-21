@@ -153,6 +153,7 @@ services:
       - JPA_SHOW_SQL=${JPA_SHOW_SQL}
 
       - KAFKA_BOOTSTRAP_SERVER=${KAFKA_BOOTSTRAP_SERVER}
+      - THUMBNAIL_DISK=${THUMBNAIL_DISK}
     depends_on:
       postgres:
         condition: service_healthy
