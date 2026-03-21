@@ -13,4 +13,5 @@ RUN chown 999:999 /data/configdb/mongo-keyfile && \
 USER mongodb
 
 # Set the command to use the internal keyfile
+# Starts mongo with replica set mode enabled
 CMD ["mongod", "--replSet", "rs0", "--bind_ip_all", "--keyFile", "/data/configdb/mongo-keyfile"]

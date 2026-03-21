@@ -168,8 +168,6 @@ services:
         condition: service_started
       minio:
         condition: service_started
-      ffmpeg:
-        condition: service_started
     volumes:
       - ${RAM_VOLUME}:/chunks
 
@@ -334,7 +332,6 @@ services:
       - "80:80"
     depends_on:
       - minio
-      - ffmpeg
     volumes:
       - ../.docker/nginx/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
       - ../.docker/nginx/proxy.conf:/usr/local/openresty/nginx/conf/proxy.conf:ro
@@ -342,17 +339,6 @@ services:
       - ${RAM_VOLUME}:/chunks
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
-  ffmpeg:
-    image: linuxserver/ffmpeg:arm64v8-version-8.0-cli
-    container_name: ffmpeg
-    depends_on:
-      - minio
-    entrypoint: [ "/bin/sh", "-c" ]   # replace ffmpeg with a shell
-    command: [ "tail -f /dev/null" ]  # keep alive
-    volumes:
-      - ${RAM_VOLUME}:/chunks      # mount same RAM disk
-      - ${THUMBNAIL_DISK}:/disk    # to generate thumbnails and then move to minio
 
   opensearch:
     image: opensearchproject/opensearch:3.3.2
@@ -449,7 +435,9 @@ services:
       - ${REDPANDA_VOLUME}:/var/lib/redpanda/data
 
   mongodb:
-    image: mongo:7
+    build:
+      context: ../.docker/mongo
+      dockerfile: Dockerfile
     container_name: mongodb
     ports:
       - "27017:27017"
@@ -460,8 +448,6 @@ services:
       MONGODB_USERNAME: ${MONGODB_USERNAME}
       MONGODB_PASSWORD: ${MONGODB_PASSWORD}
       MONGODB_AUTH_SOURCE: ${MONGODB_AUTH_SOURCE}
-    # Starts mongo with replica set mode enabled
-    command: [ "--replSet", "rs0", "--bind_ip_all", "--keyFile", "/data/configdb/mongo-keyfile" ]
     healthcheck:
       test: mongosh --username "$MONGODB_USERNAME" --password "$MONGODB_PASSWORD" --authenticationDatabase "$MONGODB_AUTH_SOURCE" --eval "db.adminCommand('ping')"
       interval: 5s
@@ -469,7 +455,6 @@ services:
       retries: 5
     volumes:
       - ${MONGODB_VOLUME}:/data/db
-      - ../.docker/mongo/mongo-keyfile:/data/configdb/mongo-keyfile
 
   mongo-init:
     image: mongo:7
