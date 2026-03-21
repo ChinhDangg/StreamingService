@@ -661,6 +661,14 @@ function getFullCurrentPath() {
     return fullPath;
 }
 
+function getFullCurrentPathInIds() {
+    let fullPath = '';
+    currentPathStack.forEach(item => {
+        fullPath += item.id + '/';
+    });
+    return fullPath;
+}
+
 const uploadingList = document.getElementById('upload-list');
 const listItemTem = uploadingList.querySelector('li');
 function addUploadingFile(name) {
@@ -1309,7 +1317,20 @@ moveButton.addEventListener('click', async function () {
         console.log('current parent id: ' + currentParentId);
         console.log('current folder id: ' + currentFolderId);
         if (currentParentId === currentFolderId) {
-            alert('Cannot move item to the same folder');
+            alert('Item is already in the same folder');
+            return;
+        }
+        if (currentId === currentFolderId) {
+            alert('Cannot move item to itself');
+            return;
+        }
+        if (getFullCurrentPathInIds().includes(currentId)) {
+            alert('Cannot move item to its subfolder');
+            return;
+        }
+        const sameNameItem = currentFileItems.find(item => item.name === currentFileItem.name);
+        if (sameNameItem) {
+            alert('Cannot move item to a folder with item that has the same name');
             return;
         }
         const response = await apiRequest(`/api/file/move`, {
