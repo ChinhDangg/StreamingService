@@ -1074,11 +1074,15 @@ fileDropZone.addEventListener('contextmenu', (event) => {
     addAsGrouperButton.disabled = true;
     openMediaButton.disabled = true;
     renameButton.disabled = true;
+    moveButton.disabled = true;
+    deleteFileButton.disabled = true;
     addAsVideoButton.classList.add('invisible');
     addAsAlbumButton.classList.add('invisible');
     addAsGrouperButton.classList.add('invisible');
     openMediaButton.classList.add('invisible');
     renameButton.classList.add('invisible');
+    moveButton.classList.add('invisible');
+    deleteFileButton.classList.add('invisible');
 
     if (!targetNode) {
         showCustomRightMenu(event.clientX, event.clientY);
@@ -1106,6 +1110,10 @@ fileDropZone.addEventListener('contextmenu', (event) => {
     }
     renameButton.disabled = false;
     renameButton.classList.remove('invisible');
+    moveButton.disabled = false;
+    moveButton.classList.remove('invisible');
+    deleteFileButton.disabled = false;
+    deleteFileButton.classList.remove('invisible');
 
     showCustomRightMenu(event.clientX, event.clientY);
 });
@@ -1222,7 +1230,7 @@ deleteFileButton.addEventListener('click', async function () {
 newFolderButton.addEventListener('click', async function () {
     const sendCreateNewFolderRequest = async (name) => {
         const currentPath = getCurrentPath();
-        if (currentPath == null) {
+        if (!currentPath) {
             alert('Failed to get current path');
             return;
         }
@@ -1268,8 +1276,8 @@ newFolderButton.addEventListener('click', async function () {
 
 renameButton.addEventListener('click', async function () {
     const currentFileItem = currentFileItems.find(item => item.id === currentTargetNode.id);
-    if (currentFileItem === undefined) {
-        console.log('No current file item');
+    if (!currentFileItem) {
+        alert('No current file item');
         return;
     }
     const sendRenameRequest = async (newName) => {
@@ -1308,7 +1316,7 @@ moveButton.addEventListener('click', async function () {
     const currentFileItem = currentFileItems.find(item => item.id === currentTargetNode.id);
     const currentId = currentFileItem?.id;
     const currentParentId = currentFileItem?.parentId;
-    if (currentId === null) {
+    if (!currentId) {
         alert('No target selected');
         return;
     }
