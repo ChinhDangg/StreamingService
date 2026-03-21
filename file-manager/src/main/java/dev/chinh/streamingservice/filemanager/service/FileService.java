@@ -458,7 +458,7 @@ public class FileService {
             ));
         }
 
-        if (moved != null) {
+        if (moved != null && (item.getFileType() == FileType.IMAGE || item.getThumbnail() != null)) {
             String thumbnailPath = ThumbnailService.getThumbnailPath(
                     item.getMId() == null ? item.getId() : item.getMId().toString(),
                     item.getThumbnail() == null ? item.getObjectName() : item.getThumbnail()
