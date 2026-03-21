@@ -440,6 +440,9 @@ public class FileService {
         if (folderIsLocked != null) {
             throw new IllegalArgumentException("File is locked: " + folderIsLocked.getId());
         }
+        if (itemWithNameExists(newParentId, item.getName())) {
+            throw new IllegalArgumentException("File already exists with name: " + item.getName());
+        }
 
         Query query = new Query(Criteria.where("id").is(fileId));
         Update update = new Update()
