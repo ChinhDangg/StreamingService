@@ -181,6 +181,17 @@ public class MediaMetadataModifyService {
         mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
     }
 
+    @Transactional
+    public void incrementMediaLength(long mediaId) {
+        Integer newLength = mediaMetaDataRepository.incrementLengthReturning(mediaId);
+        eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                EventTopics.MEDIA_SEARCH_TOPIC,
+                new MediaUpdateEvent.LengthUpdated(mediaId, newLength)
+        ));
+        mediaDisplayService.removeCacheGroupOfMedia(mediaId);
+        mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
+    }
+
     private MediaMetaData getMediaMetaData(long mediaId) {
         return mediaMetaDataRepository.findById(mediaId).orElseThrow(
                 () -> new IllegalArgumentException("Media not found: " + mediaId)

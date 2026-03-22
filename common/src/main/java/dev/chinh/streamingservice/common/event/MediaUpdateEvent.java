@@ -107,7 +107,8 @@ public interface MediaUpdateEvent {
             Instant uploadDate,
             Long parentMediaId,
             Long childMediaId,
-            boolean searchable
+            boolean searchable,
+            boolean updateParentLength
     ) implements MediaUpdateEvent {}
 
     record DirectoryToMediaInitiated(
@@ -115,6 +116,7 @@ public interface MediaUpdateEvent {
             long mediaId,
             MediaType mediaType,
             boolean searchable,
+            boolean updateParentLength,
             String thumbnailObject,
             long initialSize,
             int offset
@@ -136,8 +138,8 @@ public interface MediaUpdateEvent {
             MediaType mediaType,
             String thumbnail,
             int length,
-            int width,
-            int height
+            Integer width,
+            Integer height
     ) implements MediaUpdateEvent{}
 
     record MediaThumbnailUpdatedReady(

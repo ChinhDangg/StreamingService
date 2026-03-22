@@ -1,9 +1,7 @@
 package dev.chinh.streamingservice.mediaupload.event;
 
-import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
-import dev.chinh.streamingservice.mediaupload.MediaBasicInfo;
 import dev.chinh.streamingservice.mediaupload.event.config.KafkaRedPandaConfig;
 import dev.chinh.streamingservice.mediaupload.modify.service.MediaMetadataModifyService;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaUploadService;
@@ -14,8 +12,7 @@ import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
-
-import java.time.ZoneOffset;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @AllArgsConstructor
@@ -23,75 +20,11 @@ public class MediaUploadEventConsumer {
 
     private final MediaUploadService mediaUploadService;
     private final MediaMetadataModifyService mediaMetadataModifyService;
-    private final MediaUploadEventProducer producer;
 
-    private void onInitiateFileToMedia(MediaUpdateEvent.FileToMediaInitiated event) {
+    public void onInitiateFileToMedia(MediaUpdateEvent.FileToMediaInitiated event) {
         System.out.println("Received file to media initiated event: " + event.fileId());
         try {
-            if (event.childMediaId() != null) {
-                if (event.parentMediaId() != null) {
-                    String error = mediaUploadService.addMediaToGrouper(event.parentMediaId(), event.childMediaId(), event.fileName());
-                    if (error != null)
-                        System.err.println(error);
-                    return;
-                }
-                System.out.println("File event is given with media ID but not part of a grouper, skipping file to media");
-                return;
-            }
-
-            MediaUploadService.MediaUploadRequest uploadRequest = new MediaUploadService.MediaUploadRequest(
-                    event.bucket(), event.objectName(), event.fileName(), event.mediaType(), event.searchable()
-            );
-            int lastDotIndex = event.fileName().lastIndexOf(".");
-            lastDotIndex = lastDotIndex == -1 ? event.fileName().length() : lastDotIndex;
-            MediaBasicInfo mediaBasicInfo = new MediaBasicInfo(
-                    event.fileName().substring(0, lastDotIndex).replaceAll("[-_]", " "),
-                    (short) event.uploadDate().atOffset(ZoneOffset.UTC).getYear()
-            );
-            long mediaId = mediaUploadService.saveMedia(uploadRequest, mediaBasicInfo, event.parentMediaId());
-
-            // upload service can send media enriched for a single file
-            // for multiple files as one media like ALBUM or GROUPER need file service to retrieve all contents
-            if (event.mediaType() == MediaType.VIDEO) {
-                producer.publishEvent(new MediaUploadEventProducer.EventWrapper(
-                        EventTopics.MEDIA_OBJECT_TOPIC,
-                        new MediaUpdateEvent.MediaEnriched(
-                                event.fileId(),
-                                mediaId,
-                                event.mediaType(),
-                                MediaUploadService.createMediaThumbnailString(event.mediaType(), mediaId, event.objectName()),
-                                event.searchable(),
-                                -1,
-                                -1
-                        )
-                ));
-            } else if (event.mediaType() == MediaType.ALBUM) {
-                producer.publishEvent(new MediaUploadEventProducer.EventWrapper(
-                        EventTopics.MEDIA_FILE_TOPIC,
-                        new MediaUpdateEvent.DirectoryToMediaInitiated(
-                                event.fileId(),
-                                mediaId,
-                                event.mediaType(),
-                                event.searchable(),
-                                MediaUploadService.createMediaThumbnailString(event.mediaType(), mediaId, event.objectName()),
-                                0,
-                                0
-                        )
-                ));
-            } else if (event.mediaType() == MediaType.GROUPER) {
-                producer.publishEvent(new MediaUploadEventProducer.EventWrapper(
-                        EventTopics.MEDIA_FILE_TOPIC,
-                        new MediaUpdateEvent.NestedDirectoryToMediaInitiated(
-                                event.fileId(),
-                                mediaId,
-                                MediaType.GROUPER,
-                                MediaType.ALBUM,
-                                false,
-                                MediaUploadService.createMediaThumbnailString(event.mediaType(), mediaId, event.objectName()),
-                                0
-                        )
-                ));
-            }
+            mediaUploadService.handleInitiateFileToMedia(event);
         } catch (Exception e) {
             throw new RuntimeException("Failed to initiate file to media", e);
         }

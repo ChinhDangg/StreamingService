@@ -22,6 +22,7 @@ import software.amazon.awssdk.services.s3.model.*;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.*;
 
 @RequiredArgsConstructor
@@ -34,7 +35,7 @@ public class MediaUploadService {
     private final MinIOService minIOService;
     private final MediaMetadataModifyService mediaMetadataModifyService;
 
-    private final ApplicationEventPublisher eventPublisher;
+    private final ApplicationEventPublisher publisher;
 
     private final MediaMetaDataRepository mediaRepository;
     private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
@@ -106,7 +107,7 @@ public class MediaUploadService {
         String bucket = getBucketOnMediaType(fileName);
 
         long size = minIOService.getObjectSize(bucket, objectName);
-        eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+        publisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
                 new MediaUpdateEvent.FileCreated(bucket, objectName, fileName, size, null, null, null, userId, isLast)
         ));
@@ -144,7 +145,7 @@ public class MediaUploadService {
         if (nameUpdateList != null)
             mediaMetadataModifyService.updateNameEntityInMediaInBatch(nameUpdateList, savedId, false);
 
-        eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+        publisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
                 new MediaUpdateEvent.FileCreated(
                         bucket, objectName,
@@ -225,6 +226,78 @@ public class MediaUploadService {
         mediaMetaData.setGroupInfo(mediaGroupInfo);
         mediaRepository.save(mediaMetaData);
         return null;
+    }
+
+    @Transactional
+    public void handleInitiateFileToMedia(MediaUpdateEvent.FileToMediaInitiated event) {
+        if (event.childMediaId() != null) {
+            if (event.parentMediaId() != null) {
+                String error = addMediaToGrouper(event.parentMediaId(), event.childMediaId(), event.fileName());
+                if (error != null)
+                    System.err.println(error);
+                return;
+            }
+            System.out.println("File event is given with media ID but not part of a grouper, skipping file to media");
+            return;
+        }
+
+        MediaUploadService.MediaUploadRequest uploadRequest = new MediaUploadService.MediaUploadRequest(
+                event.bucket(), event.objectName(), event.fileName(), event.mediaType(), event.searchable()
+        );
+        int lastDotIndex = event.fileName().lastIndexOf(".");
+        lastDotIndex = lastDotIndex == -1 ? event.fileName().length() : lastDotIndex;
+        MediaBasicInfo mediaBasicInfo = new MediaBasicInfo(
+                event.fileName().substring(0, lastDotIndex).replaceAll("[-_]", " "),
+                (short) event.uploadDate().atOffset(ZoneOffset.UTC).getYear()
+        );
+        long mediaId = saveMedia(uploadRequest, mediaBasicInfo, event.parentMediaId());
+
+        if (event.parentMediaId() != null && event.updateParentLength())
+            mediaMetadataModifyService.incrementMediaLength(event.parentMediaId());
+
+        // upload service can send media enriched for a single file
+        // for multiple files as one media like ALBUM or GROUPER need file service to retrieve all contents
+        if (event.mediaType() == MediaType.VIDEO) {
+            publisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                    EventTopics.MEDIA_OBJECT_TOPIC,
+                    new MediaUpdateEvent.MediaEnriched(
+                            event.fileId(),
+                            mediaId,
+                            event.mediaType(),
+                            MediaUploadService.createMediaThumbnailString(event.mediaType(), mediaId, event.objectName()),
+                            event.searchable(),
+                            -1,
+                            -1
+                    )
+            ));
+        } else if (event.mediaType() == MediaType.ALBUM) {
+            publisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                    EventTopics.MEDIA_FILE_TOPIC,
+                    new MediaUpdateEvent.DirectoryToMediaInitiated(
+                            event.fileId(),
+                            mediaId,
+                            event.mediaType(),
+                            event.searchable(),
+                            event.updateParentLength(),
+                            event.searchable() ? MediaUploadService.createMediaThumbnailString(event.mediaType(), mediaId, event.objectName()) : null,
+                            0,
+                            0
+                    )
+            ));
+        } else if (event.mediaType() == MediaType.GROUPER) {
+            publisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                    EventTopics.MEDIA_FILE_TOPIC,
+                    new MediaUpdateEvent.NestedDirectoryToMediaInitiated(
+                            event.fileId(),
+                            mediaId,
+                            MediaType.GROUPER,
+                            MediaType.ALBUM,
+                            false,
+                            MediaUploadService.createMediaThumbnailString(event.mediaType(), mediaId, event.objectName()),
+                            0
+                    )
+            ));
+        }
     }
 
     public static String createMediaThumbnailString(MediaType mediaType, long mediaId, String objectName) {

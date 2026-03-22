@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.filemanager.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
+import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
@@ -19,6 +20,7 @@ import dev.chinh.streamingservice.filemanager.event.MediaFileEventProducer;
 import dev.chinh.streamingservice.filemanager.repository.FileSystemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.domain.*;
@@ -55,7 +57,7 @@ public class FileService {
 
     private final Cache<String, ApplicationConfig.EntryCached> directoryIdCache;
 
-    private final MediaFileEventProducer producer;
+    private final ApplicationEventPublisher publisher;
 
     private static final String mediaPath = ContentMetaData.MEDIA_BUCKET;
     private static String ROOT_PATH = null;
@@ -160,6 +162,7 @@ public class FileService {
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
+    @Transactional
     public String addFileAsVideoMedia(String fileId) {
         FileSystemItem item = getFileSystemItem(fileId);
         if (item.getFileType() != FileType.VIDEO) {
@@ -173,14 +176,14 @@ public class FileService {
             return statusCodeStr;
         }
         updateStatusCodeAndGet(fileId, FileStatus.PROCESSING);
-        producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+        publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
                         fileId, MediaType.VIDEO,
                         item.getBucket(), item.getObjectName(),
                         item.getName(), item.getUploadDate(),
                         null, null,
-                        true)
+                        true, false)
         ));
         return "Processing as video";
     }
@@ -190,6 +193,7 @@ public class FileService {
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
+    @Transactional
     public String addDirectoryAsAlbumMedia(String fileId) {
         FileSystemItem item = getFileSystemItem(fileId);
         if (item.getFileType() == FileType.ALBUM) {
@@ -209,20 +213,43 @@ public class FileService {
         if (folderIsLocked != null) {
             throw new IllegalArgumentException("File is locked: " + folderIsLocked.getId());
         }
+
+        Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
+        List<FileSystemItem> items = getItemInIds(getCommonIds(item.getPath()), criteria);
+        if (!items.isEmpty()) {
+            return "Has parent as album - child can't be album";
+        }
+
         updateStatusCodeAndGet(fileId, FileStatus.PROCESSING);
         String parentPath = Pattern.quote(getPathForFileItem(item.getPath(), item.getId()));
         FileSystemItem first = mongoTemplate.findOne(new Query(Criteria
                 .where(FileItemField.PATH).regex("^" + parentPath)
                 .and(FileItemField.FILE_TYPE).in(FileType.IMAGE, FileType.VIDEO)), FileSystemItem.class);
 
-        producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+        if (!item.getParentId().equals(getROOT_FOLDER_ID())) {
+            FileSystemItem parent = getFileSystemItem(item.getParentId());
+            if (parent.getFileType() == FileType.GROUPER) {
+                publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
+                        EventTopics.MEDIA_UPLOAD_TOPIC,
+                        new MediaUpdateEvent.FileToMediaInitiated(
+                                fileId, MediaType.ALBUM,
+                                first == null ? null : first.getBucket(), first == null ? null : first.getObjectName(),
+                                item.getName(), item.getUploadDate(),
+                                parent.getMId(), null,
+                                false, true)
+                ));
+                return "Processing as album in grouper";
+            }
+        }
+
+        publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
                         fileId, MediaType.ALBUM,
                         first == null ? null : first.getBucket(), first == null ? null : first.getObjectName(),
                         item.getName(), item.getUploadDate(),
                         null, null,
-                        true)
+                        true, false)
         ));
         return "Processing as album";
     }
@@ -232,6 +259,7 @@ public class FileService {
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
+    @Transactional
     public String addDirectoryAsGrouperMedia(String fileId) {
         FileSystemItem item = getFileSystemItem(fileId);
         if (item.getFileType() == FileType.GROUPER) {
@@ -264,14 +292,14 @@ public class FileService {
                 .where(FileItemField.PATH).regex("^" + parentPath)
                 .and(FileItemField.FILE_TYPE).in(FileType.IMAGE, FileType.VIDEO)), FileSystemItem.class);
 
-        producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+        publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
                         fileId, MediaType.GROUPER,
                         first == null ? null : first.getBucket(), first == null ? null : first.getObjectName(),
                         item.getName(), item.getUploadDate(),
                         null, null,
-                        true)
+                        true, false)
         ));
         return "Processing as grouper";
     }
@@ -281,7 +309,6 @@ public class FileService {
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
-    @Transactional
     public FileSystemItem createNewFolder(String parentId, String newFolderName) {
         String error = FileSystemValidator.isValidName(newFolderName);
         if (error != null)
@@ -351,6 +378,7 @@ public class FileService {
         return newName;
     }
 
+    @Transactional
     public void initiateDeleteFile(String fileId) {
         FileSystemItem item = getFileSystemItem(fileId);
         String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
@@ -373,12 +401,13 @@ public class FileService {
             throw new IllegalArgumentException("File is already marked as media - delete through media file item instead: " + item.getMId());
         }
 
-        producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+        publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
                 new MediaUpdateEvent.FileDeleted(item.getId(), getFullPathInName(item), FileType.isNotDir(item.getFileType()), null)
         ));
     }
 
+    @Transactional
     public void initiateDeleteMediaFile(long mediaId) {
         FileSystemItem item = findByMId(mediaId);
         if (item == null) {
@@ -401,7 +430,7 @@ public class FileService {
         }
         updateStatusCodeAndGet(item.getId(), FileStatus.DELETING);
 
-        producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+        publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC,
                 new MediaUpdateEvent.FileDeleted(
                         item.getId(), getFullPathInName(item), FileType.isNotDir(item.getFileType()), item.getMId())
@@ -451,7 +480,7 @@ public class FileService {
 
         if (!FileType.isNotDir(item.getFileType())) { // if a directory
             lockFileItem(userId, commonIds);
-            producer.publishEventListener(new MediaFileEventProducer.EventWrapper(
+            publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
                     EventTopics.MEDIA_FILE_TOPIC,
                     new MediaUpdateEvent.DirectoryMoved(fileId, newParentId, item.getPath())
             ));
@@ -460,7 +489,7 @@ public class FileService {
                 FileSystemItem oldParent = findById(item.getParentId());
                 if (oldParent.getFileType() == FileType.GROUPER) {
                     boolean newParentIsGrouper = newParent.getFileType() == FileType.GROUPER;
-                    producer.publishEventListener(new MediaFileEventProducer.EventWrapper(
+                    publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
                             EventTopics.MEDIA_UPLOAD_TOPIC,
                             new MediaUpdateEvent.GrouperItemMoved(item.getMId(), newParentIsGrouper ? newParent.getMId() : null, item.getName())
                     ));
@@ -474,7 +503,7 @@ public class FileService {
             }
         }
 
-        FileSystemItem moved = mongoTemplate.findAndModify(query, update, FileSystemItem.class);
+        FileSystemItem moved = mongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), FileSystemItem.class);
 
         if (moved != null && (item.getFileType() == FileType.IMAGE || item.getThumbnail() != null)) {
             String thumbnailPath = ThumbnailService.getThumbnailPath(
@@ -523,7 +552,15 @@ public class FileService {
         mongoTemplate.updateMulti(query, update, FileSystemItem.class);
 
         Set<String> commonIds = getCommonIds(oldPath + item.getId() + newParent.getPath() + newParent.getId());
-        releaseLockFileItem(commonIds);
+        releaseLockedFileItem(commonIds);
+    }
+
+    private List<FileSystemItem> getItemInIds(Set<String> ids, Criteria criteria) {
+        Query query = new Query(Criteria.where("id").in(ids));
+        if (criteria != null) {
+            query.addCriteria(criteria);
+        }
+        return mongoTemplate.find(query, FileSystemItem.class);
     }
 
     private Set<String> getCommonIds(String idPath) {
@@ -540,9 +577,9 @@ public class FileService {
         mongoTemplate.insert(folderLocks, FolderLocks.class);
     }
 
-    private void releaseLockFileItem(Set<String> fileIds) {
+    private void releaseLockedFileItem(Set<String> fileIds) {
         if (fileIds.isEmpty()) return;
-        Query query = new Query(Criteria.where(FileItemField.ID).in(fileIds));
+        Query query = new Query(Criteria.where("id").in(fileIds));
         mongoTemplate.remove(query, FolderLocks.class);
     }
 
@@ -566,15 +603,17 @@ public class FileService {
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
     public UpdateResult updateFileMetadataAsMedia(String fileId, long mediaId, FileType fileType, String thumbnailObject,
-                                                  int length, int width, int height) {
+                                                  int length, Integer width, Integer height) {
         Query query = new Query(Criteria.where("id").is(fileId));
         Update update = new Update()
                 .set(FileItemField.MEDIA_ID, mediaId)
                 .set(FileItemField.FILE_TYPE, fileType)
-                .set(FileItemField.THUMBNAIL, thumbnailObject)
                 .set(FileItemField.LENGTH, length)
-                .set(FileItemField.RESOLUTION_INFO, new FileSystemItem.ResolutionInfo(width, height))
                 .unset(FileItemField.STATUS_CODE);
+        if (thumbnailObject != null)
+            update.set(FileItemField.THUMBNAIL, thumbnailObject);
+        if (width != null && height != null)
+            update.set(FileItemField.RESOLUTION_INFO, new FileSystemItem.ResolutionInfo(width, height));
         return mongoTemplate.updateFirst(query, update, FileSystemItem.class);
     }
 

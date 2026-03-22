@@ -12,6 +12,7 @@ import dev.chinh.streamingservice.filemanager.data.FileItemField;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import dev.chinh.streamingservice.filemanager.service.FileService;
 import lombok.AllArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -34,7 +35,7 @@ public class MediaFileEventConsumer {
 
     private final MongoTemplate mongoTemplate;
     private final FileService fileService;
-    private final MediaFileEventProducer producer;
+    private final ApplicationEventPublisher publisher;
 
     private void onCreateFile(MediaUpdateEvent.FileCreated event) {
         System.out.println("Received create file event");
@@ -74,7 +75,7 @@ public class MediaFileEventConsumer {
             }
 
             if (event.mediaId() != null && event.mediaType() != null) {
-                producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+                publisher.publishEvent(new MediaFileEventProducer.ImmediateEventWrapper(
                         EventTopics.MEDIA_OBJECT_TOPIC,
                         new MediaUpdateEvent.MediaEnriched(
                                 fileItem.getId(),
@@ -128,12 +129,20 @@ public class MediaFileEventConsumer {
             skip += batch.size();
 
             if (hasMore) {
-                producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+                publisher.publishEvent(new MediaFileEventProducer.ImmediateEventWrapper(
                         EventTopics.MEDIA_FILE_TOPIC,
                         new MediaUpdateEvent.DirectoryToMediaInitiated(
-                                event.fileId(), event.mediaId(), event.mediaType(), event.searchable(), event.thumbnailObject(), size, skip)
+                                event.fileId(), event.mediaId(), event.mediaType(), event.searchable(), false, event.thumbnailObject(), size, skip)
                 ));
                 return;
+            }
+
+            if (event.updateParentLength()) {
+                Update update = new Update().inc(FileItemField.LENGTH, 1);
+                mongoTemplate.updateFirst(
+                        Query.query(Criteria.where("id").is(item.getParentId())),
+                        update,
+                        FileSystemItem.class);
             }
 
             Update update = new Update().set(FileItemField.SIZE, size);
@@ -144,7 +153,7 @@ public class MediaFileEventConsumer {
                     update,
                     FileSystemItem.class);
 
-            producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+            publisher.publishEvent(new MediaFileEventProducer.ImmediateEventWrapper(
                     EventTopics.MEDIA_OBJECT_TOPIC,
                     new MediaUpdateEvent.MediaEnriched(
                             item.getId(), event.mediaId(), event.mediaType(), event.thumbnailObject(), event.searchable(), size, skip)
@@ -181,14 +190,14 @@ public class MediaFileEventConsumer {
             List<FileSystemItem> directChildren = mongoTemplate.find(query, FileSystemItem.class);
             for (FileSystemItem child : directChildren) {
                 if (child.getFileType() == FileType.DIR) {
-                    producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+                    publisher.publishEvent(new MediaFileEventProducer.ImmediateEventWrapper(
                             EventTopics.MEDIA_UPLOAD_TOPIC,
                             new MediaUpdateEvent.FileToMediaInitiated(
                                     child.getId(), event.childType(),
                                     null, null,
                                     child.getName(), child.getUploadDate(),
                                     event.mediaId(), child.getMId(),
-                                    event.childSearchable())
+                                    event.childSearchable(), false)
                     ));
                 }
             }
@@ -197,7 +206,7 @@ public class MediaFileEventConsumer {
             skip += directChildren.size();
 
             if (hasMore) {
-                producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+                publisher.publishEvent(new MediaFileEventProducer.ImmediateEventWrapper(
                         EventTopics.MEDIA_FILE_TOPIC,
                         new MediaUpdateEvent.NestedDirectoryToMediaInitiated(
                                 item.getId(), event.mediaId(), event.parentType(), event.childType(), event.childSearchable(), event.thumbnailObject(), skip)
@@ -205,7 +214,7 @@ public class MediaFileEventConsumer {
                 return;
             }
 
-            producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+            publisher.publishEvent(new MediaFileEventProducer.ImmediateEventWrapper(
                     EventTopics.MEDIA_OBJECT_TOPIC,
                     new MediaUpdateEvent.MediaEnriched(
                             item.getId(), event.mediaId(), event.parentType(), event.thumbnailObject(), true, -1, skip)
@@ -263,7 +272,7 @@ public class MediaFileEventConsumer {
                 bucket = numItem.getBucket();
             }
 
-            producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+            publisher.publishEvent(new MediaFileEventProducer.ImmediateEventWrapper(
                     EventTopics.MEDIA_OBJECT_TOPIC,
                     new MediaUpdateEvent.MediaThumbnailUpdated(
                             item.getMId(),
@@ -335,7 +344,7 @@ public class MediaFileEventConsumer {
                     toDelete.computeIfAbsent(ContentMetaData.THUMBNAIL_BUCKET, _ -> new ArrayList<>()).add(item.getThumbnail());
             }
             for (Map.Entry<String, List<String>> entry : toDelete.entrySet()) {
-                producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+                publisher.publishEvent(new MediaFileEventProducer.ImmediateEventWrapper(
                         EventTopics.MEDIA_OBJECT_TOPIC,
                         new MediaUpdateEvent.ObjectDeleted(entry.getKey(), entry.getValue())
                 ));
@@ -345,12 +354,12 @@ public class MediaFileEventConsumer {
         }
 
         mongoTemplate.remove(new Query(Criteria.where("id").is(fileItem.getId())), FileSystemItem.class);
-        producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+        publisher.publishEvent(new MediaFileEventProducer.ImmediateEventWrapper(
                 EventTopics.MEDIA_OBJECT_TOPIC,
                 new MediaUpdateEvent.ObjectDeleted(fileItem.getBucket(), Collections.singletonList(fileItem.getObjectName()))
         ));
         if (fileItem.getThumbnail() != null)
-            producer.publishEvent(new MediaFileEventProducer.EventWrapper(
+            publisher.publishEvent(new MediaFileEventProducer.ImmediateEventWrapper(
                     EventTopics.MEDIA_OBJECT_AND_BACKUP_TOPIC,
                     new MediaUpdateEvent.ThumbnailDeleted(fileItem.getThumbnail())
             ));
