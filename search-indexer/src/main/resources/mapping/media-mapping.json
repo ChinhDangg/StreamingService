@@ -147,7 +147,7 @@
             "type": "long"
           },
           "numInfo": {
-            "type": "integer"
+            "type": "text"
           }
         }
       }

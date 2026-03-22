@@ -135,7 +135,6 @@ public class MediaUploadService {
         long savedId = saveMedia(
                 new MediaUploadRequest(ContentMetaData.VIDEO_BUCKET, objectName, fileName, MediaType.VIDEO, true),
                 basicInfo,
-                null,
                 null
         );
 
@@ -162,7 +161,7 @@ public class MediaUploadService {
     }
 
     @Transactional
-    public long saveMedia(MediaUploadRequest upload, MediaBasicInfo basicInfo, Long parentMediaId, Integer childNum) {
+    public long saveMedia(MediaUploadRequest upload, MediaBasicInfo basicInfo, Long parentMediaId) {
         if (upload.mediaType == MediaType.OTHER || upload.mediaType == MediaType.IMAGE) {
             throw new IllegalArgumentException("Unsupported type to be a media: " + upload.mediaType);
         }
@@ -172,7 +171,6 @@ public class MediaUploadService {
         mediaMetaData.setUploadDate(Instant.now());
         mediaMetaData.setBucket(upload.bucket);
         mediaMetaData.setMediaType(upload.mediaType);
-        mediaMetaData.setAbsoluteFilePath(ContentMetaData.MEDIA_BUCKET + "/" + upload.fileName);
         mediaMetaData.setThumbnail(null);
 
         mediaMetaData.setFormat(MediaJobStatus.PROCESSING.name());
@@ -193,7 +191,6 @@ public class MediaUploadService {
             MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
             mediaGroupInfo.setGrouperMetaData(null);
             mediaGroupInfo.setMediaMetaData(saved);
-            mediaGroupInfo.setNumInfo(-1);
             saved.setGroupInfo(mediaGroupInfo);
             mediaRepository.save(saved);
         }
@@ -204,7 +201,7 @@ public class MediaUploadService {
                 MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
                 mediaGroupInfo.setGrouperMetaData(grouperMedia.getGroupInfo());
                 mediaGroupInfo.setMediaMetaData(mediaMetaData);
-                mediaGroupInfo.setNumInfo(childNum);
+                mediaGroupInfo.setNumInfo(upload.fileName);
                 mediaMetaData.setGroupInfo(mediaGroupInfo);
             }
         }
@@ -212,7 +209,7 @@ public class MediaUploadService {
         return savedId;
     }
 
-    public String addMediaToGrouper(long grouperMediaId, long mediaId, Integer childNum) {
+    public String addMediaToGrouper(long grouperMediaId, long mediaId, String fileName) {
         MediaMetaData mediaMetaData = mediaRepository.findById(mediaId).orElse(null);
         if (mediaMetaData == null) {
             return "Media not found";
@@ -224,7 +221,7 @@ public class MediaUploadService {
         MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
         mediaGroupInfo.setGrouperMetaData(grouperMedia.getGroupInfo());
         mediaGroupInfo.setMediaMetaData(mediaMetaData);
-        mediaGroupInfo.setNumInfo(childNum);
+        mediaGroupInfo.setNumInfo(fileName);
         mediaMetaData.setGroupInfo(mediaGroupInfo);
         mediaRepository.save(mediaMetaData);
         return null;

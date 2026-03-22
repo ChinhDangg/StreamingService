@@ -181,15 +181,14 @@ public class MediaFileEventConsumer {
             List<FileSystemItem> directChildren = mongoTemplate.find(query, FileSystemItem.class);
             for (FileSystemItem child : directChildren) {
                 if (child.getFileType() == FileType.DIR) {
-                    int childIndex = directChildren.indexOf(child) + skip;
                     producer.publishEvent(new MediaFileEventProducer.EventWrapper(
                             EventTopics.MEDIA_UPLOAD_TOPIC,
                             new MediaUpdateEvent.FileToMediaInitiated(
                                     child.getId(), event.childType(),
                                     null, null,
                                     child.getName(), child.getUploadDate(),
-                                    event.mediaId(), childIndex,
-                                    child.getMId(), event.childSearchable())
+                                    event.mediaId(), child.getMId(),
+                                    event.childSearchable())
                     ));
                 }
             }

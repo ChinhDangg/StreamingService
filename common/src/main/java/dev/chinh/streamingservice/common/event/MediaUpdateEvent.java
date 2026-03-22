@@ -106,7 +106,6 @@ public interface MediaUpdateEvent {
             String fileName,
             Instant uploadDate,
             Long parentMediaId,
-            Integer childNum,
             Long childMediaId,
             boolean searchable
     ) implements MediaUpdateEvent {}
@@ -151,5 +150,11 @@ public interface MediaUpdateEvent {
             String fileId,
             String parentId,
             String oldPath
+    ) implements MediaUpdateEvent {}
+
+    record GrouperItemMoved(
+            long childMediaId,
+            Long parentMediaId,
+            String fileName
     ) implements MediaUpdateEvent {}
 }

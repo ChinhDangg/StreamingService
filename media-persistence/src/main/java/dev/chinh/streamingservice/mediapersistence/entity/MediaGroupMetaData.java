@@ -14,7 +14,9 @@ import lombok.Setter;
 @Entity
 @Table(
         name = "media_groups",
-        indexes = {@Index(columnList = "grouper_id")}
+        indexes = {
+                @Index(name = "idx_media_groups_grouper_id_num_info", columnList = "grouper_id, num_info"),
+        }
 )
 public class MediaGroupMetaData {
 
@@ -45,6 +47,5 @@ public class MediaGroupMetaData {
     private Long grouperMetaDataId;
 
     @JsonProperty(ContentMetaData.NUM_INFO)
-    @Column(nullable = false)
-    private Integer numInfo;    // episode/chapter for single media item or total episode/chapter for is grouper media metadata
+    private String numInfo; // using string as numInfo to have an easy sorting capability without needing to reorder all
 }

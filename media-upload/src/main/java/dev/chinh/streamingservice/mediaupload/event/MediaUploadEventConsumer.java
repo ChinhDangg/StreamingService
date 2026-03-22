@@ -30,7 +30,7 @@ public class MediaUploadEventConsumer {
         try {
             if (event.childMediaId() != null) {
                 if (event.parentMediaId() != null) {
-                    String error = mediaUploadService.addMediaToGrouper(event.parentMediaId(), event.childMediaId(), event.childNum());
+                    String error = mediaUploadService.addMediaToGrouper(event.parentMediaId(), event.childMediaId(), event.fileName());
                     if (error != null)
                         System.err.println(error);
                     return;
@@ -48,7 +48,7 @@ public class MediaUploadEventConsumer {
                     event.fileName().substring(0, lastDotIndex).replaceAll("[-_]", " "),
                     (short) event.uploadDate().atOffset(ZoneOffset.UTC).getYear()
             );
-            long mediaId = mediaUploadService.saveMedia(uploadRequest, mediaBasicInfo, event.parentMediaId(), event.childNum());
+            long mediaId = mediaUploadService.saveMedia(uploadRequest, mediaBasicInfo, event.parentMediaId());
 
             // upload service can send media enriched for a single file
             // for multiple files as one media like ALBUM or GROUPER need file service to retrieve all contents
@@ -111,6 +111,23 @@ public class MediaUploadEventConsumer {
         }
     }
 
+    private void onMoveGrouperItem(MediaUpdateEvent.GrouperItemMoved event) {
+        System.out.println("Received moving grouper item: " + event.childMediaId());
+        try {
+            if (event.parentMediaId() != null) {
+                String error = mediaUploadService.addMediaToGrouper(event.parentMediaId(), event.childMediaId(), event.fileName());
+                if (error != null)
+                    System.err.println(error);
+            } else {
+                // a grouper item is moved out of a grouper and not into another grouper - delete media info
+                mediaMetadataModifyService.deleteMedia(event.childMediaId());
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to move grouper item outside grouper: " + event.childMediaId());
+            throw e;
+        }
+    }
+
 
 
     @KafkaListener(topics = {
@@ -122,6 +139,7 @@ public class MediaUploadEventConsumer {
             switch (event) {
                 case MediaUpdateEvent.FileToMediaInitiated e -> onInitiateFileToMedia(e);
                 case MediaUpdateEvent.FileDeleted e -> onDeleteMedia(e);
+                case MediaUpdateEvent.GrouperItemMoved e -> onMoveGrouperItem(e);
                 default -> {
                     System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
                 }
@@ -150,6 +168,8 @@ public class MediaUploadEventConsumer {
                 System.out.println("Received initiate file to media initiated event: " + e.fileId());
             case MediaUpdateEvent.FileDeleted e ->
                 System.out.println("Received file delete event: " + e.fileId());
+            case MediaUpdateEvent.GrouperItemMoved e ->
+                System.out.println("Received move grouper item event: " + e.childMediaId());
             default -> {
                 System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
             }

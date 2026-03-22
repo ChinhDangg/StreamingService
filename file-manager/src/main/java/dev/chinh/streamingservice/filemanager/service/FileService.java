@@ -180,7 +180,7 @@ public class FileService {
                         item.getBucket(), item.getObjectName(),
                         item.getName(), item.getUploadDate(),
                         null, null,
-                        null, true)
+                        true)
         ));
         return "Processing as video";
     }
@@ -222,7 +222,7 @@ public class FileService {
                         first == null ? null : first.getBucket(), first == null ? null : first.getObjectName(),
                         item.getName(), item.getUploadDate(),
                         null, null,
-                        null, true)
+                        true)
         ));
         return "Processing as album";
     }
@@ -271,7 +271,7 @@ public class FileService {
                         first == null ? null : first.getBucket(), first == null ? null : first.getObjectName(),
                         item.getName(), item.getUploadDate(),
                         null, null,
-                        null, true)
+                        true)
         ));
         return "Processing as grouper";
     }
@@ -418,24 +418,24 @@ public class FileService {
         if (item.getParentId().equals(newParentId)) {
             throw new IllegalArgumentException("Cannot move item to same parent");
         }
-        FileSystemItem parent = findById(newParentId);
-        if (parent == null) {
+        FileSystemItem newParent = findById(newParentId);
+        if (newParent == null) {
             throw new IllegalArgumentException("Parent folder not found: " + newParentId);
         }
-        String statusCodeStr2 = FileSystemItem.getStatusCodeAsString(parent.getStatusCode());
+        String statusCodeStr2 = FileSystemItem.getStatusCodeAsString(newParent.getStatusCode());
         if (statusCodeStr2 != null) {
             throw new IllegalArgumentException("Parent is busy: " + statusCodeStr2);
         }
-        if (FileType.isNotDir(parent.getFileType())) {
+        if (FileType.isNotDir(newParent.getFileType())) {
             throw new IllegalArgumentException("Parent is not a directory: " + newParentId);
         }
         if (item.getId().equals(newParentId)) {
             throw new IllegalArgumentException("Cannot move item to itself");
         }
-        if (parent.getPath().contains(item.getId())) {
+        if (newParent.getPath().contains(item.getId())) {
             throw new IllegalArgumentException("Cannot move item to a child of itself");
         }
-        Set<String> commonIds = getCommonIds(item.getPath() + item.getId() + parent.getPath() + parent.getId());
+        Set<String> commonIds = getCommonIds(item.getPath() + item.getId() + newParent.getPath() + newParent.getId());
         FolderLocks folderIsLocked = checkIfFileItemInLock(commonIds);
         if (folderIsLocked != null) {
             throw new IllegalArgumentException("File is locked: " + folderIsLocked.getId());
@@ -447,8 +447,7 @@ public class FileService {
         Query query = new Query(Criteria.where("id").is(fileId));
         Update update = new Update()
                 .set(FileItemField.PARENT_ID, newParentId)
-                .set(FileItemField.PATH, parent.getPath() + parent.getId() + "/");
-        FileSystemItem moved = mongoTemplate.findAndModify(query, update, FileSystemItem.class);
+                .set(FileItemField.PATH, newParent.getPath() + newParent.getId() + "/");
 
         if (!FileType.isNotDir(item.getFileType())) { // if a directory
             lockFileItem(userId, commonIds);
@@ -456,7 +455,26 @@ public class FileService {
                     EventTopics.MEDIA_FILE_TOPIC,
                     new MediaUpdateEvent.DirectoryMoved(fileId, newParentId, item.getPath())
             ));
+
+            if (item.getFileType() == FileType.ALBUM && !item.getParentId().equals(getROOT_FOLDER_ID())) {
+                FileSystemItem oldParent = findById(item.getParentId());
+                if (oldParent.getFileType() == FileType.GROUPER) {
+                    boolean newParentIsGrouper = newParent.getFileType() == FileType.GROUPER;
+                    producer.publishEventListener(new MediaFileEventProducer.EventWrapper(
+                            EventTopics.MEDIA_UPLOAD_TOPIC,
+                            new MediaUpdateEvent.GrouperItemMoved(item.getMId(), newParentIsGrouper ? newParent.getMId() : null, item.getName())
+                    ));
+                    if (!newParentIsGrouper) {
+                        update.unset(FileItemField.MEDIA_ID);
+                        update.unset(FileItemField.RESOLUTION_INFO);
+                        update.unset(FileItemField.LENGTH);
+                        update.set(FileItemField.FILE_TYPE, FileType.DIR);
+                    }
+                }
+            }
         }
+
+        FileSystemItem moved = mongoTemplate.findAndModify(query, update, FileSystemItem.class);
 
         if (moved != null && (item.getFileType() == FileType.IMAGE || item.getThumbnail() != null)) {
             String thumbnailPath = ThumbnailService.getThumbnailPath(
@@ -480,12 +498,12 @@ public class FileService {
             System.err.println("File is not a directory. Moving single file is handled at initiation already. Skipping...");
             return;
         }
-        FileSystemItem parent = findById(newParentId);
-        if (parent == null) {
+        FileSystemItem newParent = findById(newParentId);
+        if (newParent == null) {
             System.err.println("Parent not found. Skipping...");
             return;
         }
-        if (FileType.isNotDir(parent.getFileType())) {
+        if (FileType.isNotDir(newParent.getFileType())) {
             System.err.println("Parent is not a directory. Skipping...");
             return;
         }
@@ -493,7 +511,7 @@ public class FileService {
         // needing oldPath since item or source dir path is already updated to reflect changes
         // item is the source directory, we need to get all children and update their paths
         String childrenIdPrefix = oldPath + item.getId() + "/"; // all children in the directory
-        String newIdPrefix = parent.getPath() + parent.getId() + "/";
+        String newIdPrefix = newParent.getPath() + newParent.getId() + "/";
 
         String anchoredRegex = "^" + Pattern.quote(childrenIdPrefix);
         Query query = new Query(Criteria.where(FileItemField.PATH).regex(anchoredRegex)); // find children
@@ -504,7 +522,7 @@ public class FileService {
                         .replacement(newIdPrefix));
         mongoTemplate.updateMulti(query, update, FileSystemItem.class);
 
-        Set<String> commonIds = getCommonIds(oldPath + item.getId() + parent.getPath() + parent.getId());
+        Set<String> commonIds = getCommonIds(oldPath + item.getId() + newParent.getPath() + newParent.getId());
         releaseLockFileItem(commonIds);
     }
 

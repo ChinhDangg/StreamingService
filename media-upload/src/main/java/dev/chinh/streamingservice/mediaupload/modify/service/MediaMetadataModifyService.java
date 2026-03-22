@@ -163,7 +163,6 @@ public class MediaMetadataModifyService {
                     EventTopics.MEDIA_SEARCH_TOPIC,
                     new MediaUpdateEvent.LengthUpdated(grouperMediaId, newLength)
             ));
-            mediaGroupMetaDataRepository.decrementNumInfo(mediaMetaData.getGrouperId());
         }
 
         mediaMetaDataRepository.decrementAuthorLengths(mediaMetaData.getId());

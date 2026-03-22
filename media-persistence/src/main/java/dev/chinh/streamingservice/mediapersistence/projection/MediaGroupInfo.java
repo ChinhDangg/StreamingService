@@ -18,7 +18,7 @@ public class MediaGroupInfo {
     private Long grouperId;
 
     @JsonProperty(ContentMetaData.NUM_INFO)
-    private Integer numInfo;
+    private String numInfo;
 
     public MediaGroupInfo(Long id, Long grouperId) {
         this.id = id;

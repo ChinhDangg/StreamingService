@@ -85,9 +85,6 @@ public class MediaMetaData extends MediaDescription {
     @Column(nullable = false)
     private String format;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String absoluteFilePath;
-
     @Override
     public List<MediaNameSearchItem> getTags() {
         return tags == null ? null
