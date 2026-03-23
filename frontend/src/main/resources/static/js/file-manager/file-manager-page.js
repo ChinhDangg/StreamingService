@@ -64,6 +64,7 @@ function getIconNode(fileType) {
     else if (fileType === 'VIDEO') iconNode = iconContainer.querySelector('.video-icon');
     else if (fileType === 'AUDIO') iconNode = iconContainer.querySelector('.audio-icon');
     else if (fileType === 'ALBUM') iconNode = iconContainer.querySelector('.album-icon');
+    else if (fileType === 'GROUPER') iconNode = iconContainer.querySelector('.grouper-icon');
     else if (fileType === 'FILE') iconNode = iconContainer.querySelector('.file-icon');
     if (iconNode) return helperCloneAndUnHideNode(iconNode);
     return null;
