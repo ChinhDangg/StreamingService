@@ -160,6 +160,72 @@ public class MediaBackupEventConsumer {
         }
     }
 
+    private void onCreateDirectory(MediaUpdateEvent.DirectoryCreated event) {
+        System.out.println("Received create directory: " + event.fileId());
+        try {
+            String dirPath = event.dirPath().startsWith(ContentMetaData.MEDIA_BUCKET)
+                    ? event.dirPath()
+                    : ContentMetaData.MEDIA_BUCKET + "/" + event.dirPath();
+            Path targetParent = Paths.get(OSUtil.normalizePath(MEDIA_BACKUP_LOCATION, dirPath));
+            if (Files.notExists(targetParent)) {
+                Files.createDirectories(targetParent);
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to create directory: " + event.fileId() + " : " + e.getMessage());
+        }
+    }
+
+    private void onRenameFile(MediaUpdateEvent.FileRenamed event) throws Exception {
+        System.out.println("Received rename file: " + event.fileId());
+        try {
+            String basePath = event.filePath().startsWith(ContentMetaData.MEDIA_BUCKET)
+                    ? event.filePath()
+                    : ContentMetaData.MEDIA_BUCKET + "/" + event.filePath();
+            int lastSlash = basePath.lastIndexOf("/");
+            Path source = Paths.get(OSUtil.normalizePath(MEDIA_BACKUP_LOCATION, basePath));
+            Path target = Paths.get(OSUtil.normalizePath(
+                    MEDIA_BACKUP_LOCATION,
+                    basePath.substring(0, lastSlash == -1 ? basePath.length() : lastSlash) + "/" + event.newFileName()
+            ));
+            Files.move(source, target);
+        } catch (Exception e) {
+            System.err.println("Failed to rename file: " + event.fileId() + " : " + e.getMessage());
+            throw e;
+        }
+    }
+
+    private void onMoveDirectory(MediaUpdateEvent.DirectoryMoved event) throws Exception {
+        System.out.println("Received move directory: " + event.fileId() + ", old: " + event.oldPath() + ", new: " + event.newPath());
+        try {
+            moveFile(event.oldPath(), event.newPath());
+        } catch (Exception e) {
+            System.err.println("Failed to move directory: " + event.fileId() + " : " + e.getMessage());
+            throw e;
+        }
+    }
+
+    private void onMoveFile(MediaUpdateEvent.FileMoved event) throws Exception {
+        System.out.println("Received move file: " + event.fileId() + ", old: " + event.oldPath() + ", new: " + event.newPath());
+        try {
+            moveFile(event.oldPath(), event.newPath());
+        } catch (Exception e) {
+            System.err.println("Failed to move file: " + event.fileId() + " : " + e.getMessage());
+        }
+    }
+
+    private void moveFile(String oldPath, String newPath) throws Exception {
+        oldPath = oldPath.startsWith(ContentMetaData.MEDIA_BUCKET)
+                ? oldPath
+                : ContentMetaData.MEDIA_BUCKET + "/" + oldPath;
+        newPath = newPath.startsWith(ContentMetaData.MEDIA_BUCKET)
+                ? newPath
+                : ContentMetaData.MEDIA_BUCKET + "/" + newPath;
+        Path source = Paths.get(OSUtil.normalizePath(MEDIA_BACKUP_LOCATION, oldPath));
+        Path target = Paths.get(OSUtil.normalizePath(MEDIA_BACKUP_LOCATION, newPath));
+        System.out.println(source + " -> " + target);
+        Files.move(source, target.resolve(source.getFileName()));
+    }
+
 
     @KafkaListener(topics = {
             EventTopics.MEDIA_BACKUP_TOPIC,
@@ -182,6 +248,11 @@ public class MediaBackupEventConsumer {
                 case MediaUpdateEvent.NameEntityCreated e -> onNameEntityCreated(e);
                 case MediaUpdateEvent.NameEntityDeleted e -> onNameEntityDeleted(e);
                 case MediaUpdateEvent.NameEntityUpdated e -> onUpdateNameEntity(e);
+
+                case MediaUpdateEvent.DirectoryCreated e -> onCreateDirectory(e);
+                case MediaUpdateEvent.FileRenamed e -> onRenameFile(e);
+                case MediaUpdateEvent.DirectoryMoved e -> onMoveDirectory(e);
+                case MediaUpdateEvent.FileMoved e -> onMoveFile(e);
                 default ->
                     // unknown event type → log and skip
                         System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
@@ -228,6 +299,15 @@ public class MediaBackupEventConsumer {
                     System.out.println("Received name entity delete backup event: " + e.nameEntityId() + " thumbnail: " + e.thumbnailPath());
             case MediaUpdateEvent.NameEntityUpdated e ->
                     System.out.println("Received name entity thumbnail updated backup event: " + e.nameEntityId() + " old: " + e.oldThumbnail() + " new: " + e.newThumbnail());
+
+            case MediaUpdateEvent.DirectoryCreated e ->
+                    System.out.println("Received create directory: " + e.fileId());
+            case MediaUpdateEvent.FileRenamed e ->
+                    System.out.println("Received rename file: " + e.fileId());
+            case MediaUpdateEvent.DirectoryMoved e ->
+                    System.out.println("Received move directory: " + e.fileId() + ", old: " + e.oldPath() + ", new: " + e.newPath());
+            case MediaUpdateEvent.FileMoved e ->
+                    System.out.println("Received move file: " + e.fileId() + ", old: " + e.oldPath() + ", new: " + e.newPath());
             default -> {
                     System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
                     //ack.acknowledge(); // ack on poison event to skip it

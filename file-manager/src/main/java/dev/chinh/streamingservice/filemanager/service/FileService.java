@@ -1,7 +1,6 @@
 package dev.chinh.streamingservice.filemanager.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
-import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
@@ -217,7 +216,7 @@ public class FileService {
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
         List<FileSystemItem> items = getItemInIds(getCommonIds(item.getPath()), criteria);
         if (!items.isEmpty()) {
-            return "Has parent as album - child can't be album";
+            return "Has parent as album - cannot have album in an album";
         }
 
         updateStatusCodeAndGet(fileId, FileStatus.PROCESSING);
@@ -279,6 +278,13 @@ public class FileService {
         if (folderIsLocked != null) {
             throw new IllegalArgumentException("File is locked: " + folderIsLocked.getId());
         }
+
+        Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
+        List<FileSystemItem> items = getItemInIds(getCommonIds(item.getPath()), criteria);
+        if (!items.isEmpty()) {
+            return "Has parent as album - cannot have grouper in an album";
+        }
+
         updateStatusCodeAndGet(fileId, FileStatus.PROCESSING);
         boolean anyDirectFile = mongoTemplate.exists(Query.query(Criteria
                         .where(FileItemField.PARENT_ID).is(fileId)
@@ -309,14 +315,15 @@ public class FileService {
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
-    public FileSystemItem createNewFolder(String parentId, String newFolderName) {
+    @Transactional
+    public FileSystemItem createNewDirectory(String parentId, String newFolderName) {
         String error = FileSystemValidator.isValidName(newFolderName);
         if (error != null)
             throw new IllegalArgumentException(error);
         FileSystemItem parent = findById(parentId);
         if (parent == null)
             throw new IllegalArgumentException("Parent folder not found: " + parentId);
-        if (parent.getFileType() != FileType.DIR)
+        if (FileType.isNotDir(parent.getFileType()))
             throw new IllegalArgumentException("Parent folder is not a directory: " + parentId);
         if (itemWithNameExists(parentId, newFolderName))
             throw new IllegalArgumentException("Folder already exists: " + newFolderName);
@@ -327,7 +334,15 @@ public class FileService {
                 .name(newFolderName)
                 .uploadDate(Instant.now())
                 .build();
-        return mongoTemplate.insert(item);
+
+        var saved = mongoTemplate.insert(item);
+
+        publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
+                EventTopics.MEDIA_BACKUP_TOPIC,
+                new MediaUpdateEvent.DirectoryCreated(saved.getId(), getFullPathInName(saved))
+        ));
+
+        return saved;
     }
 
     private String getOrCreateFolder(String name, String parentId, String currentPath, FileType fileType) {
@@ -356,6 +371,7 @@ public class FileService {
         return dir.getId();
     }
 
+    @Transactional
     public String renameFileItem(String fileId, String newName) {
         FileSystemItem item = getFileSystemItem(fileId);
         String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
@@ -375,6 +391,12 @@ public class FileService {
         Query query = new Query(Criteria.where("id").is(fileId));
         Update update = new Update().set(FileItemField.NAME, newName);
         mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+
+        publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
+                EventTopics.MEDIA_BACKUP_TOPIC,
+                new MediaUpdateEvent.FileRenamed(item.getId(), getFullPathInName(item), newName)
+        ));
+
         return newName;
     }
 
@@ -481,8 +503,10 @@ public class FileService {
         if (!FileType.isNotDir(item.getFileType())) { // if a directory
             lockFileItem(userId, commonIds);
             publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
-                    EventTopics.MEDIA_FILE_TOPIC,
-                    new MediaUpdateEvent.DirectoryMoved(fileId, newParentId, item.getPath())
+                    EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
+                    new MediaUpdateEvent.DirectoryMoved(
+                            fileId, newParentId, item.getPath(), getFullPathInName(item), getFullPathInName(newParent)
+                    )
             ));
 
             if (item.getFileType() == FileType.ALBUM && !item.getParentId().equals(getROOT_FOLDER_ID())) {
@@ -501,6 +525,13 @@ public class FileService {
                     }
                 }
             }
+        } else {
+            publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
+                    EventTopics.MEDIA_BACKUP_TOPIC,
+                    new MediaUpdateEvent.FileMoved(
+                            fileId, getFullPathInName(item), getFullPathInName(newParent)
+                    )
+            ));
         }
 
         FileSystemItem moved = mongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), FileSystemItem.class);

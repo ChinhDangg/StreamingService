@@ -368,7 +368,7 @@ public class MediaFileEventConsumer {
     private void onMoveFile(MediaUpdateEvent.DirectoryMoved event) {
         System.out.println("Received file move event: from: " + event.fileId() + " to: " + event.parentId());
         try {
-            fileService.moveDirectory(event.fileId(), event.parentId(), event.oldPath());
+            fileService.moveDirectory(event.fileId(), event.parentId(), event.oldIdPath());
         } catch (Exception e) {
             throw new RuntimeException("Failed to move file", e);
         }

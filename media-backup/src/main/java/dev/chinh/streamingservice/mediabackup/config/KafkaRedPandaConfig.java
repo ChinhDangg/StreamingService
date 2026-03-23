@@ -23,6 +23,7 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 import org.springframework.util.backoff.FixedBackOff;
 
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.NoSuchFileException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -132,9 +133,9 @@ public class KafkaRedPandaConfig {
                         dlqKafkaTemplate,
                         (record, ex) -> {
                             // Check if the exception (or its cause) is FileAlreadyExistsException
-                            if (ex instanceof FileAlreadyExistsException || ex.getCause() instanceof FileAlreadyExistsException) {
-                                return null; // Returning null skips the DLQ publication
-                            }
+//                            if (ex instanceof FileAlreadyExistsException || ex.getCause() instanceof FileAlreadyExistsException) {
+//                                return null; // Returning null skips the DLQ publication
+//                            }
                             return new org.apache.kafka.common.TopicPartition(MEDIA_BACKUP_DLQ_TOPIC, -1);
                         });
 
@@ -144,6 +145,7 @@ public class KafkaRedPandaConfig {
         errorHandler.addNotRetryableExceptions(FileAlreadyExistsException.class);
         errorHandler.addNotRetryableExceptions(NullPointerException.class);
         errorHandler.addNotRetryableExceptions(IllegalArgumentException.class);
+        errorHandler.addNotRetryableExceptions(NoSuchFileException.class);
 
         return errorHandler;
     }

@@ -75,7 +75,7 @@ public class FileManagerController {
     public record CreateDirectoryRequest(@Size(max = 30) String parentId, @Size(max = 300) String name) {}
     @PostMapping("/folder")
     public ResponseEntity<?> createDirectory(@RequestBody @Valid CreateDirectoryRequest request) {
-        return ResponseEntity.ok().body(fileService.createNewFolder(request.parentId, request.name));
+        return ResponseEntity.ok().body(fileService.createNewDirectory(request.parentId, request.name));
     }
 
     @PutMapping("/rename")

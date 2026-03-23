@@ -148,15 +148,34 @@ public interface MediaUpdateEvent {
             String newThumbnail
     ) implements MediaUpdateEvent {}
 
+    record DirectoryCreated(
+            String fileId,
+            String dirPath
+    ) implements MediaUpdateEvent {}
+
     record DirectoryMoved(
             String fileId,
             String parentId,
-            String oldPath
+            String oldIdPath,
+            String oldPath,
+            String newPath
+    ) implements MediaUpdateEvent {}
+
+    record FileMoved(
+            String fileId,
+            String oldPath,
+            String newPath
     ) implements MediaUpdateEvent {}
 
     record GrouperItemMoved(
             long childMediaId,
             Long parentMediaId,
             String fileName
+    ) implements MediaUpdateEvent {}
+
+    record FileRenamed(
+            String fileId,
+            String filePath,
+            String newFileName
     ) implements MediaUpdateEvent {}
 }
