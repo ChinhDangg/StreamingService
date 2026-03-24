@@ -111,19 +111,17 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         long size = 0;
         boolean hasImage = false;
 
-        List<MediaUrl> mediaUrlList = new ArrayList<>();
+        List<MediaUrl> mediaAllUrlList = new ArrayList<>();
+        List<MediaUrl> mediaImageUrlList = new ArrayList<>();
         List<String> bucketList = new ArrayList<>();
         List<String> pathList = new ArrayList<>();
         for (FileItem f : response.getContentList()) {
             String objectName = f.getObjectName();
 
-            bucketList.add(f.getBucket());
-            pathList.add(objectName);
-
             MediaType mediaType = MediaType.detectMediaType(objectName);
 
             if (resolution == Resolution.original) {
-                mediaUrlList.add(new MediaUrl(mediaType, minIOService.getObjectUrl(f.getBucket(), objectName)));
+                mediaAllUrlList.add(new MediaUrl(mediaType, minIOService.getObjectUrl(f.getBucket(), objectName)));
             } else {
                 if (mediaType == MediaType.IMAGE) {
                     String originalExtension = objectName.contains(".") ? objectName.substring(objectName.lastIndexOf(".") + 1)
@@ -131,13 +129,17 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                     String format = (mediaJobDescription.getAcceptHeader() != null && mediaJobDescription.getAcceptHeader().contains("image/webp")) ? "webp" : originalExtension;
                     String savedFileName = objectName + "_" + resolution + "." + format;
                     String urlPath = OSUtil.normalizePath(albumDir, savedFileName);
-                    mediaUrlList.add(new MediaUrl(mediaType, urlPath));
+                    mediaAllUrlList.add(new MediaUrl(mediaType, urlPath));
+                    mediaImageUrlList.add(new MediaUrl(mediaType, urlPath));
+
+                    bucketList.add(f.getBucket());
+                    pathList.add(objectName);
 
                     size += f.getSize();
                     hasImage = true;
                 } else if (mediaType == MediaType.VIDEO) {
                     String videoDir = "/api/album/" + albumId + "/" + resolution + "/vid/" + objectName;
-                    mediaUrlList.add(new MediaUrl(mediaType, videoDir));
+                    mediaAllUrlList.add(new MediaUrl(mediaType, videoDir));
                 }
             }
         }
@@ -151,7 +153,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                         .toList();
             }
 
-            AlbumUrlInfo urlInfo = new AlbumUrlInfo(mediaUrlList, bucketList, pathList);
+            AlbumUrlInfo urlInfo = new AlbumUrlInfo(mediaImageUrlList, bucketList, pathList);
             String saveDir = albumId + "/" + resolution.name();
             int exitCode = processResizedImagesInBatch(urlInfo, resolution, saveDir, false);
             if (exitCode != 0) {
@@ -169,7 +171,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             addCacheAlbumJobInfo(albumId, albumInfo);
         }
 
-        return mediaUrlList;
+        return mediaAllUrlList;
     }
 
     private int processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String saveDir, boolean isAlbum) throws InterruptedException, IOException {
@@ -229,7 +231,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
     }
 
     public String getAlbumVidCacheJobIdString(long albumId, String objectName, Resolution resolution) {
-        return albumId + ":" + objectName + ":" + resolution;
+        return albumId + ":" + resolution + ":" + objectName;
     }
 
     private String getAlbumPartialVideoUrl(String tokenKey, MediaJobDescription mediaJobDescription) throws Exception {
@@ -253,10 +255,10 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                 "album-vid",
                 String.valueOf(albumId),
                 albumRes.name(),
-                res.name(),
-                objectName
+                objectName,
+                res.name()
         );
-        String streamUrl = getNginxVideoStreamUrl(String.join("/", streamUrlPaths));
+        String streamUrl = "/stream/" + (String.join("/", streamUrlPaths)) + masterFileName;
 
         MediaJobStatus mediaJobStatus = videoService.getVideoJobStatus(albumVidCacheJobId);
         boolean prevJobStopped = false;
@@ -272,7 +274,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         if (!enoughSpace)
             return minIOService.getObjectUrl(bucket, objectName);
 
-        final String videoDir = albumVidCacheJobId.replace(":", "/");
+        final String videoDir = albumId + "/" + objectName + "/" + res.name();
         OSUtil.createTempDir(videoDir, ffmpegName);
 
         String containerDir = "/chunks/" + videoDir;

@@ -421,6 +421,10 @@ public class VideoService extends MediaService implements ResourceCleanable {
         workerRedisService.releaseToken(VideoWorker.TOKEN_KEY);
     }
 
+    private String getNginxVideoStreamUrl(String videoDir) {
+        return "/stream/chunks/" + videoDir + masterFileName;
+    }
+
     private String getCachePreviewJobId(long videoId) {
         return videoId + ":preview";
     }

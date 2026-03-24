@@ -30,7 +30,7 @@ public class AlbumController {
         return ResponseEntity.ok().body(albumService.getAlbumContent(id, resolution, page, 25, request));
     }
 
-    @GetMapping("/{albumId}/{albumRes}/vid/{vidRes}/{objectName}")
+    @GetMapping("/{albumId}/{albumRes}/vid/{objectName}/{vidRes}")
     public ResponseEntity<String> getAlbumVideoUrl(@PathVariable long albumId,
                                                    @PathVariable Resolution albumRes,
                                                    @PathVariable String objectName,

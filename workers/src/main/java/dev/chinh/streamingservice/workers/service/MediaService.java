@@ -84,10 +84,6 @@ public abstract class MediaService {
         return mediaId + ":" + res;
     }
 
-    protected String getNginxVideoStreamUrl(String videoDir) {
-        return "/stream/chunks/" + videoDir + masterFileName;
-    }
-
     protected boolean checkSrcSmallerThanTarget(int width, int height, int target) {
         if (width >= height) { // Landscape
             return height <= target;
