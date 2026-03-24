@@ -439,7 +439,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
         addCacheLastAccess(videoLastAccessKey, videoId, expiry);
     }
 
-    public Double getCacheVideoLastAccess(String videoWorkId) {
+    public Long getCacheVideoLastAccess(String videoWorkId) {
         return getCacheLastAccess(videoLastAccessKey, videoWorkId);
     }
 

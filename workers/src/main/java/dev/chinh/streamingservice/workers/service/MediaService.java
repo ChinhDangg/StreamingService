@@ -48,8 +48,9 @@ public abstract class MediaService {
         redisTemplate.opsForZSet().add(key, mediaWorkId, expiry);
     }
 
-    protected Double getCacheLastAccess(String key, String mediaWorkId) {
-        return redisTemplate.opsForZSet().score(key, mediaWorkId);
+    protected Long getCacheLastAccess(String key, String mediaWorkId) {
+        Double score = redisTemplate.opsForZSet().score(key, mediaWorkId);
+        return (score != null) ? score.longValue() : null;
     }
 
     protected void removeCacheLastAccess(String key, String mediaWorkId) {

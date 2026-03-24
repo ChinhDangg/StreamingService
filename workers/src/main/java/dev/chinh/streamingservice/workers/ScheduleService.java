@@ -66,12 +66,10 @@ public class ScheduleService {
 
     private void stopNonViewingVideoRunningJob() {
         Set<String> runningVideoJobs = videoService.getCacheRunningJobs(System.currentTimeMillis());
+        for (String videoJobId: runningVideoJobs) {
 
-        for (String runningVideoJob : runningVideoJobs) {
-
-            String videoJobId = runningVideoJob;
-            Double lastAccess = videoService.getCacheVideoLastAccess(videoJobId);
-            long millisPassed = (lastAccess == null) ? 130_000 : (long) (System.currentTimeMillis() - lastAccess);
+            Long lastAccess = videoService.getCacheVideoLastAccess(videoJobId);
+            long millisPassed = (lastAccess == null) ? 130_000 : (lastAccess - System.currentTimeMillis());
             if (millisPassed < 120_000) {
                 break; // sorted so any after is the same
             }
@@ -80,7 +78,6 @@ public class ScheduleService {
             if (!cachedJobStatus.get("status").toString().equals(MediaJobStatus.RUNNING.name())) {
                 // running job probably completed or removed for space - remove running cache
                 videoService.removeCacheRunningJob(videoJobId);
-                videoService.removeCacheVideoLastAccess(videoJobId);
                 continue;
             }
             String jobId = cachedJobStatus.get("jobId").toString(); // UUID
