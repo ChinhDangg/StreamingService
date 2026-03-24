@@ -521,6 +521,7 @@ public class FileService {
                         update.unset(FileItemField.MEDIA_ID);
                         update.unset(FileItemField.RESOLUTION_INFO);
                         update.unset(FileItemField.LENGTH);
+                        update.unset(FileItemField.THUMBNAIL);
                         update.set(FileItemField.FILE_TYPE, FileType.DIR);
                     }
                 }
