@@ -250,6 +250,7 @@ services:
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
 
       - GRPC_FILE_PROVIDER_ADDRESS=static://file-manager:9090
+      - NUMBER_OF_THREADS=${NUMBER_OF_THREADS}
     depends_on:
       redpanda:
         condition: service_started

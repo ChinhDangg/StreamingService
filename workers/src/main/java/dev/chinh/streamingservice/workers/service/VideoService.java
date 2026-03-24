@@ -36,6 +36,8 @@ public class VideoService extends MediaService implements ResourceCleanable {
     @Value("${ffmpeg-name}")
     private String ffmpegName;
 
+    private int numberOfThreads = 4;
+
     private final MemoryManager memoryManager;
 
     public VideoService(@Qualifier("queueRedisTemplate") RedisTemplate<String, String> redisTemplate,
@@ -50,10 +52,18 @@ public class VideoService extends MediaService implements ResourceCleanable {
     }
 
     @PostConstruct
-    public void registerWithMemoryManager() {
+    public void init() {
         memoryManager.registerResourceCleanable(this);
+        String numOfThreadEnv = System.getenv("NUMBER_OF_THREADS");
+        if (numOfThreadEnv != null && !numOfThreadEnv.isEmpty()) {
+            try {
+                numberOfThreads = Integer.parseInt(numOfThreadEnv);
+            } catch (NumberFormatException e) {
+                log.error("Invalid NUMBER_OF_THREADS environment variable: {}", numOfThreadEnv);
+            }
+        }
+        log.info("NUMBER_OF_THREADS: {}", numberOfThreads);
     }
-
 
     @Override
     public void handleJob(String tokenKey, MediaJobDescription mediaJobDescription) {
@@ -190,6 +200,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
         command.addAll(List.of(
                 "-i", nginxUrl,
+                "-threads", String.valueOf(numberOfThreads),
                 "-filter_complex", filterComplex,
                 "-map", "[v]",
 //                "-map", "[acat]",
@@ -325,6 +336,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
         command.addAll(List.of(
                 "-i", inputUrl,     // input: presigned video URL via Nginx proxy
+                "-threads", String.valueOf(numberOfThreads),  // number of threads to use for decoding/encoding
                 "-vf", scale,                 // video filter: resize to 360p height, keep aspect ratio
                 "-c:v", "h264",               // encode video with H.264 codec
                 "-preset", "veryfast",        // encoder speed/efficiency tradeoff: "veryfast" = low CPU, larger file
