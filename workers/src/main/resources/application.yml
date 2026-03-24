@@ -4,4 +4,4 @@ grpc:
       address: ${GRPC_FILE_PROVIDER_ADDRESS:static://localhost:9090}
       negotiationType: plaintext
       enableKeepAlive: true
-      keep-alive-without-calls: true
+      keep-alive-without-calls: false
