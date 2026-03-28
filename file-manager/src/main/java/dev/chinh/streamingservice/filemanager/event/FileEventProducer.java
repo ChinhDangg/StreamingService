@@ -9,7 +9,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 @Service
 @AllArgsConstructor
-public class MediaFileEventProducer {
+public class FileEventProducer {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 

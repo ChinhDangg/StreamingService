@@ -1,6 +1,5 @@
 package dev.chinh.streamingservice.filemanager.service;
 
-import com.github.benmanes.caffeine.cache.Cache;
 import com.mongodb.client.result.UpdateResult;
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
@@ -8,14 +7,13 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.validation.FileSystemValidator;
-import dev.chinh.streamingservice.filemanager.config.ApplicationConfig;
 import dev.chinh.streamingservice.filemanager.constant.FileStatus;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
 import dev.chinh.streamingservice.filemanager.constant.SortBy;
 import dev.chinh.streamingservice.filemanager.data.FileItemField;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import dev.chinh.streamingservice.filemanager.data.FolderLocks;
-import dev.chinh.streamingservice.filemanager.event.MediaFileEventProducer;
+import dev.chinh.streamingservice.filemanager.event.FileEventProducer;
 import dev.chinh.streamingservice.filemanager.repository.FileSystemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -26,8 +24,6 @@ import org.springframework.data.domain.*;
 import org.springframework.data.mongodb.MongoTransactionException;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.AggregationUpdate;
-import org.springframework.data.mongodb.core.aggregation.StringOperators;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -39,9 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -50,13 +44,12 @@ import java.util.stream.Collectors;
 public class FileService {
 
     private final RedisTemplate<String, String> redisStringTemplate;
-    private final FileSystemRepository fileSystemRepository;
     private final MongoTemplate mongoTemplate;
-    private final ThumbnailService thumbnailService;
-
-    private final Cache<String, ApplicationConfig.EntryCached> directoryIdCache;
-
     private final ApplicationEventPublisher publisher;
+    private final FileSystemRepository fileSystemRepository;
+
+    private final ThumbnailService thumbnailService;
+    private final DirectoryCacheService directoryCacheService;
 
     private static final String mediaPath = ContentMetaData.MEDIA_BUCKET;
     private static String ROOT_PATH = null;
@@ -117,6 +110,7 @@ public class FileService {
         return PageRequest.of(page, pageSize, sort);
     }
 
+
     public String initiateUploadRequest(String filePath, String userId) {
         var validatedFile = FileSystemValidator.isValidPath(filePath);
         if (validatedFile.errorMessage() != null) {
@@ -127,7 +121,7 @@ public class FileService {
         int partLength = pathParts.length;
         String parentId = getROOT_FOLDER_ID();
         for (int i = 0; i < partLength-1; i++) {
-            String dirId = getCachedElseDbDirectoryId(parentId, pathParts[i], userId);
+            String dirId = directoryCacheService.getCachedElseDbDirectoryId(parentId, pathParts[i], userId);
             if (dirId == null) {
                 return addCacheMediaUploadRequest(validatedPath);
             }
@@ -175,7 +169,7 @@ public class FileService {
             return statusCodeStr;
         }
         updateStatusCodeAndGet(fileId, FileStatus.PROCESSING);
-        publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
+        publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
                         fileId, MediaType.VIDEO,
@@ -228,7 +222,7 @@ public class FileService {
         if (!item.getParentId().equals(getROOT_FOLDER_ID())) {
             FileSystemItem parent = getFileSystemItem(item.getParentId());
             if (parent.getFileType() == FileType.GROUPER) {
-                publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
+                publisher.publishEvent(new FileEventProducer.EventWrapper(
                         EventTopics.MEDIA_UPLOAD_TOPIC,
                         new MediaUpdateEvent.FileToMediaInitiated(
                                 fileId, MediaType.ALBUM,
@@ -241,7 +235,7 @@ public class FileService {
             }
         }
 
-        publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
+        publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
                         fileId, MediaType.ALBUM,
@@ -298,7 +292,7 @@ public class FileService {
                 .where(FileItemField.PATH).regex("^" + parentPath)
                 .and(FileItemField.FILE_TYPE).in(FileType.IMAGE, FileType.VIDEO)), FileSystemItem.class);
 
-        publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
+        publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
                         fileId, MediaType.GROUPER,
@@ -337,38 +331,12 @@ public class FileService {
 
         var saved = mongoTemplate.insert(item);
 
-        publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
+        publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_BACKUP_TOPIC,
                 new MediaUpdateEvent.DirectoryCreated(saved.getId(), getFullPathInName(saved))
         ));
 
         return saved;
-    }
-
-    private String getOrCreateFolder(String name, String parentId, String currentPath, FileType fileType) {
-        Query query = new Query(Criteria
-                .where(FileItemField.PARENT_ID).is(parentId)
-                .and(FileItemField.NAME).is(name)
-                .and(FileItemField.FILE_TYPE).in(FileType.DIR, FileType.ALBUM)
-        );
-
-        // setOnInsert to create if not exists
-        Update update = new Update()
-                .setOnInsert(FileItemField.NAME, name)
-                .setOnInsert(FileItemField.PARENT_ID, parentId)
-                .setOnInsert(FileItemField.PATH, currentPath)
-                .setOnInsert(FileItemField.FILE_TYPE, fileType)
-                .setOnInsert(FileItemField.STATUS_CODE, FileStatus.IN_USE.getValue())
-                .setOnInsert(FileItemField.UPLOAD_DATE, LocalDateTime.now());
-
-        // upsert to create and return in one operation - atomic
-        FindAndModifyOptions options = new FindAndModifyOptions().upsert(true).returnNew(true);
-
-        FileSystemItem dir = mongoTemplate.findAndModify(query, update, options, FileSystemItem.class);
-
-        if (dir == null) throw new RuntimeException("Failed to create folder");
-
-        return dir.getId();
     }
 
     @Transactional
@@ -392,7 +360,7 @@ public class FileService {
         Update update = new Update().set(FileItemField.NAME, newName);
         mongoTemplate.updateFirst(query, update, FileSystemItem.class);
 
-        publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
+        publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_BACKUP_TOPIC,
                 new MediaUpdateEvent.FileRenamed(item.getId(), getFullPathInName(item), newName)
         ));
@@ -423,7 +391,7 @@ public class FileService {
             throw new IllegalArgumentException("File is already marked as media - delete through media file item instead: " + item.getMId());
         }
 
-        publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
+        publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
                 new MediaUpdateEvent.FileDeleted(item.getId(), getFullPathInName(item), FileType.isNotDir(item.getFileType()), null)
         ));
@@ -452,7 +420,7 @@ public class FileService {
         }
         updateStatusCodeAndGet(item.getId(), FileStatus.DELETING);
 
-        publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
+        publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC,
                 new MediaUpdateEvent.FileDeleted(
                         item.getId(), getFullPathInName(item), FileType.isNotDir(item.getFileType()), item.getMId())
@@ -502,7 +470,7 @@ public class FileService {
 
         if (!FileType.isNotDir(item.getFileType())) { // if a directory
             lockFileItem(userId, commonIds);
-            publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
+            publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
                     new MediaUpdateEvent.DirectoryMoved(
                             fileId, newParentId, item.getPath(), getFullPathInName(item), getFullPathInName(newParent)
@@ -513,7 +481,7 @@ public class FileService {
                 FileSystemItem oldParent = findById(item.getParentId());
                 if (oldParent.getFileType() == FileType.GROUPER) {
                     boolean newParentIsGrouper = newParent.getFileType() == FileType.GROUPER;
-                    publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
+                    publisher.publishEvent(new FileEventProducer.EventWrapper(
                             EventTopics.MEDIA_UPLOAD_TOPIC,
                             new MediaUpdateEvent.GrouperItemMoved(item.getMId(), newParentIsGrouper ? newParent.getMId() : null, item.getName())
                     ));
@@ -527,7 +495,7 @@ public class FileService {
                 }
             }
         } else {
-            publisher.publishEvent(new MediaFileEventProducer.EventWrapper(
+            publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_BACKUP_TOPIC,
                     new MediaUpdateEvent.FileMoved(
                             fileId, getFullPathInName(item), getFullPathInName(newParent)
@@ -548,44 +516,6 @@ public class FileService {
         return moved;
     }
 
-    @Transactional
-    public void moveDirectory(String fileId, String newParentId, String oldPath) {
-        FileSystemItem item = findById(fileId);
-        if (item == null) {
-            System.err.println("File not found. Skipping...");
-            return;
-        }
-        if (FileType.isNotDir(item.getFileType())) {
-            System.err.println("File is not a directory. Moving single file is handled at initiation already. Skipping...");
-            return;
-        }
-        FileSystemItem newParent = findById(newParentId);
-        if (newParent == null) {
-            System.err.println("Parent not found. Skipping...");
-            return;
-        }
-        if (FileType.isNotDir(newParent.getFileType())) {
-            System.err.println("Parent is not a directory. Skipping...");
-            return;
-        }
-
-        // needing oldPath since item or source dir path is already updated to reflect changes
-        // item is the source directory, we need to get all children and update their paths
-        String childrenIdPrefix = oldPath + item.getId() + "/"; // all children in the directory
-        String newIdPrefix = newParent.getPath() + newParent.getId() + "/";
-
-        String anchoredRegex = "^" + Pattern.quote(childrenIdPrefix);
-        Query query = new Query(Criteria.where(FileItemField.PATH).regex(anchoredRegex)); // find children
-        AggregationUpdate update = AggregationUpdate.update()
-                .set(FileItemField.PATH)
-                .toValue(StringOperators.ReplaceOne.valueOf(FileItemField.PATH)
-                        .find(oldPath) // find old path prefix and replace with new path prefix
-                        .replacement(newIdPrefix));
-        mongoTemplate.updateMulti(query, update, FileSystemItem.class);
-
-        Set<String> commonIds = getCommonIds(oldPath + item.getId() + newParent.getPath() + newParent.getId());
-        releaseLockedFileItem(commonIds);
-    }
 
     private List<FileSystemItem> getItemInIds(Set<String> ids, Criteria criteria) {
         Query query = new Query(Criteria.where("id").in(ids));
@@ -595,7 +525,7 @@ public class FileService {
         return mongoTemplate.find(query, FileSystemItem.class);
     }
 
-    private Set<String> getCommonIds(String idPath) {
+    public Set<String> getCommonIds(String idPath) {
         String[] idList = idPath.split("/");
         Set<String> commonIds = new HashSet<>(Arrays.asList(idList));
         commonIds.remove("");
@@ -609,7 +539,7 @@ public class FileService {
         mongoTemplate.insert(folderLocks, FolderLocks.class);
     }
 
-    private void releaseLockedFileItem(Set<String> fileIds) {
+    public void releaseLockedFileItem(Set<String> fileIds) {
         if (fileIds.isEmpty()) return;
         Query query = new Query(Criteria.where("id").in(fileIds));
         mongoTemplate.remove(query, FolderLocks.class);
@@ -676,37 +606,10 @@ public class FileService {
         return getROOT_PATH() + path;
     }
 
-    public String getCachedElseDbDirectoryId(String parentId, String dirName, String userId) {
-        String dirKey = "DIR_" + dirName + "|" + parentId;
-        var cached = (ApplicationConfig.DirectoryCached) directoryIdCache.asMap().get(dirKey);
-        if (cached == null) {
-            Query query = Query.query(Criteria
-                    .where(FileItemField.PARENT_ID).is(parentId)
-                    .and(FileItemField.NAME).is(dirName));
-            Update update = new Update().set(FileItemField.STATUS_CODE, FileStatus.IN_USE.getValue());
-            FileSystemItem dir = mongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), FileSystemItem.class);
-            if (dir == null)
-                return null;
-            directoryIdCache.asMap().computeIfAbsent(dirKey, k -> {
-                Set<String> users = ConcurrentHashMap.newKeySet();
-                users.add(userId);
-                return new ApplicationConfig.DirectoryCached(dir.getId(), users);
-            });
-            return dir.getId();
-        }
-        return cached.dirId();
-    }
-
 
     private void updateStatusCodeAndGet(String fileId, FileStatus status) {
         Query query = new Query(Criteria.where("id").is(fileId));
         Update update = new Update().set(FileItemField.STATUS_CODE, status.getValue());
-        mongoTemplate.updateFirst(query, update, FileSystemItem.class);
-    }
-
-    public void removeFileStatus(String fileId) {
-        Query query = new Query(Criteria.where("id").is(fileId));
-        Update update = new Update().unset(FileItemField.STATUS_CODE);
         mongoTemplate.updateFirst(query, update, FileSystemItem.class);
     }
 
@@ -718,53 +621,6 @@ public class FileService {
                         .where(FileItemField.STATUS_CODE).is(FileStatus.IN_USE.getValue())),
                 new Update().unset(FileItemField.STATUS_CODE), FileSystemItem.class);
     }
-
-
-    public ApplicationConfig.DirectoryCached getCachedOrCreateDirectory(String dirKey, String dirName, String dirParentId, String dirPath, String userId) {
-        return (ApplicationConfig.DirectoryCached) directoryIdCache.asMap().compute(dirKey, (_, existing) -> {
-            if (existing == null) {
-                String fileId = getOrCreateFolder(dirName, dirParentId, dirPath, FileType.DIR);
-                Set<String> users = ConcurrentHashMap.newKeySet();
-                users.add(userId);
-                return new ApplicationConfig.DirectoryCached(fileId, users);
-            } else {
-                ((ApplicationConfig.DirectoryCached) existing).userUsing().add(userId);
-                return existing;
-            }
-        });
-    }
-
-    public void addDirectoryToUserUsingList(String userId, String dirKey) {
-        directoryIdCache.asMap().compute(userId, (_, existing) -> {
-            if (existing == null) {
-                Set<String> dirUserUsing = ConcurrentHashMap.newKeySet();
-                dirUserUsing.add(dirKey); // add dirKey to get dir info from cache back (not using the dirId)
-                return new ApplicationConfig.UserDirUsing(dirUserUsing);
-            } else {
-                ((ApplicationConfig.UserDirUsing) existing).dirUserUsing().add(dirKey);
-                return existing;
-            }
-        });
-    }
-
-    public void removeAllDirectoriesUserUsing(String userId) {
-        directoryIdCache.asMap().computeIfPresent(userId, (_, value) -> {
-            for (String dirKey : ((ApplicationConfig.UserDirUsing) value).dirUserUsing()) {
-                directoryIdCache.asMap().computeIfPresent(dirKey, (_, dirValue) -> {
-                    var dirCached = (ApplicationConfig.DirectoryCached) dirValue;
-                    dirCached.userUsing().remove(userId);
-
-                    if (dirCached.userUsing().isEmpty()) {
-                        removeFileStatus(dirCached.dirId());
-                        return null; // null to remove the key
-                    }
-                    return dirValue;
-                });
-            }
-            return null;
-        });
-    }
-
 
 
     public FileSystemItem findByMId(long mId) {
@@ -782,10 +638,6 @@ public class FileService {
         return mongoTemplate.findById(id, FileSystemItem.class);
     }
 
-    public String getRootFolderName() {
-        return mediaPath;
-    }
-
     public String getROOT_FOLDER_ID() {
         if (ROOT_FOLDER_ID != null) return ROOT_FOLDER_ID;
         Query query = new Query(Criteria
@@ -801,7 +653,7 @@ public class FileService {
         return ROOT_FOLDER_ID;
     }
 
-    public String getROOT_PATH() {
+    private String getROOT_PATH() {
         if (ROOT_PATH != null) return ROOT_PATH;
         ROOT_PATH = "/" + getROOT_FOLDER_ID() + "/";
         return ROOT_PATH;
