@@ -295,6 +295,83 @@ function dynamicSortByField(key, order = 'ASC') {
     }
 }
 
+const searchForm = document.getElementById('search-form');
+const searchInput = searchForm.querySelector('.search-input');
+const searchButton = searchForm.querySelector('.search-btn');
+const clearSearchButton = searchForm.querySelector('.clear-search-btn');
+const recursiveToggle = searchForm.querySelector('.recursive-toggle');
+
+searchForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+});
+
+searchButton.addEventListener("click", async function () {
+    await searchFiles(searchInput.value);
+});
+
+async function searchFiles(searchTerm) {
+    if (!searchTerm || searchTerm.length === 0) {
+        clearSearch();
+    }
+    if (searchTerm.length < 2)
+        return;
+    clearSearchButton.classList.remove('hidden');
+    if (nextPage === -1 && !recursiveToggle.checked) {
+        console.log('searching locally');
+        const searchTermLowerCase = searchTerm.toLowerCase();
+        const filteredFiles = currentFileItems.filter(file => {
+            const fileNameLowerCase = file.name.toLowerCase();
+            return fileNameLowerCase.includes(searchTermLowerCase);
+        });
+        displayFileItem(filteredFiles, true, false, false);
+    } else {
+        setObserverToSearch(searchTerm);
+        await fetchSearchFiles(searchTerm, 0);
+    }
+}
+
+let nextPageSearch = -1;
+async function fetchSearchFiles(searchString, page) {
+    const currentPath = getCurrentPath();
+    if (!currentPath)
+        return;
+    const response = await apiRequest('/api/file/search', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            parentId: currentPath.id,
+            searchString: searchString,
+            isRecursive: recursiveToggle.checked,
+            page: page
+        })
+    });
+    if (!response.ok) {
+        alert('Failed to search files');
+        return;
+    }
+    const searchResult = await response.json();
+    if (searchResult.hasNext)
+        nextPageSearch = page + 1;
+    else
+        nextPageSearch = -1;
+    const subFiles = searchResult.content;
+    displayFileItem(subFiles, true, false, false);
+}
+
+clearSearchButton.addEventListener("click", async function () {
+    clearSearch();
+});
+
+function clearSearch() {
+    searchInput.value = '';
+    clearSearchButton.classList.add('hidden');
+    setObserverToFetchMore();
+    displayFileItem(currentFileItems, true, false, false);
+}
+
+
 let previousSubId = null;
 function setCurrentUri(subId) {
     const sortSelectValue = getSortSelectValue();
@@ -318,6 +395,11 @@ function setCurrentUri(subId) {
 
 function initializeObserveFileViewContainer() {
     fileViewWrapper.appendChild(sentinel);
+    setObserverToFetchMore();
+    observer.observe(sentinel);
+}
+
+function setObserverToFetchMore() {
     observer = new IntersectionObserver(async (entries) => {
         if (entries[0].isIntersecting) {
             console.log('Intersecting');
@@ -341,7 +423,18 @@ function initializeObserveFileViewContainer() {
             displayFileItem(subFiles, false);
         }
     }, { rootMargin: '500px' });
-    observer.observe(sentinel);
+}
+
+function setObserverToSearch(searchString) {
+    observer = new IntersectionObserver(async (entries) => {
+        if (entries[0].isIntersecting) {
+            if (nextPageSearch === -1) {
+                observer.unobserve(sentinel);
+                return;
+            }
+            await fetchSearchFiles(searchString, nextPageSearch);
+        }
+    }, { rootMargin: '500px' });
 }
 
 const currentPathStack = [];
@@ -1332,9 +1425,6 @@ moveButton.addEventListener('click', async function () {
             alert('Failed to get current folder id');
             return;
         }
-        console.log('current id: ' + currentId);
-        console.log('current parent id: ' + currentParentId);
-        console.log('current folder id: ' + currentFolderId);
         if (currentParentId === currentFolderId) {
             alert('Item is already in the same folder');
             return;
