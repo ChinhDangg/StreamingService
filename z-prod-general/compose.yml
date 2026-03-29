@@ -425,16 +425,15 @@ services:
       - ${REDPANDA_VOLUME}:/var/lib/redpanda/data
 
   mongodb:
-    build:
-      context: ../.docker/mongo
-      dockerfile: Dockerfile
+    image: mongodb/mongodb-atlas-local:7.0.5
     container_name: mongodb
+    hostname: mongodb
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
-      MONGO_INITDB_DATABASE: ${MONGODB_DATABASE}
+      MONGODB_INITDB_ROOT_USERNAME: ${MONGODB_USERNAME}
+      MONGODB_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
+      MONGODB_INITDB_DATABASE: ${MONGODB_DATABASE}
       MONGODB_USERNAME: ${MONGODB_USERNAME}
       MONGODB_PASSWORD: ${MONGODB_PASSWORD}
       MONGODB_AUTH_SOURCE: ${MONGODB_AUTH_SOURCE}
@@ -445,20 +444,7 @@ services:
       retries: 5
     volumes:
       - ${MONGODB_VOLUME}:/data/db
-
-  mongo-init:
-    image: mongo:7
-    container_name: mongo-init
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    environment:
-      - MONGODB_HOST=${MONGODB_HOST}
-      - MONGODB_USERNAME=${MONGODB_USERNAME}
-      - MONGODB_PASSWORD=${MONGODB_PASSWORD}
-    entrypoint: [ "/bin/bash", "/scripts/init.sh" ]
-    volumes:
-      - ../.docker/mongo/init:/scripts
+      - atlas_config:/data/configdb
 
 
 volumes:
@@ -468,3 +454,4 @@ volumes:
       type: tmpfs
       device: tmpfs
       o: size=${RAM_SIZE_BYTES}
+  atlas_config:

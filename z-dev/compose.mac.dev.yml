@@ -134,44 +134,22 @@ services: # docker compose -f compose.mac.dev.yml --env-file .env.dev -p ss-dev 
       - ${REDPANDA_VOLUME}:/var/lib/redpanda/data
 
   mongodb:
-    build:
-      context: ../.docker/mongo
-      dockerfile: Dockerfile
+    image: mongodb/mongodb-atlas-local:7.0.5
     container_name: ${PREFIX_NAME}-mongodb
+    hostname: mongodb
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
-      MONGO_INITDB_DATABASE: ${MONGODB_DATABASE}
+      MONGODB_INITDB_ROOT_USERNAME: ${MONGODB_USERNAME}
+      MONGODB_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
+      MONGODB_INITDB_DATABASE: ${MONGODB_DATABASE}
       MONGODB_USERNAME: ${MONGODB_USERNAME}
       MONGODB_PASSWORD: ${MONGODB_PASSWORD}
       MONGODB_AUTH_SOURCE: ${MONGODB_AUTH_SOURCE}
     volumes:
       - ${MONGODB_VOLUME}:/data/db
+      - atlas_config:/data/configdb
 
-  mongo-init:
-    image: mongo:7
-    container_name: ${PREFIX_NAME}-mongo-init
-    depends_on:
-      - mongodb
-    environment:
-      - MONGODB_HOST=${MONGODB_HOST}
-      - MONGODB_USERNAME=${MONGODB_USERNAME}
-      - MONGODB_PASSWORD=${MONGODB_PASSWORD}
-    entrypoint: [ "/bin/bash", "/scripts/init.sh" ]
-    volumes:
-      - ../.docker/mongo/init:/scripts
 
-#  logstash:
-#    image: docker.elastic.co/logstash/logstash:8.17.10
-#    container_name: logstash
-#    volumes:
-#      - ./pipeline:/usr/share/logstash/pipeline   # mount config files
-#      - ./drivers:/usr/share/logstash/drivers     # mount JDBC driver
-#    environment:
-#      - LS_JAVA_OPTS=-Xms512m -Xmx512m
-#    depends_on:
-#      - opensearch
-#      - postgres
-#
+volumes:
+  atlas_config:
