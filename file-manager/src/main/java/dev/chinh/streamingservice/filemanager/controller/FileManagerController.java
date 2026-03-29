@@ -42,6 +42,17 @@ public class FileManagerController {
         return ResponseEntity.ok(fileService.findFilesInDirectory(getParentInfo, id, page, sortBy, sortOrder));
     }
 
+    public record SearchFilesRequest(
+            @NotBlank @Size(max = 30) String parentId,
+            @NotBlank @Size(max = 300) String searchString,
+            boolean isRecursive,
+            int page
+    ) {}
+    @PostMapping("/search")
+    public ResponseEntity<?> searchFiles(@Valid @RequestBody SearchFilesRequest request) {
+        return ResponseEntity.ok(fileService.searchFileByName(request.parentId, request.searchString, request.isRecursive, request.page));
+    }
+
 
     @PostMapping("/vid/{fileId}")
     public ResponseEntity<?> addFileAsVideo(@PathVariable String fileId) {

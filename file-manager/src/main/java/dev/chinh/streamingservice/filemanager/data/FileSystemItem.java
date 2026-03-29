@@ -61,8 +61,7 @@ public class FileSystemItem {
     private String parentId;
 
     @Field(FileItemField.PATH)
-    @Indexed
-    private String path;
+    private String path; // format: /rootId/parent1Id/parentId/
 
     @Field(FileItemField.FILE_TYPE)
     private FileType fileType;

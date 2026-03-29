@@ -16,6 +16,7 @@ import dev.chinh.streamingservice.filemanager.data.FolderLocks;
 import dev.chinh.streamingservice.filemanager.event.FileEventProducer;
 import dev.chinh.streamingservice.filemanager.repository.FileSystemRepository;
 import lombok.RequiredArgsConstructor;
+import org.bson.Document;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
@@ -24,6 +25,8 @@ import org.springframework.data.domain.*;
 import org.springframework.data.mongodb.MongoTransactionException;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -108,6 +111,39 @@ public class FileService {
             sort = sort.and(Sort.by(sortOrder, ContentMetaData.RESOLUTION + "." + ContentMetaData.WIDTH));
         }
         return PageRequest.of(page, pageSize, sort);
+    }
+
+    public FileSearchResult searchFileByName(String parentId, String fileName, boolean isRecursive, int page) {
+        FileSystemItem parent = getFileSystemItem(parentId);
+
+        List<AggregationOperation> stages = new ArrayList<>();
+
+        String indexName = "fileNameSearchIndex";
+        Document searchDoc = new Document("$search", new Document("index", indexName)
+                .append("wildcard", new Document("query", "*" + fileName + "*")
+                        .append("path", FileItemField.NAME)
+                        .append("allowAnalyzedField", true)
+                )
+        );
+        stages.add(context -> searchDoc);
+
+        if (isRecursive) {
+            String pathPrefix = "^" + Pattern.quote(parent.getPath() + parent.getId() + "/");
+            stages.add(Aggregation.match(Criteria.where(FileItemField.PATH).regex(pathPrefix)));
+        } else {
+            stages.add(Aggregation.match(Criteria.where(FileItemField.PARENT_ID).is(parent.getId())));
+        }
+
+        final int size = 50;
+        long skipCount = (long) page * size;
+
+        stages.add(Aggregation.skip(skipCount));
+
+        stages.add(Aggregation.limit(size));
+
+        Aggregation aggregation = Aggregation.newAggregation(stages);
+        List<FileSystemItem> results = mongoTemplate.aggregate(aggregation, "fs_metadata", FileSystemItem.class).getMappedResults();
+        return new FileSearchResult(null, null, results, null, results.size() == size);
     }
 
 
