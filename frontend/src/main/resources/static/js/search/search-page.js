@@ -836,7 +836,7 @@ function displaySearchItems(searchItems) {
                 resolve(imgElement);
             };
             imgElement.onerror = () => {
-                reject(new Error(`Failed to load image: ${src}`));
+                reject(null);
             };
             // start fetching the image data
             imgElement.src = src;
@@ -847,9 +847,9 @@ function displaySearchItems(searchItems) {
         let itemContainer;
         if (item.thumbnail != null && !item.thumbnail.endsWith('null')) {
             const loadedImage = document.createElement('img');
-            await loadImage(loadedImage, item.thumbnail);
+            const result = await loadImage(loadedImage, item.thumbnail);
 
-            const horizontal = loadedImage.naturalWidth >= loadedImage.naturalHeight;
+            const horizontal = result == null ? true : loadedImage.naturalWidth >= loadedImage.naturalHeight;
             itemContainer = (horizontal) ? helperCloneAndUnHideNode(horizontalItemTem)
                 : helperCloneAndUnHideNode(verticalItemTem);
             const itemNodeImg = itemContainer.querySelector('img');
