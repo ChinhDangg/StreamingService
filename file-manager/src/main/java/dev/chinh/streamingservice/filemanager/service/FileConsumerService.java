@@ -20,6 +20,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
@@ -34,6 +35,7 @@ public class FileConsumerService {
     private final DirectoryCacheService directoryCacheService;
     private final ApplicationEventPublisher publisher;
 
+    @Transactional
     public void handleCreateFile(MediaUpdateEvent.FileCreated event) {
         String rootId = fileService.getROOT_FOLDER_ID();
         StringBuilder currentPath = new StringBuilder("/" + rootId + "/");
@@ -69,7 +71,7 @@ public class FileConsumerService {
         }
 
         if (event.mediaId() != null && event.mediaType() != null) {
-            publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
+            publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_OBJECT_TOPIC,
                     new MediaUpdateEvent.MediaEnriched(
                             event.userId(),
@@ -85,6 +87,7 @@ public class FileConsumerService {
         }
     }
 
+    @Transactional
     public void handleDirectoryToMedia(MediaUpdateEvent.DirectoryToMediaInitiated event) {
         FileSystemItem item = fileService.findById(event.userId(), event.fileId());
         if (item == null) {
@@ -119,7 +122,7 @@ public class FileConsumerService {
         skip += batch.size();
 
         if (hasMore) {
-            publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
+            publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_FILE_TOPIC,
                     new MediaUpdateEvent.DirectoryToMediaInitiated(
                             event.userId(), event.fileId(), event.mediaId(), event.mediaType(), event.searchable(), false, event.thumbnailObject(), size, skip)
@@ -143,13 +146,14 @@ public class FileConsumerService {
                 update,
                 FileSystemItem.class);
 
-        publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
+        publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_OBJECT_TOPIC,
                 new MediaUpdateEvent.MediaEnriched(
                         event.userId(), item.getId(), event.mediaId(), event.mediaType(), event.thumbnailObject(), event.searchable(), size, skip)
         ));
     }
 
+    @Transactional
     public void handleNestedDirectoryToMedia(MediaUpdateEvent.NestedDirectoryToMediaInitiated event) {
         FileSystemItem item = fileService.findById(event.userId(), event.fileId());
         if (item == null) {
@@ -174,7 +178,7 @@ public class FileConsumerService {
         List<FileSystemItem> directChildren = mongoTemplate.find(query, FileSystemItem.class);
         for (FileSystemItem child : directChildren) {
             if (child.getFileType() == FileType.DIR) {
-                publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
+                publisher.publishEvent(new FileEventProducer.EventWrapper(
                         EventTopics.MEDIA_UPLOAD_TOPIC,
                         new MediaUpdateEvent.FileToMediaInitiated(
                                 event.userId(),
@@ -191,7 +195,7 @@ public class FileConsumerService {
         skip += directChildren.size();
 
         if (hasMore) {
-            publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
+            publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_FILE_TOPIC,
                     new MediaUpdateEvent.NestedDirectoryToMediaInitiated(
                             event.userId(), item.getId(), event.mediaId(), event.parentType(), event.childType(), event.childSearchable(), event.thumbnailObject(), skip)
@@ -199,13 +203,14 @@ public class FileConsumerService {
             return;
         }
 
-        publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
+        publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_OBJECT_TOPIC,
                 new MediaUpdateEvent.MediaEnriched(
                         event.userId(), item.getId(), event.mediaId(), event.parentType(), event.thumbnailObject(), true, -1, skip)
         ));
     }
 
+    @Transactional
     public UpdateResult handleCompleteFileToMedia(MediaUpdateEvent.MediaCreatedReady event) {
         return fileService.updateFileMetadataAsMedia(
                 event.userId(),
@@ -219,6 +224,7 @@ public class FileConsumerService {
         );
     }
 
+    @Transactional
     public void handleInitiateUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdateInitiated event) {
         FileSystemItem item = fileService.findByMId(event.userId(), event.mediaId());
         if (item == null) {
@@ -244,7 +250,7 @@ public class FileConsumerService {
             bucket = numItem.getBucket();
         }
 
-        publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
+        publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_OBJECT_TOPIC,
                 new MediaUpdateEvent.MediaThumbnailUpdated(
                         event.userId(),
@@ -256,6 +262,7 @@ public class FileConsumerService {
         ));
     }
 
+    @Transactional
     public void handleUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdatedReady event) {
         Query query = Query.query(Criteria.where(FileItemField.MEDIA_ID).is(event.mediaId()));
         Update update = new Update()
@@ -263,6 +270,7 @@ public class FileConsumerService {
         mongoTemplate.updateFirst(query, update, FileSystemItem.class);
     }
 
+    @Transactional
     public void handleDeleteFile(MediaUpdateEvent.FileDeleted event) {
         FileSystemItem fileItem = fileService.findById(event.userId(), event.fileId());
         if (fileItem == null) {
@@ -283,7 +291,8 @@ public class FileConsumerService {
         deleteFile(fileItem);
     }
 
-    private void deleteFile(FileSystemItem fileItem) {
+    @Transactional
+    protected void deleteFile(FileSystemItem fileItem) {
         boolean hasMore = !FileType.isNotDir(fileItem.getFileType());
 
         int batchSize = 500;
@@ -303,7 +312,7 @@ public class FileConsumerService {
                     toDelete.computeIfAbsent(ContentMetaData.THUMBNAIL_BUCKET, _ -> new ArrayList<>()).add(item.getThumbnail());
             }
             for (Map.Entry<String, List<String>> entry : toDelete.entrySet()) {
-                publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
+                publisher.publishEvent(new FileEventProducer.EventWrapper(
                         EventTopics.MEDIA_OBJECT_TOPIC,
                         new MediaUpdateEvent.ObjectDeleted(entry.getKey(), entry.getValue())
                 ));
@@ -313,17 +322,18 @@ public class FileConsumerService {
         }
 
         mongoTemplate.remove(new Query(Criteria.where("id").is(fileItem.getId())), FileSystemItem.class);
-        publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
+        publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_OBJECT_TOPIC,
                 new MediaUpdateEvent.ObjectDeleted(fileItem.getBucket(), Collections.singletonList(fileItem.getObjectName()))
         ));
         if (fileItem.getThumbnail() != null)
-            publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
+            publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_OBJECT_AND_BACKUP_TOPIC,
                     new MediaUpdateEvent.ThumbnailDeleted(fileItem.getThumbnail())
             ));
     }
 
+    @Transactional
     public void handleMoveDirectory(String userId, String fileId, String newParentId, String oldPath) {
         FileSystemItem item = fileService.findById(userId, fileId);
         if (item == null) {
