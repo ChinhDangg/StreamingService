@@ -73,7 +73,7 @@ public class ThumbnailService {
             if (!mediaDescription.hasThumbnail())
                 continue;
 
-            String thumbnailFileName = getThumbnailPath(getThumbnailOutputParentPath(userId), mediaDescription.getId(), mediaDescription.getThumbnail());
+            String thumbnailFileName = getThumbnailPath(userId, mediaDescription.getId(), mediaDescription.getThumbnail());
             shortThumbnailInfoList.add(new ShortThumbnailInfo(thumbnailFileName, mediaDescription.getThumbnail()));
         }
         return getThumbnailImagesAsAlbumUrlInfo(shortThumbnailInfoList);
@@ -85,7 +85,7 @@ public class ThumbnailService {
             if (mediaNameEntry.getThumbnail() == null)
                 continue;
 
-            String thumbnailFileName = getThumbnailPath(getThumbnailOutputParentPath(userId), mediaNameEntry.getName(), mediaNameEntry.getThumbnail());
+            String thumbnailFileName = getThumbnailPath(userId, mediaNameEntry.getName(), mediaNameEntry.getThumbnail());
             shortThumbnailInfoList.add(new ShortThumbnailInfo(thumbnailFileName, mediaNameEntry.getThumbnail()));
         }
         return getThumbnailImagesAsAlbumUrlInfo(shortThumbnailInfoList);
@@ -103,7 +103,7 @@ public class ThumbnailService {
 
             pathList.add(info.thumbnailObject);
 
-            String urlString = "/chunks" + info.thumbnailName;
+            String urlString = "/chunks" + getThumbnailUrlParentPath() + "/" + info.thumbnailName;
             albumUrlList.add(urlString);
         }
         return new AlbumUrlInfo(albumUrlList, List.of(ContentMetaData.THUMBNAIL_BUCKET), pathList);

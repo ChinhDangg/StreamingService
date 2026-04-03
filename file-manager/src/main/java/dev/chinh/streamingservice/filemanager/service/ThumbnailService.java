@@ -67,7 +67,7 @@ public class ThumbnailService {
             String thumbnail = item.getThumbnail() == null ? item.getObjectName() : item.getThumbnail();
             fullUrlList.add(getThumbnailPath(getThumbnailParentPath(), id, thumbnail));
 
-            shortFileInfoList.add(new ShortFileInfo(getThumbnailPath(getThumbnailOutputParentPath(userId), id, thumbnail), item.getThumbnail(), item.getBucket(), item.getObjectName()));
+            shortFileInfoList.add(new ShortFileInfo(getThumbnailPath(userId, id, thumbnail), item.getThumbnail(), item.getBucket(), item.getObjectName()));
         }
 
         // Batch check existence in Redis (The Pipeline)
@@ -90,7 +90,7 @@ public class ThumbnailService {
                 pathList.add(item.objectName);
                 buckets.add(item.bucket);
             }
-            String urlString = "/chunks" + item.thumbnailName;
+            String urlString = "/chunks" + getThumbnailParentPath() + "/" + item.thumbnailName;
             urlList.add(urlString);
         }
         return new AlbumUrlInfo(urlList, buckets, pathList, fullUrlList);
