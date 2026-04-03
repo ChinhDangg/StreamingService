@@ -354,6 +354,7 @@ public class FileService {
         if (itemWithNameExists(userId, parentId, newFolderName))
             throw new IllegalArgumentException("Folder already exists: " + newFolderName);
         FileSystemItem item = FileSystemItem.builder()
+                .userId(Long.parseLong(userId))
                 .parentId(parentId)
                 .path(parent.getPath() + parentId + "/")
                 .fileType(FileType.DIR)
@@ -689,9 +690,18 @@ public class FileService {
     }
 
     public FileSystemItem findById(String userId, String id) {
+        if (id.equals(getROOT_FOLDER_ID()))
+            return getRootDirectoryItem();
         Query query = new Query(Criteria
                 .where(FileItemField.USER_ID).is(Long.parseLong(userId))
                 .and("id").is(id)
+        );
+        return mongoTemplate.findOne(query, FileSystemItem.class);
+    }
+
+    public FileSystemItem getRootDirectoryItem() {
+        Query query = new Query(Criteria
+                .where("id").is(getROOT_FOLDER_ID())
         );
         return mongoTemplate.findOne(query, FileSystemItem.class);
     }
