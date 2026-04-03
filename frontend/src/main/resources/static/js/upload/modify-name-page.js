@@ -198,8 +198,8 @@ function initializeModifyActionButtons() {
     });
     document.getElementById('saveBtn').addEventListener('click', async () => {
         const name = entityNameInput.value.trim();
-        if (name.length < 3) {
-            showWarningMessage('Name must be at least 3 characters');
+        if (name.length < 2) {
+            showWarningMessage('Name must be at least 2 characters');
             return;
         }
         if (name.length > 200) {
