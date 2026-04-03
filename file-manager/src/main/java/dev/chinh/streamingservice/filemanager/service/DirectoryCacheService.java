@@ -74,6 +74,7 @@ public class DirectoryCacheService {
 
         // setOnInsert to create if not exists
         Update update = new Update()
+                .setOnInsert(FileItemField.USER_ID, Long.parseLong(userId))
                 .setOnInsert(FileItemField.NAME, name)
                 .setOnInsert(FileItemField.PARENT_ID, parentId)
                 .setOnInsert(FileItemField.PATH, currentPath)
