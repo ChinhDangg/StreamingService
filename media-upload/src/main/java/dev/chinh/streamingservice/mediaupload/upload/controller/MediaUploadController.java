@@ -24,8 +24,8 @@ public class MediaUploadController {
     public record InitiateMultipartUploadRequest(@Size(max = 100) String sessionId) {}
 
     @PostMapping("/initiate")
-    public String initiateUpload(@RequestBody InitiateMultipartUploadRequest request) {
-        return mediaUploadService.initiateMultipartUploadRequest(request.sessionId);
+    public String initiateUpload(@RequestBody InitiateMultipartUploadRequest request, @AuthenticationPrincipal Jwt jwt) {
+        return mediaUploadService.initiateMultipartUploadRequest(jwt.getSubject(), request.sessionId);
     }
 
     public record PresignUploadRequest(
@@ -50,12 +50,12 @@ public class MediaUploadController {
 
     @PostMapping("/end-session-video")
     public ResponseEntity<Long> endSession(@RequestBody EndSessionRequest request, @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok().body(mediaUploadService.saveAsVideoMedia(request.uploadId, request.basicInfo, request.uploadedParts, request.nameUpdateList, jwt.getSubject(), request.isLast));
+        return ResponseEntity.ok().body(mediaUploadService.saveAsVideoMedia( jwt.getSubject(), request.uploadId, request.basicInfo, request.uploadedParts, request.nameUpdateList, request.isLast));
     }
 
     @PostMapping("/end-session-file")
     public ResponseEntity<Void> endSessionFile(@RequestBody @Valid EndSessionRequest request, @AuthenticationPrincipal Jwt jwt) {
-        mediaUploadService.saveFile(request.uploadId, request.uploadedParts, jwt.getSubject(), request.isLast);
+        mediaUploadService.saveFile(jwt.getSubject(), request.uploadId, request.uploadedParts, request.isLast);
         return ResponseEntity.ok().build();
     }
 

@@ -31,7 +31,7 @@ public class MediaObjectService {
 
     @Transactional
     public void handleMediaEnrich(MediaUpdateEvent.MediaEnriched event) throws Exception {
-        MediaMetaData mediaMetaData = getMediaMetadataById(event.mediaId());
+        MediaMetaData mediaMetaData = getMediaMetadataById(Long.parseLong(event.userId()), event.mediaId());
         if (event.mediaType() == MediaType.VIDEO) {
             VideoMetadata videoMetadata = mediaProbe.parseMediaMetadata(mediaProbe.probeMediaInfo(mediaMetaData.getBucket(), mediaMetaData.getKey()), VideoMetadata.class);
             mediaMetaData.setFrameRate(videoMetadata.frameRate());
@@ -71,6 +71,7 @@ public class MediaObjectService {
         eventPublisher.publishEvent(new MediaObjectEventProducer.EventWrapper(
                 topic,
                 new MediaUpdateEvent.MediaCreatedReady(
+                        event.userId(),
                         event.fileId(),
                         event.mediaId(),
                         event.mediaType(),
@@ -93,7 +94,7 @@ public class MediaObjectService {
 
     @Transactional
     public void handleUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdated event) throws Exception {
-        MediaMetaData mediaMetaData = getMediaMetadataById(event.mediaId());
+        MediaMetaData mediaMetaData = getMediaMetadataById(Long.parseLong(event.userId()), event.mediaId());
 
         boolean sameName = event.thumbnailObject().equals(mediaMetaData.getThumbnail());
 
@@ -120,7 +121,7 @@ public class MediaObjectService {
         } else if (!sameName) {
             minIOService.removeFile(event.bucket(), mediaMetaData.getThumbnail());
 
-            mediaMetaDataRepository.updateMediaThumbnail(mediaMetaData.getId(), event.thumbnailObject());
+            mediaMetaDataRepository.updateMediaThumbnail(Long.parseLong(event.userId()), mediaMetaData.getId(), event.thumbnailObject());
         }
 
         String topic = sameName ? EventTopics.MEDIA_BACKUP_TOPIC : EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC;
@@ -135,8 +136,8 @@ public class MediaObjectService {
     }
 
 
-    private MediaMetaData getMediaMetadataById(long id) {
-        return mediaMetaDataRepository.findById(id).orElseThrow(
+    private MediaMetaData getMediaMetadataById(long userId, long id) {
+        return mediaMetaDataRepository.findByUserIdAndId(userId, id).orElseThrow(
                 () -> new IllegalArgumentException("Media not found: " + id)
         );
     }

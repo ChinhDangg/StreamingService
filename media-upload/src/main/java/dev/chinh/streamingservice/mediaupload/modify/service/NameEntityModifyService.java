@@ -16,6 +16,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,49 +31,60 @@ public class NameEntityModifyService {
     private final MinIOService minIOService;
     private final ApplicationEventPublisher eventPublisher;
 
-    public void incrementNameEntityLengthCount(MediaNameEntityConstant nameEntityConstant, long nameEntityId) {
-        int updated = switch (nameEntityConstant) {
-            case MediaNameEntityConstant.AUTHORS -> mediaAuthorRepository.incrementLength(nameEntityId);
-            case MediaNameEntityConstant.CHARACTERS -> mediaCharacterRepository.incrementLength(nameEntityId);
-            case MediaNameEntityConstant.UNIVERSES -> mediaUniverseRepository.incrementLength(nameEntityId);
-            case MediaNameEntityConstant.TAGS -> mediaTagRepository.incrementLength(nameEntityId);
+    public Long[] getMediaNameEntityIdByUserIdAndIdIn(long userId, List<Long> ids, MediaNameEntityConstant nameEntity) {
+        List<Long> result = switch (nameEntity) {
+            case MediaNameEntityConstant.AUTHORS -> mediaAuthorRepository.findIdByUserIdAndIdIn(userId, ids);
+            case MediaNameEntityConstant.CHARACTERS -> mediaCharacterRepository.findIdByUserIdAndIdIn(userId, ids);
+            case MediaNameEntityConstant.UNIVERSES -> mediaUniverseRepository.findIdByUserIdAndIdIn(userId, ids);
+            case MediaNameEntityConstant.TAGS -> mediaTagRepository.findIdByUserIdAndIdIn(userId, ids);
         };
-        if (updated == 0) throw new ResourceNotFoundException("No " + nameEntityConstant.getName() + " entry found with id: " + nameEntityId);
+        return result.toArray(new Long[0]);
     }
 
-    public void decrementNameEntityLengthCount(MediaNameEntityConstant nameEntityConstant, long nameEntityId) {
+    public void incrementEntityLengthCount(long userId, Long[] nameEntityIds, MediaNameEntityConstant nameEntityConstant) {
         int updated = switch (nameEntityConstant) {
-            case MediaNameEntityConstant.AUTHORS -> mediaAuthorRepository.decrementLength(nameEntityId);
-            case MediaNameEntityConstant.CHARACTERS -> mediaCharacterRepository.decrementLength(nameEntityId);
-            case MediaNameEntityConstant.UNIVERSES -> mediaUniverseRepository.decrementLength(nameEntityId);
-            case MediaNameEntityConstant.TAGS -> mediaTagRepository.decrementLength(nameEntityId);
+            case MediaNameEntityConstant.AUTHORS -> mediaAuthorRepository.incrementLength(userId, nameEntityIds);
+            case MediaNameEntityConstant.CHARACTERS -> mediaCharacterRepository.incrementLength(userId, nameEntityIds);
+            case MediaNameEntityConstant.UNIVERSES -> mediaUniverseRepository.incrementLength(userId, nameEntityIds);
+            case MediaNameEntityConstant.TAGS -> mediaTagRepository.incrementLength(userId, nameEntityIds);
         };
-        if (updated == 0) throw new ResourceNotFoundException("No " + nameEntityConstant.getName() + " entry found with id: " + nameEntityId);
+        if (updated == 0) throw new ResourceNotFoundException("No " + nameEntityConstant.getName() + " entry found with id: " + Arrays.toString(nameEntityIds));
+    }
+
+    public void decrementNameEntityLengthCount(long userId, Long[] nameEntityIds, MediaNameEntityConstant nameEntityConstant) {
+        int updated = switch (nameEntityConstant) {
+            case MediaNameEntityConstant.AUTHORS -> mediaAuthorRepository.decrementLength(userId, nameEntityIds);
+            case MediaNameEntityConstant.CHARACTERS -> mediaCharacterRepository.decrementLength(userId, nameEntityIds);
+            case MediaNameEntityConstant.UNIVERSES -> mediaUniverseRepository.decrementLength(userId, nameEntityIds);
+            case MediaNameEntityConstant.TAGS -> mediaTagRepository.decrementLength(userId, nameEntityIds);
+        };
+        if (updated == 0) throw new ResourceNotFoundException("No " + nameEntityConstant.getName() + " entry found with id: " + Arrays.toString(nameEntityIds));
     }
 
 
     @Transactional
-    public void addAuthor(String name) {
-        addNameEntity(name, MediaNameEntityConstant.AUTHORS, new MediaAuthor(name), mediaAuthorRepository);
+    public void addAuthor(String userId, String name) {
+        addNameEntity(userId, name, MediaNameEntityConstant.AUTHORS, new MediaAuthor(Long.parseLong(userId), name), mediaAuthorRepository);
     }
 
     @Transactional
-    public void addCharacter(NameAndThumbnailPostRequest request) {
-        addNameEntity(request, MediaNameEntityConstant.CHARACTERS, new MediaCharacter(request.getName()), mediaCharacterRepository);
+    public void addCharacter(String userId, NameAndThumbnailPostRequest request) {
+        addNameEntity(userId, request, MediaNameEntityConstant.CHARACTERS, new MediaCharacter(Long.parseLong(userId), request.getName()), mediaCharacterRepository);
     }
 
     @Transactional
-    public void addUniverse(NameAndThumbnailPostRequest request) {
-        addNameEntity(request, MediaNameEntityConstant.UNIVERSES, new MediaUniverse(request.getName()), mediaUniverseRepository);
+    public void addUniverse(String userId, NameAndThumbnailPostRequest request) {
+        addNameEntity(userId, request, MediaNameEntityConstant.UNIVERSES, new MediaUniverse(Long.parseLong(userId), request.getName()), mediaUniverseRepository);
     }
 
     @Transactional
-    public void addTag(String name) {
-        addNameEntity(name, MediaNameEntityConstant.TAGS, new MediaTag(name), mediaTagRepository);
+    public void addTag(String userId, String name) {
+        addNameEntity(userId, name, MediaNameEntityConstant.TAGS, new MediaTag(Long.parseLong(userId), name), mediaTagRepository);
     }
 
     @Transactional
-    protected <T extends MediaNameEntity> void addNameEntity(String name,
+    protected <T extends MediaNameEntity> void addNameEntity(String userId,
+                                                             String name,
                                                              MediaNameEntityConstant mediaNameEntityConstant,
                                                              T mediaNameEntity,
                                                              MediaNameEntityRepository<T, Long> repository) {
@@ -83,10 +95,9 @@ public class NameEntityModifyService {
             T added = repository.save(mediaNameEntity);
             long id = added.getId();
 
-
             eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     EventTopics.MEDIA_SEARCH_TOPIC,
-                    new MediaUpdateEvent.NameEntityCreated(mediaNameEntityConstant, id, null)
+                    new MediaUpdateEvent.NameEntityCreated(userId, mediaNameEntityConstant, id, null)
             ));
         } catch (DataIntegrityViolationException e) {
             throw new IllegalArgumentException("Name already exists: " + name);
@@ -94,7 +105,8 @@ public class NameEntityModifyService {
     }
 
     @Transactional
-    protected <T extends MediaNameEntityWithThumbnail> void addNameEntity(NameAndThumbnailPostRequest request,
+    protected <T extends MediaNameEntityWithThumbnail> void addNameEntity(String userId,
+                                                                          NameAndThumbnailPostRequest request,
                                                                           MediaNameEntityConstant mediaNameEntityConstant,
                                                                           T mediaNameEntity,
                                                                           MediaNameEntityRepository<T, Long> repository) {
@@ -111,7 +123,7 @@ public class NameEntityModifyService {
                 String extension = request.getThumbnail().getOriginalFilename() == null ? ".jpg"
                         : request.getThumbnail().getOriginalFilename().substring(request.getThumbnail().getOriginalFilename().lastIndexOf("."));
 
-                thumbnailPath = createNameEntityThumbnail(mediaNameEntityConstant, id, extension);
+                thumbnailPath = createNameEntityThumbnail(userId, mediaNameEntityConstant, id, extension);
 
                 minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, thumbnailPath, request.getThumbnail());
             }
@@ -125,7 +137,7 @@ public class NameEntityModifyService {
                     : EventTopics.MEDIA_SEARCH_TOPIC;
             eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     topic,
-                    new MediaUpdateEvent.NameEntityCreated(mediaNameEntityConstant, id, thumbnailPath)
+                    new MediaUpdateEvent.NameEntityCreated(userId, mediaNameEntityConstant, id, thumbnailPath)
             ));
         } catch (Exception e) {
             try {
@@ -145,30 +157,30 @@ public class NameEntityModifyService {
 
 
     @Transactional
-    public void updateAuthor(long id, String name) {
-        updateNameEntity(id, name, MediaNameEntityConstant.AUTHORS, mediaAuthorRepository);
+    public void updateAuthor(String userId, long id, String name) {
+        updateNameEntity(userId, id, name, MediaNameEntityConstant.AUTHORS, mediaAuthorRepository);
     }
 
     @Transactional
-    public void updateCharacter(long id, NameAndThumbnailPostRequest request) {
-        updateNameEntity(id, request, MediaNameEntityConstant.CHARACTERS, mediaCharacterRepository);
+    public void updateCharacter(String userId, long id, NameAndThumbnailPostRequest request) {
+        updateNameEntity(userId, id, request, MediaNameEntityConstant.CHARACTERS, mediaCharacterRepository);
     }
 
     @Transactional
-    public void updateUniverse(long id, NameAndThumbnailPostRequest request) {
-        updateNameEntity(id, request, MediaNameEntityConstant.UNIVERSES, mediaUniverseRepository);
+    public void updateUniverse(String userId, long id, NameAndThumbnailPostRequest request) {
+        updateNameEntity(userId, id, request, MediaNameEntityConstant.UNIVERSES, mediaUniverseRepository);
     }
 
     @Transactional
-    public void updateTag(long id, String name) {
-        updateNameEntity(id, name, MediaNameEntityConstant.TAGS, mediaTagRepository);
+    public void updateTag(String userId, long id, String name) {
+        updateNameEntity(userId, id, name, MediaNameEntityConstant.TAGS, mediaTagRepository);
     }
 
     @Transactional
-    protected <T extends MediaNameEntity> void updateNameEntity(long id, String name,
+    protected <T extends MediaNameEntity> void updateNameEntity(String userId, long id, String name,
                                                                 MediaNameEntityConstant mediaNameEntityConstant,
                                                                 MediaNameEntityRepository<T, Long> repository) {
-        T nameEntity = findById(id, mediaNameEntityConstant, repository);
+        T nameEntity = findByIdAndUserId(Long.parseLong(userId), id, mediaNameEntityConstant, repository);
         name = validateNameEntity(name);
         if (nameEntity.getName().equals(name))
             return;
@@ -182,18 +194,18 @@ public class NameEntityModifyService {
 
         eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_SEARCH_TOPIC,
-                new MediaUpdateEvent.NameEntityUpdated(mediaNameEntityConstant, id, null, null)
+                new MediaUpdateEvent.NameEntityUpdated(userId, mediaNameEntityConstant, id, null, null)
         ));
     }
 
     @Transactional
-    protected <T extends MediaNameEntityWithThumbnail> void updateNameEntity(long id, NameAndThumbnailPostRequest request,
+    protected <T extends MediaNameEntityWithThumbnail> void updateNameEntity(String userId, long id, NameAndThumbnailPostRequest request,
                                                                              MediaNameEntityConstant mediaNameEntityConstant,
                                                                              MediaNameEntityRepository<T, Long> repository) {
         if (request.getThumbnail() == null && (request.getName() == null || request.getName().isBlank()))
             throw new IllegalArgumentException("No name or thumbnail provided");
 
-        T nameEntity = findById(id, mediaNameEntityConstant, repository);
+        T nameEntity = findByIdAndUserId(Long.parseLong(userId), id, mediaNameEntityConstant, repository);
         String oldName = nameEntity.getName();
         String newName = request.getName() == null ? oldName : validateNameEntity(request.getName());
 
@@ -209,7 +221,7 @@ public class NameEntityModifyService {
 
                 newThumbnailPath = oldThumbnailPath.endsWith(extension)
                         ? oldThumbnailPath
-                        : createNameEntityThumbnail(mediaNameEntityConstant, id, extension);
+                        : createNameEntityThumbnail(userId, mediaNameEntityConstant, id, extension);
                 minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnailPath, request.getThumbnail());
             }
         } catch (Exception e) {
@@ -235,7 +247,7 @@ public class NameEntityModifyService {
                         : EventTopics.MEDIA_SEARCH_TOPIC;
                 eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                         topic,
-                        new MediaUpdateEvent.NameEntityUpdated(mediaNameEntityConstant, id, oldThumbnailPath, newThumbnailPath)
+                        new MediaUpdateEvent.NameEntityUpdated(userId, mediaNameEntityConstant, id, oldThumbnailPath, newThumbnailPath)
                 ));
                 if (thumbnailChanged)
                     eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
@@ -256,35 +268,35 @@ public class NameEntityModifyService {
         }
     }
 
-    private String createNameEntityThumbnail(MediaNameEntityConstant name, long id, String extension) {
-        return name + "/" + id + "_" + UUID.randomUUID() + extension;
+    private String createNameEntityThumbnail(String userId, MediaNameEntityConstant name, long id, String extension) {
+        return userId + "/" + name + "/" + id + "_" + UUID.randomUUID() + extension;
     }
 
 
     @Transactional
-    public void deleteAuthor(long id) {
-        deleteNameEntity(id, MediaNameEntityConstant.AUTHORS, mediaAuthorRepository);
+    public void deleteAuthor(String userId, long id) {
+        deleteNameEntity(userId, id, MediaNameEntityConstant.AUTHORS, mediaAuthorRepository);
     }
 
     @Transactional
-    public void deleteCharacter(long id) {
-        deleteNameEntityWithThumbnail(id, MediaNameEntityConstant.CHARACTERS, mediaCharacterRepository);
+    public void deleteCharacter(String userId, long id) {
+        deleteNameEntityWithThumbnail(userId, id, MediaNameEntityConstant.CHARACTERS, mediaCharacterRepository);
     }
 
     @Transactional
-    public void deleteUniverse(long id) {
-        deleteNameEntityWithThumbnail(id, MediaNameEntityConstant.UNIVERSES, mediaUniverseRepository);
+    public void deleteUniverse(String userId, long id) {
+        deleteNameEntityWithThumbnail(userId, id, MediaNameEntityConstant.UNIVERSES, mediaUniverseRepository);
     }
 
     @Transactional
-    public void deleteTag(long id) {
-        deleteNameEntity(id, MediaNameEntityConstant.TAGS, mediaTagRepository);
+    public void deleteTag(String userId, long id) {
+        deleteNameEntity(userId, id, MediaNameEntityConstant.TAGS, mediaTagRepository);
     }
 
     // to be used locally for check
     @Transactional
-    protected <T extends MediaNameEntity> void deleteNameEntity(long id, MediaNameEntityConstant mediaNameEntityConstant, MediaNameEntityRepository<T, Long> repository) {
-        repository.deleteById(id);
+    protected <T extends MediaNameEntity> void deleteNameEntity(String userId, long id, MediaNameEntityConstant mediaNameEntityConstant, MediaNameEntityRepository<T, Long> repository) {
+        repository.deleteByIdAndUserId(id, Long.parseLong(userId));
 
         eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_SEARCH_TOPIC,
@@ -293,9 +305,9 @@ public class NameEntityModifyService {
     }
 
     @Transactional
-    protected <T extends MediaNameEntityWithThumbnail> void deleteNameEntityWithThumbnail(long id, MediaNameEntityConstant mediaNameEntityConstant,
+    protected <T extends MediaNameEntityWithThumbnail> void deleteNameEntityWithThumbnail(String userId, long id, MediaNameEntityConstant mediaNameEntityConstant,
                                                                                           MediaNameEntityRepository<T, Long> repository) {
-        T nameEntity = findById(id, mediaNameEntityConstant, repository);
+        T nameEntity = findByIdAndUserId(Long.parseLong(userId), id, mediaNameEntityConstant, repository);
 
         String thumbnailPath = nameEntity.getThumbnail();
 
@@ -316,8 +328,8 @@ public class NameEntityModifyService {
     }
 
 
-    private <T extends MediaNameEntity> T findById(long id, MediaNameEntityConstant mediaNameEntityConstant, MediaNameEntityRepository<T, Long> repository) {
-        return repository.findById(id).orElseThrow(() ->
+    private <T extends MediaNameEntity> T findByIdAndUserId(long userId, long id, MediaNameEntityConstant mediaNameEntityConstant, MediaNameEntityRepository<T, Long> repository) {
+        return repository.findByIdAndUserId(id, userId).orElseThrow(() ->
                 new ResourceNotFoundException("No " + mediaNameEntityConstant.getName() + " entry found with id: " + id));
     }
 

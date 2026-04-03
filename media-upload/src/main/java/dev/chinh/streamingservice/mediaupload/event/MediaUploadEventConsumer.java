@@ -12,7 +12,6 @@ import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @AllArgsConstructor
@@ -37,7 +36,7 @@ public class MediaUploadEventConsumer {
         }
         System.out.println("Received delete media event: " + event.mediaId());
         try {
-            mediaMetadataModifyService.deleteMedia(event.mediaId());
+            mediaMetadataModifyService.deleteMedia(event.userId(), event.mediaId());
         } catch (Exception e) {
             System.err.println("Failed to delete media: " + event.mediaId());
             throw e;
@@ -53,7 +52,7 @@ public class MediaUploadEventConsumer {
                     System.err.println(error);
             } else {
                 // a grouper item is moved out of a grouper and not into another grouper - delete media info
-                mediaMetadataModifyService.deleteMedia(event.childMediaId());
+                mediaMetadataModifyService.deleteMedia(event.userId(), event.childMediaId());
             }
         } catch (Exception e) {
             System.err.println("Failed to move grouper item outside grouper: " + event.childMediaId());

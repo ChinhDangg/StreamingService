@@ -17,34 +17,51 @@ import java.util.Optional;
 @NoRepositoryBean
 public interface MediaNameEntityRepository<T extends MediaNameEntity, ID> extends JpaRepository<T, ID> {
 
-    @Query("SELECT e.name FROM #{#entityName} e WHERE LOWER(e.name) LIKE LOWER(CONCAT('%', :name, '%'))")
-    List<String> findNamesContaining(@Param("name") String name);
+    @Query("""
+        SELECT new dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO(e.id, e.name, e.length)
+        FROM #{#entityName} e
+        WHERE e.userId = :userId
+    """)
+    Page<NameEntityDTO> findAllNames(@Param("userId") long userId, Pageable pageable);
 
-    @Query("SELECT new dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO(e.id, e.name, e.length) FROM #{#entityName} e")
-    Page<NameEntityDTO> findAllNames(Pageable pageable);
+    @Query("""
+        SELECT e.id
+        FROM #{#entityName} e
+        WHERE e.userId = :userId
+            AND e.id IN :ids
+    """)
+    List<Long> findIdByUserIdAndIdIn(@Param("userId") long userId, @Param("ids") List<Long> ids);
 
-    @Query("SELECT e FROM #{#entityName} e WHERE LOWER(e.name) LIKE :name")
-    Optional<MediaNameEntity> findByName(String name);
+    Optional<T> findByIdAndUserId(ID id, long userId);
 
     @Modifying
     @Transactional
     @Query(value = """
         UPDATE #{#entityName} e
         SET e.length = e.length + 1
-        WHERE e.id = :id
+        WHERE e.id IN :ids
+            AND e.userId = :userId
     """)
-    int incrementLength(@Param("id") long id);
+    int incrementLength(@Param("userId") long userId, @Param("ids") Long[] ids);
 
     @Modifying
     @Transactional
     @Query(value = """
         UPDATE #{#entityName} e
         SET e.length = e.length - 1
-        WHERE e.id = :id
-          AND e.length > 0
+        WHERE e.id IN :ids
+            AND e.length > 0
+            AND e.userId = :userId
     """)
-    int decrementLength(@Param("id") long id);
+    int decrementLength(@Param("userId") long userId, @Param("ids") Long[] ids);
 
-    @Query("SELECT e.name FROM #{#entityName} e WHERE e.id = :id")
-    String getNameEntityNameById(@Param("id") long id);
+    @Query("""
+        SELECT e.name
+        FROM #{#entityName} e
+        WHERE e.id = :id
+            ANd e.userId = :userId
+    """)
+    String getNameEntityNameById(@Param("userId") long userId, @Param("id") long id);
+
+    void deleteByIdAndUserId(ID id, long userId);
 }

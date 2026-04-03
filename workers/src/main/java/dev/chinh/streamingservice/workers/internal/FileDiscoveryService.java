@@ -12,8 +12,9 @@ public class FileDiscoveryService {
     @GrpcClient("file-provider")
     private FileServiceGrpc.FileServiceBlockingStub fileStub;
 
-    public FileResponse listFiles(String id, int page) {
+    public FileResponse listFiles(String userId, String id, int page) {
         FileRequest request = FileRequest.newBuilder()
+                .setUserId(userId)
                 .setId(id)
                 .setPage(page)
                 .setSortBy("NAME")
@@ -23,8 +24,9 @@ public class FileDiscoveryService {
         return fileStub.findFilesInDirectory(request);
     }
 
-    public FileResponse findFileByMId(long mediaId) {
+    public FileResponse findFileByMId(String userId, long mediaId) {
         FileRequest request = FileRequest.newBuilder()
+                .setUserId(userId)
                 .setId(String.valueOf(mediaId))
                 .build();
 

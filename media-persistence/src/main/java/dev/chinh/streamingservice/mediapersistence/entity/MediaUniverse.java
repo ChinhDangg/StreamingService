@@ -13,7 +13,8 @@ import lombok.Setter;
 @Table(name = ContentMetaData.UNIVERSES)
 public class MediaUniverse extends MediaNameEntityWithThumbnail {
 
-    public MediaUniverse(String name) {
+    public MediaUniverse(long userId, String name) {
+        this.userId = userId;
         this.name = name;
     }
 }

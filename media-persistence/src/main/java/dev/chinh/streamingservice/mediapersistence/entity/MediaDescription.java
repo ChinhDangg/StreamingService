@@ -20,6 +20,10 @@ public abstract class MediaDescription implements MetaDataProvider {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     protected Long id;
 
+    @JsonProperty(ContentMetaData.USER_ID)
+    @Column(nullable = false)
+    protected Long userId;
+
     @JsonProperty(ContentMetaData.TITLE)
     @Column(nullable = false, columnDefinition = "TEXT")
     protected String title;

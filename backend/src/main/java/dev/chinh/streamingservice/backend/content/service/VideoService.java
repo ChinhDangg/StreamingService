@@ -30,38 +30,38 @@ public class VideoService extends MediaService {
         super(redisStringTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaSearchCacheService);
     }
 
-    public String getOriginalVideoUrl(long videoId) {
-        MediaDescription mediaDescription = getMediaDescription(videoId);
-        return minIOService.getRedirectObjectUrl(mediaDescription.getBucket(), mediaDescription.getKey());
+    public String getOriginalVideoUrl(String userId, long videoId) {
+        MediaDescription mediaDescription = getMediaDescription(userId, videoId);
+        return minIOService.getObjectUrl(mediaDescription.getBucket(), mediaDescription.getKey().substring(mediaDescription.getKey().indexOf("/") + 1));
     }
 
     @Transactional
-    public String getPreviewVideoUrl(long videoId) throws Exception {
-        MediaDescription mediaDescription = getMediaDescription(videoId);
+    public String getPreviewVideoUrl(String userId, long videoId) throws Exception {
+        MediaDescription mediaDescription = getMediaDescription(userId, videoId);
         if (mediaDescription.getPreview() != null) {
             return minIOService.getObjectUrl(ContentMetaData.PREVIEW, mediaDescription.getPreview());
         }
         String cacheJobId = getCachePreviewJobId(videoId);
         addCacheVideoLastAccess(cacheJobId, null);
         String previewName = "preview_" + mediaDescription.getKey();
-        MediaJobDescription jobDescription = getMediaJobDescription(mediaDescription, cacheJobId, null, "preview");
+        MediaJobDescription jobDescription = getMediaJobDescription(userId, mediaDescription, cacheJobId, null, "preview");
         jobDescription.setPreview(previewName);
         String status = addJobToFfmpegQueue(ffmpegQueueKey, cacheJobId, "result", jobDescription);
         if (Arrays.stream(MediaJobStatus.values()).noneMatch(s -> s.name().equals(status))) {
-            mediaRepository.updateMediaPreview(mediaDescription.getId(), previewName);
+            mediaRepository.updateMediaPreview(Long.parseLong(userId), mediaDescription.getId(), previewName);
         }
         return status;
     }
 
-    public String getPartialVideoUrl(long videoId, Resolution res) throws Exception {
+    public String getPartialVideoUrl(String userId, long videoId, Resolution res) throws Exception {
         if (res == Resolution.original)
-            return getOriginalVideoUrl(videoId);
+            return getOriginalVideoUrl(userId, videoId);
 
-        MediaDescription mediaDescription = getMediaDescription(videoId);
+        MediaDescription mediaDescription = getMediaDescription(userId, videoId);
 
         String cacheJobId = getCacheMediaJobId(videoId, res);
         addCacheVideoLastAccess(cacheJobId, null);
-        return addJobToFfmpegQueue(ffmpegQueueKey, cacheJobId, "result", getMediaJobDescription(mediaDescription, cacheJobId, res, "partial"));
+        return addJobToFfmpegQueue(ffmpegQueueKey, cacheJobId, "result", getMediaJobDescription(userId, mediaDescription, cacheJobId, res, "partial"));
     }
 
     public void addCacheVideoLastAccess(String videoId, Long expiry) {
@@ -74,8 +74,8 @@ public class VideoService extends MediaService {
     }
 
     @Override
-    protected MediaDescription getMediaDescription(long videoId) {
-        MediaDescription mediaDescription = super.getMediaDescription(videoId);
+    protected MediaDescription getMediaDescription(String userId, long videoId) {
+        MediaDescription mediaDescription = super.getMediaDescription(userId, videoId);
         if (mediaDescription.getMediaType() != MediaType.VIDEO)
             throw new IllegalArgumentException("Requested video media does not has key with id: " + videoId);
         return mediaDescription;

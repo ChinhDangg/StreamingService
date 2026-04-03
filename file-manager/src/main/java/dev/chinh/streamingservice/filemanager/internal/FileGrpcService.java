@@ -24,7 +24,7 @@ public class FileGrpcService extends FileServiceGrpc.FileServiceImplBase {
 
     @Override
     public void findFileByMId(FileRequest request, StreamObserver<FileResponse> responseObserver) {
-        FileSystemItem fileItem = fileService.findByMId(Long.parseLong(request.getId()));
+        FileSystemItem fileItem = fileService.findByMId(request.getUserId(), Long.parseLong(request.getId()));
         if (fileItem == null) {
             responseObserver.onError(Status.NOT_FOUND
                             .withDescription("File was not found with mID: " + request.getId())
@@ -45,6 +45,7 @@ public class FileGrpcService extends FileServiceGrpc.FileServiceImplBase {
     public void findFilesInDirectory(FileRequest request, StreamObserver<FileResponse> responseObserver) {
 
         Slice<FileSystemItem> slice = fileService.findFilesInDirectory(
+                request.getUserId(),
                 request.getId(),
                 request.getPage(),
                 SortBy.valueOf(request.getSortBy()),

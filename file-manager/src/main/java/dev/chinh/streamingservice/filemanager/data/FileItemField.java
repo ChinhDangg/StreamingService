@@ -3,6 +3,7 @@ package dev.chinh.streamingservice.filemanager.data;
 public class FileItemField {
 
     public static final String ID = "_id";
+    public static final String USER_ID = "uI";
     public static final String PARENT_ID = "pI";
     public static final String PATH = "pt";
     public static final String FILE_TYPE = "ft";

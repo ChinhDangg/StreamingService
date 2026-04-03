@@ -6,6 +6,7 @@ import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.common.exception.DuplicateEntryException;
+import dev.chinh.streamingservice.mediapersistence.repository.*;
 import dev.chinh.streamingservice.mediaupload.event.MediaUploadEventProducer;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaDisplayService;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaSearchCacheService;
@@ -14,8 +15,6 @@ import dev.chinh.streamingservice.mediaupload.upload.service.MinIOService;
 import dev.chinh.streamingservice.mediapersistence.entity.MediaGroupMetaData;
 import dev.chinh.streamingservice.mediapersistence.entity.MediaMetaData;
 import dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO;
-import dev.chinh.streamingservice.mediapersistence.repository.MediaGroupMetaDataRepository;
-import dev.chinh.streamingservice.mediapersistence.repository.MediaMetaDataRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -40,18 +39,19 @@ public class MediaMetadataModifyService {
 
     private final ApplicationEventPublisher eventPublisher;
 
-    public List<NameEntityDTO> getMediaNameEntityInfo(long mediaId, MediaNameEntityConstant nameEntity) {
+    public List<NameEntityDTO> getMediaNameEntityInfo(String userIdStr, long mediaId, MediaNameEntityConstant nameEntity) {
+        long userId = Long.parseLong(userIdStr);
         return switch (nameEntity.getName()) {
-            case ContentMetaData.AUTHORS -> mediaMetaDataRepository.findAuthorsByMediaId(mediaId);
-            case ContentMetaData.CHARACTERS -> mediaMetaDataRepository.findCharactersByMediaId(mediaId);
-            case ContentMetaData.UNIVERSES -> mediaMetaDataRepository.findUniversesByMediaId(mediaId);
-            case ContentMetaData.TAGS -> mediaMetaDataRepository.findTagsByMediaId(mediaId);
+            case ContentMetaData.AUTHORS -> mediaMetaDataRepository.findAuthorsByMediaId(userId, mediaId);
+            case ContentMetaData.CHARACTERS -> mediaMetaDataRepository.findCharactersByMediaId(userId, mediaId);
+            case ContentMetaData.UNIVERSES -> mediaMetaDataRepository.findUniversesByMediaId(userId, mediaId);
+            case ContentMetaData.TAGS -> mediaMetaDataRepository.findTagsByMediaId(userId, mediaId);
             default -> throw new IllegalArgumentException("Invalid name entity type: " + nameEntity);
         };
     }
 
     @Transactional
-    public String updateMediaTitle(long mediaId, String newTitle) {
+    public String updateMediaTitle(String userId, long mediaId, String newTitle) {
         if (newTitle == null) {
             throw new IllegalArgumentException("Title must not be null");
         }
@@ -63,12 +63,12 @@ public class MediaMetadataModifyService {
         if (newTitle.length() > 300)
             throw new IllegalArgumentException("Name must be at most 300 chars");
 
-        int updated = mediaMetaDataRepository.updateMediaTitle(mediaId, newTitle);
+        int updated = mediaMetaDataRepository.updateMediaTitle(Long.parseLong(userId), mediaId, newTitle);
         if (updated == 0) throw new IllegalArgumentException("Media not found: " + mediaId);
 
         eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_SEARCH_TOPIC,
-                new MediaUpdateEvent.MediaTitleUpdated(mediaId)
+                new MediaUpdateEvent.MediaTitleUpdated(userId, mediaId)
         ));
 
         mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
@@ -80,42 +80,83 @@ public class MediaMetadataModifyService {
     ) {}
 
     @Transactional
-    public void updateNameEntityInMediaInBatch(List<UpdateList> updateLists, long mediaId, boolean publishSearchUpdate) {
+    public void updateNameEntityInMediaInBatch(String userId, List<UpdateList> updateLists, long mediaId, boolean publishSearchUpdate) {
+        MediaMetaData mediaMetaData = getMediaMetaData(mediaId);
         for (UpdateList updateList : updateLists) {
-            updateNameEntityInMedia(updateList, mediaId, publishSearchUpdate);
+            updateNameEntityInMedia(userId, updateList, mediaId, publishSearchUpdate, mediaMetaData);
         }
     }
 
     @Transactional
-    public List<NameEntityDTO> updateNameEntityInMedia(UpdateList updateList, long mediaId, boolean publishSearchUpdate) {
+    public List<NameEntityDTO> updateNameEntityInMedia(String userIdStr, UpdateList updateList, long mediaId, boolean publishSearchUpdate, MediaMetaData mediaMetaData) {
         if ((updateList.adding == null || updateList.adding.isEmpty()) && (updateList.removing == null || updateList.removing.isEmpty())) return new ArrayList<>();
 
-        List<NameEntityDTO> uniqueAdding = updateList.adding == null ? new ArrayList<>() : new ArrayList<>(updateList.adding.stream().distinct().toList());
-        List<NameEntityDTO> uniqueRemoving = updateList.removing == null ? new ArrayList<>() : updateList.removing.stream().distinct().toList();
+        long userId = Long.parseLong(userIdStr);
+
+        mediaMetaData = mediaMetaData == null ? getMediaMetaData(mediaId) : mediaMetaData;
+        if (mediaMetaData.getUserId() != userId)
+            throw new IllegalArgumentException("No media found for user: " + userId);
+
+        List<Long> uniqueAdding = updateList.adding == null
+                ? new ArrayList<>()
+                : new ArrayList<>(updateList.adding.stream().map(NameEntityDTO::getId).distinct().toList());
+        List<Long> uniqueRemoving = updateList.removing == null
+                ? new ArrayList<>()
+                : updateList.removing.stream().map(NameEntityDTO::getId).distinct().toList();
         uniqueAdding.removeAll(uniqueRemoving);
 
         if (uniqueAdding.isEmpty() && uniqueRemoving.isEmpty()) return new ArrayList<>();
 
-        for (NameEntityDTO nameEntityDTO : uniqueRemoving) {
-            int removed = removeNameEntityInMedia(mediaId, nameEntityDTO.getId(), updateList.nameEntity);
-            if (removed == 0) throw new IllegalArgumentException("Name entity not found: " + nameEntityDTO.getId());
-            nameEntityModifyService.decrementNameEntityLengthCount(updateList.nameEntity, nameEntityDTO.getId());
+        if (!uniqueAdding.isEmpty()) {
+            Long[] addingIds = nameEntityModifyService.getMediaNameEntityIdByUserIdAndIdIn(userId, uniqueAdding, updateList.nameEntity);
+            if (addingIds.length > 0) {
+                int added = addNameEntitiesToMedia(mediaId, addingIds, updateList.nameEntity);
+                System.out.println("Adding: " + addingIds.length + " Added: " + added);
+                nameEntityModifyService.incrementEntityLengthCount(userId, addingIds, updateList.nameEntity);
+            }
         }
-        for (NameEntityDTO nameEntityDTO : uniqueAdding) {
-            int added = addNameEntityInMedia(mediaId, nameEntityDTO.getId(), updateList.nameEntity);
-            if (added == 0) throw new IllegalArgumentException("Name entity not found: " + nameEntityDTO.getId());
-            nameEntityModifyService.incrementNameEntityLengthCount(updateList.nameEntity, nameEntityDTO.getId());
+
+        if (!uniqueRemoving.isEmpty()) {
+            Long[] removingIds = nameEntityModifyService.getMediaNameEntityIdByUserIdAndIdIn(userId, uniqueRemoving, updateList.nameEntity);
+            if (removingIds.length > 0) {
+                int removed = removeNameEntitiesFromMedia(mediaId, removingIds, updateList.nameEntity);
+                System.out.println("Removing: " + removingIds.length + " Removed: " + removed);
+                nameEntityModifyService.decrementNameEntityLengthCount(userId, removingIds, updateList.nameEntity);
+            }
         }
-        List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(mediaId, updateList.nameEntity);
+
+        List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(userIdStr, mediaId, updateList.nameEntity);
 
         if (publishSearchUpdate)
             eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     EventTopics.MEDIA_SEARCH_TOPIC,
-                    new MediaUpdateEvent.MediaNameEntityUpdated(mediaId, updateList.nameEntity)
+                    new MediaUpdateEvent.MediaNameEntityUpdated(userIdStr, mediaId, updateList.nameEntity)
             ));
 
         mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
         return updatedMediaNameEntityList;
+    }
+
+    private int addNameEntitiesToMedia(long mediaId, Long[] nameEntityIds, MediaNameEntityConstant nameEntity) {
+        try {
+            return switch (nameEntity) {
+                case MediaNameEntityConstant.AUTHORS -> mediaMetaDataRepository.addAuthorsToMedia(mediaId, nameEntityIds);
+                case MediaNameEntityConstant.CHARACTERS -> mediaMetaDataRepository.addCharactersToMedia(mediaId, nameEntityIds);
+                case MediaNameEntityConstant.UNIVERSES -> mediaMetaDataRepository.addUniversesToMedia(mediaId, nameEntityIds);
+                case MediaNameEntityConstant.TAGS -> mediaMetaDataRepository.addTagsToMedia(mediaId, nameEntityIds);
+            };
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateEntryException("Duplicate name entity in media: " + e.getMessage());
+        }
+    }
+
+    private int removeNameEntitiesFromMedia(long mediaId, Long[] nameEntityIds, MediaNameEntityConstant nameEntity) {
+        return switch (nameEntity) {
+            case MediaNameEntityConstant.AUTHORS -> mediaMetaDataRepository.deleteAuthorsFromMedia(mediaId, nameEntityIds);
+            case MediaNameEntityConstant.CHARACTERS -> mediaMetaDataRepository.deleteCharactersFromMedia(mediaId, nameEntityIds);
+            case MediaNameEntityConstant.UNIVERSES -> mediaMetaDataRepository.deleteUniversesFromMedia(mediaId, nameEntityIds);
+            case MediaNameEntityConstant.TAGS -> mediaMetaDataRepository.deleteTagsFromMedia(mediaId, nameEntityIds);
+        };
     }
 
     private int removeNameEntityInMedia(long mediaId, long nameEntityId, MediaNameEntityConstant nameEntity) {
@@ -141,10 +182,14 @@ public class MediaMetadataModifyService {
     }
 
     @Transactional
-    public void deleteMedia(long mediaId) {
+    public void deleteMedia(String userIdStr, long mediaId) {
         MediaMetaData mediaMetaData = mediaMetaDataRepository.findById(mediaId).orElseThrow(
                 () -> new IllegalArgumentException("Media not found: " + mediaId)
         );
+
+        long userId = Long.parseLong(userIdStr);
+        if (mediaMetaData.getUserId() != userId)
+            throw new IllegalArgumentException("No media found for user: " + userId);
 
         Long grouperMediaId = null;
         if (mediaMetaData.getMediaType() == MediaType.GROUPER) {
@@ -158,17 +203,17 @@ public class MediaMetadataModifyService {
                     () -> new IllegalArgumentException("Grouper media not found: " + mediaMetaData.getGrouperId())
             );
             grouperMediaId = grouperMetaData.getMediaMetaDataId();
-            Integer newLength = mediaMetaDataRepository.decrementLengthReturning(grouperMediaId);
+            Integer newLength = mediaMetaDataRepository.decrementLengthReturning(userId, grouperMediaId);
             eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     EventTopics.MEDIA_SEARCH_TOPIC,
                     new MediaUpdateEvent.LengthUpdated(grouperMediaId, newLength)
             ));
         }
 
-        mediaMetaDataRepository.decrementAuthorLengths(mediaMetaData.getId());
-        mediaMetaDataRepository.decrementCharacterLengths(mediaMetaData.getId());
-        mediaMetaDataRepository.decrementUniverseLengths(mediaMetaData.getId());
-        mediaMetaDataRepository.decrementTagLengths(mediaMetaData.getId());
+        mediaMetaDataRepository.decrementAuthorLengths(userId, mediaMetaData.getId());
+        mediaMetaDataRepository.decrementCharacterLengths(userId, mediaMetaData.getId());
+        mediaMetaDataRepository.decrementUniverseLengths(userId, mediaMetaData.getId());
+        mediaMetaDataRepository.decrementTagLengths(userId, mediaMetaData.getId());
 
         mediaMetaDataRepository.deleteById(mediaMetaData.getId());
 
@@ -182,8 +227,11 @@ public class MediaMetadataModifyService {
     }
 
     @Transactional
-    public void incrementMediaLength(long mediaId) {
-        Integer newLength = mediaMetaDataRepository.incrementLengthReturning(mediaId);
+    public void incrementMediaLength(long userId, long mediaId) {
+        Integer newLength = mediaMetaDataRepository.incrementLengthReturning(userId, mediaId);
+        if (newLength == null)
+            throw new IllegalArgumentException("Media not found: " + mediaId);
+
         eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_SEARCH_TOPIC,
                 new MediaUpdateEvent.LengthUpdated(mediaId, newLength)
@@ -199,24 +247,27 @@ public class MediaMetadataModifyService {
     }
 
     @Transactional(readOnly = true)
-    public void updateMediaThumbnail(long mediaId, Double num, MultipartFile multipartFile) throws Exception {
+    public void updateMediaThumbnail(String userId, long mediaId, Double num, MultipartFile multipartFile) throws Exception {
         boolean hasFile = multipartFile != null && multipartFile.getSize() > 0;
         if (!hasFile && num == null) {
             throw new IllegalArgumentException("Thumbnail file is empty and no thumbnail number provided");
         }
         MediaMetaData mediaMetaData = getMediaMetaData(mediaId);
+        if (mediaMetaData.getUserId() != Long.parseLong(userId))
+            throw new IllegalArgumentException("No media found for user: " + userId);
+
         MediaType mediaType = mediaMetaData.getMediaType();
 
         if (hasFile) {
             String extension = MediaUploadService.getFileExtension(multipartFile.getOriginalFilename());
             String newThumbnail = mediaMetaData.getThumbnail().endsWith(extension)
                     ? mediaMetaData.getThumbnail()
-                    : MediaUploadService.createMediaThumbnailString(mediaType, mediaId, multipartFile.getOriginalFilename());
+                    : MediaUploadService.createMediaThumbnailString(userId, mediaType, mediaId, multipartFile.getOriginalFilename());
             minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnail, multipartFile);
             if (newThumbnail != null && !newThumbnail.equals(mediaMetaData.getThumbnail())) {
                 eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                         EventTopics.MEDIA_OBJECT_TOPIC,
-                        new MediaUpdateEvent.MediaThumbnailUpdated(mediaId, mediaType, null, mediaMetaData.getBucket(), newThumbnail)
+                        new MediaUpdateEvent.MediaThumbnailUpdated(userId, mediaId, mediaType, null, mediaMetaData.getBucket(), newThumbnail)
                 ));
             }
         } else if (mediaType == MediaType.VIDEO || mediaType == MediaType.ALBUM) {
@@ -227,6 +278,7 @@ public class MediaMetadataModifyService {
                 eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                         EventTopics.MEDIA_OBJECT_TOPIC,
                         new MediaUpdateEvent.MediaThumbnailUpdated(
+                                userId,
                                 mediaMetaData.getId(),
                                 mediaType,
                                 num,
@@ -239,6 +291,7 @@ public class MediaMetadataModifyService {
                 eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                         EventTopics.MEDIA_FILE_TOPIC,
                         new MediaUpdateEvent.MediaThumbnailUpdateInitiated(
+                                userId,
                                 mediaMetaData.getId(),
                                 mediaType,
                                 Integer.parseInt(num.toString())

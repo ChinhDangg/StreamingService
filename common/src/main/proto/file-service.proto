@@ -15,10 +15,11 @@ message FileItem {
 }
 
 message FileRequest {
-  string id = 1;
-  int32 page = 2;
-  string sortBy = 3;
-  string sortOrder = 4;
+  string userId = 1;
+  string id = 2;
+  int32 page = 3;
+  string sortBy = 4;
+  string sortOrder = 5;
 }
 
 message FileResponse {

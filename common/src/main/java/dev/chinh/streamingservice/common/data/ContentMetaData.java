@@ -42,6 +42,9 @@ public class ContentMetaData {
     // Name entity
     public static final String NAME = "name";
 
+    // user
+    public static final String USER_ID = "userId";
+
     // Buckets
     public static final String MEDIA_BUCKET = "media";
     public static final String VIDEO_BUCKET = "video";

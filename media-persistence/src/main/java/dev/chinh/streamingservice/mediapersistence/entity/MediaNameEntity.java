@@ -18,6 +18,11 @@ public abstract class MediaNameEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     protected long id;
 
+    @Setter(AccessLevel.NONE)
+    @JsonProperty(value = ContentMetaData.USER_ID)
+    @Column(nullable = false)
+    protected long userId;
+
     @Column(unique = true, nullable = false)
     @JsonProperty(value = ContentMetaData.NAME)
     protected String name;

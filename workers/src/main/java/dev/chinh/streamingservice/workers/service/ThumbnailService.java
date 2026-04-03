@@ -14,8 +14,6 @@ public class ThumbnailService {
 
     private final RedisTemplate<String, String> queueRedisTemplate;
 
-    private static final Resolution thumbnailResolution = Resolution.p360;
-
     public Set<ZSetOperations.TypedTuple<String>> getAllThumbnailCacheLastAccess(long max) {
         return queueRedisTemplate.opsForZSet()
                 .rangeByScoreWithScores("thumbnail-cache", 0, max, 0, 50);
@@ -26,6 +24,6 @@ public class ThumbnailService {
     }
 
     public static String getThumbnailParentPath() {
-        return "/thumbnail-cache/" + thumbnailResolution;
+        return "/thumbnail-cache";
     }
 }

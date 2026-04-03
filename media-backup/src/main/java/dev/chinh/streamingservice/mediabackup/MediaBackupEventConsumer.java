@@ -38,7 +38,7 @@ public class MediaBackupEventConsumer {
         }
         System.out.println("Received create backup file event: " + event.fileName());
         try {
-            String target = OSUtil.normalizePath(MEDIA_BACKUP_LOCATION + "/" + ContentMetaData.MEDIA_BUCKET, event.fileName());
+            String target = addBackupLocationToPath(addRootToPath(event.userId() + "/" + event.fileName()));
             Path targetPath = Paths.get(target);
             if (Files.exists(targetPath)) {
                 System.err.println("File already exists: " + target);
@@ -63,7 +63,7 @@ public class MediaBackupEventConsumer {
     private void onDeleteFile(MediaUpdateEvent.FileDeleted event) throws IOException {
         System.out.println("Received delete backup file");
         try {
-            Path path = Path.of(OSUtil.normalizePath(MEDIA_BACKUP_LOCATION + "/", event.fileName()));
+            Path path = Path.of(addBackupLocationToPath(addRootToPath(event.fileName())));
             if (event.isNotDirectory()) {
                 Files.deleteIfExists(path);
             } else {
@@ -132,7 +132,7 @@ public class MediaBackupEventConsumer {
             return;
         }
         System.out.println("Received thumbnail create backup event: " + newThumbnail);
-        String thumbnail = OSUtil.normalizePath(MEDIA_BACKUP_LOCATION + "/" + ContentMetaData.THUMBNAIL_BUCKET, newThumbnail);
+        String thumbnail = addBackupLocationToPath(ContentMetaData.THUMBNAIL_BUCKET + "/" + newThumbnail);
         Path thumbnailPath = Paths.get(thumbnail);
 
         try (InputStream inputStream = minIOService.getFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnail)){
@@ -153,7 +153,7 @@ public class MediaBackupEventConsumer {
         }
         System.out.println("Received thumbnail delete backup event, old: " + oldThumbnail);
         try {
-            Path path = Paths.get(MEDIA_BACKUP_LOCATION + "/" + ContentMetaData.THUMBNAIL_BUCKET, oldThumbnail);
+            Path path = Paths.get(addBackupLocationToPath(ContentMetaData.THUMBNAIL_BUCKET + "/" + oldThumbnail));
             System.out.println("Deleted: " + Files.deleteIfExists(path));
         } catch (IOException e) {
             System.err.println("Failed to delete thumbnail file: " + oldThumbnail);
@@ -163,10 +163,8 @@ public class MediaBackupEventConsumer {
     private void onCreateDirectory(MediaUpdateEvent.DirectoryCreated event) {
         System.out.println("Received create directory: " + event.fileId());
         try {
-            String dirPath = event.dirPath().startsWith(ContentMetaData.MEDIA_BUCKET)
-                    ? event.dirPath()
-                    : ContentMetaData.MEDIA_BUCKET + "/" + event.dirPath();
-            Path targetParent = Paths.get(OSUtil.normalizePath(MEDIA_BACKUP_LOCATION, dirPath));
+            String dirPath = addRootToPath(event.dirPath());
+            Path targetParent = Paths.get(addBackupLocationToPath(dirPath));
             if (Files.notExists(targetParent)) {
                 Files.createDirectories(targetParent);
             }
@@ -178,13 +176,10 @@ public class MediaBackupEventConsumer {
     private void onRenameFile(MediaUpdateEvent.FileRenamed event) throws Exception {
         System.out.println("Received rename file: " + event.fileId());
         try {
-            String basePath = event.filePath().startsWith(ContentMetaData.MEDIA_BUCKET)
-                    ? event.filePath()
-                    : ContentMetaData.MEDIA_BUCKET + "/" + event.filePath();
+            String basePath = addRootToPath(event.filePath());
             int lastSlash = basePath.lastIndexOf("/");
-            Path source = Paths.get(OSUtil.normalizePath(MEDIA_BACKUP_LOCATION, basePath));
-            Path target = Paths.get(OSUtil.normalizePath(
-                    MEDIA_BACKUP_LOCATION,
+            Path source = Paths.get(addBackupLocationToPath(basePath));
+            Path target = Paths.get(addBackupLocationToPath(
                     basePath.substring(0, lastSlash == -1 ? basePath.length() : lastSlash) + "/" + event.newFileName()
             ));
             Files.move(source, target);
@@ -204,7 +199,7 @@ public class MediaBackupEventConsumer {
         }
     }
 
-    private void onMoveFile(MediaUpdateEvent.FileMoved event) throws Exception {
+    private void onMoveFile(MediaUpdateEvent.FileMoved event) {
         System.out.println("Received move file: " + event.fileId() + ", old: " + event.oldPath() + ", new: " + event.newPath());
         try {
             moveFile(event.oldPath(), event.newPath());
@@ -214,16 +209,23 @@ public class MediaBackupEventConsumer {
     }
 
     private void moveFile(String oldPath, String newPath) throws Exception {
-        oldPath = oldPath.startsWith(ContentMetaData.MEDIA_BUCKET)
-                ? oldPath
-                : ContentMetaData.MEDIA_BUCKET + "/" + oldPath;
-        newPath = newPath.startsWith(ContentMetaData.MEDIA_BUCKET)
-                ? newPath
-                : ContentMetaData.MEDIA_BUCKET + "/" + newPath;
-        Path source = Paths.get(OSUtil.normalizePath(MEDIA_BACKUP_LOCATION, oldPath));
-        Path target = Paths.get(OSUtil.normalizePath(MEDIA_BACKUP_LOCATION, newPath));
+        oldPath = addRootToPath(oldPath);
+        newPath = addRootToPath(newPath);
+        Path source = Paths.get(addBackupLocationToPath(oldPath));
+        Path target = Paths.get(addBackupLocationToPath(newPath));
         System.out.println(source + " -> " + target);
         Files.move(source, target.resolve(source.getFileName()));
+    }
+
+    private String addRootToPath(String path) {
+        if (path.startsWith(ContentMetaData.MEDIA_BUCKET)) {
+            return path;
+        }
+        return ContentMetaData.MEDIA_BUCKET + "/" + path;
+    }
+
+    private String addBackupLocationToPath(String path) {
+        return OSUtil.normalizePath(MEDIA_BACKUP_LOCATION, path);
     }
 
 

@@ -8,6 +8,8 @@ import dev.chinh.streamingservice.searchclient.constant.SortBy;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.client.opensearch._types.SortOrder;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -25,16 +27,18 @@ public class SearchController {
     public ResponseEntity<MediaSearchResult> search(@RequestParam String searchString,
                                                     @RequestParam(required = false) int page,
                                                     @RequestParam(required = false) SortBy sortBy,
-                                                    @RequestParam(required = false) SortOrder sortOrder) throws Exception {
-        return ResponseEntity.ok().body(mediaSearchService.search(searchString, page, pageSize, sortBy, sortOrder));
+                                                    @RequestParam(required = false) SortOrder sortOrder,
+                                                    @AuthenticationPrincipal Jwt jwt) throws Exception {
+        return ResponseEntity.ok().body(mediaSearchService.search(jwt.getSubject(), searchString, page, pageSize, sortBy, sortOrder));
     }
 
     @PostMapping("/advance")
     public ResponseEntity<MediaSearchResult> advanceSearch(@RequestBody MediaSearchRequest mediaSearchRequest,
                                                            @RequestParam(required = false) int page,
                                                            @RequestParam(required = false) SortBy sortBy,
-                                                           @RequestParam(required = false) SortOrder sortOrder) throws Exception {
-        return ResponseEntity.ok().body(mediaSearchService.advanceSearch(mediaSearchRequest, page, pageSize, sortBy, sortOrder));
+                                                           @RequestParam(required = false) SortOrder sortOrder,
+                                                           @AuthenticationPrincipal Jwt jwt) throws Exception {
+        return ResponseEntity.ok().body(mediaSearchService.advanceSearch(jwt.getSubject(), mediaSearchRequest, page, pageSize, sortBy, sortOrder));
     }
 
     @PostMapping("/keyword")
@@ -43,21 +47,24 @@ public class SearchController {
                                                            @RequestParam(required = false, defaultValue = "true") boolean matchAll,
                                                            @RequestParam(required = false) int page,
                                                            @RequestParam(required = false) SortBy sortBy,
-                                                           @RequestParam(required = false) SortOrder sortOrder) throws Exception {
+                                                           @RequestParam(required = false) SortOrder sortOrder,
+                                                           @AuthenticationPrincipal Jwt jwt) throws Exception {
         return ResponseEntity.ok().body(
-                mediaSearchService.searchByKeywords(nameEntity.getName(), keywordList, matchAll, page, pageSize, sortBy, sortOrder));
+                mediaSearchService.searchByKeywords(jwt.getSubject(), nameEntity.getName(), keywordList, matchAll, page, pageSize, sortBy, sortOrder));
     }
 
     @PostMapping("/match-all")
     public ResponseEntity<MediaSearchResult> matchAllSearch(@RequestParam(required = false) int page,
-                                                         @RequestParam(required = false) SortBy sortBy,
-                                                         @RequestParam(required = false) SortOrder sortOrder) throws Exception {
-        return ResponseEntity.ok().body(mediaSearchService.searchMatchAll(page, pageSize, sortBy, sortOrder));
+                                                            @RequestParam(required = false) SortBy sortBy,
+                                                            @RequestParam(required = false) SortOrder sortOrder,
+                                                            @AuthenticationPrincipal Jwt jwt) throws Exception {
+        return ResponseEntity.ok().body(mediaSearchService.searchMatchAll(jwt.getSubject(), page, pageSize, sortBy, sortOrder));
     }
 
     @GetMapping("/name/{nameEntity}")
     public List<?> searchNameEntity(@PathVariable MediaNameEntityConstant nameEntity,
-                                    @RequestParam(name = "s") String authorSearchString) throws IOException {
-        return mediaSearchService.searchContaining(nameEntity.getName(), authorSearchString);
+                                    @RequestParam(name = "s") String authorSearchString,
+                                    @AuthenticationPrincipal Jwt jwt) throws IOException {
+        return mediaSearchService.searchContaining(jwt.getSubject(), nameEntity.getName(), authorSearchString);
     }
 }

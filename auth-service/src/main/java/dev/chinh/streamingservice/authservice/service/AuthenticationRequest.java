@@ -18,7 +18,7 @@ public record AuthenticationRequest(
 
     private static final Pattern pass_pattern = Pattern.compile(PASSWORD_PATTERN);
 
-    public String isValid() {
+    public String isValid(boolean isBase64Encoded) {
         if (username == null || username.isBlank()) {
             return "Username cannot be empty";
         }
@@ -26,8 +26,8 @@ public record AuthenticationRequest(
             return "Password cannot be empty";
         }
 
-        String username = new String(Base64.getDecoder().decode(this.username), StandardCharsets.UTF_8);
-        String password = new String(Base64.getDecoder().decode(this.password), StandardCharsets.UTF_8);
+        String username = isBase64Encoded ? new String(Base64.getDecoder().decode(this.username), StandardCharsets.UTF_8) : this.username;
+        String password = isBase64Encoded ? new String(Base64.getDecoder().decode(this.password), StandardCharsets.UTF_8) : this.password;
 
         if (username.length() < 5) {
             return "Username must be at least 5 characters";

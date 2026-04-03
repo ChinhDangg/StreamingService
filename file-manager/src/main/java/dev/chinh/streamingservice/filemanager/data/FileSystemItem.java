@@ -20,18 +20,18 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @CompoundIndexes({
-        @CompoundIndex(name = "path_name_idx", def = "{'path': 1, 'name': 1}"),
+        @CompoundIndex(name = "user_path_name_idx", def = "{'userId': 1, 'path': 1, 'name': 1}"),
 
         // SortBy.UPLOAD: Usually we want newest first (-1)
-        @CompoundIndex(name = "parent_upload_idx", def = "{'parentId': 1, 'uploadDate': -1}"),
+        @CompoundIndex(name = "user_parent_upload_idx", def = "{'userId': 1, 'parentId': 1, 'uploadDate': -1}"),
         // SortBy.NAME: Usually alphabetical (1)
-        @CompoundIndex(name = "parent_name_idx", def = "{'parentId': 1, 'name': 1}", unique = true),
+        @CompoundIndex(name = "user_parent_name_idx", def = "{'userId': 1, 'parentId': 1, 'name': 1}", unique = true),
         // SortBy.SIZE: Smallest or Largest (1 covers both)
-        @CompoundIndex(name = "parent_size_idx", def = "{'parentId': 1, 'size': 1}"),
+        @CompoundIndex(name = "user_parent_size_idx", def = "{'userId': 1, 'parentId': 1, 'size': 1}"),
         // SortBy.LENGTH:
-        @CompoundIndex(name = "parent_length_idx", def = "{'parentId': 1, 'length': 1}"),
+        @CompoundIndex(name = "user_parent_length_idx", def = "{'userId': 1, 'parentId': 1, 'length': 1}"),
         // SortBy.RESOLUTION: (Usually want the largest area to be first)
-        @CompoundIndex(name = "res_area_width_idx", def = "{'res.a': -1, 'res.w': -1}")
+        @CompoundIndex(name = "user_res_area_width_idx", def = "{'userId': 1, 'res.a': -1, 'res.w': -1}")
 })
 public class FileSystemItem {
 
@@ -56,6 +56,9 @@ public class FileSystemItem {
     @JsonProperty(ContentMetaData.ID)
     @Id
     private String id;
+
+    @Field(FileItemField.USER_ID)
+    private Long userId;
 
     @Field(FileItemField.PARENT_ID)
     private String parentId;

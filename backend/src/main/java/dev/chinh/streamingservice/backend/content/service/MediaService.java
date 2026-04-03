@@ -46,8 +46,9 @@ public abstract class MediaService {
         return MediaJobStatus.PROCESSING.name();
     }
 
-    protected MediaJobDescription getMediaJobDescription(MediaDescription mediaDescription, String cacheJobId, Resolution resolution, String jobType) {
+    protected MediaJobDescription getMediaJobDescription(String userId, MediaDescription mediaDescription, String cacheJobId, Resolution resolution, String jobType) {
         MediaJobDescription mediaJobDescription = mediaMapper.mapToJobDescription(mediaDescription);
+        mediaJobDescription.setUserId(userId);
         mediaJobDescription.setJobType(jobType);
         mediaJobDescription.setWorkId(cacheJobId);
         mediaJobDescription.setResolution(resolution);
@@ -86,15 +87,15 @@ public abstract class MediaService {
         return mediaId + ":" + res;
     }
 
-    protected MediaDescription getMediaDescription(long mediaId) {
+    protected MediaDescription getMediaDescription(String userId, long mediaId) {
         MediaDescription mediaDescription = mediaSearchCacheService.getCachedMediaSearchItem(mediaId);
         if (mediaDescription == null)
-            mediaDescription = findMediaMetaDataAllInfo(mediaId);
+            mediaDescription = findMediaMetaDataAllInfo(userId, mediaId);
         return mediaDescription;
     }
 
-    protected MediaMetaData findMediaMetaDataAllInfo(long id) {
-        MediaMetaData mediaMetaData = mediaRepository.findByIdWithAllInfo(id).orElseThrow(() ->
+    protected MediaMetaData findMediaMetaDataAllInfo(String userId, long id) {
+        MediaMetaData mediaMetaData = mediaRepository.findByIdWithAllInfo(Long.parseLong(userId), id).orElseThrow(() ->
                 new IllegalArgumentException("Media not found with id " + id));
         MediaSearchItem mediaSearchItem = mediaMapper.map(mediaMetaData);
         if (mediaMetaData.isGrouper()) {

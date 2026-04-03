@@ -52,6 +52,7 @@ public class FileConsumerService {
         }
         String fileName = parts[parts.length - 1];
         FileSystemItem fileItem = FileSystemItem.builder()
+                .userId(Long.parseLong(event.userId()))
                 .parentId(parentId)
                 .path(currentPath.toString())
                 .bucket(event.bucket())
@@ -71,6 +72,7 @@ public class FileConsumerService {
             publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
                     EventTopics.MEDIA_OBJECT_TOPIC,
                     new MediaUpdateEvent.MediaEnriched(
+                            event.userId(),
                             fileItem.getId(),
                             event.mediaId(),
                             event.mediaType(),
@@ -84,7 +86,7 @@ public class FileConsumerService {
     }
 
     public void handleDirectoryToMedia(MediaUpdateEvent.DirectoryToMediaInitiated event) {
-        FileSystemItem item = fileService.findById(event.fileId());
+        FileSystemItem item = fileService.findById(event.userId(), event.fileId());
         if (item == null) {
             System.out.println("Item not found, skipping directory to media");
             return;
@@ -120,7 +122,7 @@ public class FileConsumerService {
             publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
                     EventTopics.MEDIA_FILE_TOPIC,
                     new MediaUpdateEvent.DirectoryToMediaInitiated(
-                            event.fileId(), event.mediaId(), event.mediaType(), event.searchable(), false, event.thumbnailObject(), size, skip)
+                            event.userId(), event.fileId(), event.mediaId(), event.mediaType(), event.searchable(), false, event.thumbnailObject(), size, skip)
             ));
             return;
         }
@@ -144,12 +146,12 @@ public class FileConsumerService {
         publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
                 EventTopics.MEDIA_OBJECT_TOPIC,
                 new MediaUpdateEvent.MediaEnriched(
-                        item.getId(), event.mediaId(), event.mediaType(), event.thumbnailObject(), event.searchable(), size, skip)
+                        event.userId(), item.getId(), event.mediaId(), event.mediaType(), event.thumbnailObject(), event.searchable(), size, skip)
         ));
     }
 
     public void handleNestedDirectoryToMedia(MediaUpdateEvent.NestedDirectoryToMediaInitiated event) {
-        FileSystemItem item = fileService.findById(event.fileId());
+        FileSystemItem item = fileService.findById(event.userId(), event.fileId());
         if (item == null) {
             System.out.println("Item not found, skipping nested directory to media");
             return;
@@ -175,6 +177,7 @@ public class FileConsumerService {
                 publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
                         EventTopics.MEDIA_UPLOAD_TOPIC,
                         new MediaUpdateEvent.FileToMediaInitiated(
+                                event.userId(),
                                 child.getId(), event.childType(),
                                 null, null,
                                 child.getName(), child.getUploadDate(),
@@ -191,7 +194,7 @@ public class FileConsumerService {
             publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
                     EventTopics.MEDIA_FILE_TOPIC,
                     new MediaUpdateEvent.NestedDirectoryToMediaInitiated(
-                            item.getId(), event.mediaId(), event.parentType(), event.childType(), event.childSearchable(), event.thumbnailObject(), skip)
+                            event.userId(), item.getId(), event.mediaId(), event.parentType(), event.childType(), event.childSearchable(), event.thumbnailObject(), skip)
             ));
             return;
         }
@@ -199,12 +202,13 @@ public class FileConsumerService {
         publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
                 EventTopics.MEDIA_OBJECT_TOPIC,
                 new MediaUpdateEvent.MediaEnriched(
-                        item.getId(), event.mediaId(), event.parentType(), event.thumbnailObject(), true, -1, skip)
+                        event.userId(), item.getId(), event.mediaId(), event.parentType(), event.thumbnailObject(), true, -1, skip)
         ));
     }
 
     public UpdateResult handleCompleteFileToMedia(MediaUpdateEvent.MediaCreatedReady event) {
         return fileService.updateFileMetadataAsMedia(
+                event.userId(),
                 event.fileId(),
                 event.mediaId(),
                 FileType.detectFileTypeFromMediaType(event.mediaType()),
@@ -216,7 +220,7 @@ public class FileConsumerService {
     }
 
     public void handleInitiateUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdateInitiated event) {
-        FileSystemItem item = fileService.findByMId(event.mediaId());
+        FileSystemItem item = fileService.findByMId(event.userId(), event.mediaId());
         if (item == null) {
             System.err.println("Item not found, skipping update media thumbnail");
             return;
@@ -243,6 +247,7 @@ public class FileConsumerService {
         publisher.publishEvent(new FileEventProducer.ImmediateEventWrapper(
                 EventTopics.MEDIA_OBJECT_TOPIC,
                 new MediaUpdateEvent.MediaThumbnailUpdated(
+                        event.userId(),
                         item.getMId(),
                         event.mediaType(),
                         (double) event.num(),
@@ -259,7 +264,7 @@ public class FileConsumerService {
     }
 
     public void handleDeleteFile(MediaUpdateEvent.FileDeleted event) {
-        FileSystemItem fileItem = fileService.findById(event.fileId());
+        FileSystemItem fileItem = fileService.findById(event.userId(), event.fileId());
         if (fileItem == null) {
             System.out.println("File not found with id: " + event.fileId() + ", skipping delete");
             return;
@@ -267,7 +272,7 @@ public class FileConsumerService {
 
         boolean isMedia = fileItem.getMId() != null && fileItem.getMId() > 0;
         if (isMedia && fileItem.getFileType() == FileType.ALBUM) {
-            FileSystemItem parent = fileService.findById(fileItem.getParentId());
+            FileSystemItem parent = fileService.findById(event.userId(), fileItem.getParentId());
             if (parent != null && parent.getFileType() == FileType.GROUPER) {
                 Query query = new Query(Criteria.where("id").is(parent.getId()));
                 Update update = new Update().set(FileItemField.LENGTH, parent.getLength() - 1);
@@ -319,8 +324,8 @@ public class FileConsumerService {
             ));
     }
 
-    public void handleMoveDirectory(String fileId, String newParentId, String oldPath) {
-        FileSystemItem item = fileService.findById(fileId);
+    public void handleMoveDirectory(String userId, String fileId, String newParentId, String oldPath) {
+        FileSystemItem item = fileService.findById(userId, fileId);
         if (item == null) {
             System.err.println("File not found. Skipping...");
             return;
@@ -329,7 +334,7 @@ public class FileConsumerService {
             System.err.println("File is not a directory. Moving single file is handled at initiation already. Skipping...");
             return;
         }
-        FileSystemItem newParent = fileService.findById(newParentId);
+        FileSystemItem newParent = fileService.findById(userId, newParentId);
         if (newParent == null) {
             System.err.println("Parent not found. Skipping...");
             return;

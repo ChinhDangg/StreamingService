@@ -1,17 +1,15 @@
 package dev.chinh.streamingservice.authservice;
 
 import dev.chinh.streamingservice.authservice.entity.Role;
-import dev.chinh.streamingservice.authservice.entity.User;
-import dev.chinh.streamingservice.authservice.repository.UserRepository;
-import jakarta.annotation.PostConstruct;
+import dev.chinh.streamingservice.authservice.service.AuthService;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemWriter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.*;
 
 import java.io.StringWriter;
@@ -28,22 +26,18 @@ public class AuthServiceApplication {
     }
 
     @Bean
-    CommandLineRunner commandLineRunner(PasswordEncoder passwordEncoder,
-                                        UserRepository userRepository,
-                                        @Value("${test-user.username}") String testUsername,
+    CommandLineRunner commandLineRunner(@Value("${test-user.username}") String testUsername,
                                         @Value("${test-user.password}") String testPassword,
                                         @Value("${test-user.roles}") String testRole,
                                         @Value("${test-user.name}") String testName,
-                                        RSAPublicKey publicKey, JwtEncoder encoder, JwtDecoder decoder) {
+                                        AuthService authService,
+                                        RSAPublicKey publicKey, JwtEncoder encoder, JwtDecoder decoder,
+                                        ApplicationEventPublisher publisher) {
         return args -> {
             try {
-                User user = new User();
-                user.setEmail(testUsername);
-                user.setPassword(passwordEncoder.encode(testPassword));
-                user.setUsername(testName);
-                user.setRole(Role.valueOf(testRole));
-                userRepository.save(user);
-            } catch (Exception ignored) {
+                authService.createNewUser(testUsername, testPassword, Role.valueOf(testRole), testName);
+            } catch (Exception e) {
+                System.err.println(e.getMessage());
             }
 //            printKeys(publicKey, encoder, decoder);
         };

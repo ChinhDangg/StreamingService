@@ -21,25 +21,28 @@ public class OpenSearchService {
 
     private final OpenSearchClient client;
 
-    public <T> SearchResponse<T> searchContaining(String index, String field, String text, Class<T> clazz) throws IOException {
+    public <T> SearchResponse<T> searchContaining(String index, long userId, String field, String text, Class<T> clazz) throws IOException {
+        BoolQuery.Builder rootBool = new BoolQuery.Builder();
+        rootBool.filter(buildTermOrMatch(ContentMetaData.USER_ID, FieldValue.of(userId), true));
+        rootBool.must(buildTermOrMatch(field, FieldValue.of(text), false));
         return client.search(s -> s
                         .index(index)
-                        .query(q -> q
-                                .match(m -> m
-                                        .field(field)
-                                        .query(FieldValue.of(text))
-                                )
+                        .query(Query.of(q -> q
+                                .bool(rootBool.build()))
                         ),
                 clazz
         );
     }
 
     public SearchResponse<Object> advanceSearch(String index,
+                                                long userId,
                                                 List<SearchFieldGroup> includeGroups,
                                                 List<SearchFieldGroup> excludeGroups,
                                                 List<MediaSearchRangeField> mediaSearchRanges,
                                                 int page, int size, SortBy sortBy, SortOrder sortOrder) throws IOException {
         BoolQuery.Builder rootBool = new BoolQuery.Builder();
+
+        rootBool.filter(buildTermOrMatch(ContentMetaData.USER_ID, FieldValue.of(userId), true));
 
         if (mediaSearchRanges != null) {
             for (MediaSearchRangeField mediaSearchRange : mediaSearchRanges) {
@@ -63,11 +66,11 @@ public class OpenSearchService {
 
                 if (group.isMatchAll()) {
                     for (Object value : values) {
-                        groupBool.must(buildTermOrMatch(field, value, group.isSearchTerm()));
+                        groupBool.must(buildTermOrMatch(field, FieldValue.of(value.toString()), group.isSearchTerm()));
                     }
                 } else {
                     for (Object value : values) {
-                        groupBool.should(buildTermOrMatch(field, value, group.isSearchTerm()));
+                        groupBool.should(buildTermOrMatch(field, FieldValue.of(value.toString()), group.isSearchTerm()));
                     }
                     groupBool.minimumShouldMatch("1");
                 }
@@ -82,7 +85,7 @@ public class OpenSearchService {
                 if (values == null || values.isEmpty()) continue;
 
                 for (Object value : values) {
-                    rootBool.mustNot(buildTermOrMatch(field, value, group.isSearchTerm()));
+                    rootBool.mustNot(buildTermOrMatch(field, FieldValue.of(value.toString()), group.isSearchTerm()));
                 }
             }
         }
@@ -92,12 +95,12 @@ public class OpenSearchService {
         return searchWithQuery(index, rootQuery, page, size, sortBy, sortOrder, true);
     }
 
-    private Query buildTermOrMatch(String field, Object value, boolean isTermQuery) {
+    private Query buildTermOrMatch(String field, FieldValue value, boolean isTermQuery) {
         Query leafQuery = Query.of(q -> {
             if (isTermQuery) {
-                return q.term(t -> t.field(field).value(FieldValue.of(value.toString())));
+                return q.term(t -> t.field(field).value(value));
             } else {
-                return q.match(m -> m.field(field).query(FieldValue.of(value.toString())));
+                return q.match(m -> m.field(field).query(value));
             }
         });
         // if field contains a dot (nameEntity.name), wrap it in a nested query
@@ -113,10 +116,11 @@ public class OpenSearchService {
         return leafQuery;
     }
 
-    public SearchResponse<Object> search(String index, Object text, int page, int size, SortBy sortBy,
+    public SearchResponse<Object> search(String index, long userId, Object text, int page, int size, SortBy sortBy,
                                     SortOrder sortOrder) throws IOException {
         Query multiMatchNested = Query.of(q -> q
                 .bool(b -> b
+                        .filter(buildTermOrMatch(ContentMetaData.USER_ID, FieldValue.of(userId), true))
                         // Root level field (Title)
                         .should(s -> s
                                 .match(m -> m
@@ -199,16 +203,17 @@ public class OpenSearchService {
     /**
      * Search exactly with given search strings by field.
      */
-    public SearchResponse<Object> searchTermByOneField(String index, String field, List<Object> text, boolean matchAll, int page, int size,
+    public SearchResponse<Object> searchTermByOneField(String index, long userId, String field, List<Object> text, boolean matchAll, int page, int size,
                                                SortBy sortBy, SortOrder sortOrder) throws IOException {
         BoolQuery.Builder termBoolBuilder = new BoolQuery.Builder();
+        termBoolBuilder.filter(buildTermOrMatch(ContentMetaData.USER_ID, FieldValue.of(userId), true));
         if (matchAll) {
             for (Object term : text) {
-                termBoolBuilder.must(buildTermOrMatch(field, term, true));
+                termBoolBuilder.must(buildTermOrMatch(field, FieldValue.of(term.toString()), true));
             }
         } else {
             for (Object term : text) {
-                termBoolBuilder.should(buildTermOrMatch(field, term, true));
+                termBoolBuilder.should(buildTermOrMatch(field, FieldValue.of(term.toString()), true));
             }
             termBoolBuilder.minimumShouldMatch("1");
         }
@@ -216,9 +221,14 @@ public class OpenSearchService {
         return searchWithQuery(index, termBoolQuery, page, size, sortBy, sortOrder, true);
     }
 
-    public SearchResponse<Object> searchMatchAll(String index, int page, int size, SortBy sortBy, SortOrder sortOrder) throws IOException {
+    public SearchResponse<Object> searchMatchAll(String index, long userId, int page, int size, SortBy sortBy, SortOrder sortOrder) throws IOException {
         Query matchAll = Query.of(q -> q
-                .matchAll(m -> m)
+                .bool(b -> b
+                        .filter(buildTermOrMatch(ContentMetaData.USER_ID, FieldValue.of(userId), true))
+                        .must(Query.of(mq -> mq
+                                .matchAll(m -> m)
+                        ))
+                )
         );
         return searchWithQuery(index, matchAll, page, size, sortBy, sortOrder, false);
     }

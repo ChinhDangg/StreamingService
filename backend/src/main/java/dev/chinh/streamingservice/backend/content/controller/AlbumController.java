@@ -6,6 +6,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,14 +22,15 @@ public class AlbumController {
 
     @GetMapping("/{id}/{resolution}/{page}")
     public ResponseEntity<?> checkResizedImage(@PathVariable Long id,
-                                                  @PathVariable Resolution resolution,
-                                                  @PathVariable Integer page,
-                                                  HttpServletRequest request) throws Exception {
+                                               @PathVariable Resolution resolution,
+                                               @PathVariable Integer page,
+                                               HttpServletRequest request,
+                                               @AuthenticationPrincipal Jwt jwt) throws Exception {
         if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
             // if always show original - intercept the resolution parameter
             resolution = Resolution.original;
         }
-        return ResponseEntity.ok().body(albumService.getAlbumContent(id, resolution, page, 25, request));
+        return ResponseEntity.ok().body(albumService.getAlbumContent(jwt.getSubject(), id, resolution, page, 25, request));
     }
 
     @GetMapping("/{albumId}/{albumRes}/vid/{objectName}/{vidRes}")
@@ -35,12 +38,13 @@ public class AlbumController {
                                                    @PathVariable Resolution albumRes,
                                                    @PathVariable String objectName,
                                                    @PathVariable Resolution vidRes,
-                                                   HttpServletRequest request) throws Exception {
+                                                   HttpServletRequest request,
+                                                   @AuthenticationPrincipal Jwt jwt) throws Exception {
         if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
             // if always show original - intercept the resolution parameter
             albumRes = Resolution.original;
             vidRes = Resolution.original;
         }
-        return ResponseEntity.ok().body(albumService.getAlbumPartialVideoUrl(albumId, albumRes, objectName, vidRes, request));
+        return ResponseEntity.ok().body(albumService.getAlbumPartialVideoUrl(jwt.getSubject(), albumId, albumRes, objectName, vidRes, request));
     }
 }

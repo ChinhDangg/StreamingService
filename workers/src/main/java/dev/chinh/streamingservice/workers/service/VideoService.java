@@ -104,14 +104,12 @@ public class VideoService extends MediaService implements ResourceCleanable {
     }
 
     private String getOriginalVideoUrl(MediaJobDescription mediaJobDescription) {
-        return minIOService.getRedirectObjectUrl(mediaJobDescription.getBucket(), mediaJobDescription.getKey());
+        return minIOService.getObjectUrl(mediaJobDescription.getBucket(), mediaJobDescription.getKey().substring(mediaJobDescription.getKey().indexOf("/") + 1));
     }
 
     private String getPreviewVideoUrl(String tokenKey, MediaJobDescription mediaJobDescription) throws Exception {
         long videoId = mediaJobDescription.getId();
         String videoDir = videoId + "/preview";
-        String containerDir = "/chunks/" + videoDir;
-        String outPath = containerDir + masterFileName;
 
         String cacheJobId = getCachePreviewJobId(videoId);
 
@@ -136,8 +134,6 @@ public class VideoService extends MediaService implements ResourceCleanable {
         if (duration <= 60) {
             return getPartialVideoUrl(tokenKey, mediaJobDescription, resolution);
         }
-
-        OSUtil.createTempDir(videoDir, ffmpegName);
 
         long estimatedSize = (long) (Resolution.getEstimatedSize(
                 mediaJobDescription.getSize(), mediaJobDescription.getWidth(), mediaJobDescription.getHeight(), resolution)
@@ -198,6 +194,11 @@ public class VideoService extends MediaService implements ResourceCleanable {
             }
         }
 
+        String userDir = mediaJobDescription.getUserId() + "/" + videoDir;
+        OSUtil.createTempDir(userDir, ffmpegName);
+        String containerDir = "/chunks/" + userDir;
+        String outPath = containerDir + masterFileName;
+
         command.addAll(List.of(
                 "-i", nginxUrl,
                 "-threads", String.valueOf(numberOfThreads),
@@ -221,7 +222,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
         addCacheVideoJobStatus(cacheJobId, partialVideoJobId, estimatedSize, MediaJobStatus.RUNNING);
         addCacheRunningJob(cacheJobId);
 
-        checkPlaylistCreated(videoDir + masterFileName);
+        checkPlaylistCreated(userDir + masterFileName);
 
         return getNginxVideoStreamUrl(videoDir);
     }
@@ -232,7 +233,6 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
         long videoId = mediaJobDescription.getId();
 
-        // 1. container paths
         String videoDir = videoId + "/" + res;
 
         String cacheJobId = getCacheMediaJobIdString(videoId, res);
@@ -255,14 +255,14 @@ public class VideoService extends MediaService implements ResourceCleanable {
         if (!enoughSpace)
             return getOriginalVideoUrl(mediaJobDescription);
 
-        OSUtil.createTempDir(videoDir, ffmpegName);
-
         String nginxUrl = minIOService.getObjectUrlForContainer(mediaJobDescription.getBucket(), mediaJobDescription.getKey());
 
         String scale = getFfmpegScaleString(
                 mediaJobDescription.getWidth(), mediaJobDescription.getHeight(), res.getResolution());
 
-        String containerDir = "/chunks/" + videoDir;
+        String userDir = mediaJobDescription.getUserId() + "/" + videoDir;
+        OSUtil.createTempDir(userDir, ffmpegName);
+        String containerDir = "/chunks/" + userDir;
         String outPath = containerDir + masterFileName;
         String partialVideoJobId = createPartialVideo(tokenKey, nginxUrl, scale, videoDir, outPath, prevJobStopped, cacheJobId);
 
@@ -271,7 +271,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
         addCacheRunningJob(cacheJobId);
 
         // check the master file has been created. maybe check first chunks being created for smoother experience
-        checkPlaylistCreated(videoDir + masterFileName);
+        checkPlaylistCreated(userDir + masterFileName);
 
         // 5. Return playlist URL for browser
         return getNginxVideoStreamUrl(videoDir);

@@ -166,7 +166,7 @@ local function verify_jwt(jwt)
     if not PUBLIC_KEY_PEM then
         -- For now, just fail.
         ngx.log(ngx.ERR, "Public Key is missing (Fetch failed)")
-        return false
+        return false, nil
     end
 
     local header_b64, payload_b64, sig_b64 =
@@ -174,7 +174,7 @@ local function verify_jwt(jwt)
 
     if not header_b64 or not payload_b64 or not sig_b64 then
         ngx.log(ngx.ERR, "JWT split failed")
-        return false
+        return false, nil
     end
 
     local signature = b64url_decode(sig_b64)
@@ -185,7 +185,7 @@ local function verify_jwt(jwt)
     local pub, err = pkey.new(PUBLIC_KEY_PEM)
     if not pub then
         ngx.log(ngx.ERR, "Cannot load public key: ", err)
-        return false
+        return false, nil
     end
 
     local d = digest.new("SHA256")
@@ -194,23 +194,46 @@ local function verify_jwt(jwt)
     local ok, err = pub:verify(signature, d)
     if not ok then
         ngx.log(ngx.ERR, "Signature verification FAILED: ", err)
-        return false
+        return false, nil
     end
 
-    return true
+    -- Decode the payload to extract claims
+    local payload_raw = b64url_decode(payload_b64)
+    if not payload_raw then
+        ngx.log(ngx.ERR, "Failed to decode payload")
+        return false, nil
+    end
+
+    local status, payload = pcall(cjson.decode, payload_raw)
+    if not status then
+        ngx.log(ngx.ERR, "Failed to parse payload JSON")
+        return false, nil
+    end
+
+    return true, payload
 end
 
 -----------------------------------------------------
 -- ENTRY POINT
 -----------------------------------------------------
-local jwt = get_jwt()
-if not jwt then
+local jwt_str = get_jwt()
+if not jwt_str then
     return ngx.exit(401)
 end
 
-local ok = verify_jwt(jwt)
+local ok, payload = verify_jwt(jwt_str)
 if not ok then
     return ngx.exit(401)
-else
-    ngx.log(ngx.INFO, "Signature verification PASSED")
 end
+
+ngx.log(ngx.INFO, "Signature verification PASSED")
+
+-- Extract the subject (userId)
+local user_id = payload.sub
+if not user_id then
+    ngx.log(ngx.ERR, "JWT missing 'sub' claim")
+    return ngx.exit(403)
+end
+
+-- Export to NGINX variable so the location block can use it
+ngx.var.jwt_user_id = user_id

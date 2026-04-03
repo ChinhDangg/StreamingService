@@ -60,34 +60,26 @@ public class FileService {
 
     public record FileSearchResult(String parentId, String parentName, List<FileSystemItem> content, Pageable pageable, boolean hasNext) {}
 
-    public Slice<FileSystemItem> findFilesInDirectory(String parentId, int page, SortBy sortBy, Sort.Direction sortOrder) {
-        return fileSystemRepository.findByParentId(parentId, getPageable(page, sortBy, sortOrder));
+    public Slice<FileSystemItem> findFilesInDirectory(String userId, String parentId, int page, SortBy sortBy, Sort.Direction sortOrder) {
+        return fileSystemRepository.findByUserIdAndParentId(Long.parseLong(userId), parentId, getPageable(page, sortBy, sortOrder));
     }
 
-    public FileSearchResult findFilesAtRoot(int page, SortBy sortBy, Sort.Direction sortOrder) {
-        Slice<FileSystemItem> items = fileSystemRepository.findByParentId(getROOT_FOLDER_ID(), getPageable(page, sortBy, sortOrder));
-        List<FileSystemItem> itemInRoot = items.getContent();
-        List<String> thumbnailName = thumbnailService.processThumbnail(itemInRoot);
-        for (int i = 0; i < thumbnailName.size(); i++) {
-            itemInRoot.get(i).setThumbnail(thumbnailName.get(i));
-        }
+    public FileSearchResult findFilesAtRoot(String userId, int page, SortBy sortBy, Sort.Direction sortOrder) {
+        Slice<FileSystemItem> items = fileSystemRepository.findByUserIdAndParentId(Long.parseLong(userId), getROOT_FOLDER_ID(), getPageable(page, sortBy, sortOrder));
+        List<FileSystemItem> itemInRoot = getUpdatedThumbnailUrl(userId, items.getContent());
 
         return new FileSearchResult(getROOT_FOLDER_ID(), mediaPath, itemInRoot, items.getPageable(), items.hasNext());
     }
 
-    public FileSearchResult findFilesInDirectory(boolean getFullPathInfo, String parentId, int page, SortBy sortBy, Sort.Direction sortOrder) {
-        Slice<FileSystemItem> items = fileSystemRepository.findByParentId(parentId, getPageable(page, sortBy, sortOrder));
-        List<FileSystemItem> itemInDir = items.getContent();
-        List<String> thumbnailName = thumbnailService.processThumbnail(itemInDir);
-        for (int i = 0; i < thumbnailName.size(); i++) {
-            itemInDir.get(i).setThumbnail(thumbnailName.get(i));
-        }
+    public FileSearchResult findFilesInDirectory(String userId, boolean getFullPathInfo, String parentId, int page, SortBy sortBy, Sort.Direction sortOrder) {
+        Slice<FileSystemItem> items = fileSystemRepository.findByUserIdAndParentId(Long.parseLong(userId), parentId, getPageable(page, sortBy, sortOrder));
+        List<FileSystemItem> itemInDir = getUpdatedThumbnailUrl(userId, items.getContent());
 
         if (getFullPathInfo) {
             FileSystemItem parentCraft = new FileSystemItem();
             String pathInId;
             if (itemInDir.isEmpty()) {
-                FileSystemItem parent = getFileSystemItem(parentId);
+                FileSystemItem parent = getFileSystemItem(userId, parentId);
                 pathInId = parent.getPath() + parent.getId() + "/";
                 parentCraft.setName(parent.getName());
             } else {
@@ -95,11 +87,19 @@ public class FileService {
                 parentCraft.setName("unknown");
             }
             parentCraft.setPath(pathInId);
-            String pathInName = getFullPathInName(parentCraft);
+            String pathInName = getFullPathInName(parentCraft, false);
             return new FileSearchResult(pathInId, pathInName, itemInDir, items.getPageable(), items.hasNext());
         }
 
         return new FileSearchResult(itemInDir.isEmpty() ? null : itemInDir.getFirst().getParentId(), null, itemInDir, items.getPageable(), items.hasNext());
+    }
+
+    private List<FileSystemItem> getUpdatedThumbnailUrl(String userId, List<FileSystemItem> source) {
+        List<String> thumbnailName = thumbnailService.processThumbnail(userId, source);
+        for (int i = 0; i < thumbnailName.size(); i++) {
+            source.get(i).setThumbnail(thumbnailName.get(i));
+        }
+        return source;
     }
 
     private Pageable getPageable(int page, SortBy sortBy, Sort.Direction sortOrder) {
@@ -113,8 +113,8 @@ public class FileService {
         return PageRequest.of(page, pageSize, sort);
     }
 
-    public FileSearchResult searchFileByName(String parentId, String fileName, boolean isRecursive, int page) {
-        FileSystemItem parent = getFileSystemItem(parentId);
+    public FileSearchResult searchFileByName(String userId, String parentId, String fileName, boolean isRecursive, int page) {
+        FileSystemItem parent = getFileSystemItem(userId, parentId);
 
         List<AggregationOperation> stages = new ArrayList<>();
 
@@ -147,7 +147,7 @@ public class FileService {
     }
 
 
-    public String initiateUploadRequest(String filePath, String userId) {
+    public String initiateUploadRequest(String userId, String filePath) {
         var validatedFile = FileSystemValidator.isValidPath(filePath);
         if (validatedFile.errorMessage() != null) {
             throw new IllegalArgumentException(validatedFile.errorMessage());
@@ -164,10 +164,7 @@ public class FileService {
             parentId = dirId;
         }
 
-        boolean exists = mongoTemplate.exists(new Query(Criteria
-                        .where(FileItemField.PARENT_ID).is(parentId)
-                        .and(FileItemField.NAME).is(pathParts[partLength-1])),
-                FileSystemItem.class);
+        boolean exists = itemWithNameExists(userId, parentId, pathParts[partLength-1]);
         if (exists) throw new IllegalArgumentException("File already exists: " + validatedPath);
         return addCacheMediaUploadRequest(validatedPath);
     }
@@ -192,8 +189,8 @@ public class FileService {
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
     @Transactional
-    public String addFileAsVideoMedia(String fileId) {
-        FileSystemItem item = getFileSystemItem(fileId);
+    public String addFileAsVideoMedia(String userId, String fileId) {
+        FileSystemItem item = getFileSystemItem(userId, fileId);
         if (item.getFileType() != FileType.VIDEO) {
             throw new IllegalArgumentException("File is not a video");
         }
@@ -208,6 +205,7 @@ public class FileService {
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
+                        userId,
                         fileId, MediaType.VIDEO,
                         item.getBucket(), item.getObjectName(),
                         item.getName(), item.getUploadDate(),
@@ -223,8 +221,8 @@ public class FileService {
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
     @Transactional
-    public String addDirectoryAsAlbumMedia(String fileId) {
-        FileSystemItem item = getFileSystemItem(fileId);
+    public String addDirectoryAsAlbumMedia(String userId, String fileId) {
+        FileSystemItem item = getFileSystemItem(userId, fileId);
         if (item.getFileType() == FileType.ALBUM) {
             return "Item is already an album";
         }
@@ -250,17 +248,15 @@ public class FileService {
         }
 
         updateStatusCodeAndGet(fileId, FileStatus.PROCESSING);
-        String parentPath = Pattern.quote(getPathForFileItem(item.getPath(), item.getId()));
-        FileSystemItem first = mongoTemplate.findOne(new Query(Criteria
-                .where(FileItemField.PATH).regex("^" + parentPath)
-                .and(FileItemField.FILE_TYPE).in(FileType.IMAGE, FileType.VIDEO)), FileSystemItem.class);
+        FileSystemItem first = findFirstImageOrVideo(userId, getPathForFileItem(item.getPath(), item.getId()));
 
         if (!item.getParentId().equals(getROOT_FOLDER_ID())) {
-            FileSystemItem parent = getFileSystemItem(item.getParentId());
+            FileSystemItem parent = getFileSystemItem(userId, item.getParentId());
             if (parent.getFileType() == FileType.GROUPER) {
                 publisher.publishEvent(new FileEventProducer.EventWrapper(
                         EventTopics.MEDIA_UPLOAD_TOPIC,
                         new MediaUpdateEvent.FileToMediaInitiated(
+                                userId,
                                 fileId, MediaType.ALBUM,
                                 first == null ? null : first.getBucket(), first == null ? null : first.getObjectName(),
                                 item.getName(), item.getUploadDate(),
@@ -274,6 +270,7 @@ public class FileService {
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
+                        userId,
                         fileId, MediaType.ALBUM,
                         first == null ? null : first.getBucket(), first == null ? null : first.getObjectName(),
                         item.getName(), item.getUploadDate(),
@@ -289,8 +286,8 @@ public class FileService {
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
     @Transactional
-    public String addDirectoryAsGrouperMedia(String fileId) {
-        FileSystemItem item = getFileSystemItem(fileId);
+    public String addDirectoryAsGrouperMedia(String userId, String fileId) {
+        FileSystemItem item = getFileSystemItem(userId, fileId);
         if (item.getFileType() == FileType.GROUPER) {
             return "Item is already a grouper";
         }
@@ -317,20 +314,19 @@ public class FileService {
 
         updateStatusCodeAndGet(fileId, FileStatus.PROCESSING);
         boolean anyDirectFile = mongoTemplate.exists(Query.query(Criteria
-                        .where(FileItemField.PARENT_ID).is(fileId)
+                        .where(FileItemField.USER_ID).is(Long.parseLong(userId))
+                        .and(FileItemField.PARENT_ID).is(fileId)
                         .and(FileItemField.FILE_TYPE).nin(FileType.DIR, FileType.ALBUM, FileType.GROUPER)),
                 FileSystemItem.class);
         if (anyDirectFile) {
             return "Contains direct files - can't be grouped - must include only direct directories";
         }
-        String parentPath = Pattern.quote(getPathForFileItem(item.getPath(), item.getId()));
-        FileSystemItem first = mongoTemplate.findOne(new Query(Criteria
-                .where(FileItemField.PATH).regex("^" + parentPath)
-                .and(FileItemField.FILE_TYPE).in(FileType.IMAGE, FileType.VIDEO)), FileSystemItem.class);
+        FileSystemItem first = findFirstImageOrVideo(userId, getPathForFileItem(item.getPath(), item.getId()));
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
+                        userId,
                         fileId, MediaType.GROUPER,
                         first == null ? null : first.getBucket(), first == null ? null : first.getObjectName(),
                         item.getName(), item.getUploadDate(),
@@ -346,16 +342,16 @@ public class FileService {
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
     @Transactional
-    public FileSystemItem createNewDirectory(String parentId, String newFolderName) {
+    public FileSystemItem createNewDirectory(String userId, String parentId, String newFolderName) {
         String error = FileSystemValidator.isValidName(newFolderName);
         if (error != null)
             throw new IllegalArgumentException(error);
-        FileSystemItem parent = findById(parentId);
+        FileSystemItem parent = findById(userId, parentId);
         if (parent == null)
             throw new IllegalArgumentException("Parent folder not found: " + parentId);
         if (FileType.isNotDir(parent.getFileType()))
             throw new IllegalArgumentException("Parent folder is not a directory: " + parentId);
-        if (itemWithNameExists(parentId, newFolderName))
+        if (itemWithNameExists(userId, parentId, newFolderName))
             throw new IllegalArgumentException("Folder already exists: " + newFolderName);
         FileSystemItem item = FileSystemItem.builder()
                 .parentId(parentId)
@@ -369,15 +365,15 @@ public class FileService {
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_BACKUP_TOPIC,
-                new MediaUpdateEvent.DirectoryCreated(saved.getId(), getFullPathInName(saved))
+                new MediaUpdateEvent.DirectoryCreated(saved.getId(), addUserIdToPath(userId, getFullPathInName(saved, true)))
         ));
 
         return saved;
     }
 
     @Transactional
-    public String renameFileItem(String fileId, String newName) {
-        FileSystemItem item = getFileSystemItem(fileId);
+    public String renameFileItem(String userId, String fileId, String newName) {
+        FileSystemItem item = getFileSystemItem(userId, fileId);
         String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
         if (statusCodeStr != null) {
             throw new IllegalArgumentException(statusCodeStr);
@@ -389,7 +385,7 @@ public class FileService {
         if (item.getName().equals(newName)) {
             return newName;
         }
-        if (itemWithNameExists(item.getParentId(), newName)) {
+        if (itemWithNameExists(userId, item.getParentId(), newName)) {
             throw new IllegalArgumentException("File already exists with name: " + newName);
         }
         Query query = new Query(Criteria.where("id").is(fileId));
@@ -398,26 +394,21 @@ public class FileService {
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_BACKUP_TOPIC,
-                new MediaUpdateEvent.FileRenamed(item.getId(), getFullPathInName(item), newName)
+                new MediaUpdateEvent.FileRenamed(item.getId(), addUserIdToPath(userId, getFullPathInName(item, true)), newName)
         ));
 
         return newName;
     }
 
     @Transactional
-    public void initiateDeleteFile(String fileId) {
-        FileSystemItem item = getFileSystemItem(fileId);
+    public void initiateDeleteFile(String userId, String fileId) {
+        FileSystemItem item = getFileSystemItem(userId, fileId);
         String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
         if (statusCodeStr != null) {
             throw new IllegalArgumentException(statusCodeStr);
         }
         if (!FileType.isNotDir(item.getFileType())) { // if a directory
-            String parentPath = Pattern.quote(getPathForFileItem(item.getPath(), item.getId()));
-            boolean anyChildMedia = mongoTemplate.exists(
-                    new Query(Criteria
-                            .where(FileItemField.PATH).regex("^" + parentPath)
-                            .and(FileItemField.MEDIA_ID).nin(null, 0)),
-                    FileSystemItem.class);
+            boolean anyChildMedia = anyChildMedia(userId, getPathForFileItem(item.getPath(), item.getId()));
             if (anyChildMedia) {
                 throw new IllegalArgumentException("Directory is not empty - include media item");
             }
@@ -429,13 +420,13 @@ public class FileService {
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
-                new MediaUpdateEvent.FileDeleted(item.getId(), getFullPathInName(item), FileType.isNotDir(item.getFileType()), null)
+                new MediaUpdateEvent.FileDeleted(userId, item.getId(), addUserIdToPath(userId, getFullPathInName(item, true)), FileType.isNotDir(item.getFileType()), null)
         ));
     }
 
     @Transactional
-    public void initiateDeleteMediaFile(long mediaId) {
-        FileSystemItem item = findByMId(mediaId);
+    public void initiateDeleteMediaFile(String userId, long mediaId) {
+        FileSystemItem item = findByMId(userId, mediaId);
         if (item == null) {
             throw new IllegalArgumentException("Media file not found: " + mediaId);
         }
@@ -444,12 +435,7 @@ public class FileService {
             throw new IllegalArgumentException(statusCodeStr);
         }
         if (!FileType.isNotDir(item.getFileType())) { // if a directory
-            String parentPath = Pattern.quote(getPathForFileItem(item.getPath(), item.getId()));
-            boolean anyChildMedia = mongoTemplate.exists(
-                    new Query(Criteria
-                            .where(FileItemField.PATH).regex("^" + parentPath)
-                            .and(FileItemField.MEDIA_ID).nin(null, 0)),
-                    FileSystemItem.class);
+            boolean anyChildMedia = anyChildMedia(userId, getPathForFileItem(item.getPath(), item.getId()));
             if (anyChildMedia) {
                 throw new IllegalArgumentException("Media is not empty - include nested media item");
             }
@@ -459,13 +445,13 @@ public class FileService {
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC,
                 new MediaUpdateEvent.FileDeleted(
-                        item.getId(), getFullPathInName(item), FileType.isNotDir(item.getFileType()), item.getMId())
+                        userId, item.getId(), addUserIdToPath(userId, getFullPathInName(item, true)), FileType.isNotDir(item.getFileType()), item.getMId())
         ));
     }
 
     @Transactional
-    public FileSystemItem initiateMoveFileItem(String fileId, String newParentId, String userId) {
-        FileSystemItem item = getFileSystemItem(fileId);
+    public FileSystemItem initiateMoveFileItem(String userId, String fileId, String newParentId) {
+        FileSystemItem item = getFileSystemItem(userId, fileId);
         String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
         if (statusCodeStr != null) {
             throw new IllegalArgumentException(statusCodeStr);
@@ -473,7 +459,7 @@ public class FileService {
         if (item.getParentId().equals(newParentId)) {
             throw new IllegalArgumentException("Cannot move item to same parent");
         }
-        FileSystemItem newParent = findById(newParentId);
+        FileSystemItem newParent = findById(userId, newParentId);
         if (newParent == null) {
             throw new IllegalArgumentException("Parent folder not found: " + newParentId);
         }
@@ -495,7 +481,7 @@ public class FileService {
         if (folderIsLocked != null) {
             throw new IllegalArgumentException("File is locked: " + folderIsLocked.getId());
         }
-        if (itemWithNameExists(newParentId, item.getName())) {
+        if (itemWithNameExists(userId, newParentId, item.getName())) {
             throw new IllegalArgumentException("File already exists with name: " + item.getName());
         }
 
@@ -509,17 +495,17 @@ public class FileService {
             publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
                     new MediaUpdateEvent.DirectoryMoved(
-                            fileId, newParentId, item.getPath(), getFullPathInName(item), getFullPathInName(newParent)
+                            userId, fileId, newParentId, item.getPath(), addUserIdToPath(userId, getFullPathInName(item, true)), addUserIdToPath(userId, getFullPathInName(newParent, true))
                     )
             ));
 
             if (item.getFileType() == FileType.ALBUM && !item.getParentId().equals(getROOT_FOLDER_ID())) {
-                FileSystemItem oldParent = findById(item.getParentId());
+                FileSystemItem oldParent = findById(userId, item.getParentId());
                 if (oldParent.getFileType() == FileType.GROUPER) {
                     boolean newParentIsGrouper = newParent.getFileType() == FileType.GROUPER;
                     publisher.publishEvent(new FileEventProducer.EventWrapper(
                             EventTopics.MEDIA_UPLOAD_TOPIC,
-                            new MediaUpdateEvent.GrouperItemMoved(item.getMId(), newParentIsGrouper ? newParent.getMId() : null, item.getName())
+                            new MediaUpdateEvent.GrouperItemMoved(userId, item.getMId(), newParentIsGrouper ? newParent.getMId() : null, item.getName())
                     ));
                     if (!newParentIsGrouper) {
                         update.unset(FileItemField.MEDIA_ID);
@@ -534,7 +520,7 @@ public class FileService {
             publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_BACKUP_TOPIC,
                     new MediaUpdateEvent.FileMoved(
-                            fileId, getFullPathInName(item), getFullPathInName(newParent)
+                            fileId, addUserIdToPath(userId, getFullPathInName(item, true)), addUserIdToPath(userId, getFullPathInName(newParent, true))
                     )
             ));
         }
@@ -543,6 +529,7 @@ public class FileService {
 
         if (moved != null && (item.getFileType() == FileType.IMAGE || item.getThumbnail() != null)) {
             String thumbnailPath = ThumbnailService.getThumbnailPath(
+                    ThumbnailService.getThumbnailParentPath(),
                     item.getMId() == null ? item.getId() : item.getMId().toString(),
                     item.getThumbnail() == null ? item.getObjectName() : item.getThumbnail()
             );
@@ -588,11 +575,35 @@ public class FileService {
     }
 
 
-    private boolean itemWithNameExists(String parentId, String name) {
+    private boolean itemWithNameExists(String userId, String parentId, String name) {
         Query query = new Query(Criteria
-                .where(FileItemField.PARENT_ID).is(parentId)
+                .where(FileItemField.USER_ID).is(Long.parseLong(userId))
+                .and(FileItemField.PARENT_ID).is(parentId)
                 .and(FileItemField.NAME).is(name));
         return mongoTemplate.exists(query, FileSystemItem.class);
+    }
+
+    private boolean anyChildMedia(String userId, String parentPath) {
+        String quotedParentPath = Pattern.quote(parentPath);
+        return mongoTemplate.exists(
+                new Query(Criteria
+                        .where(FileItemField.USER_ID).is(Long.parseLong(userId))
+                        .and(FileItemField.PATH).regex("^" + quotedParentPath)
+                        .and(FileItemField.MEDIA_ID).nin(null, 0)),
+                FileSystemItem.class);
+    }
+
+    private FileSystemItem findFirstImageOrVideo(String userId, String parentPath) {
+        String quotedParentPath = Pattern.quote(parentPath);
+        return mongoTemplate.findOne(new Query(Criteria
+                .where(FileItemField.USER_ID).is(Long.parseLong(userId))
+                .and(FileItemField.PATH).regex("^" + quotedParentPath)
+                .and(FileItemField.FILE_TYPE).in(FileType.IMAGE, FileType.VIDEO)), FileSystemItem.class);
+    }
+
+    private String addUserIdToPath(String userId, String path) {
+        if (path.startsWith(userId + "/")) return path;
+        return userId + "/" + path;
     }
 
     @Retryable(
@@ -600,9 +611,12 @@ public class FileService {
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000, multiplier = 2)
     )
-    public UpdateResult updateFileMetadataAsMedia(String fileId, long mediaId, FileType fileType, String thumbnailObject,
+    public UpdateResult updateFileMetadataAsMedia(String userId, String fileId, long mediaId, FileType fileType, String thumbnailObject,
                                                   int length, Integer width, Integer height) {
-        Query query = new Query(Criteria.where("id").is(fileId));
+        Query query = new Query(Criteria
+                .where(FileItemField.USER_ID).is(Long.parseLong(userId))
+                .and("id").is(fileId)
+        );
         Update update = new Update()
                 .set(FileItemField.MEDIA_ID, mediaId)
                 .set(FileItemField.FILE_TYPE, fileType)
@@ -615,10 +629,10 @@ public class FileService {
         return mongoTemplate.updateFirst(query, update, FileSystemItem.class);
     }
 
-    public String getFullPathInName(FileSystemItem item) {
+    public String getFullPathInName(FileSystemItem item, boolean omitRoot) {
         String pathInId = item.getPath();
         List<String> pathIds = Arrays.stream(pathInId.split("/"))
-                .filter(s -> !s.isEmpty())
+                .filter(s -> !s.isEmpty() && (!omitRoot || !s.equals(getROOT_FOLDER_ID())))
                 .toList();
 
         if (pathIds.isEmpty()) return item.getName();
@@ -659,19 +673,27 @@ public class FileService {
     }
 
 
-    public FileSystemItem findByMId(long mId) {
-        Query query = new Query(Criteria.where(FileItemField.MEDIA_ID).is(mId));
+    public FileSystemItem findByMId(String userId, long mId) {
+        Query query = new Query(Criteria
+                .where(FileItemField.USER_ID).is(Long.parseLong(userId))
+                .and(FileItemField.MEDIA_ID).is(mId)
+        );
         return mongoTemplate.findOne(query, FileSystemItem.class);
     }
 
-    private FileSystemItem getFileSystemItem(String id) {
-        return fileSystemRepository.findById(id).orElseThrow(() ->
-                new IllegalArgumentException("File not found with id: " + id)
-        );
+    private FileSystemItem getFileSystemItem(String userId, String id) {
+        FileSystemItem item = findById(userId, id);
+        if (item == null)
+            throw new IllegalArgumentException("File not found with id: " + id);
+        return item;
     }
 
-    public FileSystemItem findById(String id) {
-        return mongoTemplate.findById(id, FileSystemItem.class);
+    public FileSystemItem findById(String userId, String id) {
+        Query query = new Query(Criteria
+                .where(FileItemField.USER_ID).is(Long.parseLong(userId))
+                .and("id").is(id)
+        );
+        return mongoTemplate.findOne(query, FileSystemItem.class);
     }
 
     public String getROOT_FOLDER_ID() {

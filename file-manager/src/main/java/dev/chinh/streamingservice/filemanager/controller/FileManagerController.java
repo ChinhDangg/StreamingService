@@ -22,11 +22,12 @@ public class FileManagerController {
     @GetMapping("/root")
     public ResponseEntity<?> getRootDirectory(@RequestParam(required = false, name = "p") Integer page,
                                               @RequestParam(required = false, name = "by") SortBy sortBy,
-                                              @RequestParam(required = false, name = "order") Sort.Direction sortOrder) {
+                                              @RequestParam(required = false, name = "order") Sort.Direction sortOrder,
+                                              @AuthenticationPrincipal Jwt jwt) {
         if (page == null) page = 0;
         if (sortBy == null) sortBy = SortBy.NAME;
         if (sortOrder == null) sortOrder = Sort.Direction.ASC;
-        return ResponseEntity.ok(fileService.findFilesAtRoot(page, sortBy, sortOrder));
+        return ResponseEntity.ok(fileService.findFilesAtRoot(jwt.getSubject(), page, sortBy, sortOrder));
     }
 
     @GetMapping("/dir")
@@ -34,12 +35,13 @@ public class FileManagerController {
                                                   @RequestParam String id,
                                                   @RequestParam(required = false, name = "p") Integer page,
                                                   @RequestParam(required = false, name = "by") SortBy sortBy,
-                                                  @RequestParam(required = false, name = "order") Sort.Direction sortOrder) {
+                                                  @RequestParam(required = false, name = "order") Sort.Direction sortOrder,
+                                                  @AuthenticationPrincipal Jwt jwt) {
         if (getParentInfo == null) getParentInfo = false;
         if (page == null) page = 0;
         if (sortBy == null) sortBy = SortBy.NAME;
         if (sortOrder == null) sortOrder = Sort.Direction.ASC;
-        return ResponseEntity.ok(fileService.findFilesInDirectory(getParentInfo, id, page, sortBy, sortOrder));
+        return ResponseEntity.ok(fileService.findFilesInDirectory(jwt.getSubject(), getParentInfo, id, page, sortBy, sortOrder));
     }
 
     public record SearchFilesRequest(
@@ -49,61 +51,61 @@ public class FileManagerController {
             int page
     ) {}
     @PostMapping("/search")
-    public ResponseEntity<?> searchFiles(@Valid @RequestBody SearchFilesRequest request) {
-        return ResponseEntity.ok(fileService.searchFileByName(request.parentId, request.searchString, request.isRecursive, request.page));
+    public ResponseEntity<?> searchFiles(@Valid @RequestBody SearchFilesRequest request, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(fileService.searchFileByName(jwt.getSubject(), request.parentId, request.searchString, request.isRecursive, request.page));
     }
 
 
     @PostMapping("/vid/{fileId}")
-    public ResponseEntity<?> addFileAsVideo(@PathVariable String fileId) {
-        return ResponseEntity.ok(fileService.addFileAsVideoMedia(fileId));
+    public ResponseEntity<?> addFileAsVideo(@PathVariable String fileId, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(fileService.addFileAsVideoMedia(jwt.getSubject(), fileId));
     }
 
     @PostMapping("/album/{fileId}")
-    public ResponseEntity<?> addDirectoryAsAlbum(@PathVariable String fileId) {
-        return ResponseEntity.ok(fileService.addDirectoryAsAlbumMedia(fileId));
+    public ResponseEntity<?> addDirectoryAsAlbum(@PathVariable String fileId, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(fileService.addDirectoryAsAlbumMedia(jwt.getSubject(), fileId));
     }
 
     @PostMapping("/grouper/{fileId}")
-    public ResponseEntity<?> addDirectoryAsGrouper(@PathVariable String fileId) {
-        return ResponseEntity.ok(fileService.addDirectoryAsGrouperMedia(fileId));
+    public ResponseEntity<?> addDirectoryAsGrouper(@PathVariable String fileId, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(fileService.addDirectoryAsGrouperMedia(jwt.getSubject(), fileId));
     }
 
 
     @DeleteMapping("/{fileId}")
-    public ResponseEntity<?> deleteFile(@PathVariable String fileId) {
-        fileService.initiateDeleteFile(fileId);
+    public ResponseEntity<?> deleteFile(@PathVariable String fileId, @AuthenticationPrincipal Jwt jwt) {
+        fileService.initiateDeleteFile(jwt.getSubject(), fileId);
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/media/{mediaId}")
-    public ResponseEntity<?> deleteMedia(@PathVariable long mediaId) {
-        fileService.initiateDeleteMediaFile(mediaId);
+    public ResponseEntity<?> deleteMedia(@PathVariable long mediaId, @AuthenticationPrincipal Jwt jwt) {
+        fileService.initiateDeleteMediaFile(jwt.getSubject(), mediaId);
         return ResponseEntity.ok().build();
     }
 
 
     public record CreateDirectoryRequest(@Size(max = 30) String parentId, @Size(max = 300) String name) {}
     @PostMapping("/folder")
-    public ResponseEntity<?> createDirectory(@RequestBody @Valid CreateDirectoryRequest request) {
-        return ResponseEntity.ok().body(fileService.createNewDirectory(request.parentId, request.name));
+    public ResponseEntity<?> createDirectory(@RequestBody @Valid CreateDirectoryRequest request, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().body(fileService.createNewDirectory(jwt.getSubject(), request.parentId, request.name));
     }
 
     @PutMapping("/rename")
-    public ResponseEntity<?> renameFile(@RequestBody @Valid CreateDirectoryRequest request) {
-        return ResponseEntity.ok().body(fileService.renameFileItem(request.parentId, request.name));
+    public ResponseEntity<?> renameFile(@RequestBody @Valid CreateDirectoryRequest request, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().body(fileService.renameFileItem(jwt.getSubject(), request.parentId, request.name));
     }
 
     public record MoveFileRequest(@Size(max = 30) String fileId, @Size(max = 30) String parentId) {}
     @PutMapping("/move")
     public ResponseEntity<?> moveFile(@RequestBody @Valid MoveFileRequest request, @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok().body(fileService.initiateMoveFileItem(request.fileId, request.parentId, jwt.getSubject()));
+        return ResponseEntity.ok().body(fileService.initiateMoveFileItem(jwt.getSubject(), request.fileId, request.parentId));
     }
 
 
     public record InitiateMultipartUploadRequest(@NotBlank @Size(max = 1000) String filePath) {}
     @PostMapping("/upload/create-session")
     public String initiateSession(@RequestBody @Valid InitiateMultipartUploadRequest request, @AuthenticationPrincipal Jwt jwt) {
-        return fileService.initiateUploadRequest(request.filePath, jwt.getSubject());
+        return fileService.initiateUploadRequest(jwt.getSubject(), request.filePath);
     }
 }

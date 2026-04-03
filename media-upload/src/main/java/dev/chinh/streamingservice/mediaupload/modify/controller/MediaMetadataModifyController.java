@@ -8,6 +8,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,32 +23,36 @@ public class MediaMetadataModifyController {
 
     @GetMapping("/{nameEntity}/{id}")
     public ResponseEntity<List<NameEntityDTO>> getMediaNameEntityInfo(@PathVariable MediaNameEntityConstant nameEntity,
-                                                                      @PathVariable long id) {
-        return ResponseEntity.ok().body(mediaMetadataModifyService.getMediaNameEntityInfo(id, nameEntity));
+                                                                      @PathVariable long id,
+                                                                      @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().body(mediaMetadataModifyService.getMediaNameEntityInfo(jwt.getSubject(), id, nameEntity));
     }
 
     @PutMapping("/title/{id}")
-    public ResponseEntity<String> updateMediaTitle(@PathVariable long id, @RequestBody String title) {
-        return ResponseEntity.ok().body(mediaMetadataModifyService.updateMediaTitle(id, title));
+    public ResponseEntity<String> updateMediaTitle(@PathVariable long id, @RequestBody String title, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().body(mediaMetadataModifyService.updateMediaTitle(jwt.getSubject(), id, title));
     }
 
     @PutMapping("/update/{id}")
     public ResponseEntity<List<NameEntityDTO>> updateMediaNameEntityInfo(@PathVariable long id,
-                                                      @RequestBody MediaMetadataModifyService.UpdateList updateList) {
-        return ResponseEntity.ok().body(mediaMetadataModifyService.updateNameEntityInMedia(updateList, id, true));
+                                                                         @RequestBody MediaMetadataModifyService.UpdateList updateList,
+                                                                         @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().body(mediaMetadataModifyService.updateNameEntityInMedia(jwt.getSubject(), updateList, id, true, null));
     }
 
     @PutMapping("/update-batch/{id}")
     public ResponseEntity<Void> updateMediaNameEntityInfoInBatch(@PathVariable long id,
-                                                      @RequestBody List<MediaMetadataModifyService.UpdateList> updateLists) {
-        mediaMetadataModifyService.updateNameEntityInMediaInBatch(updateLists, id, false);
+                                                                 @RequestBody List<MediaMetadataModifyService.UpdateList> updateLists,
+                                                                 @AuthenticationPrincipal Jwt jwt) {
+        mediaMetadataModifyService.updateNameEntityInMediaInBatch(jwt.getSubject(), updateLists, id, false);
         return ResponseEntity.ok().build();
     }
 
     @PutMapping(value = "/thumbnail/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Void> updateMediaThumbnail(@PathVariable long id,
-                                                     @Valid @ModelAttribute MediaUpdateThumbnailRequest request) throws Exception {
-        mediaMetadataModifyService.updateMediaThumbnail(id, request.getNum(), request.getThumbnail());
+                                                     @Valid @ModelAttribute MediaUpdateThumbnailRequest request,
+                                                     @AuthenticationPrincipal Jwt jwt) throws Exception {
+        mediaMetadataModifyService.updateMediaThumbnail(jwt.getSubject(), id, request.getNum(), request.getThumbnail());
         return ResponseEntity.ok().build();
     }
 

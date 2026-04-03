@@ -11,6 +11,7 @@ import java.time.Instant;
 @Setter
 public class MediaJobDescription {
 
+    private String userId;
     private String workId;
     private String jobType;
     private Instant scheduledTime = Instant.now();

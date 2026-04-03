@@ -54,12 +54,12 @@ public class MediaUploadService {
         };
     }
 
-    public String initiateMultipartUploadRequest(String sessionId) {
+    public String initiateMultipartUploadRequest(String userId, String sessionId) {
         String fileName = getCachedSessionRequest(sessionId);
         if (fileName == null) {
             throw new IllegalArgumentException("Invalid session ID: " + sessionId);
         }
-        String objectName = generateUniqueObjectName(fileName);
+        String objectName = generateUniqueObjectName(userId, fileName);
         String uploadId = objectUploadService.getMultipartUploadId(getBucketOnMediaType(fileName), objectName);
         addCacheFileUploadRequest(sessionId, uploadId, objectName, fileName);
         return uploadId;
@@ -99,7 +99,7 @@ public class MediaUploadService {
 
 
     @Transactional(readOnly = true)
-    public void saveFile(String uploadId, List<UploadedPart> parts, String userId, boolean isLast) {
+    public void saveFile(String userId, String uploadId, List<UploadedPart> parts, boolean isLast) {
         String combinedName = completeUpload(uploadId, parts);
 
         String objectName = combinedName.substring(0, combinedName.indexOf(":|:"));
@@ -109,7 +109,7 @@ public class MediaUploadService {
         long size = minIOService.getObjectSize(bucket, objectName);
         publisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
-                new MediaUpdateEvent.FileCreated(bucket, objectName, fileName, size, null, null, null, userId, isLast)
+                new MediaUpdateEvent.FileCreated(userId, bucket, objectName, fileName, size, null, null, null, isLast)
         ));
 
         removeCacheFileUploadRequest(uploadId);
@@ -119,7 +119,7 @@ public class MediaUploadService {
     public record MediaUploadRequest(String bucket, String objectName, String fileName, MediaType mediaType, boolean searchable) {}
 
     @Transactional
-    public long saveAsVideoMedia(String uploadId, MediaBasicInfo basicInfo, List<UploadedPart> parts, List<MediaMetadataModifyService.UpdateList> nameUpdateList, String userId, boolean isLast) {
+    public long saveAsVideoMedia(String userId, String uploadId, MediaBasicInfo basicInfo, List<UploadedPart> parts, List<MediaMetadataModifyService.UpdateList> nameUpdateList, boolean isLast) {
         String combinedName = getCachedFileUploadRequest(uploadId);
         if (combinedName == null) {
             throw new IllegalArgumentException("Invalid upload ID: " + uploadId);
@@ -134,6 +134,7 @@ public class MediaUploadService {
 
         String objectName = combinedName.substring(0, combinedName.indexOf(":|:"));
         long savedId = saveMedia(
+                userId,
                 new MediaUploadRequest(ContentMetaData.VIDEO_BUCKET, objectName, fileName, MediaType.VIDEO, true),
                 basicInfo,
                 null
@@ -143,16 +144,17 @@ public class MediaUploadService {
         long size = minIOService.getObjectSize(bucket, objectName);
 
         if (nameUpdateList != null)
-            mediaMetadataModifyService.updateNameEntityInMediaInBatch(nameUpdateList, savedId, false);
+            mediaMetadataModifyService.updateNameEntityInMediaInBatch(userId, nameUpdateList, savedId, false);
 
         publisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
                 new MediaUpdateEvent.FileCreated(
+                        userId,
                         bucket, objectName,
                         fileName, size,
                         savedId, MediaType.VIDEO,
-                        MediaUploadService.createMediaThumbnailString(MediaType.VIDEO, savedId, objectName),
-                        userId, isLast
+                        MediaUploadService.createMediaThumbnailString(userId, MediaType.VIDEO, savedId, objectName),
+                        isLast
                 )
         ));
 
@@ -162,7 +164,7 @@ public class MediaUploadService {
     }
 
     @Transactional
-    public long saveMedia(MediaUploadRequest upload, MediaBasicInfo basicInfo, Long parentMediaId) {
+    public long saveMedia(String userId, MediaUploadRequest upload, MediaBasicInfo basicInfo, Long parentMediaId) {
         if (upload.mediaType == MediaType.OTHER || upload.mediaType == MediaType.IMAGE) {
             throw new IllegalArgumentException("Unsupported type to be a media: " + upload.mediaType);
         }
@@ -173,6 +175,7 @@ public class MediaUploadService {
         mediaMetaData.setBucket(upload.bucket);
         mediaMetaData.setMediaType(upload.mediaType);
         mediaMetaData.setThumbnail(null);
+        mediaMetaData.setUserId(Long.parseLong(userId));
 
         mediaMetaData.setFormat(MediaJobStatus.PROCESSING.name());
         mediaMetaData.setSize(0L);
@@ -250,10 +253,10 @@ public class MediaUploadService {
                 event.fileName().substring(0, lastDotIndex).replaceAll("[-_]", " "),
                 (short) event.uploadDate().atOffset(ZoneOffset.UTC).getYear()
         );
-        long mediaId = saveMedia(uploadRequest, mediaBasicInfo, event.parentMediaId());
+        long mediaId = saveMedia(event.userId(), uploadRequest, mediaBasicInfo, event.parentMediaId());
 
         if (event.parentMediaId() != null && event.updateParentLength())
-            mediaMetadataModifyService.incrementMediaLength(event.parentMediaId());
+            mediaMetadataModifyService.incrementMediaLength(Long.parseLong(event.userId()), event.parentMediaId());
 
         // upload service can send media enriched for a single file
         // for multiple files as one media like ALBUM or GROUPER need file service to retrieve all contents
@@ -261,10 +264,11 @@ public class MediaUploadService {
             publisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     EventTopics.MEDIA_OBJECT_TOPIC,
                     new MediaUpdateEvent.MediaEnriched(
+                            event.userId(),
                             event.fileId(),
                             mediaId,
                             event.mediaType(),
-                            MediaUploadService.createMediaThumbnailString(event.mediaType(), mediaId, event.objectName()),
+                            MediaUploadService.createMediaThumbnailString(event.userId(), event.mediaType(), mediaId, event.objectName()),
                             event.searchable(),
                             -1,
                             -1
@@ -274,12 +278,13 @@ public class MediaUploadService {
             publisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     EventTopics.MEDIA_FILE_TOPIC,
                     new MediaUpdateEvent.DirectoryToMediaInitiated(
+                            event.userId(),
                             event.fileId(),
                             mediaId,
                             event.mediaType(),
                             event.searchable(),
                             event.updateParentLength(),
-                            event.searchable() ? MediaUploadService.createMediaThumbnailString(event.mediaType(), mediaId, event.objectName()) : null,
+                            event.searchable() ? MediaUploadService.createMediaThumbnailString(event.userId(), event.mediaType(), mediaId, event.objectName()) : null,
                             0,
                             0
                     )
@@ -288,34 +293,35 @@ public class MediaUploadService {
             publisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     EventTopics.MEDIA_FILE_TOPIC,
                     new MediaUpdateEvent.NestedDirectoryToMediaInitiated(
+                            event.userId(),
                             event.fileId(),
                             mediaId,
                             MediaType.GROUPER,
                             MediaType.ALBUM,
                             false,
-                            MediaUploadService.createMediaThumbnailString(event.mediaType(), mediaId, event.objectName()),
+                            MediaUploadService.createMediaThumbnailString(event.userId(), event.mediaType(), mediaId, event.objectName()),
                             0
                     )
             ));
         }
     }
 
-    public static String createMediaThumbnailString(MediaType mediaType, long mediaId, String objectName) {
+    public static String createMediaThumbnailString(String userId, MediaType mediaType, long mediaId, String objectName) {
         String extension = getFileExtension(objectName);
         if (MediaType.detectMediaType(extension) != MediaType.IMAGE)
             extension = ".jpg";
         if (mediaType == MediaType.VIDEO) {
-            return defaultVidPath + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb" + extension;
+            return userId + "/" + defaultVidPath + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb" + extension;
         } else if (mediaType == MediaType.ALBUM) {
-            return defaultAlbumPath + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb" + extension;
+            return userId + "/" + defaultAlbumPath + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb" + extension;
         } else if (mediaType == MediaType.GROUPER) {
-            return defaultGrouperPath + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb" + extension;
+            return userId + "/" + defaultGrouperPath + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb" + extension;
         }
         return null;
     }
 
-    private String generateUniqueObjectName(String fileName) {
-        return UuidCreator.getTimeOrderedEpoch().toString() + getFileExtension(fileName);
+    private String generateUniqueObjectName(String userId, String fileName) {
+        return userId + "/" + UuidCreator.getTimeOrderedEpoch().toString() + getFileExtension(fileName);
     }
 
     private void addCacheFileUploadRequest(String sessionId, String uploadId, String objectName, String fileName) {

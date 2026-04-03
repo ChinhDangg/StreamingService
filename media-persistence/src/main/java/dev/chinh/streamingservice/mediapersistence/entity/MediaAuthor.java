@@ -13,7 +13,8 @@ import lombok.Setter;
 @Table(name = ContentMetaData.AUTHORS)
 public class MediaAuthor extends MediaNameEntity{
 
-    public MediaAuthor(String name) {
+    public MediaAuthor(long userId, String name) {
+        this.userId = userId;
         this.name = name;
     }
 }

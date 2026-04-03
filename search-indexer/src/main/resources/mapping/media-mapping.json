@@ -117,6 +117,9 @@
       "id": {
         "type": "long"
       },
+      "userId": {
+        "type": "long"
+      },
       "bucket": {
         "type": "text"
       },

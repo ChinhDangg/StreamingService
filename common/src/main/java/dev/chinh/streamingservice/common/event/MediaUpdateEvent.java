@@ -16,16 +16,19 @@ public interface MediaUpdateEvent {
     ) implements MediaUpdateEvent {}
 
     record MediaNameEntityUpdated(
+            String userId,
             long mediaId,
             MediaNameEntityConstant nameEntityConstant
     ) implements MediaUpdateEvent{}
 
     record MediaTitleUpdated(
+            String userId,
             long mediaId
     ) implements MediaUpdateEvent{}
 
 
     record NameEntityCreated(
+            String userId,
             MediaNameEntityConstant nameEntityConstant,
             long nameEntityId,
             String thumbnailPath
@@ -38,6 +41,7 @@ public interface MediaUpdateEvent {
     ) implements MediaUpdateEvent{}
 
     record NameEntityUpdated(
+            String userId,
             MediaNameEntityConstant nameEntityConstant,
             long nameEntityId,
             String oldThumbnail,
@@ -46,6 +50,7 @@ public interface MediaUpdateEvent {
 
 
     record MediaEnriched(
+            String userId,
             String fileId,
             long mediaId,
             MediaType mediaType,
@@ -56,6 +61,7 @@ public interface MediaUpdateEvent {
     ) implements MediaUpdateEvent {}
 
     record MediaThumbnailUpdated(
+            String userId,
             long mediaId,
             MediaType mediaType,
             Double num,
@@ -64,6 +70,7 @@ public interface MediaUpdateEvent {
     ) implements MediaUpdateEvent {}
 
     record MediaThumbnailUpdateInitiated(
+            String userId,
             long mediaId,
             MediaType mediaType,
             int num
@@ -80,6 +87,7 @@ public interface MediaUpdateEvent {
 
 
     record FileCreated(
+            String userId,
             String bucket,
             String objectName,
             String fileName,
@@ -87,11 +95,11 @@ public interface MediaUpdateEvent {
             Long mediaId,
             MediaType mediaType,
             String thumbnailObject,
-            String userId,
             boolean isLast
     ) implements MediaUpdateEvent {}
 
     record FileDeleted(
+            String userId,
             String fileId,
             String fileName,
             boolean isNotDirectory,
@@ -99,6 +107,7 @@ public interface MediaUpdateEvent {
     ) implements MediaUpdateEvent {}
 
     record FileToMediaInitiated(
+            String userId,
             String fileId,
             MediaType mediaType,
             String bucket,
@@ -112,6 +121,7 @@ public interface MediaUpdateEvent {
     ) implements MediaUpdateEvent {}
 
     record DirectoryToMediaInitiated(
+            String userId,
             String fileId,
             long mediaId,
             MediaType mediaType,
@@ -123,6 +133,7 @@ public interface MediaUpdateEvent {
     ) implements MediaUpdateEvent {}
 
     record NestedDirectoryToMediaInitiated(
+            String userId,
             String fileId,
             long mediaId,
             MediaType parentType,
@@ -133,6 +144,7 @@ public interface MediaUpdateEvent {
     ) implements MediaUpdateEvent {}
 
     record MediaCreatedReady(
+            String userId,
             String fileId,
             long mediaId,
             MediaType mediaType,
@@ -154,6 +166,7 @@ public interface MediaUpdateEvent {
     ) implements MediaUpdateEvent {}
 
     record DirectoryMoved(
+            String userId,
             String fileId,
             String parentId,
             String oldIdPath,
@@ -168,6 +181,7 @@ public interface MediaUpdateEvent {
     ) implements MediaUpdateEvent {}
 
     record GrouperItemMoved(
+            String userId,
             long childMediaId,
             Long parentMediaId,
             String fileName
@@ -177,5 +191,10 @@ public interface MediaUpdateEvent {
             String fileId,
             String filePath,
             String newFileName
+    ) implements MediaUpdateEvent {}
+
+
+    record UserCreated(
+            long userId
     ) implements MediaUpdateEvent {}
 }

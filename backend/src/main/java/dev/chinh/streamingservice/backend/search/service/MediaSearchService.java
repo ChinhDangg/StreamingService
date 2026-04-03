@@ -40,14 +40,14 @@ public class MediaSearchService {
     @Value("${always-show-original-resolution}")
     private String alwaysShowOriginalResolution;
 
-    public List<NameEntityDTO> searchContaining(String index, String text) throws IOException {
+    public List<NameEntityDTO> searchContaining(String index, String userId, String text) throws IOException {
         ContentMetaData.validateSearchText(text);
-        SearchResponse<NameEntityDTO> response = searchContaining(index, ContentMetaData.NAME, text, NameEntityDTO.class);
+        SearchResponse<NameEntityDTO> response = searchContaining(index, userId, ContentMetaData.NAME, text, NameEntityDTO.class);
         return mapSearchReponseNameEntryToList(response);
     }
 
-    public <T> SearchResponse<T> searchContaining(String index, String field, String text, Class<T> clazz) throws IOException {
-        return openSearchService.searchContaining(index, field, text, clazz);
+    private <T> SearchResponse<T> searchContaining(String index, String userId, String field, String text, Class<T> clazz) throws IOException {
+        return openSearchService.searchContaining(index, Long.parseLong(userId), field, text, clazz);
     }
 
     private List<NameEntityDTO> mapSearchReponseNameEntryToList(SearchResponse<NameEntityDTO> response) {
@@ -68,7 +68,7 @@ public class MediaSearchService {
         }
     }
 
-    public MediaSearchResult advanceSearch(MediaSearchRequest request, int page, int size,
+    public MediaSearchResult advanceSearch(String userId, MediaSearchRequest request, int page, int size,
                                            SortBy sortBy, SortOrder sortOrder) throws Exception {
 
         boolean hasAnyField = request.hasAny();
@@ -88,11 +88,11 @@ public class MediaSearchService {
         }
 
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.advanceSearch(MEDIA_INDEX_NAME, includes, excludes, request.getRangeFields(), page, size, sortBy, sortOrder),
+                openSearchService.advanceSearch(MEDIA_INDEX_NAME, Long.parseLong(userId), includes, excludes, request.getRangeFields(), page, size, sortBy, sortOrder),
                 page, size);
 
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
-            thumbnailService.processThumbnails(mapSearchResult.searchItems);
+            thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
         cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
@@ -114,43 +114,43 @@ public class MediaSearchService {
         return searchFieldGroups;
     }
 
-    public MediaSearchResult search(String searchString, int page, int size, SortBy sortBy,
+    public MediaSearchResult search(String userId, String searchString, int page, int size, SortBy sortBy,
                                     SortOrder sortOrder) throws Exception {
 
         if (!MediaSearchField.validateSearchString(searchString)) {
             throw new IllegalArgumentException("Invalid search string");
         }
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.search(MEDIA_INDEX_NAME, searchString, page, size, sortBy, sortOrder),
+                openSearchService.search(MEDIA_INDEX_NAME, Long.parseLong(userId), searchString, page, size, sortBy, sortOrder),
                 page, size);
 
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
-            thumbnailService.processThumbnails(mapSearchResult.searchItems);
+            thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
 
         cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 
-    public MediaSearchResult searchByKeywords(String field, List<Object> keywords, boolean matchAll, int page, int size,
+    public MediaSearchResult searchByKeywords(String userId, String field, List<Object> keywords, boolean matchAll, int page, int size,
                                               SortBy sortBy, SortOrder sortOrder) throws Exception {
         ContentMetaData.validateSearchFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.searchTermByOneField(MEDIA_INDEX_NAME, field + "." + ContentMetaData.ID, keywords, matchAll, page, size, sortBy, sortOrder),
+                openSearchService.searchTermByOneField(MEDIA_INDEX_NAME, Long.parseLong(userId), field + "." + ContentMetaData.ID, keywords, matchAll, page, size, sortBy, sortOrder),
                 page, size);
 
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
-            thumbnailService.processThumbnails(mapSearchResult.searchItems);
+            thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
 
         cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 
-    public MediaSearchResult searchMatchAll(int page, int size, SortBy sortBy, SortOrder sortOrder) throws Exception {
+    public MediaSearchResult searchMatchAll(String userId, int page, int size, SortBy sortBy, SortOrder sortOrder) throws Exception {
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.searchMatchAll(MEDIA_INDEX_NAME, page, size, sortBy, sortOrder), page, size);
+                openSearchService.searchMatchAll(MEDIA_INDEX_NAME, Long.parseLong(userId), page, size, sortBy, sortOrder), page, size);
 
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
-            thumbnailService.processThumbnails(mapSearchResult.searchItems);
+            thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
 
         cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
@@ -173,8 +173,9 @@ public class MediaSearchService {
                         ? minIOService.getObjectUrl(ContentMetaData.THUMBNAIL_BUCKET, searchItem.getThumbnail())
                         : null);
             } else {
-                itemResponse.setThumbnail(searchItem.hasThumbnail() ? ThumbnailService.getThumbnailPath(
-                        searchItem.getId(), searchItem.getThumbnail()) : null);
+                itemResponse.setThumbnail(searchItem.hasThumbnail()
+                        ? ThumbnailService.getThumbnailPath(ThumbnailService.getThumbnailUrlParentPath(), searchItem.getId(), searchItem.getThumbnail())
+                        : null);
             }
             itemResponse.setMediaType(searchItem.getMediaType());
             itemResponses.add(itemResponse);

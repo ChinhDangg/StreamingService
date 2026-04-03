@@ -31,8 +31,10 @@ public class DirectoryCacheService {
         var cached = (ApplicationConfig.DirectoryCached) directoryIdCache.asMap().get(dirKey);
         if (cached == null) {
             Query query = Query.query(Criteria
-                    .where(FileItemField.PARENT_ID).is(parentId)
-                    .and(FileItemField.NAME).is(dirName));
+                    .where(FileItemField.USER_ID).is(Long.parseLong(userId))
+                    .and(FileItemField.PARENT_ID).is(parentId)
+                    .and(FileItemField.NAME).is(dirName)
+            );
             Update update = new Update().set(FileItemField.STATUS_CODE, FileStatus.IN_USE.getValue());
             FileSystemItem dir = mongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), FileSystemItem.class);
             if (dir == null)
@@ -51,7 +53,7 @@ public class DirectoryCacheService {
         String dirKey = getDirKey(dirName, dirParentId);
         return (ApplicationConfig.DirectoryCached) directoryIdCache.asMap().compute(dirKey, (_, existing) -> {
             if (existing == null) {
-                String fileId = getOrCreateFolder(dirName, dirParentId, dirPath, FileType.DIR);
+                String fileId = getOrCreateFolder(userId, dirName, dirParentId, dirPath, FileType.DIR);
                 Set<String> users = ConcurrentHashMap.newKeySet();
                 users.add(userId);
                 return new ApplicationConfig.DirectoryCached(fileId, users);
@@ -62,9 +64,10 @@ public class DirectoryCacheService {
         });
     }
 
-    private String getOrCreateFolder(String name, String parentId, String currentPath, FileType fileType) {
+    private String getOrCreateFolder(String userId, String name, String parentId, String currentPath, FileType fileType) {
         Query query = new Query(Criteria
-                .where(FileItemField.PARENT_ID).is(parentId)
+                .where(FileItemField.USER_ID).is(Long.parseLong(userId))
+                .and(FileItemField.PARENT_ID).is(parentId)
                 .and(FileItemField.NAME).is(name)
                 .and(FileItemField.FILE_TYPE).in(FileType.DIR, FileType.ALBUM)
         );

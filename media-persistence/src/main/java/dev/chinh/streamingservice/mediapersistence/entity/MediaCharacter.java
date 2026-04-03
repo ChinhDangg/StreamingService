@@ -13,7 +13,8 @@ import lombok.Setter;
 @Table(name = ContentMetaData.CHARACTERS)
 public class MediaCharacter extends MediaNameEntityWithThumbnail {
 
-    public MediaCharacter(String name) {
+    public MediaCharacter(long userId, String name) {
+        this.userId = userId;
         this.name = name;
     }
 }

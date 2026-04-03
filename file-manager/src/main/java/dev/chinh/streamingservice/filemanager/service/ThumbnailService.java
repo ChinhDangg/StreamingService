@@ -31,20 +31,20 @@ public class ThumbnailService {
 
     public record AlbumUrlInfo(List<String> mediaUrlList, List<String> buckets, List<String> pathList, List<String> fullUrlList) {}
 
-    public List<String> processThumbnail(List<FileSystemItem> items) {
-        AlbumUrlInfo albumUrlInfo = getFileSystemItemThumbnailAsAlbumUrls(items);
+    public List<String> processThumbnail(String userId, List<FileSystemItem> items) {
+        AlbumUrlInfo albumUrlInfo = getFileSystemItemThumbnailAsAlbumUrls(userId, items);
         if (albumUrlInfo.mediaUrlList.isEmpty())
             return albumUrlInfo.fullUrlList;
         if (counter.get() == 0)
             return albumUrlInfo.fullUrlList;
         counter.decrementAndGet();
         try {
-            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), false);
+            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailOutputParentPath(userId), false);
             if (exitCode != 0) {
                 throw new RuntimeException("Failed to resize thumbnails");
             }
             long now = System.currentTimeMillis() + 60 * 60 * 1000;
-            addCacheThumbnails(albumUrlInfo.mediaUrlList, now, (name) -> name.substring(name.lastIndexOf("/") + 1));
+            addCacheThumbnails(albumUrlInfo.mediaUrlList, now, (name) -> name.replaceFirst("/chunks/thumbnail-cache/", ""));
         } catch (Exception e) {
             System.err.println(e.getMessage());
         }
@@ -54,7 +54,7 @@ public class ThumbnailService {
 
     public record ShortFileInfo(String thumbnailName, String thumbnailObject, String bucket, String objectName) {}
 
-    private AlbumUrlInfo getFileSystemItemThumbnailAsAlbumUrls(List<FileSystemItem> items) {
+    private AlbumUrlInfo getFileSystemItemThumbnailAsAlbumUrls(String userId, List<FileSystemItem> items) {
         List<String> fullUrlList = new ArrayList<>();
         List<ShortFileInfo> shortFileInfoList = new ArrayList<>();
         for (var item : items) {
@@ -63,23 +63,15 @@ public class ThumbnailService {
                 continue;
             }
 
-            String thumbnailPath = getThumbnailPath(
-                    item.getMId() == null ? item.getId() : item.getMId().toString(),
-                    item.getThumbnail() == null ? item.getObjectName() : item.getThumbnail()
-            );
-            fullUrlList.add(thumbnailPath);
+            String id = item.getMId() == null ? item.getId() : item.getMId().toString();
+            String thumbnail = item.getThumbnail() == null ? item.getObjectName() : item.getThumbnail();
+            fullUrlList.add(getThumbnailPath(getThumbnailParentPath(), id, thumbnail));
 
-            shortFileInfoList.add(new ShortFileInfo(thumbnailPath, item.getThumbnail(), item.getBucket(), item.getObjectName()));
+            shortFileInfoList.add(new ShortFileInfo(getThumbnailPath(getThumbnailOutputParentPath(userId), id, thumbnail), item.getThumbnail(), item.getBucket(), item.getObjectName()));
         }
 
         // Batch check existence in Redis (The Pipeline)
-        List<Object> existenceResults = redisStringTemplate.executePipelined((RedisCallback<Object>) connection -> {
-            for (var info : shortFileInfoList) {
-                String name = info.thumbnailName().substring(info.thumbnailName().lastIndexOf("/") + 1);
-                connection.zSetCommands().zScore("thumbnail-cache".getBytes(), name.getBytes());
-            }
-            return null;
-        });
+        List<Object> existenceResults = checkHasCacheThumbnails(shortFileInfoList);
 
         List<String> pathList = new ArrayList<>();
         List<String> buckets = new ArrayList<>();
@@ -104,16 +96,29 @@ public class ThumbnailService {
         return new AlbumUrlInfo(urlList, buckets, pathList, fullUrlList);
     }
 
-    public static String getThumbnailPath(String id, String thumbnail) {
+    public static String getThumbnailPath(String parentPath, String id, String thumbnail) {
         if (id == null || thumbnail == null)
             return null;
         String originalExtension = thumbnail.contains(".") ? thumbnail.substring(thumbnail.lastIndexOf(".") + 1)
                 .toLowerCase() : "jpg";
-        return getThumbnailParentPath() + "/" + id + "_" + thumbnailResolution + "." + originalExtension;
+        return parentPath + "/" + id + "_" + thumbnailResolution + "." + originalExtension;
     }
 
     public static String getThumbnailParentPath() {
-        return "/thumbnail-cache/" + thumbnailResolution;
+        return "/thumbnail-cache";
+    }
+
+    private static String getThumbnailOutputParentPath(String userId) {
+        return "/thumbnail-cache/" + userId;
+    }
+
+    private List<Object> checkHasCacheThumbnails(List<ShortFileInfo> shortFileInfoList) {
+        return redisStringTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (var info : shortFileInfoList) {
+                connection.zSetCommands().zScore("thumbnail-cache".getBytes(), info.thumbnailName.getBytes());
+            }
+            return null;
+        });
     }
 
     private void addCacheThumbnails(List<String> thumbnailFileNames, long expiry, Function<String, String> processThumbnailName) {

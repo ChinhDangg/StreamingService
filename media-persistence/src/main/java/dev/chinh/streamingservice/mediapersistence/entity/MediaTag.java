@@ -13,7 +13,8 @@ import lombok.Setter;
 @Table(name = ContentMetaData.TAGS)
 public class MediaTag extends MediaNameEntity {
 
-    public MediaTag(String name) {
+    public MediaTag(long userId, String name) {
+        this.userId = userId;
         this.name = name;
     }
 }

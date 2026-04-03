@@ -40,8 +40,9 @@ public class MediaSearchEventConsumer {
 
     private void onCreateMediaIndexSearch(MediaUpdateEvent.MediaCreatedReady event) {
         System.out.println("Received new index event: " + event.mediaId());
-        Optional<MediaMetaData> mediaMetaData = mediaMetaDataRepository.findByIdWithAllInfo(event.mediaId());
+        Optional<MediaMetaData> mediaMetaData = mediaMetaDataRepository.findByIdWithAllInfo(Long.parseLong(event.userId()), event.mediaId());
         if (mediaMetaData.isEmpty()) {
+            System.err.println("MediaMetaData not found for mediaId: " + event.mediaId());
             return;
         }
         MediaSearchItem mediaSearchItem = mediaMapper.map(mediaMetaData.get());
@@ -67,7 +68,7 @@ public class MediaSearchEventConsumer {
     private void onUpdateMediaNameEntitySearch(MediaUpdateEvent.MediaNameEntityUpdated event) {
         System.out.println("Received update media name entity event: " + event.mediaId());
         List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(
-                event.mediaId(), event.nameEntityConstant());
+                Long.parseLong(event.userId()), event.mediaId(), event.nameEntityConstant());
         List<MediaNameSearchItem> nameEntityList = updatedMediaNameEntityList.stream()
                 .map(n -> new MediaNameSearchItem(n.getId(), n.getName()))
                 .toList();
@@ -80,7 +81,7 @@ public class MediaSearchEventConsumer {
 
     private void onUpdateMediaTitleSearch(MediaUpdateEvent.MediaTitleUpdated event) {
         System.out.println("Received update media title event: " + event.mediaId());
-        String title = mediaMetaDataRepository.getMediaTitle(event.mediaId());
+        String title = mediaMetaDataRepository.getMediaTitle(Long.parseLong(event.userId()), event.mediaId());
         try {
             openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, event.mediaId(), Map.of(ContentMetaData.TITLE, title));
         } catch (IOException e) {
@@ -108,7 +109,7 @@ public class MediaSearchEventConsumer {
 
     private void onCreateNameEntitySearch(MediaUpdateEvent.NameEntityCreated event) {
         System.out.println("Received create name entity: " + event.nameEntityConstant() + " nameEntityId: " + event.nameEntityId());
-        String name = getNameEntityName(event.nameEntityConstant(), event.nameEntityId());
+        String name = getNameEntityName(Long.parseLong(event.userId()), event.nameEntityConstant(), event.nameEntityId());
         if (name != null) {
             try {
                 Map<String, Object> fields = new HashMap<>();
@@ -125,7 +126,7 @@ public class MediaSearchEventConsumer {
 
     private void onUpdateNameEntitySearch(MediaUpdateEvent.NameEntityUpdated event) {
         System.out.println("Received update name entity");
-        String name = getNameEntityName(event.nameEntityConstant(), event.nameEntityId());
+        String name = getNameEntityName(Long.parseLong(event.userId()), event.nameEntityConstant(), event.nameEntityId());
         if (name != null) {
             try {
                 openSearchService.partialUpdateDocument(event.nameEntityConstant().getName(), event.nameEntityId(), Map.of(ContentMetaData.NAME, name));
@@ -151,22 +152,22 @@ public class MediaSearchEventConsumer {
         }
     }
 
-    private List<NameEntityDTO> getMediaNameEntityInfo(long mediaId, MediaNameEntityConstant nameEntity) {
+    private List<NameEntityDTO> getMediaNameEntityInfo(long userId, long mediaId, MediaNameEntityConstant nameEntity) {
         return switch (nameEntity) {
-            case AUTHORS -> mediaMetaDataRepository.findAuthorsByMediaId(mediaId);
-            case CHARACTERS -> mediaMetaDataRepository.findCharactersByMediaId(mediaId);
-            case UNIVERSES -> mediaMetaDataRepository.findUniversesByMediaId(mediaId);
-            case TAGS -> mediaMetaDataRepository.findTagsByMediaId(mediaId);
+            case AUTHORS -> mediaMetaDataRepository.findAuthorsByMediaId(userId, mediaId);
+            case CHARACTERS -> mediaMetaDataRepository.findCharactersByMediaId(userId, mediaId);
+            case UNIVERSES -> mediaMetaDataRepository.findUniversesByMediaId(userId, mediaId);
+            case TAGS -> mediaMetaDataRepository.findTagsByMediaId(userId, mediaId);
             default -> throw new IllegalArgumentException("Invalid name entity type: " + nameEntity);
         };
     }
 
-    private String getNameEntityName(MediaNameEntityConstant nameEntity, long nameEntityId) {
+    private String getNameEntityName(long userId, MediaNameEntityConstant nameEntity, long nameEntityId) {
         return switch (nameEntity) {
-            case AUTHORS -> mediaAuthorRepository.getNameEntityNameById(nameEntityId);
-            case CHARACTERS -> mediaCharacterRepository.getNameEntityNameById(nameEntityId);
-            case UNIVERSES -> mediaUniverseRepository.getNameEntityNameById(nameEntityId);
-            case TAGS -> mediaTagRepository.getNameEntityNameById(nameEntityId);
+            case AUTHORS -> mediaAuthorRepository.getNameEntityNameById(userId, nameEntityId);
+            case CHARACTERS -> mediaCharacterRepository.getNameEntityNameById(userId, nameEntityId);
+            case UNIVERSES -> mediaUniverseRepository.getNameEntityNameById(userId, nameEntityId);
+            case TAGS -> mediaTagRepository.getNameEntityNameById(userId, nameEntityId);
         };
     }
 
@@ -224,12 +225,12 @@ public class MediaSearchEventConsumer {
                     System.out.println("Received delete index event: " + e.mediaId());
             case MediaUpdateEvent.MediaThumbnailUpdatedReady e ->
                     System.out.println("Received update media thumbnail event: " + e.mediaId() + " old: " + e.oldThumbnail() + " new: " + e.newThumbnail());
-            case MediaUpdateEvent.MediaNameEntityUpdated(long mediaId, MediaNameEntityConstant nameEntityConstant) ->
-                    System.out.println("Received update media name entity event: " + mediaId + " nameEntityConstant: " + nameEntityConstant);
-            case MediaUpdateEvent.LengthUpdated(long mediaId, Integer newLength) ->
-                    System.out.println("Received update length event: " + mediaId + " newLength: " + newLength);
-            case MediaUpdateEvent.MediaTitleUpdated(long mediaId) ->
-                    System.out.println("Received update media title event: " + mediaId);
+            case MediaUpdateEvent.MediaNameEntityUpdated e ->
+                    System.out.println("Received update media name entity event: " + e.mediaId() + " nameEntityConstant: " + e.nameEntityConstant());
+            case MediaUpdateEvent.LengthUpdated e ->
+                    System.out.println("Received update length event: " + e.mediaId() + " newLength: " + e.newLength());
+            case MediaUpdateEvent.MediaTitleUpdated e ->
+                    System.out.println("Received update media title event: " + e.mediaId());
 
             case MediaUpdateEvent.NameEntityCreated e ->
                     System.out.println("Received create name entity: " + e.nameEntityConstant() + " nameEntityId: " + e.nameEntityId());

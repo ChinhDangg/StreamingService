@@ -69,7 +69,7 @@ public class ScheduleService {
         for (String videoJobId: runningVideoJobs) {
 
             Long lastAccess = videoService.getCacheVideoLastAccess(videoJobId);
-            long millisPassed = (lastAccess == null) ? 130_000 : (lastAccess - System.currentTimeMillis());
+            long millisPassed = (lastAccess == null) ? 130_000 : (System.currentTimeMillis() - lastAccess);
             if (millisPassed < 120_000) {
                 break; // sorted so any after is the same
             }
@@ -90,10 +90,10 @@ public class ScheduleService {
     }
 
     private void cleanThumbnails() {
-        long now = System.currentTimeMillis();
-        Set<ZSetOperations.TypedTuple<String>> lastAccessThumbnails = thumbnailService.getAllThumbnailCacheLastAccess(now);
+        Set<ZSetOperations.TypedTuple<String>> lastAccessThumbnails = thumbnailService.getAllThumbnailCacheLastAccess(System.currentTimeMillis());
         for (ZSetOperations.TypedTuple<String> thumbnail : lastAccessThumbnails) {
-            long millisPassed = (long) (System.currentTimeMillis() - thumbnail.getScore());
+            long lastAccess = thumbnail.getScore() == null ? 0 : thumbnail.getScore().longValue();
+            long millisPassed = (System.currentTimeMillis() - lastAccess);
             if (millisPassed < 60_000) {
                 break;
             }

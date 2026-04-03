@@ -28,37 +28,37 @@ public class ThumbnailService {
 
     public record AlbumUrlInfo(List<String> mediaUrlList, List<String> buckets, List<String> pathList) {}
 
-    public void processThumbnails(List<NameEntityDTO> items) {
+    public void processThumbnails(String userId, List<NameEntityDTO> items) {
         if (counter.get() == 0) {
             System.out.println("Counter is 0, skipping thumbnail processing");
             return;
         }
-        var albumUrlInfo = getThumbnailImagesAsAlbumUrls(items);
-        processThumbnails(albumUrlInfo);
+        var albumUrlInfo = getThumbnailImagesAsAlbumUrls(userId, items);
+        processThumbnails(userId, albumUrlInfo);
     }
 
-    public void processThumbnails(Collection<? extends MediaDescription> items) {
+    public void processThumbnails(String userId, Collection<? extends MediaDescription> items) {
         if (counter.get() == 0) {
             System.out.println("Counter is 0, skipping thumbnail processing");
             return;
         }
-        var albumUrlInfo = getMixThumbnailImagesAsAlbumUrls(items);
-        processThumbnails(albumUrlInfo);
+        var albumUrlInfo = getMixThumbnailImagesAsAlbumUrls(userId, items);
+        processThumbnails(userId, albumUrlInfo);
     }
 
-    private void processThumbnails(AlbumUrlInfo albumUrlInfo) {
+    private void processThumbnails(String userId, AlbumUrlInfo albumUrlInfo) {
         counter.decrementAndGet();
         try {
             if (albumUrlInfo.mediaUrlList().isEmpty()) {
                 counter.incrementAndGet();
                 return;
             }
-            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailParentPath(), true);
+            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailOutputParentPath(userId), true);
             if (exitCode != 0) {
                 throw new RuntimeException("Failed to resize thumbnails");
             }
             long now = System.currentTimeMillis() + 60 * 60 * 1000;
-            addCacheThumbnails(albumUrlInfo.mediaUrlList, now, (name) -> name.substring(name.lastIndexOf("/") + 1));
+            addCacheThumbnails(albumUrlInfo.mediaUrlList, now, (name) -> name.replaceFirst("/chunks/thumbnail-cache/", ""));
         } catch (Exception e) {
             System.err.println(e.getMessage());
         }
@@ -67,25 +67,25 @@ public class ThumbnailService {
 
     public record ShortThumbnailInfo(String thumbnailName, String thumbnailObject) {}
 
-    private AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(Collection<? extends MediaDescription> mediaDescriptionList) {
+    private AlbumUrlInfo getMixThumbnailImagesAsAlbumUrls(String userId, Collection<? extends MediaDescription> mediaDescriptionList) {
         List<ShortThumbnailInfo> shortThumbnailInfoList = new ArrayList<>();
         for (MediaDescription mediaDescription : mediaDescriptionList) {
             if (!mediaDescription.hasThumbnail())
                 continue;
 
-            String thumbnailFileName = getThumbnailPath(mediaDescription.getId(), mediaDescription.getThumbnail());
+            String thumbnailFileName = getThumbnailPath(getThumbnailOutputParentPath(userId), mediaDescription.getId(), mediaDescription.getThumbnail());
             shortThumbnailInfoList.add(new ShortThumbnailInfo(thumbnailFileName, mediaDescription.getThumbnail()));
         }
         return getThumbnailImagesAsAlbumUrlInfo(shortThumbnailInfoList);
     }
 
-    private AlbumUrlInfo getThumbnailImagesAsAlbumUrls(List<NameEntityDTO> mediaNameEntryList) {
+    private AlbumUrlInfo getThumbnailImagesAsAlbumUrls(String userId, List<NameEntityDTO> mediaNameEntryList) {
         List<ShortThumbnailInfo> shortThumbnailInfoList = new ArrayList<>();
         for (NameEntityDTO mediaNameEntry : mediaNameEntryList) {
             if (mediaNameEntry.getThumbnail() == null)
                 continue;
 
-            String thumbnailFileName = getThumbnailPath(mediaNameEntry.getName(), mediaNameEntry.getThumbnail());
+            String thumbnailFileName = getThumbnailPath(getThumbnailOutputParentPath(userId), mediaNameEntry.getName(), mediaNameEntry.getThumbnail());
             shortThumbnailInfoList.add(new ShortThumbnailInfo(thumbnailFileName, mediaNameEntry.getThumbnail()));
         }
         return getThumbnailImagesAsAlbumUrlInfo(shortThumbnailInfoList);
@@ -112,8 +112,7 @@ public class ThumbnailService {
     private List<Object> checkHasCacheThumbnails(List<ShortThumbnailInfo> shortThumbnailInfoList) {
         return redisStringTemplate.executePipelined((RedisCallback<Object>) connection -> {
             for (var info : shortThumbnailInfoList) {
-                String name = info.thumbnailName().substring(info.thumbnailName().lastIndexOf("/") + 1);
-                connection.zSetCommands().zScore("thumbnail-cache".getBytes(), name.getBytes());
+                connection.zSetCommands().zScore("thumbnail-cache".getBytes(), info.thumbnailName.getBytes());
             }
             return null;
         });
@@ -133,20 +132,24 @@ public class ThumbnailService {
         });
     }
 
-    public static String getThumbnailPath(String id, String thumbnail) {
+    public static String getThumbnailPath(String parentPath, String id, String thumbnail) {
         String originalExtension = thumbnail.contains(".") ? thumbnail.substring(thumbnail.lastIndexOf(".") + 1)
                 .toLowerCase() : "jpg";
-        return getThumbnailParentPath() + "/" + id + "_" + thumbnailResolution + "." + originalExtension;
+        return parentPath + "/" + id + "_" + thumbnailResolution + "." + originalExtension;
     }
 
-    public static String getThumbnailPath(long mediaId, String thumbnail) {
+    public static String getThumbnailPath(String parentPath, long mediaId, String thumbnail) {
         String originalExtension = thumbnail.contains(".") ? thumbnail.substring(thumbnail.lastIndexOf(".") + 1)
                 .toLowerCase() : "jpg";
-        return getThumbnailParentPath() + "/" + mediaId + "_" + thumbnailResolution + "." + originalExtension;
+        return parentPath + "/" + mediaId + "_" + thumbnailResolution + "." + originalExtension;
     }
 
-    public static String getThumbnailParentPath() {
-        return "/thumbnail-cache/" + thumbnailResolution;
+    public static String getThumbnailUrlParentPath() {
+        return "/thumbnail-cache";
+    }
+
+    private static String getThumbnailOutputParentPath(String userId) {
+        return "/thumbnail-cache/" + userId;
     }
 
 

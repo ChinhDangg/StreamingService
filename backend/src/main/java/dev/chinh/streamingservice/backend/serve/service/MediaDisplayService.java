@@ -45,10 +45,10 @@ public class MediaDisplayService {
             int page,
             int size,
             boolean hasNext
-    ){}
+    ) {}
 
-    public MediaDisplayContent getMediaContentInfo(long mediaId) throws Exception {
-        MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(mediaId);
+    public MediaDisplayContent getMediaContentInfo(String userId, long mediaId) throws Exception {
+        MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(userId, mediaId);
 
         MediaDisplayContent mediaDisplayContent = mediaMapper.map(mediaItem);
         if (mediaItem.hasThumbnail()) {
@@ -56,13 +56,13 @@ public class MediaDisplayService {
                 String thumbnailBucket = mediaItem.getMediaType() == MediaType.ALBUM ? mediaItem.getBucket() : ContentMetaData.THUMBNAIL_BUCKET;
                 mediaDisplayContent.setThumbnail(minIOService.getObjectUrl(thumbnailBucket, mediaItem.getThumbnail()));
             } else {
-                mediaDisplayContent.setThumbnail(ThumbnailService.getThumbnailPath(mediaId, mediaItem.getThumbnail()));
-                thumbnailService.processThumbnails(List.of(mediaItem));
+                mediaDisplayContent.setThumbnail(ThumbnailService.getThumbnailPath(ThumbnailService.getThumbnailUrlParentPath(), mediaId, mediaItem.getThumbnail()));
+                thumbnailService.processThumbnails(userId, List.of(mediaItem));
             }
         }
 
         if (mediaItem.isGrouper()) {
-            GroupSlice mediaIds = getNextGroupOfMedia(mediaId, 0, Sort.Direction.DESC);
+            GroupSlice mediaIds = getNextGroupOfMedia(userId, mediaId, 0, Sort.Direction.DESC);
             mediaDisplayContent.setChildMediaIds(mediaIds);
             mediaDisplayContent.setMediaType(MediaType.GROUPER);
         } else {
@@ -90,13 +90,13 @@ public class MediaDisplayService {
         }
     }
 
-    public GroupSlice getNextGroupOfMedia(long mediaId, int offset, Sort.Direction sortOrder) throws JsonProcessingException {
+    public GroupSlice getNextGroupOfMedia(String userId, long mediaId, int offset, Sort.Direction sortOrder) throws JsonProcessingException {
         GroupSlice cachedGroupOfMedia = getCacheGroupOfMedia(mediaId, offset, sortOrder);
         if (cachedGroupOfMedia != null) {
             return cachedGroupOfMedia;
         }
 
-        MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(mediaId);
+        MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(userId, mediaId);
         if (!mediaItem.isGrouper()) {
             throw new ResourceNotFoundException("No media grouper found with id: " + mediaId);
         }
@@ -110,8 +110,8 @@ public class MediaDisplayService {
         return groupSlice;
     }
 
-    public ResponseEntity<Void> getServePageTypeFromMedia(long mediaId) {
-        MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(mediaId);
+    public ResponseEntity<Void> getServePageTypeFromMedia(String userId, long mediaId) {
+        MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(userId, mediaId);
 
         String mediaPage = switch (mediaItem.getMediaType()) {
             case MediaType.GROUPER -> "/page/album-grouper?grouperId=" + mediaId;

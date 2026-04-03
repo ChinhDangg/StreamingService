@@ -41,10 +41,6 @@ public class MinIOService {
         return minioContainerUrl + "/" + encodeUriPathSegment(bucket) + "/" + encodeUriPath(object);
     }
 
-    public String getRedirectObjectUrl(String bucket, String object) {
-        return "/stream/redirect/object/" + encodeUriPathSegment(bucket) + "/" + encodeUriPath(object);
-    }
-
     public String getObjectUrl(String bucket, String object) {
         return "/stream/object/" + encodeUriPathSegment(bucket) + "/" + encodeUriPath(object);
     }

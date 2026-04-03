@@ -30,23 +30,23 @@ public class MediaNameEntityService {
     @Value("${always-show-original-resolution}")
     private String alwaysShowOriginalResolution;
 
-    public Page<NameEntityDTO> findAllAuthors(int offset, SortBy sortBy, Sort.Direction sortOrder) {
-        return mapInfo(mediaAuthorRepository.findAllNames(getPageable(offset, sortBy, sortOrder)), false);
+    public Page<NameEntityDTO> findAllAuthors(String userId, int offset, SortBy sortBy, Sort.Direction sortOrder) {
+        return mapInfo(userId, mediaAuthorRepository.findAllNames(Long.parseLong(userId), getPageable(offset, sortBy, sortOrder)), false);
     }
 
-    public Page<NameEntityDTO> findAllCharacters(int offset, SortBy sortBy, Sort.Direction sortOrder) {
-        return mapInfo(mediaCharacterRepository.findAllNames(getPageable(offset, sortBy, sortOrder)), true);
+    public Page<NameEntityDTO> findAllCharacters(String userId, int offset, SortBy sortBy, Sort.Direction sortOrder) {
+        return mapInfo(userId, mediaCharacterRepository.findAllNames(Long.parseLong(userId), getPageable(offset, sortBy, sortOrder)), true);
     }
 
-    public Page<NameEntityDTO> findAllUniverses(int offset, SortBy sortBy, Sort.Direction sortOrder) {
-        return mapInfo(mediaUniverseRepository.findAllNames(getPageable(offset, sortBy, sortOrder)), true);
+    public Page<NameEntityDTO> findAllUniverses(String userId, int offset, SortBy sortBy, Sort.Direction sortOrder) {
+        return mapInfo(userId, mediaUniverseRepository.findAllNames(Long.parseLong(userId), getPageable(offset, sortBy, sortOrder)), true);
     }
 
-    public Page<NameEntityDTO> findAllTags(int offset, SortBy sortBy, Sort.Direction sortOrder) {
-        return mapInfo(mediaTagRepository.findAllNames(getPageable(offset, sortBy, sortOrder)), false);
+    public Page<NameEntityDTO> findAllTags(String userId, int offset, SortBy sortBy, Sort.Direction sortOrder) {
+        return mapInfo(userId, mediaTagRepository.findAllNames(Long.parseLong(userId), getPageable(offset, sortBy, sortOrder)), false);
     }
 
-    private Page<NameEntityDTO> mapInfo(Page<NameEntityDTO> entry, boolean hasThumbnail) {
+    private Page<NameEntityDTO> mapInfo(String userId, Page<NameEntityDTO> entry, boolean hasThumbnail) {
         List<NameEntityDTO> nameEntries = entry.getContent();
         if (hasThumbnail) {
             if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
@@ -58,11 +58,11 @@ public class MediaNameEntityService {
                     }
                 });
             } else {
-                thumbnailService.processThumbnails(nameEntries); // process thumbnails first with the original thumbnail path
+                thumbnailService.processThumbnails(userId, nameEntries); // process thumbnails first with the original thumbnail path
                 // set thumbnail path to the directory of the thumbnail location
                 nameEntries.forEach(nameEntry -> {
                     try {
-                        nameEntry.setThumbnail(ThumbnailService.getThumbnailPath(nameEntry.getName(), nameEntry.getThumbnail()));
+                        nameEntry.setThumbnail(ThumbnailService.getThumbnailPath(ThumbnailService.getThumbnailUrlParentPath(), nameEntry.getName(), nameEntry.getThumbnail()));
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }

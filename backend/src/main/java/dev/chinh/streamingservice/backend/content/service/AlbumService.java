@@ -44,9 +44,9 @@ public class AlbumService extends MediaService {
         addCacheLastAccess(albumLastAccessKey, getCacheMediaJobId(albumId, albumRes), now);
     }
 
-    public String getAlbumContent(long albumId, Resolution resolution, int page, int batch,
+    public String getAlbumContent(String userId, long albumId, Resolution resolution, int page, int batch,
                                   HttpServletRequest request) throws Exception {
-        MediaDescription album = getMediaDescription(albumId);
+        MediaDescription album = getMediaDescription(userId, albumId);
 
         String albumJobId = getCacheMediaJobId(albumId, resolution);
         addCacheAlbumLastAccess(albumJobId);
@@ -66,7 +66,7 @@ public class AlbumService extends MediaService {
             }
         }
 
-        MediaJobDescription jobDescription = getMediaJobDescription(album, albumJobId, resolution, "albumUrlList");
+        MediaJobDescription jobDescription = getMediaJobDescription(userId, album, albumJobId, resolution, "albumUrlList");
         jobDescription.setOffset(page);
         jobDescription.setBatch(batch);
         jobDescription.setWidth(album.getWidth());
@@ -81,12 +81,12 @@ public class AlbumService extends MediaService {
         return albumId + ":" + resolution + ":" + objectName;
     }
 
-    public String getAlbumPartialVideoUrl(long albumId, Resolution albumRes, String objectName, Resolution res,
+    public String getAlbumPartialVideoUrl(String userId, long albumId, Resolution albumRes, String objectName, Resolution res,
                                           HttpServletRequest request) throws Exception {
-        MediaDescription album = getMediaDescription(albumId);
+        MediaDescription album = getMediaDescription(userId, albumId);
         final String albumVidJobId = getAlbumVidCacheJobIdString(albumId, objectName, res);
 
-        MediaJobDescription jobDescription = getMediaJobDescription(album, albumVidJobId, albumRes, "albumVideoUrl");
+        MediaJobDescription jobDescription = getMediaJobDescription(userId, album, albumVidJobId, albumRes, "albumVideoUrl");
         jobDescription.setKey(objectName);
         jobDescription.setVidResolution(res);
         jobDescription.setAcceptHeader(request.getHeader("Accept"));
@@ -95,14 +95,14 @@ public class AlbumService extends MediaService {
     }
 
     @Override
-    protected MediaDescription getMediaDescription(long albumId) {
-        MediaDescription mediaDescription = super.getMediaDescription(albumId);
+    protected MediaDescription getMediaDescription(String userId, long albumId) {
+        MediaDescription mediaDescription = super.getMediaDescription(userId, albumId);
         if (mediaDescription.getMediaType() != MediaType.ALBUM)
             throw new IllegalArgumentException("Not an album, individual media found: " + albumId);
         return mediaDescription;
     }
 
-    public MediaDescription getMediaDescriptionGeneral(long mediaId) {
-        return super.getMediaDescription(mediaId);
+    public MediaDescription getMediaDescriptionGeneral(String userId, long mediaId) {
+        return super.getMediaDescription(userId, mediaId);
     }
 }

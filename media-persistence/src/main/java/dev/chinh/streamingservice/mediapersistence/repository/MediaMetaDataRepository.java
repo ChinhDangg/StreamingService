@@ -24,28 +24,11 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
         LEFT JOIN FETCH m.authors
         LEFT JOIN FETCH m.groupInfo
         WHERE m.id = :id
+            AND m.userId = :userId
     """)
-    Optional<MediaMetaData> findByIdWithAllInfo(@Param("id") Long id);
+    Optional<MediaMetaData> findByIdWithAllInfo(@Param("userId") long userId, @Param("id") long id);
 
-
-    @Query("""
-        SELECT DISTINCT m FROM MediaMetaData m
-        LEFT JOIN FETCH m.tags
-        LEFT JOIN FETCH m.characters
-        LEFT JOIN FETCH m.universes
-        LEFT JOIN FETCH m.authors
-        LEFT JOIN FETCH m.groupInfo
-    """)
-    List<MediaMetaData> findAllWithAllInfo(Pageable page);
-
-
-    @Query("SELECT m.length FROM MediaMetaData m WHERE m.id = :id")
-    int getMediaLength(@Param("id") Long id);
-
-    @Modifying
-    @Transactional
-    @Query("UPDATE MediaMetaData m SET m.length = m.length + 1 WHERE m.id = :id")
-    void incrementLength(@Param("id") Long id);
+    Optional<MediaMetaData> findByUserIdAndId(long userId, long id);
 
     // returning query doesn't work with modifying - remove annotation or create a custom RepositoryImpl
     // and then use an entity manager to create the query.
@@ -56,10 +39,11 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
         UPDATE media.media_metadata
         SET length = length + 1
         WHERE id = :id
+            AND userId = :userId
         RETURNING length
     """, nativeQuery = true
     )
-    Integer incrementLengthReturning(@Param("id") Long id);
+    Integer incrementLengthReturning(@Param("userId") long userId, @Param("id") long id);
 
 //    @Modifying
 //    @Transactional
@@ -67,62 +51,87 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
         UPDATE media.media_metadata
         SET length = length - 1
         WHERE id = :id
-        AND length > 0
+            AND length > 0
+            AND userId = :userId
         RETURNING length
     """, nativeQuery = true)
-    Integer decrementLengthReturning(@Param("id") long id);
+    Integer decrementLengthReturning(@Param("userId") long userId, @Param("id") long id);
 
 
-    @Query("SELECT m.title FROM MediaMetaData m WHERE m.id = :id")
-    String getMediaTitle(@Param("id") long id);
+    @Query("""
+        SELECT m.title
+        FROM MediaMetaData m
+        WHERE m.id = :id
+            AND m.userId = :userId
+    """)
+    String getMediaTitle(@Param("userId") long userId, @Param("id") long id);
 
     @Modifying
     @Transactional
-    @Query("UPDATE MediaMetaData m SET m.title = :title WHERE m.id = :id")
-    int updateMediaTitle(Long id, String title);
+    @Query("""
+        UPDATE MediaMetaData m
+        SET m.title = :title
+        WHERE m.id = :id
+            AND m.userId = :userId
+    """)
+    int updateMediaTitle(@Param("userId") long userId, @Param("id") long id, @Param("title") String title);
 
     @Modifying
     @Transactional
-    @Query("UPDATE MediaMetaData m SET m.thumbnail = :thumbnail WHERE m.id = :id")
-    int updateMediaThumbnail(long id, String thumbnail);
+    @Query("""
+        UPDATE MediaMetaData m
+        SET m.thumbnail = :thumbnail
+        WHERE m.id = :id
+            AND m.userId = :userId
+    """)
+    int updateMediaThumbnail(@Param("userId") long userId, @Param("id") long id, @Param("thumbnail") String thumbnail);
 
     @Query("""
         SELECT new dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO(a.id, a.name)
         FROM MediaMetaData m
         JOIN m.authors a
         WHERE m.id = :mediaId
+            AND m.userId = :userId
     """)
-    List<NameEntityDTO> findAuthorsByMediaId(long mediaId);
+    List<NameEntityDTO> findAuthorsByMediaId(@Param("userId") long userId, @Param("mediaId") long mediaId);
 
     @Query("""
         SELECT new dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO(c.id, c.name)
         FROM MediaMetaData m
         JOIN m.characters c
         WHERE m.id = :mediaId
+            AND m.userId = :userId
     """)
-    List<NameEntityDTO> findCharactersByMediaId(long mediaId);
+    List<NameEntityDTO> findCharactersByMediaId(@Param("userId") long userId, @Param("mediaId") long mediaId);
 
     @Query("""
         SELECT new dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO(u.id, u.name)
         FROM MediaMetaData m
         JOIN m.universes u
         WHERE m.id = :mediaId
+            AND m.userId = :userId
     """)
-    List<NameEntityDTO> findUniversesByMediaId(long mediaId);
+    List<NameEntityDTO> findUniversesByMediaId(@Param("userId") long userId, @Param("mediaId") long mediaId);
 
     @Query("""
         SELECT new dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO(t.id, t.name)
         FROM MediaMetaData m
         JOIN m.tags t
         WHERE m.id = :mediaId
+            AND m.userId = :userId
     """)
-    List<NameEntityDTO> findTagsByMediaId(long mediaId);
+    List<NameEntityDTO> findTagsByMediaId(@Param("userId") long userId, @Param("mediaId") long mediaId);
 
 
     @Transactional
     @Modifying
-    @Query("UPDATE MediaMetaData m SET m.preview = :preview WHERE m.id = :mediaId")
-    int updateMediaPreview(long mediaId, String preview);
+    @Query("""
+        UPDATE MediaMetaData m
+        SET m.preview = :preview
+        WHERE m.id = :mediaId
+            AND m.userId = :userId
+    """)
+    int updateMediaPreview(@Param("userId") long userId, @Param("mediaId") long mediaId, @Param("preview") String preview);
 
 
     @Modifying
@@ -131,7 +140,15 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
         INSERT INTO media.authors_media (media_id, authors_id)
         VALUES (:mediaId, :authorId)
     """, nativeQuery = true)
-    int addAuthorToMedia(Long mediaId, Long authorId);
+    int addAuthorToMedia(long mediaId, long authorId);
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+        INSERT INTO media.authors_media (media_id, authors_id)
+        SELECT :mediaId, unnest(CAST(:authorIds AS bigint[]))
+    """, nativeQuery = true)
+    int addAuthorsToMedia(@Param("mediaId") long mediaId, @Param("authorIds") Long[] authorIds);
 
     @Modifying
     @Transactional
@@ -139,7 +156,15 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
         INSERT INTO media.characters_media (media_id, characters_id)
         VALUES (:mediaId, :characterId)
     """, nativeQuery = true)
-    int addCharacterToMedia(Long mediaId, Long characterId);
+    int addCharacterToMedia(long mediaId, long characterId);
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+        INSERT INTO media.characters_media (media_id, characters_id)
+        SELECT :mediaId, unnest(CAST(:characterIds AS bigint[]))
+    """, nativeQuery = true)
+    int addCharactersToMedia(@Param("mediaId") long mediaId, @Param("characterIds") Long[] characterIds);
 
     @Modifying
     @Transactional
@@ -147,7 +172,15 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
         INSERT INTO media.universes_media (media_id, universes_id)
         VALUES (:mediaId, :universeId)
     """, nativeQuery = true)
-    int addUniverseToMedia(Long mediaId, Long universeId);
+    int addUniverseToMedia(long mediaId, long universeId);
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+        INSERT INTO media.universes_media (media_id, universes_id)
+        SELECT :mediaId, unnest(CAST(:universeIds AS bigint[]))
+    """, nativeQuery = true)
+    int addUniversesToMedia(@Param("mediaId") long mediaId, @Param("universeIds") Long[] universeIds);
 
     @Modifying
     @Transactional
@@ -155,7 +188,15 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
         INSERT INTO media.tags_media (media_id, tags_id)
         VALUES (:mediaId, :tagId)
     """, nativeQuery = true)
-    int addTagToMedia(Long mediaId, Long tagId);
+    int addTagToMedia(long mediaId, long tagId);
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+        INSERT INTO media.tags_media (media_id, tags_id)
+        SELECT :mediaId, unnest(CAST(:tagIds AS bigint[]))
+    """, nativeQuery = true)
+    int addTagsToMedia(@Param("mediaId") long mediaId, @Param("tagIds") Long[] tagIds);
 
 
     @Modifying
@@ -163,36 +204,72 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Query(value = """
         DELETE FROM media.authors_media am
         WHERE am.media_id = :mediaId
-        AND am.authors_id = :authorId
+            AND am.authors_id = :authorId
     """, nativeQuery = true)
-    int deleteAuthorFromMedia(Long mediaId, Long authorId);
+    int deleteAuthorFromMedia(@Param("mediaId") long mediaId, @Param("authorId") long authorId);
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+        DELETE FROM media.authors_media am
+        WHERE am.media_id = :mediaId
+            AND am.authors_id IN :authorIds
+    """, nativeQuery = true)
+    int deleteAuthorsFromMedia(@Param("mediaId") long mediaId, @Param("authorIds") Long[] authorIds);
 
     @Modifying
     @Transactional
     @Query(value = """
         DELETE FROM media.characters_media cm
         WHERE cm.media_id = :mediaId
-        AND cm.characters_id = :characterId
+            AND cm.characters_id = :characterId
     """, nativeQuery = true)
-    int deleteCharacterFromMedia(Long mediaId, Long characterId);
+    int deleteCharacterFromMedia(@Param("mediaId") long mediaId, @Param("characterId") long characterId);
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+        DELETE FROM media.characters_media cm
+        WHERE cm.media_id = :mediaId
+            AND cm.characters_id IN :characterIds
+    """, nativeQuery = true)
+    int deleteCharactersFromMedia(@Param("mediaId") long mediaId, @Param("characterIds") Long[] characterIds);
 
     @Modifying
     @Transactional
     @Query(value = """
         DELETE FROM media.universes_media um
         WHERE um.media_id = :mediaId
-        AND um.universes_id = :universeId
+            AND um.universes_id = :universeId
     """, nativeQuery = true)
-    int deleteUniverseFromMedia(Long mediaId, Long universeId);
+    int deleteUniverseFromMedia(@Param("mediaId") long mediaId, @Param("universeId") long universeId);
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+        DELETE FROM media.universes_media cm
+        WHERE cm.media_id = :mediaId
+            AND cm.universes_id IN :universeIds
+    """, nativeQuery = true)
+    int deleteUniversesFromMedia(@Param("mediaId") long mediaId, @Param("universeIds") Long[] universeIds);
 
     @Modifying
     @Transactional
     @Query(value = """
         DELETE FROM media.tags_media tm
         WHERE tm.media_id = :mediaId
-        AND tm.tags_id = :tagId
+            AND tm.tags_id = :tagId
     """, nativeQuery = true)
-    int deleteTagFromMedia(Long mediaId, Long tagId);
+    int deleteTagFromMedia(@Param("mediaId") long mediaId, @Param("tagId") long tagId);
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+        DELETE FROM media.tags_media tm
+        WHERE cm.media_id = :mediaId
+            AND tm.tags_id IN :tagIds
+    """, nativeQuery = true)
+    int deleteTagsFromMedia(@Param("mediaId") long mediaId, @Param("tagIds") Long[] tagIds);
 
 
     @Modifying
@@ -204,10 +281,11 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
             SELECT authors_id
             FROM media.authors_media
             WHERE media_id = :mediaId
+                AND user_id = :userId
         )
         AND length > 0
     """, nativeQuery = true)
-    int decrementAuthorLengths(@Param("mediaId") long mediaId);
+    int decrementAuthorLengths(@Param("userId") long userId, @Param("mediaId") long mediaId);
 
     @Modifying
     @Transactional
@@ -218,10 +296,11 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
             SELECT characters_id
             FROM media.characters_media
             WHERE media_id = :mediaId
+                AND user_id = :userId
         )
         AND length > 0
     """, nativeQuery = true)
-    int decrementCharacterLengths(@Param("mediaId") long mediaId);
+    int decrementCharacterLengths(@Param("userId") long userId, @Param("mediaId") long mediaId);
 
     @Modifying
     @Transactional
@@ -232,10 +311,11 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
             SELECT universes_id
             FROM media.universes_media
             WHERE media_id = :mediaId
+                AND user_id = :userId
         )
         AND length > 0
     """, nativeQuery = true)
-    int decrementUniverseLengths(@Param("mediaId") long mediaId);
+    int decrementUniverseLengths(@Param("userId") long userId, @Param("mediaId") long mediaId);
 
     @Modifying
     @Transactional
@@ -246,8 +326,9 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
             SELECT tags_id
             FROM media.tags_media
             WHERE media_id = :mediaId
+                ANd user_id = :userId
         )
         AND length > 0
     """, nativeQuery = true)
-    int decrementTagLengths(@Param("mediaId") long mediaId);
+    int decrementTagLengths(@Param("userId") long userId, @Param("mediaId") long mediaId);
 }
