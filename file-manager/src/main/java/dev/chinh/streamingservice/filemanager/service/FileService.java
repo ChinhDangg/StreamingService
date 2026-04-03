@@ -134,7 +134,7 @@ public class FileService {
             stages.add(Aggregation.match(Criteria.where(FileItemField.PARENT_ID).is(parent.getId())));
         }
 
-        final int size = 50;
+        final int size = 25;
         long skipCount = (long) page * size;
 
         stages.add(Aggregation.skip(skipCount));
@@ -143,6 +143,7 @@ public class FileService {
 
         Aggregation aggregation = Aggregation.newAggregation(stages);
         List<FileSystemItem> results = mongoTemplate.aggregate(aggregation, "fs_metadata", FileSystemItem.class).getMappedResults();
+        getUpdatedThumbnailUrl(userId, results);
         return new FileSearchResult(null, null, results, null, results.size() == size);
     }
 
