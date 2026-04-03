@@ -21,7 +21,7 @@ public class OpenSearchService {
 
     private final OpenSearchClient client;
 
-    public <T> SearchResponse<T> searchContaining(String index, long userId, String field, String text, Class<T> clazz) throws IOException {
+    public <T> SearchResponse<T> searchContaining(long userId, String index, String field, String text, Class<T> clazz) throws IOException {
         BoolQuery.Builder rootBool = new BoolQuery.Builder();
         rootBool.filter(buildTermOrMatch(ContentMetaData.USER_ID, FieldValue.of(userId), true));
         rootBool.must(buildTermOrMatch(field, FieldValue.of(text), false));
@@ -34,8 +34,8 @@ public class OpenSearchService {
         );
     }
 
-    public SearchResponse<Object> advanceSearch(String index,
-                                                long userId,
+    public SearchResponse<Object> advanceSearch(long userId,
+                                                String index,
                                                 List<SearchFieldGroup> includeGroups,
                                                 List<SearchFieldGroup> excludeGroups,
                                                 List<MediaSearchRangeField> mediaSearchRanges,
@@ -116,7 +116,7 @@ public class OpenSearchService {
         return leafQuery;
     }
 
-    public SearchResponse<Object> search(String index, long userId, Object text, int page, int size, SortBy sortBy,
+    public SearchResponse<Object> search(long userId, String index, Object text, int page, int size, SortBy sortBy,
                                     SortOrder sortOrder) throws IOException {
         Query multiMatchNested = Query.of(q -> q
                 .bool(b -> b
@@ -203,7 +203,7 @@ public class OpenSearchService {
     /**
      * Search exactly with given search strings by field.
      */
-    public SearchResponse<Object> searchTermByOneField(String index, long userId, String field, List<Object> text, boolean matchAll, int page, int size,
+    public SearchResponse<Object> searchTermByOneField(long userId, String index, String field, List<Object> text, boolean matchAll, int page, int size,
                                                SortBy sortBy, SortOrder sortOrder) throws IOException {
         BoolQuery.Builder termBoolBuilder = new BoolQuery.Builder();
         termBoolBuilder.filter(buildTermOrMatch(ContentMetaData.USER_ID, FieldValue.of(userId), true));

@@ -40,14 +40,14 @@ public class MediaSearchService {
     @Value("${always-show-original-resolution}")
     private String alwaysShowOriginalResolution;
 
-    public List<NameEntityDTO> searchContaining(String index, String userId, String text) throws IOException {
+    public List<NameEntityDTO> searchContaining(String userId, String index, String text) throws IOException {
         ContentMetaData.validateSearchText(text);
-        SearchResponse<NameEntityDTO> response = searchContaining(index, userId, ContentMetaData.NAME, text, NameEntityDTO.class);
+        SearchResponse<NameEntityDTO> response = searchContaining(userId, index, ContentMetaData.NAME, text, NameEntityDTO.class);
         return mapSearchReponseNameEntryToList(response);
     }
 
-    private <T> SearchResponse<T> searchContaining(String index, String userId, String field, String text, Class<T> clazz) throws IOException {
-        return openSearchService.searchContaining(index, Long.parseLong(userId), field, text, clazz);
+    private <T> SearchResponse<T> searchContaining(String userId, String index, String field, String text, Class<T> clazz) throws IOException {
+        return openSearchService.searchContaining(Long.parseLong(userId), index, field, text, clazz);
     }
 
     private List<NameEntityDTO> mapSearchReponseNameEntryToList(SearchResponse<NameEntityDTO> response) {
@@ -88,7 +88,7 @@ public class MediaSearchService {
         }
 
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.advanceSearch(MEDIA_INDEX_NAME, Long.parseLong(userId), includes, excludes, request.getRangeFields(), page, size, sortBy, sortOrder),
+                openSearchService.advanceSearch(Long.parseLong(userId), MEDIA_INDEX_NAME, includes, excludes, request.getRangeFields(), page, size, sortBy, sortOrder),
                 page, size);
 
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
@@ -121,7 +121,7 @@ public class MediaSearchService {
             throw new IllegalArgumentException("Invalid search string");
         }
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.search(MEDIA_INDEX_NAME, Long.parseLong(userId), searchString, page, size, sortBy, sortOrder),
+                openSearchService.search(Long.parseLong(userId), MEDIA_INDEX_NAME, searchString, page, size, sortBy, sortOrder),
                 page, size);
 
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
@@ -135,7 +135,7 @@ public class MediaSearchService {
                                               SortBy sortBy, SortOrder sortOrder) throws Exception {
         ContentMetaData.validateSearchFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.searchTermByOneField(MEDIA_INDEX_NAME, Long.parseLong(userId), field + "." + ContentMetaData.ID, keywords, matchAll, page, size, sortBy, sortOrder),
+                openSearchService.searchTermByOneField(Long.parseLong(userId), MEDIA_INDEX_NAME, field + "." + ContentMetaData.ID, keywords, matchAll, page, size, sortBy, sortOrder),
                 page, size);
 
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
