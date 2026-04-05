@@ -71,23 +71,34 @@ function getIconNode(fileType) {
 }
 
 let isProcessing = false;
-const currentFileItems = [];
+const currentFileItemsMap = new Map();
+let currentFileItemIds = [];
 
-function displayFileItem(fileItems, clearNode = true, clearFileList = true, pushFileList = true) {
+/*
+    if useGlobalMapItems is true, then the fileItems will be a list of fileItemIds
+    and the displayFileItem will use the global map to get the fileItem objects
+    and display them. This is useful when we want to display the fileItems in a
+    different order than the order they are in the fileItems array.
+ */
+function displayFileItem(fileItems, clearNode = true, clearFileList = true, pushFileList = true, useGlobalMapItems = false) {
     if (clearNode) {
         const first = fileViewContainer.firstElementChild;
         if (first) fileViewContainer.replaceChildren(first);
         if (observer)
             observer.observe(sentinel);
     }
-    if (clearFileList)
-        currentFileItems.length = 0;
+    if (clearFileList) {
+        currentFileItemsMap.clear();
+        currentFileItemIds.length = 0;
+    }
 
     fileViewWrapper.querySelector('.end-of-file-text').classList.add('hidden');
 
-    fileItems.forEach(item => {
-        if (pushFileList)
-            currentFileItems.push(item);
+    const renderFileItem = (item) => {
+        if (pushFileList) {
+            currentFileItemsMap.set(item.id, item);
+            currentFileItemIds.push(item.id);
+        }
 
         const fileNode = helperCloneAndUnHideNode(fileNodeTem);
         const fileType = item.fileType;
@@ -109,14 +120,7 @@ function displayFileItem(fileItems, clearNode = true, clearFileList = true, push
             setMediaBgColor(fileNode, fileType);
         }
         if (fileType === 'DIR' || fileType === 'ALBUM' || fileType === 'GROUPER') {
-            fileNode.addEventListener('click', async function () {
-                if (isProcessing) return;
-                setCurrentUri(item.id);
-                const subFiles = await fetchMoreFiles(item.id);
-                if (!subFiles) return;
-                displayFileItem(subFiles);
-                addToCurrentPath(item.id, item.name);
-            });
+            fileNode.dataset.name = item.name;
         }
         const sortingInfo = fileNode.querySelector('.sorting-info');
         const sortInfo = getItemKeyFromSortSelectValue(getSortSelectValue().by);
@@ -136,7 +140,17 @@ function displayFileItem(fileItems, clearNode = true, clearFileList = true, push
             sortingInfo.classList.add('hidden');
         }
         fileViewContainer.appendChild(fileNode);
-    });
+    }
+
+    if (useGlobalMapItems) {
+        fileItems.forEach(itemId => {
+            renderFileItem(currentFileItemsMap.get(itemId));
+        });
+    } else {
+        fileItems.forEach(item => {
+            renderFileItem(item);
+        });
+    }
 
     if (nextPage === -1) {
         const endOfFileText = fileViewWrapper.querySelector('.end-of-file-text');
@@ -245,8 +259,8 @@ sortSelect.addEventListener('change', async function () {
         if (key === 'resolution')
             key = 'resolution.area';
         const order = sortSelectValue.order;
-        currentFileItems.sort(dynamicSortByField(key, order));
-        displayFileItem(currentFileItems, true, false, false);
+        currentFileItemIds.sort(sortIdsByMap(key, order));
+        displayFileItem(currentFileItemIds, true, false, false, true);
         return;
     }
 
@@ -269,6 +283,20 @@ function getItemKeyFromSortSelectValue(value) {
     else if (value === 'UPLOAD')
         return 'uploadDate';
     return null;
+}
+
+function sortIdsByMap(key, order = 'ASC') {
+    // We get the original comparison logic
+    const internalSort = dynamicSortByField(key, order);
+
+    // We return a new function that expects IDs instead of Objects
+    return function(idA, idB) {
+        const objA = currentFileItemsMap.get(idA);
+        const objB = currentFileItemsMap.get(idB);
+
+        // Pass the actual objects into your existing logic
+        return internalSort(objA, objB);
+    };
 }
 
 function dynamicSortByField(key, order = 'ASC') {
@@ -319,11 +347,14 @@ async function searchFiles(searchTerm) {
     if (nextPage === -1 && !recursiveToggle.checked) {
         console.log('searching locally');
         const searchTermLowerCase = searchTerm.toLowerCase();
-        const filteredFiles = currentFileItems.filter(file => {
+        const filteredFileIds = [];
+        for (const [key, file] of currentFileItemsMap) {
             const fileNameLowerCase = file.name.toLowerCase();
-            return fileNameLowerCase.includes(searchTermLowerCase);
-        });
-        displayFileItem(filteredFiles, true, false, false);
+            if (fileNameLowerCase.includes(searchTermLowerCase)) {
+                filteredFileIds.push(key);
+            }
+        }
+        displayFileItem(filteredFileIds, true, false, false, true);
     } else {
         setObserverToSearch(searchTerm);
         await fetchSearchFiles(searchTerm, 0);
@@ -368,7 +399,7 @@ function clearSearch() {
     searchInput.value = '';
     clearSearchButton.classList.add('hidden');
     setObserverToFetchMore();
-    displayFileItem(currentFileItems, true, false, false);
+    displayFileItem(currentFileItemIds, true, false, false, true);
 }
 
 
@@ -1134,6 +1165,132 @@ function clearNameEntityDisplayNode(nameEntityNode) {
 }
 
 
+
+const selectedFiles = new Map();
+const selectFileBanner = document.getElementById('select-file-banner');
+const selectFileBannerCancelBtn = selectFileBanner.querySelector('.cancel-btn');
+
+function addSelectedFile(fileId, mediaId, fileType, fileNode) {
+    if (selectedFiles.has(fileId))
+        return false;
+    selectedFiles.set(fileId, {mediaId: mediaId, fileType: fileType, fileNode: fileNode});
+    fileNode.classList.add('border-[3px]', 'border-white')
+    selectFileBanner.querySelector('.selected-count-text').textContent = selectedFiles.size.toString();
+    selectFileBanner.classList.remove('hidden');
+    return true;
+}
+
+function removeSelectedFile(fileId) {
+    if (!selectedFiles.has(fileId))
+        return false;
+    selectedFiles.get(fileId).fileNode.classList.remove('border-[3px]', 'border-white');
+    selectedFiles.delete(fileId);
+    selectFileBanner.querySelector('.selected-count-text').textContent = selectedFiles.size.toString();
+    if (selectedFiles.size === 0) {
+        selectFileBanner.classList.add('hidden');
+    }
+    return true;
+}
+
+selectFileBannerCancelBtn.addEventListener('click', function () {
+    for (const file of selectedFiles.values()) {
+        file.fileNode.classList.remove('border-[3px]', 'border-white');
+    }
+    selectedFiles.clear();
+    selectFileBanner.querySelector('.selected-count-text').textContent = '0';
+    selectFileBanner.classList.add('hidden');
+});
+
+const selectionBox = document.getElementById('selection-box');
+let isDragging = false;
+let startX, startY;
+let cachedFiles = [];
+let animationFrameId = null;
+fileViewWrapper.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || e.target.closest('.file-node-wrapper')) return;
+
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+
+    const files = document.querySelectorAll('.file-node-wrapper');
+
+    cachedFiles = Array.from(files).map(fileEl => {
+        const rect = fileEl.getBoundingClientRect();
+        return {
+            element: fileEl,
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+            isSelected: false
+        };
+    });
+
+    selectionBox.style.display = 'block';
+    selectionBox.style.left = `${startX}px`;
+    selectionBox.style.top = `${startY}px`;
+    selectionBox.style.width = '0px';
+    selectionBox.style.height = '0px';
+});
+
+window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+    animationFrameId = requestAnimationFrame(() => {
+        const currentX = e.clientX;
+        const currentY = e.clientY;
+
+        const boxLeft = Math.min(startX, currentX);
+        const boxTop = Math.min(startY, currentY);
+        const boxWidth = Math.abs(startX - currentX);
+        const boxHeight = Math.abs(startY - currentY);
+        const boxRight = boxLeft + boxWidth;
+        const boxBottom = boxTop + boxHeight;
+
+        // Update the visual box
+        selectionBox.style.left = `${boxLeft}px`;
+        selectionBox.style.top = `${boxTop}px`;
+        selectionBox.style.width = `${boxWidth}px`;
+        selectionBox.style.height = `${boxHeight}px`;
+
+        for (let i = 0; i < cachedFiles.length; i++) {
+            const file = cachedFiles[i];
+
+            const isIntersecting = !(
+                file.left > boxRight ||
+                file.right < boxLeft ||
+                file.top > boxBottom ||
+                file.bottom < boxTop
+            );
+
+            // Only touch the DOM if the state actually flipped (massive speed boost)
+            if (isIntersecting !== file.isSelected) {
+                file.isSelected = isIntersecting;
+                const fileId = file.element.getAttribute('data-id');
+                const fileMid = file.element.getAttribute('data-mId');
+                const fileType = file.element.getAttribute('data-type');
+                if (!removeSelectedFile(fileId))
+                    addSelectedFile(fileId, fileMid, fileType, file.element);
+            }
+        }
+    });
+});
+
+window.addEventListener('mouseup', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    selectionBox.style.display = 'none';
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+    // Clear memory
+    cachedFiles = [];
+});
+
+
+
 const customRightMenu = document.getElementById('custom-right-menu');
 const newFolderButton = customRightMenu.querySelector('.new-folder-btn');
 const renameButton = customRightMenu.querySelector('.rename-btn');
@@ -1188,6 +1345,8 @@ fileDropZone.addEventListener('contextmenu', (event) => {
     currentTargetNode.mId = targetNode.getAttribute('data-mId');
     currentTargetNode.node = targetNode;
 
+    addSelectedFile(currentTargetNode.id, currentTargetNode.mId, currentTargetNode.type, targetNode)
+
     if (currentTargetNode.mId) {
         openMediaButton.disabled = false;
         openMediaButton.classList.remove('invisible');
@@ -1202,14 +1361,43 @@ fileDropZone.addEventListener('contextmenu', (event) => {
             addAsGrouperButton.classList.remove('invisible');
         }
     }
-    renameButton.disabled = false;
-    renameButton.classList.remove('invisible');
+    if (selectedFiles.size > 0) {
+        renameButton.disabled = false;
+        renameButton.classList.remove('invisible');
+    }
     moveButton.disabled = false;
     moveButton.classList.remove('invisible');
     deleteFileButton.disabled = false;
     deleteFileButton.classList.remove('invisible');
 
     showCustomRightMenu(event.clientX, event.clientY);
+});
+
+fileDropZone.addEventListener('click', async (event) => {
+    const targetNode = event.target.closest('.file-node-wrapper');
+    if (!targetNode) return;
+    clearTargetNode();
+
+    const fileType = targetNode.getAttribute('data-type');
+    const fileId = targetNode.getAttribute('data-id');
+    const mediaId = targetNode.getAttribute('data-mId');
+
+    if (!isMovingFile && selectedFiles.size > 0) {
+        if (!removeSelectedFile(fileId))
+            addSelectedFile(fileId, mediaId, fileType, targetNode);
+        return;
+    }
+
+    if (fileType === 'DIR' || fileType === 'ALBUM' || fileType === 'GROUPER') {
+        const fileName = targetNode.getAttribute('data-name');
+
+        if (isProcessing) return;
+        setCurrentUri(fileId);
+        const subFiles = await fetchMoreFiles(fileId);
+        if (!subFiles) return;
+        displayFileItem(subFiles);
+        addToCurrentPath(fileId, fileName);
+    }
 });
 
 function showCustomRightMenu(posX, posY) {
@@ -1236,14 +1424,26 @@ addAsVideoButton.addEventListener('click', async function () {
         console.log('No target selected');
         return;
     }
-    const response = await apiRequest(`/api/file/vid/${currentTargetNode.id}`, {
-        method: 'POST'
-    });
-    if (!response.ok) {
-        alert('Failed to add as video: ' + await response.text());
+    if (selectedFiles.size === 0) {
+        console.log('No file selected');
         return;
     }
-    displayInfoMessage(await response.text());
+    for (const [fileId, fileInfo] of selectedFiles.entries()) {
+        if (fileInfo.fileType !== 'VIDEO') {
+            console.log('File is not a video: ' + fileId);
+            continue;
+        }
+        const response = await apiRequest(`/api/file/vid/${fileId}`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            //alert('Failed to add as video: ' + await response.text());
+            displayFailTexts(['Failed to add as video: ' + await response.text()]);
+            return;
+        }
+        displayInfoMessage(await response.text());
+    }
+    displayInfoMessage(`Processing ${selectedFiles.size} file(s) as video(s).`);
 });
 
 addAsAlbumButton.addEventListener('click', async function () {
@@ -1251,14 +1451,26 @@ addAsAlbumButton.addEventListener('click', async function () {
         console.log('No target selected');
         return;
     }
-    const response = await apiRequest(`/api/file/album/${currentTargetNode.id}`, {
-        method: 'POST'
-    });
-    if (!response.ok) {
-        alert('Failed to add as album: ' + await response.text());
-        return
+    if (selectedFiles.size === 0) {
+        console.log('No file selected');
+        return;
     }
-    displayInfoMessage(await response.text());
+    for (const [fileId, fileInfo] of selectedFiles.entries()) {
+        if (fileInfo.fileType !== 'DIR') {
+            console.log('File is not a directory: ' + fileId);
+            continue;
+        }
+        const response = await apiRequest(`/api/file/album/${fileId}`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            //alert('Failed to add as album: ' + await response.text());
+            displayFailTexts(['Failed to add as album: ' + await response.text()]);
+            return
+        }
+        displayInfoMessage(await response.text());
+    }
+    displayInfoMessage(`Processing ${selectedFiles.size} dir(s) as album(s).`);
 });
 
 addAsGrouperButton.addEventListener('click', async function () {
@@ -1266,15 +1478,27 @@ addAsGrouperButton.addEventListener('click', async function () {
         console.log('No target selected');
         return;
     }
-    const response = await apiRequest(`/api/file/grouper/${currentTargetNode.id}`, {
-        method: 'POST'
-    });
-    if (!response.ok) {
-        alert('Failed to add as grouper: ' + await response.text());
+    if (selectedFiles.size === 0) {
+        console.log('No file selected');
         return;
     }
-    displayInfoMessage(await response.text());
-})
+    for (const [fileId, fileInfo] of selectedFiles.entries()) {
+        if (fileInfo.fileType !== 'DIR') {
+            console.log('File is not a directory: ' + fileId);
+            continue;
+        }
+        const response = await apiRequest(`/api/file/grouper/${fileId}`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            //alert('Failed to add as grouper: ' + await response.text());
+            displayFailTexts(['Failed to add as grouper: ' + await response.text()]);
+            return;
+        }
+        displayInfoMessage(await response.text());
+    }
+    displayInfoMessage(`Processing ${selectedFiles.size} dir(s) as grouper(s).`);
+});
 
 openMediaButton.addEventListener('click', async function () {
     if (currentTargetNode.mId === null) {
@@ -1295,31 +1519,52 @@ deleteFileButton.addEventListener('click', async function () {
         console.log('No target selected');
         return;
     }
-    const confirmDelete = confirm('Are you sure to delete this file?');
-    if (!confirmDelete) return;
-    if (currentTargetNode.mId) {
-        const response = await apiRequest(`/api/file/media/${currentTargetNode.mId}`, {
-            method: 'DELETE'
-        });
-        if (!response.ok) {
-            alert('Failed to delete media: ' + await response.text());
-            return;
-        }
-        displayInfoMessage("Processing to delete media");
-    } else {
-        const response = await apiRequest(`/api/file/${currentTargetNode.id}`, {
-            method: 'DELETE'
-        });
-        if (!response.ok) {
-            alert('Failed to delete file: ' + await response.text());
-            return;
-        }
-        displayInfoMessage("Processing to delete file");
+    if (selectedFiles.size === 0) {
+        console.log('No file selected');
+        return;
     }
-    currentTargetNode.node.remove();
-    const index = currentFileItems.findIndex(item => item.id === currentTargetNode.id);
-    if (index !== -1) currentFileItems.splice(index, 1);
+    const deleteText = selectedFiles.size === 1 ? `file ${currentTargetNode.id}` : `${selectedFiles.size} files`;
+    const confirmDelete = confirm(`Are you sure to delete ${deleteText}?`);
+    if (!confirmDelete) return;
+    const idsToDelete = [];
+    for (const [fileId, fileInfo] of selectedFiles.entries()) {
+        if (fileInfo.mediaId) {
+            const response = await apiRequest(`/api/file/media/${fileInfo.mediaId}`, {
+                method: 'DELETE'
+            });
+            if (!response.ok) {
+                //alert('Failed to delete media: ' + await response.text());
+                displayFailTexts(['Failed to delete media: ' + await response.text()]);
+                return;
+            }
+            displayInfoMessage("Processing to delete media: " + fileInfo.mediaId);
+        } else {
+            const response = await apiRequest(`/api/file/${fileId}`, {
+                method: 'DELETE'
+            });
+            if (!response.ok) {
+                //alert('Failed to delete file: ' + await response.text());
+                displayFailTexts(['Failed to delete file: ' + await response.text()]);
+                return;
+            }
+            displayInfoMessage("Processing to delete file: " + fileId);
+        }
+        idsToDelete.push(fileId);
+        removeSelectedFile(fileId);
+        fileInfo.fileNode.remove();
+        currentFileItemsMap.delete(fileId);
+    }
+    const toDeleteSet = new Set(idsToDelete);
+    currentFileItemIds = currentFileItemIds.filter(id => !toDeleteSet.has(id));
+    displayInfoMessage(`Successfully deleted ${deleteText}`);
 });
+
+function hasSameNameItem(name) {
+    for (const fileItem of currentFileItemsMap.values()) {
+        if (name === fileItem.name) return true;
+    }
+    return false;
+}
 
 newFolderButton.addEventListener('click', async function () {
     const sendCreateNewFolderRequest = async (name) => {
@@ -1342,7 +1587,7 @@ newFolderButton.addEventListener('click', async function () {
             alert('Folder name cannot be empty');
             return;
         }
-        const sameNameItem = currentFileItems.find(item => item.name === name);
+        const sameNameItem = hasSameNameItem(newFolderName);
         if (sameNameItem) {
             alert('Folder name already exists');
             return;
@@ -1369,7 +1614,7 @@ newFolderButton.addEventListener('click', async function () {
 });
 
 renameButton.addEventListener('click', async function () {
-    const currentFileItem = currentFileItems.find(item => item.id === currentTargetNode.id);
+    const currentFileItem = currentFileItemsMap.get(currentTargetNode.id);
     if (!currentFileItem) {
         alert('No current file item');
         return;
@@ -1379,7 +1624,8 @@ renameButton.addEventListener('click', async function () {
             displayInfoMessage('New name is the same as current name');
             return;
         }
-        const sameNameItem = currentFileItems.find(item => item.name === newName);
+        newName = newName.trim();
+        const sameNameItem = hasSameNameItem(newName);
         if (sameNameItem) {
             alert('An item the same name already exists');
             return;
@@ -1407,40 +1653,39 @@ renameButton.addEventListener('click', async function () {
 
 const movingFileBanner = document.getElementById('moving-file-banner');
 moveButton.addEventListener('click', async function () {
-    const currentFileItem = currentFileItems.find(item => item.id === currentTargetNode.id);
-    const currentId = currentFileItem?.id;
-    const currentParentId = currentFileItem?.parentId;
-    if (!currentId) {
+    if (!currentTargetNode.id) {
         alert('No target selected');
         return;
     }
-    const moveFile = async () => {
+    if (selectedFiles.size === 0) {
+        alert('No file selected');
+        return;
+    }
+    const moveFile = async (movingFileId, currentParentId, currentFileName) => {
+        if (!movingFileId) {
+            return 'Failed to get current file item: ' + movingFileId;
+        }
         const currentPath = getCurrentPath();
         if (currentPath == null) {
-            alert('Failed to get current path');
-            return;
+            return 'Failed to get current path';
         }
         const currentFolderId = currentPath.id;
         if (currentFolderId === null) {
-            alert('Failed to get current folder id');
-            return;
+            return 'Failed to get current folder id';
         }
         if (currentParentId === currentFolderId) {
-            alert('Item is already in the same folder');
-            return;
+            return 'Item is already in the same folder';
         }
-        if (currentId === currentFolderId) {
-            alert('Cannot move item to itself');
-            return;
+        if (movingFileId === currentFolderId) {
+            return 'Cannot move item to itself';
         }
-        if (getFullCurrentPathInIds().includes(currentId)) {
-            alert('Cannot move item to its subfolder');
-            return;
+        if (getFullCurrentPathInIds().includes(movingFileId)) {
+            return 'Cannot move item to its subfolder';
         }
-        const sameNameItem = currentFileItems.find(item => item.name === currentFileItem.name);
+        const sameNameItem = hasSameNameItem(currentFileName);
         if (sameNameItem) {
             alert('Cannot move item to a folder with item that has the same name');
-            return;
+            return null;
         }
         const response = await apiRequest(`/api/file/move`, {
             method: 'PUT',
@@ -1448,24 +1693,47 @@ moveButton.addEventListener('click', async function () {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                fileId: currentId,
+                fileId: movingFileId,
                 parentId: currentFolderId
             })
         });
         if (!response.ok) {
-            alert('Failed to move file: ' + await response.text());
-            return;
+            return 'Failed to move file: ' + await response.text();
         }
-        movingFileBanner.querySelector('.cancel-btn').click();
         const fileInfo = await response.json();
         displayFileItem([fileInfo], false, false, true);
         displayInfoMessage(`Moved: ${fileInfo.name}`, true, 30000);
     }
-    const currentFullPath = currentFileItem.name;
-    openMovingFileBanner(currentFullPath, moveFile);
+
+    const movingFiles = [];
+    for (const fileId of selectedFiles.keys()) {
+        movingFiles.push(currentFileItemsMap.get(fileId));
+    }
+
+    const moveFiles = async () => {
+        for (const movingFile of movingFiles) {
+            const failedText = await moveFile(movingFile.id, movingFile.parentId, movingFile.name);
+            if (failedText) {
+                alert(failedText);
+                return;
+            }
+        }
+        movingFileBanner.querySelector('.cancel-btn').click();
+        selectFileBannerCancelBtn.click();
+    }
+    let currentFullPath;
+    if (selectedFiles.size === 1) {
+        const currentFileItem = currentFileItemsMap.get(currentTargetNode.id);
+        currentFileItem.name;
+    } else {
+        currentFullPath = `${selectedFiles.size} files`;
+    }
+    openMovingFileBanner(currentFullPath, moveFiles);
 });
 
+let isMovingFile = false;
 function openMovingFileBanner(name, moveFunc) {
+    isMovingFile = true;
     const movingPathText = movingFileBanner.querySelector('.moving-path-text');
     movingPathText.textContent = getFullCurrentPath() + name;
     movingPathText.title = name;
@@ -1475,6 +1743,7 @@ function openMovingFileBanner(name, moveFunc) {
 }
 
 movingFileBanner.querySelector('.cancel-btn').onclick = () => {
+    isMovingFile = false;
     movingFileBanner.querySelector('.moving-path-text').textContent = '';
     movingFileBanner.querySelector('.move-btn').onclick = null;
     movingFileBanner.classList.add('hidden');
@@ -1485,16 +1754,47 @@ document.addEventListener('click', () => {
 });
 
 const infoMessageContainer = document.getElementById('info-message-container');
-let infoMessageTimer = null;
+const messageText = infoMessageContainer.querySelector('.info-message');
+
+let messageQueue = [];
+let isProcessingMessage = false;
+const MAX_QUEUE = 20;
+
 function displayInfoMessage(message, hasTimeout = true, timeoutTime = 5000) {
-    infoMessageContainer.querySelector('.info-message').textContent = message;
-    infoMessageContainer.classList.remove('hidden');
-    if (hasTimeout) {
-        clearTimeout(infoMessageTimer);
-        infoMessageTimer = setTimeout(() => {
-            infoMessageContainer.classList.add('hidden');
-        }, timeoutTime);
+    if (messageQueue.length >= MAX_QUEUE) {
+        messageQueue.shift(); // Remove oldest to make room
     }
+
+    messageQueue.push({ message, hasTimeout, timeoutTime });
+
+    if (!isProcessingMessage) {
+        processQueue();
+    }
+}
+
+async function processQueue() {
+    if (messageQueue.length === 0) {
+        isProcessingMessage = false;
+        infoMessageContainer.classList.add('hidden');
+        return;
+    }
+
+    isProcessingMessage = true;
+    const currentItem = messageQueue.shift();
+
+    messageText.textContent = currentItem.message;
+    infoMessageContainer.classList.remove('hidden');
+
+    // If there are more messages waiting, use 500ms.
+    // Otherwise, use the item's specific timeout (default 5000ms).
+    let delay = 500;
+    if (messageQueue.length === 0 && currentItem.hasTimeout) {
+        delay = currentItem.timeoutTime;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    processQueue();
 }
 
 

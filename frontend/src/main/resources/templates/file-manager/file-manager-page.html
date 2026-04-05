@@ -163,6 +163,15 @@
             -ms-overflow-style: none;  /* Internet Explorer and Edge */
             scrollbar-width: none;  /* Firefox */
         }
+
+        #selection-box {
+            display: none;
+            position: fixed; /* Fixed is often faster/easier than absolute for viewport math */
+            border: 1px solid rgba(26, 115, 232, 0.8);
+            background-color: rgba(26, 115, 232, 0.2);
+            pointer-events: none;
+            z-index: 999;
+        }
     </style>
 </head>
 
@@ -434,7 +443,7 @@
             </div>
         </div>
 
-        <div id="file-view-wrapper">
+        <div id="file-view-wrapper" class="select-none">
             <div id="file-view-container" class="mt-4 grid-view text-xs border-t border-gray-700 pt-2">
                 <div class="file-node-wrapper !hidden">
                     <div class="file-node">
@@ -450,6 +459,7 @@
             <div class="end-of-file-text mt-[50px] flex w-full h-full text-sm items-center justify-center">
                 End of file list
             </div>
+            <div id="selection-box"></div>
         </div>
 
         <div class="min-h-16"></div>
@@ -590,7 +600,7 @@
 <div class="w-full shadow-lg rounded-xl px-6 pb-2">
     <div id="moving-file-banner"  class="hidden relative bg-gray-900 flex items-start justify-center">
         <!-- Floating Move Box -->
-        <div class="absolute top-1/2 -translate-y-full bg-gray-800 text-gray-200 shadow-xl rounded-xl px-4 py-3 w-full max-w-xl">
+        <div class="absolute top-1/2 -translate-y-[200%] bg-gray-800 text-gray-200 shadow-xl rounded-xl px-4 py-3 w-full max-w-xl">
             <!-- Moving text -->
             <div class="text-sm truncate">
                 <span class="text-gray-400">Moving:</span>
@@ -603,6 +613,19 @@
                 </button>
                 <button class="move-btn text-xs px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-500 transition">
                     Move here
+                </button>
+            </div>
+        </div>
+    </div>
+    <div id="select-file-banner"  class="hidden relative bg-gray-900 flex items-start justify-center">
+        <div class="absolute top-1/2 -translate-y-full bg-gray-800 text-gray-200 shadow-xl rounded-xl px-4 py-3 w-full max-w-52">
+            <div class="text-sm truncate">
+                <span class="text-gray-400">Selected:</span>
+                <span class="selected-count-text ml-1 font-medium">0</span>
+            </div>
+            <div class="mt-1 flex justify-end space-x-2">
+                <button class="cancel-btn text-xs px-3 py-1 rounded-md bg-gray-700 hover:bg-gray-600 transition">
+                    Cancel
                 </button>
             </div>
         </div>
