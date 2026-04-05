@@ -85,7 +85,7 @@ public class FileManagerController {
     }
 
 
-    public record CreateDirectoryRequest(@Size(max = 30) String parentId, @Size(max = 300) String name) {}
+    public record CreateDirectoryRequest(@NotBlank @Size(max = 30) String parentId, @NotBlank @Size(max = 300) String name) {}
     @PostMapping("/folder")
     public ResponseEntity<?> createDirectory(@RequestBody @Valid CreateDirectoryRequest request, @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok().body(fileService.createNewDirectory(jwt.getSubject(), request.parentId, request.name));
@@ -96,7 +96,7 @@ public class FileManagerController {
         return ResponseEntity.ok().body(fileService.renameFileItem(jwt.getSubject(), request.parentId, request.name));
     }
 
-    public record MoveFileRequest(@Size(max = 30) String fileId, @Size(max = 30) String parentId) {}
+    public record MoveFileRequest(@NotBlank @Size(max = 30) String fileId, @NotBlank @Size(max = 30) String parentId) {}
     @PutMapping("/move")
     public ResponseEntity<?> moveFile(@RequestBody @Valid MoveFileRequest request, @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok().body(fileService.initiateMoveFileItem(jwt.getSubject(), request.fileId, request.parentId));
