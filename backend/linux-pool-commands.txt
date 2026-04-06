@@ -93,6 +93,14 @@ sudo zfs set atime=off file_pool/opensearch
 sudo zfs set primarycache=metadata file_pool/opensearch
 sudo zfs set xattr=sa file_pool/opensearch
 
+# MongoDB (atlas) dataset tuning:
+sudo zfs set recordsize=64K file_pool/mongodb
+sudo zfs set compression=lz4 file_pool/mongodb
+sudo zfs set atime=off file_pool/mongodb
+sudo zfs set logbias=latency file_pool/mongodb
+sudo zfs set xattr=sa file_pool/mongodb
+sudo zfs set primarycache=all file_pool/mongodb
+
 # Files dataset tuning:
 sudo zfs set recordsize=1M file_pool/files
 sudo zfs set compression=lz4 file_pool/files
