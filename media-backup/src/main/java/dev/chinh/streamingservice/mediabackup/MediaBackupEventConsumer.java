@@ -33,9 +33,6 @@ public class MediaBackupEventConsumer {
     private String backupEnabled;
 
     private void onCreateFile(MediaUpdateEvent.FileCreated event) throws Exception {
-        if (!Boolean.parseBoolean(backupEnabled)) {
-            return;
-        }
         System.out.println("Received create backup file event: " + event.fileName());
         try {
             String target = addBackupLocationToPath(addRootToPath(event.userId() + "/" + event.fileName()));
@@ -114,9 +111,6 @@ public class MediaBackupEventConsumer {
     }
 
     private void updateThumbnail(long id, String oldThumbnail, String newThumbnail) throws Exception {
-        if (!Boolean.parseBoolean(backupEnabled)) {
-            return;
-        }
         System.out.println("Received thumbnail update backup event: " + id + ", old: " + oldThumbnail + ", new: " + newThumbnail);
         if (newThumbnail != null) {
             createThumbnailBackup(newThumbnail);
@@ -128,9 +122,6 @@ public class MediaBackupEventConsumer {
 
 
     private void createThumbnailBackup(String newThumbnail) throws Exception {
-        if (!Boolean.parseBoolean(backupEnabled)) {
-            return;
-        }
         System.out.println("Received thumbnail create backup event: " + newThumbnail);
         String thumbnail = addBackupLocationToPath(ContentMetaData.THUMBNAIL_BUCKET + "/" + newThumbnail);
         Path thumbnailPath = Paths.get(thumbnail);
@@ -148,9 +139,6 @@ public class MediaBackupEventConsumer {
     }
 
     private void deleteThumbnailBackup(String oldThumbnail) {
-        if (!Boolean.parseBoolean(backupEnabled)) {
-            return;
-        }
         System.out.println("Received thumbnail delete backup event, old: " + oldThumbnail);
         try {
             Path path = Paths.get(addBackupLocationToPath(ContentMetaData.THUMBNAIL_BUCKET + "/" + oldThumbnail));
@@ -239,6 +227,11 @@ public class MediaBackupEventConsumer {
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws Exception {
         try {
+            if (!Boolean.parseBoolean(backupEnabled)) {
+                System.out.println("Backup is disabled -- Skipping " + event.getClass().getSimpleName());
+                ack.acknowledge();
+                return;
+            }
             switch (event) {
                 case MediaUpdateEvent.FileCreated e -> onCreateFile(e);
                 case MediaUpdateEvent.FileDeleted e -> onDeleteFile(e);
