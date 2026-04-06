@@ -68,6 +68,7 @@ sudo zpool create file_pool \
 sudo zfs create file_pool/files
 sudo zfs create file_pool/postgres
 sudo zfs create file_pool/opensearch
+sudo zfs create file_pool/mongodb
 
 # Set the parent mount point
 sudo zfs set mountpoint=/media/file_pool file_pool
@@ -76,6 +77,7 @@ sudo zfs set mountpoint=/media/file_pool file_pool
 sudo zfs set mountpoint=/media/file_pool/files file_pool/files
 sudo zfs set mountpoint=/media/file_pool/postgres file_pool/postgres
 sudo zfs set mountpoint=/media/file_pool/opensearch file_pool/opensearch
+sudo zfs set mountpoint=/media/file_pool/mongodb file_pool/mongodb
 
 # PostgreSQL dataset tuning:
 sudo zfs set recordsize=16K file_pool/postgres
@@ -120,16 +122,19 @@ sudo chmod 755 /media/file_pool
 sudo chown root:root /media/file_pool
 
 # Set each direct path to correct user id. (1000 is $USER chinh):
-sudo chown root:root /media/file_pool
+sudo chown $USER:$USER /media/file_pool
 
 sudo chown -R chinh:chinh /media/file_pool/files
-sudo chmod -R 755 /media/file_pool/files
+sudo chmod -R 777 /media/file_pool/files
 
-sudo chown -R chinh:chinh /media/file_pool/opensearch
+sudo chown -R 1000:1000 /media/file_pool/opensearch
 sudo chmod -R 755 /media/file_pool/opensearch
 
 sudo chown -R 999:999 /media/file_pool/postgres
 sudo chmod -R 700 /media/file_pool/postgres
+
+sudo chown -R 999:999 /media/file_pool/mongodb
+sudo chmod -R 700 /media/file_pool/mongodb
 
 # For remounting:
 # Unmounting the children first
