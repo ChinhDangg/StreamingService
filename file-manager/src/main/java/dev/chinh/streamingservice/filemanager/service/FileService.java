@@ -605,6 +605,7 @@ public class FileService {
 
     private String addUserIdToPath(String userId, String path) {
         if (path.startsWith(userId + "/")) return path;
+        if (path.isBlank()) return userId;
         return userId + "/" + path;
     }
 
@@ -637,7 +638,11 @@ public class FileService {
                 .filter(s -> !s.isEmpty() && (!omitRoot || !s.equals(getROOT_FOLDER_ID())))
                 .toList();
 
-        if (pathIds.isEmpty()) return item.getName();
+        if (pathIds.isEmpty()) {
+            if (omitRoot && item.getId().equals(getROOT_FOLDER_ID()))
+                return "";
+            return item.getName();
+        }
 
         List<FileSystemItem> parents = mongoTemplate.find(new Query(Criteria.where("id").in(pathIds)), FileSystemItem.class);
 
