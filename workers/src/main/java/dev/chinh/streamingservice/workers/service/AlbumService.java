@@ -189,7 +189,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
 
         // Setup thread-safe list to hold logs
         List<String> logs = Collections.synchronizedList(new ArrayList<>());
-        Thread logConsumer = new Thread(() -> getLogsFromInputStream(logs, process.getInputStream()));
+        Thread logConsumer = Thread.ofVirtual().unstarted(() -> getLogsFromInputStream(logs, process.getInputStream()));
         logConsumer.start();
 
         try (BufferedWriter writer = new BufferedWriter(

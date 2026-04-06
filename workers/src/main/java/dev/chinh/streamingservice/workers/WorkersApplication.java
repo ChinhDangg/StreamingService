@@ -33,9 +33,10 @@ public class WorkersApplication {
     public <T extends Worker> void createAndStartWorkers(ApplicationContext ctx, Class<T> workerClass, int numberOfWorker, String workerGroupName) {
         for (int i = 0; i < numberOfWorker; i++) {
             T clazz = ctx.getBean(workerClass);
-            Thread t = new Thread(clazz, workerGroupName + "_" + i);
-            t.setDaemon(true);
-            t.start();
+            Thread vThread = Thread.ofVirtual()
+                    .name(workerGroupName + "_" + i)
+                    .unstarted(clazz);
+            vThread.start();
         }
         System.out.println("Started " + numberOfWorker + " " + workerGroupName + " worker threads.");
     }

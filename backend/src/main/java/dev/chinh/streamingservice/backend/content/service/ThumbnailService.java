@@ -169,7 +169,7 @@ public class ThumbnailService {
 
         // Capture ffmpeg combined logs in a thread-safe list
         List<String> logs = Collections.synchronizedList(new ArrayList<>());
-        Thread logConsumer = new Thread(() -> {
+        Thread logConsumer = Thread.ofVirtual().unstarted(() -> {
             try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
                 while ((line = br.readLine()) != null) {

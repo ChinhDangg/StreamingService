@@ -9,9 +9,12 @@ import java.util.concurrent.Executors;
 @Configuration
 public class MediaProcessingConfig {
 
-    @Bean(name = "ffmpegExecutor", destroyMethod = "shutdown")
+    @Bean(name = "ffmpegExecutor")
     public ExecutorService ffmpegExecutor() {
-        int cores = Runtime.getRuntime().availableProcessors();
-        return Executors.newFixedThreadPool(Math.max(1, cores / 4));
+        // Returns an Executor that starts a new virtual thread for each task.
+        // No need for a destroyMethod="shutdown" because virtual threads
+        // are closed automatically when using try-with-resources or
+        // when the application shuts down.
+        return Executors.newVirtualThreadPerTaskExecutor();
     }
 }
