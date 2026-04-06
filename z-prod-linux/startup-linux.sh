@@ -95,12 +95,7 @@ else
 
     # -DskipTests makes it fast
     # -T 1C uses one thread per CPU core
-    ./mvnw clean install -DskipTests -T 1C
-
-    if [ $? -ne 0 ]; then
-        echo "❌ Maven build failed! Fix the code and try again."
-        exit 1
-    fi
+    ./mvnw clean install -DskipTests -T 1C || { echo " Maven build failed!"; exit 1; }
 fi
 
 ############################################
