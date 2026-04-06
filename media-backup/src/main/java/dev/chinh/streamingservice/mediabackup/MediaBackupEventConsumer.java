@@ -61,7 +61,7 @@ public class MediaBackupEventConsumer {
     }
 
     private void onDeleteFile(MediaUpdateEvent.FileDeleted event) throws IOException {
-        System.out.println("Received delete backup file");
+        System.out.println("Received delete backup file: " + event.fileName());
         try {
             Path path = Path.of(addBackupLocationToPath(addRootToPath(event.fileName())));
             if (event.isNotDirectory()) {
@@ -161,7 +161,7 @@ public class MediaBackupEventConsumer {
     }
 
     private void onCreateDirectory(MediaUpdateEvent.DirectoryCreated event) {
-        System.out.println("Received create directory: " + event.fileId());
+        System.out.println("Received create directory: " + event.fileId() + " " + event.dirPath());
         try {
             String dirPath = addRootToPath(event.dirPath());
             Path targetParent = Paths.get(addBackupLocationToPath(dirPath));
