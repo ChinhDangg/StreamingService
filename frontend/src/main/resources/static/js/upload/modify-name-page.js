@@ -225,7 +225,7 @@ function initializeModifyActionButtons() {
         }
 
         const formData = new FormData();
-        formData.append("name", entityNameInput.value);
+        formData.append("name", name);
         if (entityImageInput.files.length > 0) {
             formData.append("thumbnail", entityImageInput.files[0]);
         }
@@ -239,7 +239,7 @@ function initializeModifyActionButtons() {
         }
 
         if (currentNameEntity === nameEntity.Authors || currentNameEntity === nameEntity.Tags) {
-            body = entityNameInput.value;
+            body = name;
         }
 
         const response = await apiRequest(url, {
