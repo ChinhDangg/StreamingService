@@ -339,8 +339,8 @@ public class NameEntityModifyService {
         name = name.trim();
         if (name.isEmpty())
             throw new IllegalArgumentException("Name must not be empty");
-        if (name.length() < 3)
-            throw new IllegalArgumentException("Name must be at least 3 chars: " + name);
+        if (name.length() < 2)
+            throw new IllegalArgumentException("Name must be at least 2 chars: " + name);
         if (name.length() > 200)
             throw new IllegalArgumentException("Name must be at most 200 chars");
         return name;
