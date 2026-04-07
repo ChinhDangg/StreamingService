@@ -336,7 +336,7 @@ public class NameEntityModifyService {
     private String validateNameEntity(String name) {
         if (name == null)
             throw new IllegalArgumentException("Name must not be null");
-        name = name.toLowerCase().trim();
+        name = name.trim();
         if (name.isEmpty())
             throw new IllegalArgumentException("Name must not be empty");
         if (name.length() < 3)
