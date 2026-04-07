@@ -17,7 +17,8 @@
         },
         "autocomplete_search": {
           "type": "custom",
-          "tokenizer": "lowercase"
+          "tokenizer": "standard",
+          "filter": ["lowercase"]
         }
       }
     }
