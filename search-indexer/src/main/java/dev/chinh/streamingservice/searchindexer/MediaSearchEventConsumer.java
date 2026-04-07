@@ -114,7 +114,7 @@ public class MediaSearchEventConsumer {
             try {
                 Map<String, Object> fields = new HashMap<>();
                 fields.put(ContentMetaData.NAME, name);
-                fields.put(ContentMetaData.USER_ID, event.userId());
+                fields.put(ContentMetaData.USER_ID, Long.parseLong(event.userId()));
                 if (event.thumbnailPath() != null) {
                     fields.put(ContentMetaData.THUMBNAIL, event.thumbnailPath());
                 }
