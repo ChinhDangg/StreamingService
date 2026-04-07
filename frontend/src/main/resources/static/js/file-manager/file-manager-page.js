@@ -451,7 +451,7 @@ function setObserverToFetchMore() {
                 observer.unobserve(sentinel);
                 return;
             }
-            displayFileItem(subFiles, false);
+            displayFileItem(subFiles, false, false, true);
         }
     }, { rootMargin: '500px' });
 }
