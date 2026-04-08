@@ -6,7 +6,9 @@ import lombok.Getter;
 public enum FileStatus {
     DELETING((short) -1),
     PROCESSING((short) -2),
-    IN_USE((short) -3);
+    IN_USE((short) -3),
+    BEING_MOVED_INTO((short) -4),
+    BEING_MOVED((short) -5);
 
     private final short value;
 

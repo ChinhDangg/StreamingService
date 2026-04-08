@@ -23,6 +23,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.domain.*;
 import org.springframework.data.mongodb.MongoTransactionException;
+import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -237,7 +238,7 @@ public class FileService {
         if (statusCodeStr != null) {
             return statusCodeStr;
         }
-        FolderLocks folderIsLocked = checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()));
+        FolderLocks folderIsLocked = checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), null);
         if (folderIsLocked != null) {
             throw new IllegalArgumentException("File is locked: " + folderIsLocked.getId());
         }
@@ -302,7 +303,7 @@ public class FileService {
         if (statusCodeStr != null) {
             return statusCodeStr;
         }
-        FolderLocks folderIsLocked = checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()));
+        FolderLocks folderIsLocked = checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), null);
         if (folderIsLocked != null) {
             throw new IllegalArgumentException("File is locked: " + folderIsLocked.getId());
         }
@@ -478,8 +479,11 @@ public class FileService {
         if (newParent.getPath().contains(item.getId())) {
             throw new IllegalArgumentException("Cannot move item to a child of itself");
         }
+        Map<String, FileStatus> parentStatusMap = getCommonIds(newParent.getPath() + newParent.getId()).stream()
+                .collect(Collectors.toMap(id -> id, _ -> FileStatus.BEING_MOVED_INTO));
+
         Set<String> commonIds = getCommonIds(item.getPath() + item.getId() + newParent.getPath() + newParent.getId());
-        FolderLocks folderIsLocked = checkIfFileItemInLock(commonIds);
+        FolderLocks folderIsLocked = checkIfFileItemInLock(commonIds, parentStatusMap);
         if (folderIsLocked != null) {
             throw new IllegalArgumentException("File is locked: " + folderIsLocked.getId());
         }
@@ -493,7 +497,7 @@ public class FileService {
                 .set(FileItemField.PATH, newParent.getPath() + newParent.getId() + "/");
 
         if (!FileType.isNotDir(item.getFileType())) { // if a directory
-            lockFileItem(userId, commonIds);
+            lockFileItem(userId, commonIds, parentStatusMap);
             publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
                     new MediaUpdateEvent.DirectoryMoved(
@@ -558,10 +562,21 @@ public class FileService {
         return commonIds;
     }
 
-    private void lockFileItem(String userId, Set<String> fileIds) {
+    private void lockFileItem(String userId, Set<String> fileIds, Map<String, FileStatus> statusMap) {
         if (fileIds.isEmpty()) return;
-        List<FolderLocks> folderLocks = fileIds.stream().map(i -> new FolderLocks(i, userId)).toList();
-        mongoTemplate.insert(folderLocks, FolderLocks.class);
+        // Use UNORDERED to process everything even if some IDs already exist
+        BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, FolderLocks.class);
+
+        for (String id : fileIds) {
+            Query query = new Query(Criteria.where("id").is(id));
+            Update update = new Update()
+                    .setOnInsert(FileItemField.USER_ID, userId)
+                    .setOnInsert(FileItemField.STATUS_CODE, statusMap.getOrDefault(id, FileStatus.PROCESSING));
+            // use setOnInsert, if the ID exists, nothing happens.
+            // If it doesn't exist, a new document is created with these values.
+            bulkOps.upsert(query, update);
+        }
+        bulkOps.execute();
     }
 
     public void releaseLockedFileItem(Set<String> fileIds) {
@@ -570,10 +585,18 @@ public class FileService {
         mongoTemplate.remove(query, FolderLocks.class);
     }
 
-    private FolderLocks checkIfFileItemInLock(Set<String> fileIds) {
+    private FolderLocks checkIfFileItemInLock(Set<String> fileIds, Map<String, FileStatus> ignoredStatusMap) {
         if (fileIds.isEmpty()) return null;
-        Query query = new Query(Criteria.where("id").in(fileIds));
-        return mongoTemplate.findOne(query, FolderLocks.class);
+        Criteria criteria = Criteria.where("id").in(fileIds);
+        if (ignoredStatusMap != null && !ignoredStatusMap.isEmpty()) {
+            List<Criteria> excludeCriteria = new ArrayList<>();
+            ignoredStatusMap.forEach((id, status) -> {
+                excludeCriteria.add(Criteria.where("id").is(id).and(FileItemField.STATUS_CODE).is(status));
+            });
+            // "nor" ensures that none of these specific ID+Status pairs are returned
+            criteria.norOperator(excludeCriteria.toArray(new Criteria[0]));
+        }
+        return mongoTemplate.findOne(new Query(criteria), FolderLocks.class);
     }
 
 
