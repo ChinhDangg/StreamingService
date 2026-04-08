@@ -50,7 +50,9 @@ public class OpenSearchService {
                 }
                 for (MediaNameEntityConstant constant : MediaNameEntityConstant.values()) {
                     if (!indexExists(constant.getName())) {
-                        createIndexWithSettingAndMapping(constant.getName(), "/mapping/media-name-entity-mapping.json");
+                        String version1 = constant.getName() + "_v1";
+                        createIndexWithSettingAndMapping(version1, "/mapping/media-name-entity-mapping.json");
+                        addAliasToIndex(version1, constant.getName());
                     }
                 }
                 break;
@@ -203,6 +205,47 @@ public class OpenSearchService {
                 .properties(properties)
         );
         System.out.println("Mapping updated? " + response.acknowledged());
+    }
+
+    public void updateIndexSettings(String indexName) throws IOException {
+        PutIndicesSettingsRequest request = PutIndicesSettingsRequest.builder()
+                .index(indexName)
+                .settings(s -> s
+                        .analysis(a -> a
+                                // 1. Define a custom tokenizer for your edge_ngram settings
+                                .tokenizer("custom_edge_ngram", t -> t
+                                        .definition(td -> td
+                                                .edgeNgram(e -> e
+                                                        .minGram(2)
+                                                        .maxGram(20)
+                                                        .tokenChars(List.of(TokenChar.Letter, TokenChar.Digit,  TokenChar.Punctuation, TokenChar.Symbol))
+                                                )
+                                        )
+                                )
+                                // 2. Reference that custom tokenizer inside the analyzer
+                                .analyzer("autocomplete_search", an -> an
+                                        .custom(c -> c
+                                                .tokenizer("custom_edge_ngram")
+                                                .filter("lowercase")
+                                        )
+                                )
+                        )
+                )
+                .build();
+
+        client.indices().close(c -> c.index(indexName));
+        try {
+            PutIndicesSettingsResponse response = client.indices().putSettings(request);
+            if (response.acknowledged()) {
+                System.out.println("Settings updated successfully.");
+            } else {
+                System.out.println("Settings update failed.");
+            }
+        } catch (Exception e) {
+            System.out.println("Settings update failed with error: " + e.getMessage());
+            e.printStackTrace();
+        }
+        client.indices().open(o -> o.index(indexName));
     }
 
     public void deleteIndex(String indexName) throws IOException {

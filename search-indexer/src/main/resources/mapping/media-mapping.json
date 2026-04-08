@@ -1,23 +1,36 @@
 {
   "settings": {
     "analysis": {
-      "tokenizer": {
-        "autocomplete_tokenizer": {
+      "filter": {
+        "autocomplete_ngram": {
           "type": "edge_ngram",
           "min_gram": 2,
           "max_gram": 20,
           "token_chars": ["letter", "digit", "punctuation", "symbol"]
+        },
+        "hyphen_handler": {
+          "type": "word_delimiter_graph",
+          "preserve_original": true,
+          "catenate_words": true
         }
       },
       "analyzer": {
         "autocomplete": {
           "type": "custom",
-          "tokenizer": "autocomplete_tokenizer",
-          "filter": ["lowercase"]
+          "tokenizer": "whitespace",
+          "filter": [
+            "lowercase",
+            "hyphen_handler",
+            "autocomplete_ngram"
+          ]
         },
         "autocomplete_search": {
           "type": "custom",
-          "tokenizer": "lowercase"
+          "tokenizer": "whitespace",
+          "filter": [
+            "lowercase",
+            "hyphen_handler"
+          ]
         }
       }
     }
@@ -25,7 +38,9 @@
   "mappings": {
     "properties": {
       "title": {
-        "type": "text"
+        "type": "text",
+        "analyzer": "autocomplete",
+        "search_analyzer": "autocomplete_search"
       },
 
       "tags": {
@@ -37,12 +52,7 @@
           "name": {
             "type": "text",
             "analyzer": "autocomplete",
-            "search_analyzer": "autocomplete_search",
-            "fields": {
-              "raw": {
-                "type": "keyword"
-              }
-            }
+            "search_analyzer": "autocomplete_search"
           }
         }
       },
@@ -55,12 +65,7 @@
           "name": {
             "type": "text",
             "analyzer": "autocomplete",
-            "search_analyzer": "autocomplete_search",
-            "fields": {
-              "raw": {
-                "type": "keyword"
-              }
-            }
+            "search_analyzer": "autocomplete_search"
           }
         }
       },
@@ -73,12 +78,7 @@
           "name": {
             "type": "text",
             "analyzer": "autocomplete",
-            "search_analyzer": "autocomplete_search",
-            "fields": {
-              "raw": {
-                "type": "keyword"
-              }
-            }
+            "search_analyzer": "autocomplete_search"
           }
         }
       },
@@ -91,12 +91,7 @@
           "name": {
             "type": "text",
             "analyzer": "autocomplete",
-            "search_analyzer": "autocomplete_search",
-            "fields": {
-              "raw": {
-                "type": "keyword"
-              }
-            }
+            "search_analyzer": "autocomplete_search"
           }
         }
       },
