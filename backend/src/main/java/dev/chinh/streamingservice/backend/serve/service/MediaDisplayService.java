@@ -71,15 +71,15 @@ public class MediaDisplayService {
         return mediaDisplayContent;
     }
 
-    private void addCacheGroupOfMedia(long mediaId, int offset, Sort.Direction sortOrder, GroupSlice mediaIds) throws JsonProcessingException {
+    private void addCacheGroupOfMedia(long mediaId, int page, Sort.Direction sortOrder, GroupSlice mediaIds) throws JsonProcessingException {
         String id = "grouper::" + mediaId;
-        redisStringTemplate.opsForHash().put(id, offset + ":" + sortOrder, objectMapper.writeValueAsString(mediaIds));
+        redisStringTemplate.opsForHash().put(id, page + ":" + sortOrder, objectMapper.writeValueAsString(mediaIds));
         redisStringTemplate.expire(id, Duration.ofMinutes(15));
     }
 
-    public GroupSlice getCacheGroupOfMedia(long mediaId, int offset, Sort.Direction sortOrder) {
+    public GroupSlice getCacheGroupOfMedia(long mediaId, int page, Sort.Direction sortOrder) {
         String id = "grouper::" + mediaId;
-        Object json = redisStringTemplate.opsForHash().get(id, offset + ":" + sortOrder);
+        Object json = redisStringTemplate.opsForHash().get(id, page + ":" + sortOrder);
 
         if (json == null)
             return null;
@@ -90,8 +90,8 @@ public class MediaDisplayService {
         }
     }
 
-    public GroupSlice getNextGroupOfMedia(String userId, long mediaId, int offset, Sort.Direction sortOrder) throws JsonProcessingException {
-        GroupSlice cachedGroupOfMedia = getCacheGroupOfMedia(mediaId, offset, sortOrder);
+    public GroupSlice getNextGroupOfMedia(String userId, long mediaId, int page, Sort.Direction sortOrder) throws JsonProcessingException {
+        GroupSlice cachedGroupOfMedia = getCacheGroupOfMedia(mediaId, page, sortOrder);
         if (cachedGroupOfMedia != null) {
             return cachedGroupOfMedia;
         }
@@ -102,11 +102,11 @@ public class MediaDisplayService {
         }
 
         final int maxBatchSize = 20;
-        Pageable pageable = PageRequest.of(offset, maxBatchSize, Sort.by(sortOrder, ContentMetaData.NUM_INFO));
+        Pageable pageable = PageRequest.of(page, maxBatchSize, Sort.by(sortOrder, ContentMetaData.NUM_INFO));
         Slice<Long> groupOfMedia = mediaGroupMetaDataRepository.findMediaMetadataIdsByGrouperMetaDataId(mediaItem.getGrouperId(), pageable);
-        GroupSlice groupSlice = new GroupSlice(groupOfMedia.getContent(), offset, maxBatchSize, groupOfMedia.hasNext());
+        GroupSlice groupSlice = new GroupSlice(groupOfMedia.getContent(), page, maxBatchSize, groupOfMedia.hasNext());
 
-        addCacheGroupOfMedia(mediaId, offset, sortOrder, groupSlice);
+        addCacheGroupOfMedia(mediaId, page, sortOrder, groupSlice);
         return groupSlice;
     }
 

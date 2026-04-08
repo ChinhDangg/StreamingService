@@ -25,10 +25,10 @@ public class MediaDisplayController {
 
     @GetMapping("/grouper-next/{id}")
     public ResponseEntity<MediaDisplayService.GroupSlice> getNextGrouper(@PathVariable long id,
-                                                                         @RequestParam(name = "offset") int offset,
+                                                                         @RequestParam(name = "p") int page,
                                                                          @RequestParam(name = "order") Sort.Direction order,
                                                                          @AuthenticationPrincipal Jwt jwt) throws JsonProcessingException {
-        return ResponseEntity.ok().body(mediaDisplayService.getNextGroupOfMedia(jwt.getSubject(), id, offset, order));
+        return ResponseEntity.ok().body(mediaDisplayService.getNextGroupOfMedia(jwt.getSubject(), id, page, order));
     }
 
     @GetMapping("/content-page/{id}")
