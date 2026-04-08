@@ -111,7 +111,7 @@ public class FileConsumerService {
                         .where(FileItemField.PATH).regex("^" + parentPath))
                 .limit(batchSize)
                 .skip(skip);
-        query.fields().include("id", FileItemField.SIZE);
+        query.fields().include("id", FileItemField.SIZE, FileItemField.FILE_TYPE);
         List<FileSystemItem> batch = mongoTemplate.find(query, FileSystemItem.class);
 
         size += batch.stream()
