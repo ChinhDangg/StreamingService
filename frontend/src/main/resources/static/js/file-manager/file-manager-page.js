@@ -1510,6 +1510,8 @@ openMediaButton.addEventListener('click', async function () {
         url = `/page/video?mediaId=${currentTargetNode.mId}`;
     else if (currentTargetNode.type === 'ALBUM')
         url = `/page/album?mediaId=${currentTargetNode.mId}`;
+    else if (currentTargetNode.type === 'GROUPER')
+        url = `/page/album-grouper?grouperId=${currentTargetNode.mId}`;
     if (url)
         window.open(url);
 });
