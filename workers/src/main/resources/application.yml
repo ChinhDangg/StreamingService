@@ -4,4 +4,6 @@ grpc:
       address: ${GRPC_FILE_PROVIDER_ADDRESS:static://localhost:9090}
       negotiationType: plaintext
       enableKeepAlive: true
-      keep-alive-without-calls: false
+      keep-alive-time: 2m               # Frequent enough to beat Load Balancer timeouts
+      keep-alive-timeout: 20s           # How long to wait for the pong
+      keep-alive-without-calls: true
