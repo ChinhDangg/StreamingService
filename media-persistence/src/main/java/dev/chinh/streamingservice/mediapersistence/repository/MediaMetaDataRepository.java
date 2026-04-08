@@ -39,7 +39,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
         UPDATE media.media_metadata
         SET length = length + 1
         WHERE id = :id
-            AND media_metadata.user_id = :userId
+            AND user_id = :userId
         RETURNING length
     """, nativeQuery = true
     )
@@ -52,7 +52,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
         SET length = length - 1
         WHERE id = :id
             AND length > 0
-            AND media_metadata.user_id = :userId
+            AND user_id = :userId
         RETURNING length
     """, nativeQuery = true)
     Integer decrementLengthReturning(@Param("userId") long userId, @Param("id") long id);
