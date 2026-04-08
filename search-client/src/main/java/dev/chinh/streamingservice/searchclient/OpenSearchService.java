@@ -120,6 +120,7 @@ public class OpenSearchService {
                                     SortOrder sortOrder) throws IOException {
         Query multiMatchNested = Query.of(q -> q
                 .bool(b -> b
+                        .minimumShouldMatch("1") // Forces at least one of the 'should' clauses to match else all is fetched
                         .filter(buildTermOrMatch(ContentMetaData.USER_ID, FieldValue.of(userId), true))
                         // Root level field (Title)
                         .should(s -> s
@@ -127,7 +128,6 @@ public class OpenSearchService {
                                         .field(ContentMetaData.TITLE)
                                         .query(FieldValue.of(text.toString()))
                                         .boost(3.0f)
-                                        .fuzziness("AUTO")
                                         .prefixLength(1)
                                 )
                         )
@@ -139,7 +139,6 @@ public class OpenSearchService {
                                                 .match(m -> m
                                                         .field(ContentMetaData.UNIVERSES + ".name")
                                                         .query(FieldValue.of(text.toString()))
-                                                        .fuzziness("AUTO")
                                                         .prefixLength(1)
                                                 )
                                         )
@@ -155,7 +154,6 @@ public class OpenSearchService {
                                                 .match(m -> m
                                                         .field(ContentMetaData.CHARACTERS + ".name")
                                                         .query(FieldValue.of(text.toString()))
-                                                        .fuzziness("AUTO")
                                                         .prefixLength(1)
                                                 )
                                         )
@@ -171,7 +169,6 @@ public class OpenSearchService {
                                                 .match(m -> m
                                                         .field(ContentMetaData.TAGS + ".name")
                                                         .query(FieldValue.of(text.toString()))
-                                                        .fuzziness("AUTO")
                                                         .prefixLength(1)
                                                 )
                                         )
@@ -187,7 +184,6 @@ public class OpenSearchService {
                                                 .match(m -> m
                                                         .field(ContentMetaData.AUTHORS + ".name")
                                                         .query(FieldValue.of(text.toString()))
-                                                        .fuzziness("AUTO")
                                                         .prefixLength(1)
                                                 )
                                         )
