@@ -93,7 +93,6 @@ function displayThumbnailSectionInfo(albumGrouperInfo) {
     thumbnailItem.querySelector('img').src = albumGrouperInfo.thumbnail;
 }
 
-let offset = 0;
 let albumGrouperCountLength = 0;
 let currentViewAlbumId = null;
 let albumGrouperChildAlbumIds = [];
@@ -191,8 +190,10 @@ const addItem = (id) => {
     });
 }
 
+let currentPage = 0;
 async function getNextGrouperInfo(grouperId) {
-    const grouperInfo = await fetchGrouperNext(grouperId);
+    if (albumGrouperChildAlbumIds.length >= albumGrouperInfo.length) return;
+    const grouperInfo = await fetchGrouperNext(grouperId, ++currentPage);
     if (!grouperInfo.content.length) return;
     grouperInfo.content.forEach(id => {
         addItem(id);
@@ -231,9 +232,6 @@ sortOrderButton.addEventListener('click', async () => {
         });
         return;
     }
-    const batchSize = 20;
-    offset = Math.floor((albumGrouperChildAlbumIds.length - 1) / batchSize);
-    if (offset < 0) return;
     await getNextGrouperInfo(albumGrouperInfo.id);
 });
 
@@ -292,6 +290,8 @@ rightPrevBtn.addEventListener('click', viewPrevAlbum);
 
 showMoreBtn.addEventListener('click', async () => {
     await getNextGrouperInfo(albumGrouperInfo.id);
+    if (albumGrouperChildAlbumIds.length >= albumGrouperInfo.length)
+        showMoreBtn.classList.add('hidden');
     // const grouperInfo = {
     //     "content": [
     //         101,
@@ -344,17 +344,12 @@ function displayListSectionInfo(grouperInfo) {
     else
         albumGrouperCountLength = 0;
 
-    if (albumGrouperInfo.length === 0) {
-        showMoreBtn.classList.add('hidden');
-        return;
-    }
-
     childMediaIdsSlice.forEach(id => {
         addItem(id);
     });
 
     if (albumGrouperCountLength === 0 || albumGrouperCountLength === albumGrouperInfo.length) {
-        listSection.querySelector('.show-more-btn').classList.add('hidden');
+        showMoreBtn.classList.add('hidden');
     }
 }
 
@@ -386,8 +381,8 @@ async function fetchMediaContent(mediaId) {
     return await response.json();
 }
 
-async function fetchGrouperNext(albumGrouperId) {
-    const response = await apiRequest(`/api/media/grouper-next/${albumGrouperId}?offset=${offset}&order=${sortOrder}`);
+async function fetchGrouperNext(albumGrouperId, page = 0) {
+    const response = await apiRequest(`/api/media/grouper-next/${albumGrouperId}?p=${page}&order=${sortOrder}`);
     if (!response.ok) {
         alert("Failed to grouper next list");
         return null;
