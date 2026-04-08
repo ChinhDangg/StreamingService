@@ -39,7 +39,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
         UPDATE media.media_metadata
         SET length = length + 1
         WHERE id = :id
-            AND userId = :userId
+            AND media_metadata.user_id = :userId
         RETURNING length
     """, nativeQuery = true
     )
@@ -52,7 +52,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
         SET length = length - 1
         WHERE id = :id
             AND length > 0
-            AND userId = :userId
+            AND media_metadata.user_id = :userId
         RETURNING length
     """, nativeQuery = true)
     Integer decrementLengthReturning(@Param("userId") long userId, @Param("id") long id);
@@ -266,7 +266,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Transactional
     @Query(value = """
         DELETE FROM media.tags_media tm
-        WHERE cm.media_id = :mediaId
+        WHERE tm.media_id = :mediaId
             AND tm.tags_id IN :tagIds
     """, nativeQuery = true)
     int deleteTagsFromMedia(@Param("mediaId") long mediaId, @Param("tagIds") Long[] tagIds);
