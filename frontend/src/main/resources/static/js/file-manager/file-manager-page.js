@@ -265,7 +265,7 @@ sortSelect.addEventListener('change', async function () {
     }
 
     const subFiles = await fetchMoreFiles(subId);
-    if (!subFiles) return
+    if (!subFiles) return;
     displayFileItem(subFiles);
     if (observer)
         observer.observe(sentinel);
@@ -356,12 +356,16 @@ async function searchFiles(searchTerm) {
         }
         displayFileItem(filteredFileIds, true, false, false, true);
     } else {
+        oldNextPageBeforeSearch = nextPage;
+        displayFileItem([], true, false, false);
+        observer.unobserve(sentinel);
         setObserverToSearch(searchTerm);
         await fetchSearchFiles(searchTerm, 0);
+        observer.observe(sentinel);
     }
 }
 
-let nextPageSearch = -1;
+let oldNextPageBeforeSearch = null;
 async function fetchSearchFiles(searchString, page) {
     const currentPath = getCurrentPath();
     if (!currentPath)
@@ -384,11 +388,11 @@ async function fetchSearchFiles(searchString, page) {
     }
     const searchResult = await response.json();
     if (searchResult.hasNext)
-        nextPageSearch = page + 1;
+        nextPage = page + 1;
     else
-        nextPageSearch = -1;
+        nextPage = -1;
     const subFiles = searchResult.content;
-    displayFileItem(subFiles, true, false, false);
+    displayFileItem(subFiles, false, false, false, false);
 }
 
 clearSearchButton.addEventListener("click", async function () {
@@ -396,6 +400,8 @@ clearSearchButton.addEventListener("click", async function () {
 });
 
 function clearSearch() {
+    if (oldNextPageBeforeSearch !== null)
+        nextPage = oldNextPageBeforeSearch;
     searchInput.value = '';
     clearSearchButton.classList.add('hidden');
     setObserverToFetchMore();
@@ -459,11 +465,12 @@ function setObserverToFetchMore() {
 function setObserverToSearch(searchString) {
     observer = new IntersectionObserver(async (entries) => {
         if (entries[0].isIntersecting) {
-            if (nextPageSearch === -1) {
+            console.log('Intersecting in search');
+            if (nextPage === -1) {
                 observer.unobserve(sentinel);
                 return;
             }
-            await fetchSearchFiles(searchString, nextPageSearch);
+            await fetchSearchFiles(searchString, nextPage);
         }
     }, { rootMargin: '500px' });
 }
