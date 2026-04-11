@@ -100,8 +100,10 @@ public class DirectoryCacheService {
                 dirUserUsing.add(dirKey); // add dirKey to get dir info from cache back (not using the dirId)
                 return new ApplicationConfig.UserDirUsing(dirUserUsing);
             } else {
-                ((ApplicationConfig.UserDirUsing) existing).dirUserUsing().add(dirKey);
-                return existing;
+                Set<String> updatedSet = ((ApplicationConfig.UserDirUsing) existing).dirUserUsing();
+                updatedSet.add(dirKey);
+                // Return a new record/object so Caffeine sees a state change
+                return new ApplicationConfig.UserDirUsing(updatedSet);
             }
         });
     }
