@@ -151,10 +151,13 @@ container.addEventListener('mousemove', resetHideTimer);
 container.addEventListener('mouseleave', hideControls);
 container.addEventListener('mouseenter', showControls);
 
+container.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+});
+
 // --- Unified Skip Controls ---
 const SKIP_SECONDS = 5;
 let lastClickTime = 0;
-let lastTouchTime = 0;
 const DOUBLE_TAP_THRESHOLD = 250; // ms
 let singleTapTimer = null;
 let skipTimeTotalTimer = null;
@@ -204,47 +207,72 @@ forwardBtn.addEventListener('click', () => {
     skip();
 });
 
-function handleDouble(clientX) {
-    const rect = container.getBoundingClientRect();
-    const relativeX = clientX - rect.left;
+let holdTimer;
+const holdDuration = 1000;
+let isLongPress = false;
+let videoSpeedWithLongPress = 1.00;
 
-    if (relativeX < rect.width / 2) {
-        replay();
-    } else {
-        skip();
-    }
+function handleLongPress() {
+    isLongPress = false;
+    holdTimer = setTimeout(() => {
+        console.log("Hold detected! Triggering action...");
+        isLongPress = true;
+        if (videoSpeedWithLongPress === 1.00) {
+            videoSpeedWithLongPress = 2.00;
+        } else if (videoSpeedWithLongPress === 2.00) {
+            videoSpeedWithLongPress = 3.00;
+        } else
+            videoSpeedWithLongPress = 1.00;
+        video.playbackRate = videoSpeedWithLongPress;
+        showFeedback(videoSpeedWithLongPress + "x");
+    }, holdDuration);
 }
 
+video.addEventListener('pointerdown', () => {
+    handleLongPress();
+});
+
+video.addEventListener('pointerup', () => {
+    clearTimeout(holdTimer);
+});
+
+video.addEventListener('pointerleave', () => {
+    clearTimeout(holdTimer);
+});
+
 video.addEventListener('click', e => {
-    handleClickOrTap(e.clientX, e.timeStamp, false);
-});
-// Mobile touch support
-video.addEventListener('touchstart', () => {
-    showControls();
-    resetHideTimer();
-});
-video.addEventListener('touchend', (e) => {
-    resetHideTimer();
-    const touch = e.changedTouches[0];
-    handleClickOrTap(touch.clientX, e.timeStamp, true);
+    if (!isLongPress) {
+        showControls();
+        resetHideTimer();
+        handleClickOrTap(e.clientY, e.timeStamp, false);
+    }
 });
 
-function handleClickOrTap(clientX, time, isTouch) {
+function handleClickOrTap(clientY, time) {
     const now = time;
-    const lastTime = isTouch ? lastTouchTime : lastClickTime;
-    const isDouble = now - lastTime < DOUBLE_TAP_THRESHOLD;
+    const isDouble = now - lastClickTime < DOUBLE_TAP_THRESHOLD;
 
-    if (isTouch) lastTouchTime = now;
-    else lastClickTime = now;
+    lastClickTime = now;
 
     if (isDouble) {
         clearTimeout(singleTapTimer);
-        handleDouble(clientX);
+        handleDouble(clientY);
     } else {
         // Delay single tap a bit to check if second comes
         singleTapTimer = setTimeout(() => {
             togglePlay();
         }, DOUBLE_TAP_THRESHOLD + 30);
+    }
+}
+
+function handleDouble(clientY) {
+    const rect = container.getBoundingClientRect();
+    const relativeY = clientY - rect.top;
+
+    if (relativeY < rect.height / 2) {
+        skip();
+    } else {
+        replay();
     }
 }
 
