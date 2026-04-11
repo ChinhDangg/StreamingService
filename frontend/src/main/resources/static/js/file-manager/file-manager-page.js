@@ -593,6 +593,7 @@ async function handleFiles(files) {
             file: file
         });
     }
+    displayInfoMessage(`Uploading ${fileList.length} files`, false);
     sortUploadFileAndDisplayFileName(fileList);
     fileInput.value = '';
 }
@@ -612,6 +613,7 @@ async function handleFolderFiles(files) {
             file: file
         });
     }
+    displayInfoMessage(`Uploading ${fileList.length} files`, false);
     sortUploadFileAndDisplayFileName(fileList);
     folderInput.value = '';
 }
@@ -661,31 +663,50 @@ async function handleFileArray(fileArray) {
             file: file.file
         });
     }
+    displayInfoMessage(`Uploading ${fileList.length} files`, false);
     sortUploadFileAndDisplayFileName(fileList);
 }
 
-async function traverseEntry(entry, filesArray, path = "") {
+async function traverseEntry(entry, fileArray) {
     if (entry.isFile) {
-        await new Promise((resolve) => {
+        // Handle individual files
+        return new Promise((resolve) => {
             entry.file(file => {
-                filesArray.push({
-                    path: path + file.name,
+                // Adjust the object structure to match what your handleFileArray expects
+                fileArray.push({
+                    path: entry.fullPath.startsWith('/') ? entry.fullPath.substring(1) : entry.fullPath,
                     file: file
                 });
                 resolve();
-            })
+            });
         });
-    }
-
-    if (entry.isDirectory) {
+    } else if (entry.isDirectory) {
+        // Handle directories
         const dirReader = entry.createReader();
-        const entries = await new Promise((resolve) => {
-            dirReader.readEntries(resolve);
-        });
-        const promises = entries.map(child =>
-            traverseEntry(child, filesArray, path + entry.name + '/')
-        );
-        await Promise.all(promises);
+        const allEntries = [];
+
+        // Recursive function to keep reading batches of 100 until empty
+        const readDirectory = () => {
+            return new Promise((resolve, reject) => {
+                dirReader.readEntries(async (entriesBatch) => {
+                    if (entriesBatch.length > 0) {
+                        allEntries.push(...entriesBatch);
+                        // Call itself again to get the next 100 files
+                        resolve(await readDirectory());
+                    } else {
+                        // No more files left to read
+                        resolve();
+                    }
+                }, reject);
+            });
+        };
+
+        // Wait for all batches to be read
+        await readDirectory();
+
+        // Now process all the gathered entries (including sub-folders)
+        const promises = allEntries.map(childEntry => traverseEntry(childEntry, fileArray));
+        return Promise.all(promises);
     }
 }
 
@@ -697,7 +718,7 @@ sortUploadSelection.addEventListener('change', function () {
 function sortUploadFileAndDisplayFileName(fileList) {
     if (fileList.length === 0) return;
     else if (fileList.length === 1) {
-        addUploadingFile(fileList[0].name);
+        addUploadingFileText(fileList[0].name);
         return;
     }
     const sortSelectionValue = sortUploadSelection.value;
@@ -718,7 +739,7 @@ function sortUploadFileAndDisplayFileName(fileList) {
     }
     clearUploadingListNameText();
     fileList.forEach(file => {
-        addUploadingFile(file.name);
+        addUploadingFileText(file.name);
     });
 }
 
@@ -777,11 +798,13 @@ function getFullCurrentPathInIds() {
 
 const uploadingList = document.getElementById('upload-list');
 const listItemTem = uploadingList.querySelector('li');
-function addUploadingFile(name) {
+const uploadingFileNameNodeMap = new Map();
+function addUploadingFileText(name) {
     name = name.replace(/\\/g, '/');
     const listItem = helperCloneAndUnHideNode(listItemTem);
     listItem.innerText = name;
     uploadingList.appendChild(listItem);
+    uploadingFileNameNodeMap.set(name, listItem);
 }
 
 function validateAllowUpload(fileList) {
@@ -854,6 +877,7 @@ async function uploadFiles(fileList) {
         const total = uploadingFiles.size;
         for (const f of uploadingFiles.keys()) {
             i++;
+            displayInfoMessage(`Re-uploading ${total - i} files`);
             const uploadingFile = uploadingFiles.get(f);
             uploadingFile.chunks.partNumber = uploadingFile.partNumber;
             const passed = await uploadFile(
@@ -869,10 +893,14 @@ async function uploadFiles(fileList) {
                     continue;
                 }
                 uploadingFiles.delete(f);
+                uploadingFileNameNodeMap.get(uploadingFile.fileName).remove();
+                uploadingFileNameNodeMap.delete(uploadingFile.fileName);
             }
         }
     } else {
+        displayInfoMessage(`Uploading ${fileList.length} files`);
         for (let i = 0; i < fileList.length; i++) {
+            displayInfoMessage(`Uploading ${fileList.length - i} files`);
             const file = fileList[i];
             const fileName = getDirPath(currentFullPath, file.name);
             const passed = await uploadFile(
@@ -889,6 +917,8 @@ async function uploadFiles(fileList) {
                     continue;
                 }
                 uploadingFiles.delete(fileName);
+                uploadingFileNameNodeMap.get(fileName).remove();
+                uploadingFileNameNodeMap.delete(fileName);
             }
         }
     }
@@ -953,6 +983,7 @@ function clearProgress() {
 function clearUploadingListNameText() {
     const first = uploadingList.firstElementChild;
     if (first) uploadingList.replaceChildren(first);
+    uploadingFileNameNodeMap.clear();
 }
 
 function clearUploadingList() {
@@ -966,6 +997,7 @@ function clearUploadingList() {
     currentFailTexts.length = 0;
     clearFailTexts();
     clearNameEntityMap();
+    submitBtn.textContent = 'Submit';
 }
 
 function helperCloneAndUnHideNode(node) {
@@ -1761,12 +1793,29 @@ let messageQueue = [];
 let isProcessingMessage = false;
 const MAX_QUEUE = 20;
 
+let currentController = null;
+let currentStartTime = 0;
+
 function displayInfoMessage(message, hasTimeout = true, timeoutTime = 5000) {
     if (messageQueue.length >= MAX_QUEUE) {
-        messageQueue.shift(); // Remove oldest to make room
+        messageQueue.shift();
     }
 
     messageQueue.push({ message, hasTimeout, timeoutTime });
+
+    // If a message is currently showing → try to interrupt it
+    if (isProcessingMessage && currentController) {
+        const elapsed = Date.now() - currentStartTime;
+
+        if (elapsed >= 500) {
+            currentController.abort(); // cancel immediately
+        } else {
+            // wait until 500ms is reached, then cancel
+            setTimeout(() => {
+                if (currentController) currentController.abort();
+            }, 500 - elapsed);
+        }
+    }
 
     if (!isProcessingMessage) {
         processQueue();
@@ -1781,23 +1830,54 @@ async function processQueue() {
     }
 
     isProcessingMessage = true;
+
     const currentItem = messageQueue.shift();
 
     messageText.textContent = currentItem.message;
     infoMessageContainer.classList.remove('hidden');
 
-    // If there are more messages waiting, use 500ms.
-    // Otherwise, use the item's specific timeout (default 5000ms).
-    let delay = 500;
-    if (messageQueue.length === 0 && currentItem.hasTimeout) {
-        delay = currentItem.timeoutTime;
+    currentStartTime = Date.now();
+    currentController = new AbortController();
+
+    try {
+        let delay;
+
+        if (messageQueue.length === 0) {
+            // Only message
+            if (!currentItem.hasTimeout) {
+                // wait forever until aborted
+                await new Promise((_, reject) => {
+                    currentController.signal.addEventListener('abort', reject);
+                });
+                return;
+            } else {
+                delay = currentItem.timeoutTime;
+            }
+        } else {
+            // Multiple messages → max 500ms
+            delay = 500;
+        }
+
+        await cancellableDelay(delay, currentController.signal);
+    } catch (e) {
+        // Aborted → just move on
     }
 
-    await new Promise(resolve => setTimeout(resolve, delay));
+    currentController = null;
 
     processQueue();
 }
 
+function cancellableDelay(ms, signal) {
+    return new Promise((resolve, reject) => {
+        const id = setTimeout(resolve, ms);
+
+        signal.addEventListener('abort', () => {
+            clearTimeout(id);
+            reject(new Error('aborted'));
+        });
+    });
+}
 
 const overlayTextPrompt = document.getElementById('overlay-text-prompt');
 overlayTextPrompt.querySelector('.cancel-btn').addEventListener('click', () => {
