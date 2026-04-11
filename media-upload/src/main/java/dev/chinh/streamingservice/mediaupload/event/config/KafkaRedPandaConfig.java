@@ -2,6 +2,7 @@ package dev.chinh.streamingservice.mediaupload.event.config;
 
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
+import dev.chinh.streamingservice.common.exception.DuplicateEntryException;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -218,6 +219,7 @@ public class KafkaRedPandaConfig {
         errorHandler.addNotRetryableExceptions(IllegalArgumentException.class);
         errorHandler.addNotRetryableExceptions(NullPointerException.class);
         errorHandler.addNotRetryableExceptions(JpaSystemException.class);
+        errorHandler.addNotRetryableExceptions(DuplicateEntryException.class);
 
         return errorHandler;
     }
