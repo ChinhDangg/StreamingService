@@ -194,7 +194,38 @@ public interface MediaUpdateEvent {
     ) implements MediaUpdateEvent {}
 
 
-    record UserCreated(
-            long userId
+
+
+
+    record ControlAddAsVideo(
+            String userId,
+            String fileId
     ) implements MediaUpdateEvent {}
+
+    record ControlAddAsAlbum(
+            String userId,
+            String fileId
+    ) implements MediaUpdateEvent {}
+
+    record ControlAddAsGrouper(
+            String userId,
+            String fileId
+    ) implements MediaUpdateEvent {}
+
+    record ControlAddAuthor(
+            String userId,
+            String author
+    ) implements MediaUpdateEvent {}
+
+    record ControlAddTag(
+            String userId,
+            String tag
+    ) implements MediaUpdateEvent {}
+
+    record ControlAddNameEntitiesToMedia(
+            String userId,
+            long mediaId,
+            Long[] nameEntityIds,
+            MediaNameEntityConstant nameEntityConstant
+    )  implements MediaUpdateEvent {}
 }

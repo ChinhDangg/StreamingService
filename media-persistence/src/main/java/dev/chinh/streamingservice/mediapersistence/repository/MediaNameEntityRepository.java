@@ -64,4 +64,6 @@ public interface MediaNameEntityRepository<T extends MediaNameEntity, ID> extend
     String getNameEntityNameById(@Param("userId") long userId, @Param("id") long id);
 
     void deleteByIdAndUserId(ID id, long userId);
+
+    Optional<T> findByUserIdAndName(long userId, String name);
 }

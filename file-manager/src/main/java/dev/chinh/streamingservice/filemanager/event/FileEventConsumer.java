@@ -5,6 +5,7 @@ import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.filemanager.config.KafkaConfig;
 import dev.chinh.streamingservice.filemanager.service.FileConsumerService;
+import dev.chinh.streamingservice.filemanager.service.FileService;
 import lombok.AllArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 public class FileEventConsumer {
 
     private final FileConsumerService fileConsumerService;
+    private final FileService fileService;
 
     private void onCreateFile(MediaUpdateEvent.FileCreated event) {
         System.out.println("Received create file event");
@@ -115,6 +117,11 @@ public class FileEventConsumer {
                 case MediaUpdateEvent.MediaThumbnailUpdateInitiated e -> onInitiateUpdateMediaThumbnail(e);
                 case MediaUpdateEvent.MediaThumbnailUpdatedReady e -> onUpdateMediaThumbnail(e);
                 case MediaUpdateEvent.DirectoryMoved e -> onMoveFile(e);
+
+
+                case MediaUpdateEvent.ControlAddAsVideo e -> controlAddAsVideo(e.userId(), e.fileId());
+                case MediaUpdateEvent.ControlAddAsAlbum e -> controlAddAsAlbum(e.userId(), e.fileId());
+                case MediaUpdateEvent.ControlAddAsGrouper e -> controlAddAsGrouper(e.userId(), e.fileId());
                 default ->
                     System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
             }
@@ -161,5 +168,23 @@ public class FileEventConsumer {
             }
         }
         System.out.println("======= =======");
+    }
+
+
+
+
+    private void controlAddAsVideo(String userId, String fileId) {
+        String result = fileService.addFileAsVideoMedia(userId, fileId);
+        System.out.println(result);
+    }
+
+    private void controlAddAsAlbum(String userId, String fileId) {
+        String result = fileService.addDirectoryAsAlbumMedia(userId, fileId);
+        System.out.println(result);
+    }
+
+    private void controlAddAsGrouper(String userId, String fileId) {
+        String result = fileService.addDirectoryAsGrouperMedia(userId, fileId);
+        System.out.println(result);
     }
 }

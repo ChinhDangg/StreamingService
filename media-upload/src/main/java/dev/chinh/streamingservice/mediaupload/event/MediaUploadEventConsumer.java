@@ -1,9 +1,12 @@
 package dev.chinh.streamingservice.mediaupload.event;
 
+import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
+import dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO;
 import dev.chinh.streamingservice.mediaupload.event.config.KafkaRedPandaConfig;
 import dev.chinh.streamingservice.mediaupload.modify.service.MediaMetadataModifyService;
+import dev.chinh.streamingservice.mediaupload.modify.service.NameEntityModifyService;
 import dev.chinh.streamingservice.mediaupload.upload.service.MediaUploadService;
 import lombok.AllArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -12,6 +15,9 @@ import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
+
+import java.util.Arrays;
+import java.util.List;
 
 @Service
 @AllArgsConstructor
@@ -72,6 +78,11 @@ public class MediaUploadEventConsumer {
                 case MediaUpdateEvent.FileToMediaInitiated e -> onInitiateFileToMedia(e);
                 case MediaUpdateEvent.FileDeleted e -> onDeleteMedia(e);
                 case MediaUpdateEvent.GrouperItemMoved e -> onMoveGrouperItem(e);
+
+
+                case MediaUpdateEvent.ControlAddAuthor e -> controlAddAuthor(e.userId(), e.author());
+                case MediaUpdateEvent.ControlAddTag e -> controlAddTag(e.userId(), e.tag());
+                case MediaUpdateEvent.ControlAddNameEntitiesToMedia e -> controlAddNameEntitiesToMedia(e.userId(), e.mediaId(), e.nameEntityIds(), e.nameEntityConstant());
                 default -> {
                     System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
                 }
@@ -108,5 +119,32 @@ public class MediaUploadEventConsumer {
         }
 
         System.out.println("======= =======");
+    }
+
+
+
+
+    private final NameEntityModifyService nameEntityModifyService;
+    private void controlAddAuthor(String userId, String author) {
+        nameEntityModifyService.addAuthor(userId, author);
+    }
+
+    private void controlAddTag(String userId, String tag) {
+        nameEntityModifyService.addTag(userId, tag);
+    }
+
+    private void controlAddNameEntitiesToMedia(String userId, long mediaId, Long[] nameEntityIds, MediaNameEntityConstant nameEntity) {
+        List<NameEntityDTO> addingIds = Arrays.stream(nameEntityIds)
+                .map(id -> new NameEntityDTO(id, null))
+                .toList();
+        mediaMetadataModifyService.updateNameEntityInMedia(
+                userId,
+                new MediaMetadataModifyService.UpdateList(
+                        addingIds, null, nameEntity
+                ),
+                mediaId,
+                true,
+                null
+        );
     }
 }
