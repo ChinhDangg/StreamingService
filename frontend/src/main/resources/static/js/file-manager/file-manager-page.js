@@ -917,8 +917,8 @@ async function uploadFiles(fileList) {
                     continue;
                 }
                 uploadingFiles.delete(fileName);
-                uploadingFileNameNodeMap.get(fileName).remove();
-                uploadingFileNameNodeMap.delete(fileName);
+                uploadingFileNameNodeMap.get(file.name).remove();
+                uploadingFileNameNodeMap.delete(file.name);
             }
         }
     }
@@ -944,6 +944,7 @@ function displayFailTexts(failTexts) {
     });
     failTexts.length = 0;
     errorMessageContainer.classList.remove('hidden');
+    uploadContainer.classList.remove('hidden');
 }
 
 function clearFailTexts() {
@@ -1786,6 +1787,7 @@ document.addEventListener('click', () => {
     customRightMenu.style.display = 'none';
 });
 
+
 const infoMessageContainer = document.getElementById('info-message-container');
 const messageText = infoMessageContainer.querySelector('.info-message');
 
@@ -1841,7 +1843,6 @@ async function processQueue() {
 
     try {
         let delay;
-
         if (messageQueue.length === 0) {
             // Only message
             if (!currentItem.hasTimeout) {
