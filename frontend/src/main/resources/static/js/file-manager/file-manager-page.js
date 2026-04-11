@@ -459,6 +459,8 @@ function addToCurrentPath(id, name, isRoot = false) {
         if (!subFiles) return;
         displayFileItem(subFiles, currentMainFileItems);
         console.log(thisIndex, currentPathStack[thisIndex]);
+        if (!isMovingFile)
+            selectFileBannerCancelBtn.click();
     });
 }
 
@@ -498,6 +500,8 @@ pathBackBtn.addEventListener('click', async function () {
         : await fetchMoreFiles(lastPath.id);
     if (!subFiles) return;
     displayFileItem(subFiles, currentMainFileItems);
+    if (!isMovingFile)
+        selectFileBannerCancelBtn.click();
 });
 
 async function initialize() {
@@ -558,6 +562,8 @@ homeButton.addEventListener('click', async function () {
     if (!rootInfo) return;
     addToCurrentPath(rootInfo.parentId, rootInfo.parentName, true);
     displayFileItem(rootInfo.content, currentMainFileItems);
+    if (!isMovingFile)
+        selectFileBannerCancelBtn.click();
 });
 
 
@@ -1172,6 +1178,8 @@ selectFileBannerCancelBtn.addEventListener('click', function () {
         file.fileNode.classList.remove('border-[3px]', 'border-white');
     }
     selectedFiles.clear();
+    if (isMovingFile)
+        movingFileBannerCancelBtn.click();
     selectFileBanner.querySelector('.selected-count-text').textContent = '0';
     selectFileBanner.classList.add('hidden');
 });
@@ -1644,6 +1652,7 @@ renameButton.addEventListener('click', async function () {
 });
 
 const movingFileBanner = document.getElementById('moving-file-banner');
+const movingFileBannerCancelBtn = movingFileBanner.querySelector('.cancel-btn');
 moveButton.addEventListener('click', async function () {
     if (!currentTargetNode.id) {
         alert('No target selected');
@@ -1710,7 +1719,7 @@ moveButton.addEventListener('click', async function () {
                 return;
             }
         }
-        movingFileBanner.querySelector('.cancel-btn').click();
+        movingFileBannerCancelBtn.click();
         selectFileBannerCancelBtn.click();
     }
     let currentFullPath;
@@ -1734,7 +1743,7 @@ function openMovingFileBanner(name, moveFunc) {
     movingFileBanner.classList.remove('hidden');
 }
 
-movingFileBanner.querySelector('.cancel-btn').onclick = () => {
+movingFileBannerCancelBtn.onclick = () => {
     isMovingFile = false;
     movingFileBanner.querySelector('.moving-path-text').textContent = '';
     movingFileBanner.querySelector('.move-btn').onclick = null;
