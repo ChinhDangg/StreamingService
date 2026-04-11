@@ -1,5 +1,6 @@
 import {endFileSession, endVideoUploadSession, uploadFile,} from "/static/js/upload/upload-file.js";
 import {apiRequest} from "/static/js/common.js";
+import {FileManager} from "/static/js/file-manager/FileManager.js";
 
 const view = document.getElementById("file-view-container");
 
@@ -32,9 +33,9 @@ async function getRootDir() {
     }
     const subFiles = await rootDir.json();
     if (subFiles.hasNext)
-        nextPage = subFiles.pageable.pageNumber + 1;
+        currentMainFileItems.setCurrentFilePage(subFiles.pageable.pageNumber + 1);
     else
-        nextPage = -1;
+        currentMainFileItems.setCurrentFilePage(-1);
     return subFiles;
     // return [
     //     {
@@ -71,8 +72,7 @@ function getIconNode(fileType) {
 }
 
 let isProcessing = false;
-const currentFileItemsMap = new Map();
-let currentFileItemIds = [];
+const currentMainFileItems = new FileManager();
 
 /*
     if useGlobalMapItems is true, then the fileItems will be a list of fileItemIds
@@ -80,24 +80,22 @@ let currentFileItemIds = [];
     and display them. This is useful when we want to display the fileItems in a
     different order than the order they are in the fileItems array.
  */
-function displayFileItem(fileItems, clearNode = true, clearFileList = true, pushFileList = true, useGlobalMapItems = false) {
+function displayFileItem(fileItems, fileItemManager = null, clearNode = true, clearFileList = true, pushFileList = true, useGlobalMapItems = false) {
     if (clearNode) {
         const first = fileViewContainer.firstElementChild;
         if (first) fileViewContainer.replaceChildren(first);
         if (observer)
             observer.observe(sentinel);
     }
-    if (clearFileList) {
-        currentFileItemsMap.clear();
-        currentFileItemIds.length = 0;
+    if (clearFileList && fileItemManager !== null) {
+        fileItemManager.removeAll();
     }
 
     fileViewWrapper.querySelector('.end-of-file-text').classList.add('hidden');
 
     const renderFileItem = (item) => {
-        if (pushFileList) {
-            currentFileItemsMap.set(item.id, item);
-            currentFileItemIds.push(item.id);
+        if (pushFileList && fileItemManager !== null) {
+            fileItemManager.addFileItem(item);
         }
 
         const fileNode = helperCloneAndUnHideNode(fileNodeTem);
@@ -142,17 +140,18 @@ function displayFileItem(fileItems, clearNode = true, clearFileList = true, push
         fileViewContainer.appendChild(fileNode);
     }
 
-    if (useGlobalMapItems) {
-        fileItems.forEach(itemId => {
-            renderFileItem(currentFileItemsMap.get(itemId));
-        });
+    if (useGlobalMapItems && fileItemManager !== null) {
+        if (fileItems && fileItems.length > 0)
+            fileItemManager.loopAndDoWithGivenFileItemIds(fileItems, renderFileItem);
+        else
+            fileItemManager.loopAllAndDo(renderFileItem);
     } else {
         fileItems.forEach(item => {
             renderFileItem(item);
         });
     }
 
-    if (nextPage === -1) {
+    if (fileItemManager && fileItemManager.getCurrentFilePage() === -1) {
         const endOfFileText = fileViewWrapper.querySelector('.end-of-file-text');
         if (fileItems.length === 0)
             endOfFileText.innerText = 'No files found';
@@ -209,7 +208,6 @@ const fileViewWrapper = document.getElementById('file-view-wrapper');
 const sortSelect = document.getElementById('file-sort-by-select');
 const sentinel = document.createElement("div");
 let observer;
-let nextPage = -1;
 async function fetchMoreFiles(subId, page = 0, getParentInfo = false) {
     if (isProcessing) return false;
     isProcessing = true;
@@ -230,9 +228,9 @@ async function fetchMoreFiles(subId, page = 0, getParentInfo = false) {
     }
     const subFiles = await response.json();
     if (subFiles.hasNext)
-        nextPage = subFiles.pageable.pageNumber + 1;
+        currentMainFileItems.setCurrentFilePage(subFiles.pageable.pageNumber + 1);
     else
-        nextPage = -1;
+        currentMainFileItems.setCurrentFilePage(-1);
     isProcessing = false;
     if (getParentInfo)
         return subFiles;
@@ -252,21 +250,22 @@ sortSelect.addEventListener('change', async function () {
 
     setCurrentUri(subId);
 
-    if (nextPage === -1) {
+    if (currentMainFileItems.getCurrentFilePage() === -1) {
         // reached the end - should have all files with all info to sort locally
         const sortSelectValue = getSortSelectValue();
         let key = getItemKeyFromSortSelectValue(sortSelectValue.by);
         if (key === 'resolution')
             key = 'resolution.area';
         const order = sortSelectValue.order;
-        currentFileItemIds.sort(sortIdsByMap(key, order));
-        displayFileItem(currentFileItemIds, true, false, false, true);
+        console.log('sorting locally');
+        currentMainFileItems.sortFileItems(key, order);
+        displayFileItem([], currentMainFileItems, true, false, false, true);
         return;
     }
 
     const subFiles = await fetchMoreFiles(subId);
     if (!subFiles) return;
-    displayFileItem(subFiles);
+    displayFileItem(subFiles, currentMainFileItems);
     if (observer)
         observer.observe(sentinel);
 });
@@ -285,44 +284,6 @@ function getItemKeyFromSortSelectValue(value) {
     return null;
 }
 
-function sortIdsByMap(key, order = 'ASC') {
-    // We get the original comparison logic
-    const internalSort = dynamicSortByField(key, order);
-
-    // We return a new function that expects IDs instead of Objects
-    return function(idA, idB) {
-        const objA = currentFileItemsMap.get(idA);
-        const objB = currentFileItemsMap.get(idB);
-
-        // Pass the actual objects into your existing logic
-        return internalSort(objA, objB);
-    };
-}
-
-function dynamicSortByField(key, order = 'ASC') {
-    const getValue = (obj, path) => {
-        // Splitting by dot and reducing through the object
-        return path.split('.').reduce((acc, part) => acc?.[part], obj);
-    };
-
-    return function innerSort(a, b) {
-        let varA = getValue(a, key);
-        let varB = getValue(b, key);
-        if (!varA || !varB) {
-            return 0;
-        }
-        const valA = (typeof varA === 'string') ? varA.toUpperCase() : varA;
-        const valB = (typeof varB === 'string') ? varB.toUpperCase() : varB;
-        let comparison = 0;
-        if (valA > valB) {
-            comparison = 1;
-        } else if (valA < valB) {
-            comparison = -1;
-        }
-        return (order === 'DESC') ? (comparison * -1) : comparison;
-    }
-}
-
 const searchForm = document.getElementById('search-form');
 const searchInput = searchForm.querySelector('.search-input');
 const searchButton = searchForm.querySelector('.search-btn');
@@ -337,6 +298,8 @@ searchButton.addEventListener("click", async function () {
     await searchFiles(searchInput.value);
 });
 
+const currentSearchFileItems = new FileManager();
+let isInDeepSearch = false;
 async function searchFiles(searchTerm) {
     if (!searchTerm || searchTerm.length === 0) {
         clearSearch();
@@ -344,20 +307,14 @@ async function searchFiles(searchTerm) {
     if (searchTerm.length < 2)
         return;
     clearSearchButton.classList.remove('hidden');
-    if (nextPage === -1 && !recursiveToggle.checked) {
+    if (currentMainFileItems.getCurrentFilePage() === -1 && !recursiveToggle.checked) {
         console.log('searching locally');
-        const searchTermLowerCase = searchTerm.toLowerCase();
-        const filteredFileIds = [];
-        for (const [key, file] of currentFileItemsMap) {
-            const fileNameLowerCase = file.name.toLowerCase();
-            if (fileNameLowerCase.includes(searchTermLowerCase)) {
-                filteredFileIds.push(key);
-            }
-        }
-        displayFileItem(filteredFileIds, true, false, false, true);
+        const filteredFileIds = currentMainFileItems.findFileItemsWithNameAndReturnTheirIds(searchTerm);
+        displayFileItem(filteredFileIds, currentMainFileItems, true, false, false, true);
     } else {
-        oldNextPageBeforeSearch = nextPage;
-        displayFileItem([], true, false, false);
+        if (recursiveToggle.checked)
+            isInDeepSearch = true;
+        displayFileItem([], currentSearchFileItems,true, true, false);
         observer.unobserve(sentinel);
         setObserverToSearch(searchTerm);
         await fetchSearchFiles(searchTerm, 0);
@@ -365,7 +322,6 @@ async function searchFiles(searchTerm) {
     }
 }
 
-let oldNextPageBeforeSearch = null;
 async function fetchSearchFiles(searchString, page) {
     const currentPath = getCurrentPath();
     if (!currentPath)
@@ -388,11 +344,11 @@ async function fetchSearchFiles(searchString, page) {
     }
     const searchResult = await response.json();
     if (searchResult.hasNext)
-        nextPage = page + 1;
+        currentSearchFileItems.setCurrentFilePage(page + 1);
     else
-        nextPage = -1;
+        currentSearchFileItems.setCurrentFilePage(-1);
     const subFiles = searchResult.content;
-    displayFileItem(subFiles, false, false, false, false);
+    displayFileItem(subFiles, currentSearchFileItems,false, false, true);
 }
 
 clearSearchButton.addEventListener("click", async function () {
@@ -400,12 +356,10 @@ clearSearchButton.addEventListener("click", async function () {
 });
 
 function clearSearch() {
-    if (oldNextPageBeforeSearch !== null)
-        nextPage = oldNextPageBeforeSearch;
     searchInput.value = '';
     clearSearchButton.classList.add('hidden');
     setObserverToFetchMore();
-    displayFileItem(currentFileItemIds, true, false, false, true);
+    displayFileItem([], currentMainFileItems, true, false, false, true);
 }
 
 
@@ -446,18 +400,18 @@ function setObserverToFetchMore() {
                 return;
             }
             const subId = currentPathStack.id;
-            if (nextPage === -1) {
+            if (currentMainFileItems.getCurrentFilePage() === -1) {
                 observer.unobserve(sentinel);
                 return;
             }
-            const subFiles = await fetchMoreFiles(subId, nextPage);
+            const subFiles = await fetchMoreFiles(subId, currentMainFileItems.getCurrentFilePage());
             if (subFiles === false)
                 return;
             if (subFiles == null) {
                 observer.unobserve(sentinel);
                 return;
             }
-            displayFileItem(subFiles, false, false, true);
+            displayFileItem(subFiles, currentMainFileItems,false, false, true);
         }
     }, { rootMargin: '500px' });
 }
@@ -466,11 +420,11 @@ function setObserverToSearch(searchString) {
     observer = new IntersectionObserver(async (entries) => {
         if (entries[0].isIntersecting) {
             console.log('Intersecting in search');
-            if (nextPage === -1) {
+            if (currentSearchFileItems.getCurrentFilePage() === -1) {
                 observer.unobserve(sentinel);
                 return;
             }
-            await fetchSearchFiles(searchString, nextPage);
+            await fetchSearchFiles(searchString, currentSearchFileItems.getCurrentFilePage());
         }
     }, { rootMargin: '500px' });
 }
@@ -503,7 +457,7 @@ function addToCurrentPath(id, name, isRoot = false) {
             ? await fetchMoreFiles(null)
             : await fetchMoreFiles(currentPathStack[thisIndex].id);
         if (!subFiles) return;
-        displayFileItem(subFiles);
+        displayFileItem(subFiles, currentMainFileItems);
         console.log(thisIndex, currentPathStack[thisIndex]);
     });
 }
@@ -524,6 +478,13 @@ function removeLastPathStack() {
     pathBar.removeChild(pathBar.lastElementChild);
 }
 
+function clearPathStack() {
+    const end = currentPathStack.length;
+    for (let i = 0; i < end; i++) {
+        removeLastPathStack();
+    }
+}
+
 const pathBackBtn = document.getElementById('path-back-btn');
 pathBackBtn.addEventListener('click', async function () {
     if (isProcessing) return;
@@ -536,7 +497,7 @@ pathBackBtn.addEventListener('click', async function () {
         ? await fetchMoreFiles(null)
         : await fetchMoreFiles(lastPath.id);
     if (!subFiles) return;
-    displayFileItem(subFiles);
+    displayFileItem(subFiles, currentMainFileItems);
 });
 
 async function initialize() {
@@ -552,21 +513,28 @@ async function initialize() {
             sortSelect.value = newValue;
         else
             sortSelect.value = 'NAME-ASC';
-        const subFiles = await fetchMoreFiles(subId, 0, true);
-        if (subFiles) {
-            if (subFiles.parentId && subFiles.parentName) {
-                const parentIds = subFiles.parentId.split('/').filter(Boolean);
-                const parentNames = subFiles.parentName.split('/').filter(Boolean);
-                for (let i = 0; i < parentIds.length; i++) {
-                    addToCurrentPath(parentIds[i], parentNames[i]);
-                }
-                displayFileItem(subFiles.content);
-                return;
-            }
-        }
+        const fetchedAndMoved = await fetchMoreFilesAndMove(subId, 0);
+        if (fetchedAndMoved) return;
     }
 
     homeButton.click();
+}
+
+async function fetchMoreFilesAndMove(subId, page) {
+    const subFiles = await fetchMoreFiles(subId, page, true);
+    if (subFiles) {
+        if (subFiles.parentId && subFiles.parentName) {
+            clearPathStack();
+            const parentIds = subFiles.parentId.split('/').filter(Boolean);
+            const parentNames = subFiles.parentName.split('/').filter(Boolean);
+            for (let i = 0; i < parentIds.length; i++) {
+                addToCurrentPath(parentIds[i], parentNames[i]);
+            }
+            displayFileItem(subFiles.content, currentMainFileItems);
+            return true;
+        }
+    }
+    return false;
 }
 
 window.addEventListener('DOMContentLoaded', async function () {
@@ -589,7 +557,7 @@ homeButton.addEventListener('click', async function () {
     const rootInfo = await getRootDir();
     if (!rootInfo) return;
     addToCurrentPath(rootInfo.parentId, rootInfo.parentName, true);
-    displayFileItem(rootInfo.content);
+    displayFileItem(rootInfo.content, currentMainFileItems);
 });
 
 
@@ -1395,14 +1363,31 @@ fileDropZone.addEventListener('click', async (event) => {
         return;
     }
 
-    if (fileType === 'DIR' || fileType === 'ALBUM' || fileType === 'GROUPER') {
+    const isDir = fileType === 'DIR' || fileType === 'ALBUM' || fileType === 'GROUPER';
+
+    if (isInDeepSearch) {
+        if (isDir)
+            await fetchMoreFilesAndMove(fileId, 0);
+        else {
+            const parentId = currentSearchFileItems.getFileItemById(fileId)?.parentId;
+            if (!parentId) {
+                alert('Failed to get parent id.');
+                return;
+            }
+            await fetchMoreFilesAndMove(parentId, 0);
+        }
+        isInDeepSearch = false;
+        return;
+    }
+
+    if (isDir) {
         const fileName = targetNode.getAttribute('data-name');
 
         if (isProcessing) return;
         setCurrentUri(fileId);
         const subFiles = await fetchMoreFiles(fileId);
         if (!subFiles) return;
-        displayFileItem(subFiles);
+        displayFileItem(subFiles, currentMainFileItems);
         addToCurrentPath(fileId, fileName);
     }
 });
@@ -1561,18 +1546,16 @@ deleteFileButton.addEventListener('click', async function () {
         idsToDelete.push(fileId);
         removeSelectedFile(fileId);
         fileInfo.fileNode.remove();
-        currentFileItemsMap.delete(fileId);
+        currentMainFileItems.removeFileItemInMapOnly(fileId);
     }
     const toDeleteSet = new Set(idsToDelete);
-    currentFileItemIds = currentFileItemIds.filter(id => !toDeleteSet.has(id));
+    currentMainFileItems.removeFileItemsInIdListOnly(toDeleteSet);
     displayInfoMessage(`Successfully deleted ${deleteText}`);
 });
 
 function hasSameNameItem(name) {
-    for (const fileItem of currentFileItemsMap.values()) {
-        if (name === fileItem.name) return true;
-    }
-    return false;
+    const item = currentMainFileItems.findOneFileItemWithExactName(name);
+    return !!item;
 }
 
 newFolderButton.addEventListener('click', async function () {
@@ -1616,14 +1599,14 @@ newFolderButton.addEventListener('click', async function () {
             return;
         }
         const fileInfo = await response.json();
-        displayFileItem([fileInfo], false, false, true);
+        displayFileItem([fileInfo], currentMainFileItems,false, false, true);
         displayInfoMessage(`Created folder: ${name}`, true, 30000);
     }
     openOverlayTextPrompt('New Folder', 'Untitled Folder', sendCreateNewFolderRequest);
 });
 
 renameButton.addEventListener('click', async function () {
-    const currentFileItem = currentFileItemsMap.get(currentTargetNode.id);
+    const currentFileItem = currentMainFileItems.getFileItemById(currentTargetNode.id);
     if (!currentFileItem) {
         alert('No current file item');
         return;
@@ -1710,13 +1693,13 @@ moveButton.addEventListener('click', async function () {
             return 'Failed to move file: ' + await response.text();
         }
         const fileInfo = await response.json();
-        displayFileItem([fileInfo], false, false, true);
+        displayFileItem([fileInfo], currentMainFileItems,false,false,true);
         displayInfoMessage(`Moved: ${fileInfo.name}`, true, 30000);
     }
 
     const movingFiles = [];
     for (const fileId of selectedFiles.keys()) {
-        movingFiles.push(currentFileItemsMap.get(fileId));
+        movingFiles.push(currentMainFileItems.getFileItemById(fileId));
     }
 
     const moveFiles = async () => {
@@ -1732,7 +1715,7 @@ moveButton.addEventListener('click', async function () {
     }
     let currentFullPath;
     if (selectedFiles.size === 1) {
-        const currentFileItem = currentFileItemsMap.get(currentTargetNode.id);
+        const currentFileItem = currentMainFileItems.getFileItemById(currentTargetNode.id);
         currentFileItem.name;
     } else {
         currentFullPath = `${selectedFiles.size} files`;
