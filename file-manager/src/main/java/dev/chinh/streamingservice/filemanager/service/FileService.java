@@ -49,11 +49,14 @@ public class FileService {
 
     private final RedisTemplate<String, String> redisStringTemplate;
     private final MongoTemplate mongoTemplate;
+    private final MongoTemplate safeWriteMongoTemplate;
     private final ApplicationEventPublisher publisher;
     private final FileSystemRepository fileSystemRepository;
 
     private final ThumbnailService thumbnailService;
     private final DirectoryCacheService directoryCacheService;
+    private final FileCacheService fileCacheService;
+
 
     private static final String mediaPath = ContentMetaData.MEDIA_BUCKET;
     private static String ROOT_PATH = null;
@@ -159,7 +162,7 @@ public class FileService {
         int partLength = pathParts.length;
         String parentId = getROOT_FOLDER_ID();
         for (int i = 0; i < partLength-1; i++) {
-            String dirId = directoryCacheService.getCachedElseDbDirectoryId(parentId, pathParts[i], userId);
+            String dirId = directoryCacheService.getCachedElseDbDirectoryId(parentId, pathParts[i], userId, true);
             if (dirId == null) {
                 return addCacheMediaUploadRequest(validatedPath);
             }
@@ -203,7 +206,7 @@ public class FileService {
         if (statusCodeStr != null) {
             return statusCodeStr;
         }
-        updateStatusCodeAndGet(fileId, FileStatus.PROCESSING);
+        updateStatusCode(fileId, FileStatus.PROCESSING);
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
@@ -249,7 +252,7 @@ public class FileService {
             return "Has parent as album - cannot have album in an album";
         }
 
-        updateStatusCodeAndGet(fileId, FileStatus.PROCESSING);
+        updateStatusCode(fileId, FileStatus.PROCESSING);
         FileSystemItem first = findFirstImageOrVideo(userId, getPathForFileItem(item.getPath(), item.getId()));
 
         if (!item.getParentId().equals(getROOT_FOLDER_ID())) {
@@ -314,7 +317,7 @@ public class FileService {
             return "Has parent as album - cannot have grouper in an album";
         }
 
-        updateStatusCodeAndGet(fileId, FileStatus.PROCESSING);
+        updateStatusCode(fileId, FileStatus.PROCESSING);
         boolean anyDirectFile = mongoTemplate.exists(Query.query(Criteria
                         .where(FileItemField.USER_ID).is(Long.parseLong(userId))
                         .and(FileItemField.PARENT_ID).is(fileId)
@@ -394,6 +397,7 @@ public class FileService {
         Query query = new Query(Criteria.where("id").is(fileId));
         Update update = new Update().set(FileItemField.NAME, newName);
         mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+        fileCacheService.invalidateFileCache(fileId);
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_BACKUP_TOPIC,
@@ -416,7 +420,7 @@ public class FileService {
                 throw new IllegalArgumentException("Directory is not empty - include media item");
             }
         }
-        updateStatusCodeAndGet(fileId, FileStatus.DELETING);
+        updateStatusCode(fileId, FileStatus.DELETING);
         if (item.getMId() != null && item.getMId() > 0) {
             throw new IllegalArgumentException("File is already marked as media - delete through media file item instead: " + item.getMId());
         }
@@ -443,7 +447,7 @@ public class FileService {
                 throw new IllegalArgumentException("Media is not empty - include nested media item");
             }
         }
-        updateStatusCodeAndGet(item.getId(), FileStatus.DELETING);
+        updateStatusCode(item.getId(), FileStatus.DELETING);
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC,
@@ -545,15 +549,6 @@ public class FileService {
         return moved;
     }
 
-
-    private List<FileSystemItem> getItemInIds(Set<String> ids, Criteria criteria) {
-        Query query = new Query(Criteria.where("id").in(ids));
-        if (criteria != null) {
-            query.addCriteria(criteria);
-        }
-        return mongoTemplate.find(query, FileSystemItem.class);
-    }
-
     public Set<String> getCommonIds(String idPath) {
         String[] idList = idPath.split("/");
         Set<String> commonIds = new HashSet<>(Arrays.asList(idList));
@@ -565,7 +560,7 @@ public class FileService {
     private void lockFileItem(String userId, Set<String> fileIds, Map<String, FileStatus> statusMap) {
         if (fileIds.isEmpty()) return;
         // Use UNORDERED to process everything even if some IDs already exist
-        BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, FolderLocks.class);
+        BulkOperations bulkOps = safeWriteMongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, FolderLocks.class);
 
         for (String id : fileIds) {
             Query query = new Query(Criteria.where("id").is(id));
@@ -582,7 +577,7 @@ public class FileService {
     public void releaseLockedFileItem(Set<String> fileIds) {
         if (fileIds.isEmpty()) return;
         Query query = new Query(Criteria.where("id").in(fileIds));
-        mongoTemplate.remove(query, FolderLocks.class);
+        safeWriteMongoTemplate.remove(query, FolderLocks.class);
     }
 
     private FolderLocks checkIfFileItemInLock(Set<String> fileIds, Map<String, FileStatus> ignoredStatusMap) {
@@ -596,7 +591,7 @@ public class FileService {
             // "nor" ensures that none of these specific ID+Status pairs are returned
             criteria.norOperator(excludeCriteria.toArray(new Criteria[0]));
         }
-        return mongoTemplate.findOne(new Query(criteria), FolderLocks.class);
+        return safeWriteMongoTemplate.findOne(new Query(criteria), FolderLocks.class);
     }
 
 
@@ -667,7 +662,7 @@ public class FileService {
             return item.getName();
         }
 
-        List<FileSystemItem> parents = mongoTemplate.find(new Query(Criteria.where("id").in(pathIds)), FileSystemItem.class);
+        List<FileSystemItem> parents = getItemInIds(pathIds, null);
 
         Map<String, String> nameMap = parents.stream().collect(Collectors.toMap(FileSystemItem::getId, FileSystemItem::getName));
 
@@ -687,10 +682,11 @@ public class FileService {
     }
 
 
-    private void updateStatusCodeAndGet(String fileId, FileStatus status) {
+    private void updateStatusCode(String fileId, FileStatus status) {
         Query query = new Query(Criteria.where("id").is(fileId));
         Update update = new Update().set(FileItemField.STATUS_CODE, status.getValue());
-        mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+        safeWriteMongoTemplate.updateFirst(query, update, FileSystemItem.class);
+        fileCacheService.invalidateFileCache(fileId);
     }
 
     // since directories get set as in-use in caching for folder upload - reset all at startup for dangling status
@@ -721,18 +717,20 @@ public class FileService {
     public FileSystemItem findById(String userId, String id) {
         if (id.equals(getROOT_FOLDER_ID()))
             return getRootDirectoryItem();
-        Query query = new Query(Criteria
-                .where(FileItemField.USER_ID).is(Long.parseLong(userId))
-                .and("id").is(id)
-        );
-        return mongoTemplate.findOne(query, FileSystemItem.class);
+        return fileCacheService.getFileCacheElseFromDatabase(userId, id);
+    }
+
+    private List<FileSystemItem> getItemInIds(Collection<String> ids, Criteria criteria) {
+        return fileCacheService.getCachedFilesElseFromDatabase(ids, criteria);
     }
 
     public FileSystemItem getRootDirectoryItem() {
-        Query query = new Query(Criteria
-                .where("id").is(getROOT_FOLDER_ID())
-        );
-        return mongoTemplate.findOne(query, FileSystemItem.class);
+        return fileCacheService.getFileCache(getROOT_FOLDER_ID(), (rootId) -> {
+            Query query = new Query(Criteria
+                    .where("id").is(rootId)
+            );
+            return mongoTemplate.findOne(query, FileSystemItem.class);
+        });
     }
 
     public String getROOT_FOLDER_ID() {

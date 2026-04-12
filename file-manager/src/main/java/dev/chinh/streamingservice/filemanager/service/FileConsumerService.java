@@ -45,8 +45,6 @@ public class FileConsumerService {
             for (int i = 0; i < parts.length - 1; i++) {
                 ApplicationConfig.DirectoryCached directoryCached = directoryCacheService.getCachedOrCreateDirectory(parts[i], parentId, currentPath.toString(), event.userId());
 
-                directoryCacheService.addDirectoryToUserUsingList(event.userId(), parts[i], parentId);
-
                 String folderId = directoryCached.dirId();
                 parentId = folderId;
                 currentPath.append(folderId).append("/");

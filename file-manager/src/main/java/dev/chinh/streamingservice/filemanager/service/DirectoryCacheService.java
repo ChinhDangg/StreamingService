@@ -23,10 +23,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DirectoryCacheService {
 
     private final MongoTemplate mongoTemplate;
+    private final MongoTemplate safeWriteMongoTemplate;
 
     private final Cache<String, ApplicationConfig.EntryCached> directoryIdCache;
+    private final FileCacheService fileCacheService;
 
-    public String getCachedElseDbDirectoryId(String parentId, String dirName, String userId) {
+    public String getCachedElseDbDirectoryId(String parentId, String dirName, String userId, boolean mustBeDirectory) {
         String dirKey = getDirKey(dirName, parentId);
         var cached = (ApplicationConfig.DirectoryCached) directoryIdCache.asMap().get(dirKey);
         if (cached == null) {
@@ -36,9 +38,14 @@ public class DirectoryCacheService {
                     .and(FileItemField.NAME).is(dirName)
             );
             Update update = new Update().set(FileItemField.STATUS_CODE, FileStatus.IN_USE.getValue());
-            FileSystemItem dir = mongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), FileSystemItem.class);
+            FileSystemItem dir = safeWriteMongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), FileSystemItem.class);
             if (dir == null)
                 return null;
+            if (mustBeDirectory && FileType.isNotDir(dir.getFileType())) {
+                removeFileStatus(dir.getId());
+                throw new IllegalArgumentException("File with name: " + dirName + " already exist but is not a directory");
+            }
+            fileCacheService.invalidateFileCache(dir.getId());
             directoryIdCache.asMap().computeIfAbsent(dirKey, k -> {
                 Set<String> users = ConcurrentHashMap.newKeySet();
                 users.add(userId);
@@ -56,9 +63,11 @@ public class DirectoryCacheService {
                 String fileId = getOrCreateFolder(userId, dirName, dirParentId, dirPath, FileType.DIR);
                 Set<String> users = ConcurrentHashMap.newKeySet();
                 users.add(userId);
+                addDirectoryToUserUsingList(userId, dirName, dirParentId);
                 return new ApplicationConfig.DirectoryCached(fileId, users);
             } else {
                 ((ApplicationConfig.DirectoryCached) existing).userUsing().add(userId);
+                addDirectoryToUserUsingList(userId, dirName, dirParentId);
                 return existing;
             }
         });
@@ -69,7 +78,6 @@ public class DirectoryCacheService {
                 .where(FileItemField.USER_ID).is(Long.parseLong(userId))
                 .and(FileItemField.PARENT_ID).is(parentId)
                 .and(FileItemField.NAME).is(name)
-                .and(FileItemField.FILE_TYPE).in(FileType.DIR, FileType.ALBUM)
         );
 
         // setOnInsert to create if not exists
@@ -130,6 +138,7 @@ public class DirectoryCacheService {
         Query query = new Query(Criteria.where("id").is(fileId));
         Update update = new Update().unset(FileItemField.STATUS_CODE);
         mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+        fileCacheService.invalidateFileCache(fileId);
     }
 
     private String getDirKey(String dirName, String parentId) {

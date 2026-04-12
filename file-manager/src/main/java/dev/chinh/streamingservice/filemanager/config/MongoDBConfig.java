@@ -3,12 +3,15 @@ package dev.chinh.streamingservice.filemanager.config;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
+import com.mongodb.WriteConcern;
 import com.mongodb.client.MongoClients;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.SimpleMongoClientDatabaseFactory;
 import org.springframework.data.mongodb.core.convert.*;
 import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
@@ -75,5 +78,20 @@ public class MongoDBConfig {
         converter.setTypeMapper(new DefaultMongoTypeMapper(null));
 
         return converter;
+    }
+
+    @Bean
+    @Primary
+    public MongoTemplate mongoTemplate(MongoDatabaseFactory factory, MongoConverter converter) {
+        // Fast, default template
+        return new MongoTemplate(factory, converter);
+    }
+
+    @Bean
+    public MongoTemplate safeWriteMongoTemplate(MongoDatabaseFactory factory, MongoConverter converter) {
+        // Strict consistency template for state changes
+        MongoTemplate template = new MongoTemplate(factory, converter);
+        template.setWriteConcern(WriteConcern.MAJORITY);
+        return template;
     }
 }
