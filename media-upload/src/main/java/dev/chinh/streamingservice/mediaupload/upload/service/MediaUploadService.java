@@ -256,7 +256,7 @@ public class MediaUploadService {
         long mediaId = saveMedia(event.userId(), uploadRequest, mediaBasicInfo, event.parentMediaId());
 
         if (event.parentMediaId() != null && event.updateParentLength())
-            mediaMetadataModifyService.incrementMediaLength(Long.parseLong(event.userId()), event.parentMediaId());
+            mediaMetadataModifyService.updateMediaLengthWithDelta(Long.parseLong(event.userId()), event.parentMediaId(), 1);
 
         // upload service can send media enriched for a single file
         // for multiple files as one media like ALBUM or GROUPER need file service to retrieve all contents

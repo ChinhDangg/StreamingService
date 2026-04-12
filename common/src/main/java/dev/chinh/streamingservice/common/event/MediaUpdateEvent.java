@@ -193,7 +193,11 @@ public interface MediaUpdateEvent {
             String newFileName
     ) implements MediaUpdateEvent {}
 
-
+    record MediaFileLengthUpdate(
+            String userId,
+            long mediaId,
+            int length
+    ) implements MediaUpdateEvent {}
 
 
 

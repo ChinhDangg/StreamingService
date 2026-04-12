@@ -83,11 +83,16 @@ public class FileConsumerService {
                     )
             ));
         }
+
+        Set<String> parentIds = fileService.getCommonIds(fileItem.getPath());
+        Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
+        List<FileSystemItem> parents = fileService.getItemInIds(parentIds, criteria);
+        updateParentMediaLength(event.userId(), parents, 1);
     }
 
     @Transactional
     public void handleDirectoryToMedia(MediaUpdateEvent.DirectoryToMediaInitiated event) {
-        FileSystemItem item = fileService.findById(event.userId(), event.fileId());
+        FileSystemItem item = fileService.findById(event.userId(), event.fileId(), true);
         if (item == null) {
             System.out.println("Item not found, skipping directory to media");
             return;
@@ -281,17 +286,21 @@ public class FileConsumerService {
             FileSystemItem parent = fileService.findById(event.userId(), fileItem.getParentId(), true);
             if (parent != null && parent.getFileType() == FileType.GROUPER) {
                 Query query = new Query(Criteria.where("id").is(parent.getId()));
-                Update update = new Update().set(FileItemField.LENGTH, parent.getLength() - 1);
+                Update update = new Update().inc(FileItemField.LENGTH, -1);
                 mongoTemplate.updateFirst(query, update, FileSystemItem.class);
             }
         }
 
-        deleteFile(fileItem);
+        deleteFile(event.userId(), fileItem);
     }
 
     @Transactional
-    protected void deleteFile(FileSystemItem fileItem) {
+    protected void deleteFile(String userId, FileSystemItem fileItem) {
         boolean hasMore = !FileType.isNotDir(fileItem.getFileType());
+
+        Set<String> parentIds = fileService.getCommonIds(fileItem.getPath());
+        Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
+        List<FileSystemItem> parents = fileService.getItemInIds(parentIds, criteria);
 
         int batchSize = 500;
         while (hasMore) {
@@ -302,12 +311,16 @@ public class FileConsumerService {
             hasMore = batch.size() == batchSize;
 
             List<String> ids = new ArrayList<>();
+            int fileCount = 0;
             Map<String, List<String>> toDelete = new HashMap<>();
             for (FileSystemItem item : batch) {
                 ids.add(item.getId());
-                toDelete.computeIfAbsent(item.getBucket(), _ -> new ArrayList<>()).add(item.getObjectName());
-                if (item.getThumbnail() != null)
-                    toDelete.computeIfAbsent(ContentMetaData.THUMBNAIL_BUCKET, _ -> new ArrayList<>()).add(item.getThumbnail());
+                if (FileType.isNotDir(item.getFileType())) {
+                    fileCount++;
+                    toDelete.computeIfAbsent(item.getBucket(), _ -> new ArrayList<>()).add(item.getObjectName());
+                    if (item.getThumbnail() != null)
+                        toDelete.computeIfAbsent(ContentMetaData.THUMBNAIL_BUCKET, _ -> new ArrayList<>()).add(item.getThumbnail());
+                }
             }
             for (Map.Entry<String, List<String>> entry : toDelete.entrySet()) {
                 publisher.publishEvent(new FileEventProducer.EventWrapper(
@@ -315,6 +328,7 @@ public class FileConsumerService {
                         new MediaUpdateEvent.ObjectDeleted(entry.getKey(), entry.getValue())
                 ));
             }
+            updateParentMediaLength(userId, parents, -fileCount);
             mongoTemplate.remove(new Query(Criteria.where("id").in(ids)), FileSystemItem.class);
             System.out.println("Deleted " + ids.size() + " items");
         }
@@ -329,7 +343,24 @@ public class FileConsumerService {
                     EventTopics.MEDIA_OBJECT_AND_BACKUP_TOPIC,
                     new MediaUpdateEvent.ThumbnailDeleted(fileItem.getThumbnail())
             ));
+
+        if (FileType.isNotDir(fileItem.getFileType())) {
+            updateParentMediaLength(userId, parents, -1);
+        }
     }
+
+    private void updateParentMediaLength(String userId, List<FileSystemItem> parents, int lengthDelta) {
+        for (FileSystemItem parent : parents) {
+            Query query = new Query(Criteria.where("id").is(parent.getId()));
+            Update update = new Update().inc(FileItemField.LENGTH, lengthDelta);
+            mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+            publisher.publishEvent(new FileEventProducer.EventWrapper(
+                    EventTopics.MEDIA_UPLOAD_TOPIC,
+                    new MediaUpdateEvent.MediaFileLengthUpdate(userId, parent.getMId(), lengthDelta)
+            ));
+        }
+    }
+
 
     @Transactional
     public void handleMoveDirectory(String userId, String fileId, String newParentId, String oldPath) {

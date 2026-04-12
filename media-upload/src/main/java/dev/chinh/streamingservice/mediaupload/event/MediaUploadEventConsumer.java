@@ -66,6 +66,16 @@ public class MediaUploadEventConsumer {
         }
     }
 
+    private void onUpdateMediaLength(MediaUpdateEvent.MediaFileLengthUpdate event) {
+        System.out.println("Received update media length: " + event.mediaId() + " " + event.length());
+        try {
+            mediaMetadataModifyService.updateMediaLengthWithDelta(Long.parseLong(event.userId()), event.mediaId(), event.length());
+        } catch (Exception e) {
+            System.err.println("Failed to update media length: " + event.mediaId() + " " + event.length());
+            throw e;
+        }
+    }
+
 
 
     @KafkaListener(topics = {
@@ -78,6 +88,7 @@ public class MediaUploadEventConsumer {
                 case MediaUpdateEvent.FileToMediaInitiated e -> onInitiateFileToMedia(e);
                 case MediaUpdateEvent.FileDeleted e -> onDeleteMedia(e);
                 case MediaUpdateEvent.GrouperItemMoved e -> onMoveGrouperItem(e);
+                case MediaUpdateEvent.MediaFileLengthUpdate e -> onUpdateMediaLength(e);
 
 
                 case MediaUpdateEvent.ControlAddAuthor e -> controlAddAuthor(e.userId(), e.author());
@@ -113,6 +124,8 @@ public class MediaUploadEventConsumer {
                 System.out.println("Received file delete event: " + e.fileId());
             case MediaUpdateEvent.GrouperItemMoved e ->
                 System.out.println("Received move grouper item event: " + e.childMediaId());
+            case MediaUpdateEvent.MediaFileLengthUpdate e ->
+                System.out.println("Received update media length event: " + e.mediaId() + " " + e.length());
             default -> {
                 System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
             }
