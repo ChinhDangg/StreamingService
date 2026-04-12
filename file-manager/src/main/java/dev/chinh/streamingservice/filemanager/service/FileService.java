@@ -40,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -250,7 +251,7 @@ public class FileService {
         }
 
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
-        List<FileSystemItem> items = getItemInIds(getCommonIds(item.getPath()), criteria);
+        List<FileSystemItem> items = getItemInIds(getCommonIds(item.getPath()), criteria, f -> f.getFileType() == FileType.ALBUM);
         if (!items.isEmpty()) {
             throw new IllegalArgumentException("Has parent as album - cannot have album in an album");
         }
@@ -315,7 +316,7 @@ public class FileService {
         }
 
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
-        List<FileSystemItem> items = getItemInIds(getCommonIds(item.getPath()), criteria);
+        List<FileSystemItem> items = getItemInIds(getCommonIds(item.getPath()), criteria, f -> f.getFileType() == FileType.ALBUM);
         if (!items.isEmpty()) {
             throw new IllegalArgumentException("Has parent as album - cannot have grouper in an album");
         }
@@ -665,7 +666,7 @@ public class FileService {
             return item.getName();
         }
 
-        List<FileSystemItem> parents = getItemInIds(pathIds, null);
+        List<FileSystemItem> parents = getItemInIds(pathIds, null, null);
 
         Map<String, String> nameMap = parents.stream().collect(Collectors.toMap(FileSystemItem::getId, FileSystemItem::getName));
 
@@ -723,8 +724,8 @@ public class FileService {
         return fileCacheService.getFileCacheElseFromDatabase(userId, id, getCachedFirst);
     }
 
-    public List<FileSystemItem> getItemInIds(Collection<String> ids, Criteria criteria) {
-        return fileCacheService.getCachedFilesElseFromDatabase(ids, criteria);
+    public List<FileSystemItem> getItemInIds(Collection<String> ids, Criteria criteria, Predicate<FileSystemItem> filter) {
+        return fileCacheService.getCachedFilesElseFromDatabase(ids, criteria, filter);
     }
 
     public FileSystemItem getRootDirectoryItem() {

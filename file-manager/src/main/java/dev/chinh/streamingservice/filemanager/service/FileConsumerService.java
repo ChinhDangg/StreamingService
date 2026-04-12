@@ -86,7 +86,7 @@ public class FileConsumerService {
 
         Set<String> parentIds = fileService.getCommonIds(fileItem.getPath());
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
-        List<FileSystemItem> parents = fileService.getItemInIds(parentIds, criteria);
+        List<FileSystemItem> parents = fileService.getItemInIds(parentIds, criteria, f -> f.getFileType() == FileType.ALBUM);
         updateParentMediaLength(event.userId(), parents, 1);
     }
 
@@ -300,7 +300,7 @@ public class FileConsumerService {
 
         Set<String> parentIds = fileService.getCommonIds(fileItem.getPath());
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
-        List<FileSystemItem> parents = fileService.getItemInIds(parentIds, criteria);
+        List<FileSystemItem> parents = fileService.getItemInIds(parentIds, criteria, f -> f.getFileType() == FileType.ALBUM);
 
         int batchSize = 500;
         while (hasMore) {

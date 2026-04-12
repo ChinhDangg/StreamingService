@@ -14,6 +14,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,16 +28,17 @@ public class FileCacheService {
     private final Cache<String, FileSystemItem> fileCache;
     private final MongoTemplate mongoTemplate;
 
-    public List<FileSystemItem> getCachedFilesElseFromDatabase(Collection<String> ids, Criteria criteria) {
+    public List<FileSystemItem> getCachedFilesElseFromDatabase(Collection<String> ids, Criteria criteria, Predicate<FileSystemItem> filter) {
         Map<String, FileSystemItem> result = fileCache.getAll(ids, (keysToFetch) -> {
             Query query = new Query(Criteria.where("id").in(keysToFetch));
-            if (criteria != null) {
-                query.addCriteria(criteria);
-            }
+            if (criteria != null) query.addCriteria(criteria);
             List<FileSystemItem> fetched = mongoTemplate.find(query, FileSystemItem.class);
             return fetched.stream().collect(Collectors.toMap(FileSystemItem::getId, item -> item));
         });
-        return new ArrayList<>(result.values());
+        var listResult = new ArrayList<>(result.values());
+        if (filter != null)
+            return listResult.stream().filter(filter).toList();
+        return listResult;
     }
 
     public FileSystemItem getFileCache(String id) {
