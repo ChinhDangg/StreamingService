@@ -47,17 +47,29 @@ public class FileCacheService {
         return fileCache.get(id, function);
     }
 
-    public FileSystemItem getFileCacheElseFromDatabase(String userId, String id) {
+    /**
+     * If getCachedFirst is true, the file cache is checked first. Then from the database. The result is cached.
+     * Else from database only, the result is still cached.
+     */
+    public FileSystemItem getFileCacheElseFromDatabase(String userId, String id, boolean getCachedFirst) {
         // atomic: if multiple threads request the same ID, the compute function runs only once.
         // get, else compute, save, and return the result.
-        return fileCache.get(id, k -> findById(userId, k));
+        if (getCachedFirst)
+            return fileCache.get(id, k -> findById(userId, k));
+        var item = findById(userId, id);
+        putFileCache(item);
+        return item;
+    }
+
+    public void putFileCache(FileSystemItem item) {
+        fileCache.put(item.getId(), item);
     }
 
     public void invalidateFileCache(String id) {
         fileCache.invalidate(id);
     }
 
-    public FileSystemItem findById(String userId, String id) {
+    private FileSystemItem findById(String userId, String id) {
         Query query = new Query(Criteria
                 .where(FileItemField.USER_ID).is(Long.parseLong(userId))
                 .and("id").is(id)

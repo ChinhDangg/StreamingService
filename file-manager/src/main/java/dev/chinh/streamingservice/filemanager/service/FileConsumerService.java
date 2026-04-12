@@ -153,7 +153,7 @@ public class FileConsumerService {
 
     @Transactional
     public void handleNestedDirectoryToMedia(MediaUpdateEvent.NestedDirectoryToMediaInitiated event) {
-        FileSystemItem item = fileService.findById(event.userId(), event.fileId());
+        FileSystemItem item = fileService.findById(event.userId(), event.fileId(), true);
         if (item == null) {
             System.out.println("Item not found, skipping nested directory to media");
             return;
@@ -270,7 +270,7 @@ public class FileConsumerService {
 
     @Transactional
     public void handleDeleteFile(MediaUpdateEvent.FileDeleted event) {
-        FileSystemItem fileItem = fileService.findById(event.userId(), event.fileId());
+        FileSystemItem fileItem = fileService.findById(event.userId(), event.fileId(), true);
         if (fileItem == null) {
             System.out.println("File not found with id: " + event.fileId() + ", skipping delete");
             return;
@@ -278,7 +278,7 @@ public class FileConsumerService {
 
         boolean isMedia = fileItem.getMId() != null && fileItem.getMId() > 0;
         if (isMedia && fileItem.getFileType() == FileType.ALBUM) {
-            FileSystemItem parent = fileService.findById(event.userId(), fileItem.getParentId());
+            FileSystemItem parent = fileService.findById(event.userId(), fileItem.getParentId(), true);
             if (parent != null && parent.getFileType() == FileType.GROUPER) {
                 Query query = new Query(Criteria.where("id").is(parent.getId()));
                 Update update = new Update().set(FileItemField.LENGTH, parent.getLength() - 1);
@@ -333,7 +333,7 @@ public class FileConsumerService {
 
     @Transactional
     public void handleMoveDirectory(String userId, String fileId, String newParentId, String oldPath) {
-        FileSystemItem item = fileService.findById(userId, fileId);
+        FileSystemItem item = fileService.findById(userId, fileId, true);
         if (item == null) {
             System.err.println("File not found. Skipping...");
             return;
@@ -342,7 +342,7 @@ public class FileConsumerService {
             System.err.println("File is not a directory. Moving single file is handled at initiation already. Skipping...");
             return;
         }
-        FileSystemItem newParent = fileService.findById(userId, newParentId);
+        FileSystemItem newParent = fileService.findById(userId, newParentId, true);
         if (newParent == null) {
             System.err.println("Parent not found. Skipping...");
             return;

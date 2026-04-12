@@ -83,7 +83,7 @@ public class FileService {
             FileSystemItem parentCraft = new FileSystemItem();
             String pathInId;
             if (itemInDir.isEmpty()) {
-                FileSystemItem parent = getFileSystemItem(userId, parentId);
+                FileSystemItem parent = getFileSystemItem(userId, parentId, true);
                 pathInId = parent.getPath() + parent.getId() + "/";
                 parentCraft.setName(parent.getName());
             } else {
@@ -118,7 +118,7 @@ public class FileService {
     }
 
     public FileSearchResult searchFileByName(String userId, String parentId, String fileName, boolean isRecursive, int page) {
-        FileSystemItem parent = getFileSystemItem(userId, parentId);
+        FileSystemItem parent = getFileSystemItem(userId, parentId, true);
 
         List<AggregationOperation> stages = new ArrayList<>();
 
@@ -195,7 +195,7 @@ public class FileService {
     )
     @Transactional
     public String addFileAsVideoMedia(String userId, String fileId) {
-        FileSystemItem item = getFileSystemItem(userId, fileId);
+        FileSystemItem item = getFileSystemItem(userId, fileId, true);
         if (item.getFileType() != FileType.VIDEO) {
             throw new IllegalArgumentException("File is not a video");
         }
@@ -227,7 +227,7 @@ public class FileService {
     )
     @Transactional
     public String addDirectoryAsAlbumMedia(String userId, String fileId) {
-        FileSystemItem item = getFileSystemItem(userId, fileId);
+        FileSystemItem item = getFileSystemItem(userId, fileId, false);
         if (item.getFileType() == FileType.ALBUM) {
             return "Item is already an album";
         }
@@ -256,7 +256,7 @@ public class FileService {
         FileSystemItem first = findFirstImageOrVideo(userId, getPathForFileItem(item.getPath(), item.getId()));
 
         if (!item.getParentId().equals(getROOT_FOLDER_ID())) {
-            FileSystemItem parent = getFileSystemItem(userId, item.getParentId());
+            FileSystemItem parent = getFileSystemItem(userId, item.getParentId(), true);
             if (parent.getFileType() == FileType.GROUPER) {
                 publisher.publishEvent(new FileEventProducer.EventWrapper(
                         EventTopics.MEDIA_UPLOAD_TOPIC,
@@ -292,7 +292,7 @@ public class FileService {
     )
     @Transactional
     public String addDirectoryAsGrouperMedia(String userId, String fileId) {
-        FileSystemItem item = getFileSystemItem(userId, fileId);
+        FileSystemItem item = getFileSystemItem(userId, fileId, false);
         if (item.getFileType() == FileType.GROUPER) {
             return "Item is already a grouper";
         }
@@ -351,7 +351,7 @@ public class FileService {
         String error = FileSystemValidator.isValidName(newFolderName);
         if (error != null)
             throw new IllegalArgumentException(error);
-        FileSystemItem parent = findById(userId, parentId);
+        FileSystemItem parent = findById(userId, parentId, true);
         if (parent == null)
             throw new IllegalArgumentException("Parent folder not found: " + parentId);
         if (FileType.isNotDir(parent.getFileType()))
@@ -379,7 +379,7 @@ public class FileService {
 
     @Transactional
     public String renameFileItem(String userId, String fileId, String newName) {
-        FileSystemItem item = getFileSystemItem(userId, fileId);
+        FileSystemItem item = getFileSystemItem(userId, fileId, true);
         String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
         if (statusCodeStr != null) {
             throw new IllegalArgumentException(statusCodeStr);
@@ -409,7 +409,7 @@ public class FileService {
 
     @Transactional
     public void initiateDeleteFile(String userId, String fileId) {
-        FileSystemItem item = getFileSystemItem(userId, fileId);
+        FileSystemItem item = getFileSystemItem(userId, fileId, false);
         String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
         if (statusCodeStr != null) {
             throw new IllegalArgumentException(statusCodeStr);
@@ -458,7 +458,7 @@ public class FileService {
 
     @Transactional
     public FileSystemItem initiateMoveFileItem(String userId, String fileId, String newParentId) {
-        FileSystemItem item = getFileSystemItem(userId, fileId);
+        FileSystemItem item = getFileSystemItem(userId, fileId, false);
         String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
         if (statusCodeStr != null) {
             throw new IllegalArgumentException(statusCodeStr);
@@ -466,7 +466,7 @@ public class FileService {
         if (item.getParentId().equals(newParentId)) {
             throw new IllegalArgumentException("Cannot move item to same parent");
         }
-        FileSystemItem newParent = findById(userId, newParentId);
+        FileSystemItem newParent = findById(userId, newParentId, false);
         if (newParent == null) {
             throw new IllegalArgumentException("Parent folder not found: " + newParentId);
         }
@@ -510,7 +510,7 @@ public class FileService {
             ));
 
             if (item.getFileType() == FileType.ALBUM && !item.getParentId().equals(getROOT_FOLDER_ID())) {
-                FileSystemItem oldParent = findById(userId, item.getParentId());
+                FileSystemItem oldParent = findById(userId, item.getParentId(), true);
                 if (oldParent.getFileType() == FileType.GROUPER) {
                     boolean newParentIsGrouper = newParent.getFileType() == FileType.GROUPER;
                     publisher.publishEvent(new FileEventProducer.EventWrapper(
@@ -707,20 +707,20 @@ public class FileService {
         return mongoTemplate.findOne(query, FileSystemItem.class);
     }
 
-    private FileSystemItem getFileSystemItem(String userId, String id) {
-        FileSystemItem item = findById(userId, id);
+    private FileSystemItem getFileSystemItem(String userId, String id, boolean getCachedFirst) {
+        FileSystemItem item = findById(userId, id, getCachedFirst);
         if (item == null)
             throw new IllegalArgumentException("File not found with id: " + id);
         return item;
     }
 
-    public FileSystemItem findById(String userId, String id) {
+    public FileSystemItem findById(String userId, String id, boolean getCachedFirst) {
         if (id.equals(getROOT_FOLDER_ID()))
             return getRootDirectoryItem();
-        return fileCacheService.getFileCacheElseFromDatabase(userId, id);
+        return fileCacheService.getFileCacheElseFromDatabase(userId, id, getCachedFirst);
     }
 
-    private List<FileSystemItem> getItemInIds(Collection<String> ids, Criteria criteria) {
+    public List<FileSystemItem> getItemInIds(Collection<String> ids, Criteria criteria) {
         return fileCacheService.getCachedFilesElseFromDatabase(ids, criteria);
     }
 
