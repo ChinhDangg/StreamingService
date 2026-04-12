@@ -159,28 +159,6 @@ public class MediaMetadataModifyService {
         };
     }
 
-    private int removeNameEntityInMedia(long mediaId, long nameEntityId, MediaNameEntityConstant nameEntity) {
-        return switch (nameEntity) {
-            case MediaNameEntityConstant.AUTHORS -> mediaMetaDataRepository.deleteAuthorFromMedia(mediaId, nameEntityId);
-            case MediaNameEntityConstant.CHARACTERS -> mediaMetaDataRepository.deleteCharacterFromMedia(mediaId, nameEntityId);
-            case MediaNameEntityConstant.UNIVERSES -> mediaMetaDataRepository.deleteUniverseFromMedia(mediaId, nameEntityId);
-            case MediaNameEntityConstant.TAGS -> mediaMetaDataRepository.deleteTagFromMedia(mediaId, nameEntityId);
-        };
-    }
-
-    private int addNameEntityInMedia(long mediaId, long nameEntityId, MediaNameEntityConstant nameEntity) {
-        try {
-            return switch (nameEntity) {
-                case MediaNameEntityConstant.AUTHORS -> mediaMetaDataRepository.addAuthorToMedia(mediaId, nameEntityId);
-                case MediaNameEntityConstant.CHARACTERS -> mediaMetaDataRepository.addCharacterToMedia(mediaId, nameEntityId);
-                case MediaNameEntityConstant.UNIVERSES -> mediaMetaDataRepository.addUniverseToMedia(mediaId, nameEntityId);
-                case MediaNameEntityConstant.TAGS -> mediaMetaDataRepository.addTagToMedia(mediaId, nameEntityId);
-            };
-        } catch (DataIntegrityViolationException e) {
-            throw new DuplicateEntryException("Duplicate name entity in media: " + nameEntityId);
-        }
-    }
-
     @Transactional
     public void deleteMedia(String userIdStr, long mediaId) {
         MediaMetaData mediaMetaData = mediaMetaDataRepository.findById(mediaId).orElseThrow(
@@ -203,7 +181,7 @@ public class MediaMetadataModifyService {
                     () -> new IllegalArgumentException("Grouper media not found: " + mediaMetaData.getGrouperId())
             );
             grouperMediaId = grouperMetaData.getMediaMetaDataId();
-            Integer newLength = mediaMetaDataRepository.decrementLengthReturning(userId, grouperMediaId);
+            Integer newLength = mediaMetaDataRepository.updateLengthWithDeltaReturning(userId, grouperMediaId, -1);
             eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     EventTopics.MEDIA_SEARCH_TOPIC,
                     new MediaUpdateEvent.LengthUpdated(grouperMediaId, newLength)
@@ -227,8 +205,8 @@ public class MediaMetadataModifyService {
     }
 
     @Transactional
-    public void incrementMediaLength(long userId, long mediaId) {
-        Integer newLength = mediaMetaDataRepository.incrementLengthReturning(userId, mediaId);
+    public void updateMediaLengthWithDelta(long userId, long mediaId, int delta) {
+        Integer newLength = mediaMetaDataRepository.updateLengthWithDeltaReturning(userId, mediaId, delta);
         if (newLength == null)
             throw new IllegalArgumentException("Media not found: " + mediaId);
 

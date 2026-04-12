@@ -37,25 +37,13 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     //@Transactional
     @Query(value = """
         UPDATE media.media_metadata
-        SET length = length + 1
-        WHERE id = :id
-            AND user_id = :userId
-        RETURNING length
-    """, nativeQuery = true
-    )
-    Integer incrementLengthReturning(@Param("userId") long userId, @Param("id") long id);
-
-//    @Modifying
-//    @Transactional
-    @Query(value = """
-        UPDATE media.media_metadata
-        SET length = length - 1
+        SET length = length + :length
         WHERE id = :id
             AND length > 0
             AND user_id = :userId
         RETURNING length
     """, nativeQuery = true)
-    Integer decrementLengthReturning(@Param("userId") long userId, @Param("id") long id);
+    Integer updateLengthWithDeltaReturning(@Param("userId") long userId, @Param("id") long id, @Param("length") int length);
 
 
     @Query("""
