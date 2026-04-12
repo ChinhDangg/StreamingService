@@ -38,6 +38,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ############################################
 # Resolve env file
 ############################################
+set +H # Disable Bash history expansion (!)
 
 if [[ -z "$ENV_SUFFIX" ]]; then
   ENV_FILE="$SCRIPT_DIR/.env"
@@ -54,7 +55,8 @@ echo "Loading env: $ENV_FILE"
 
 # be careful as env variable is loaded - any same name used in bash script afterward will overwrite the env - use unique name
 set -a
-source "$ENV_FILE"
+# 'tr -d' removes any hidden Windows carriage returns
+source <(tr -d '\r' < "$ENV_FILE")
 set +a
 
 RAM_VOLUME_NAME="${RAM_VOLUME:-/mnt/ramdisk}"
