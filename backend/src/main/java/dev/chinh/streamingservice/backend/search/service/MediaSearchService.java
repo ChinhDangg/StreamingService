@@ -88,7 +88,7 @@ public class MediaSearchService {
         }
 
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.advanceSearch(Long.parseLong(userId), MEDIA_INDEX_NAME, includes, excludes, request.getRangeFields(), page, size, sortBy, sortOrder),
+                userId, openSearchService.advanceSearch(Long.parseLong(userId), MEDIA_INDEX_NAME, includes, excludes, request.getRangeFields(), page, size, sortBy, sortOrder),
                 page, size);
 
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
@@ -121,7 +121,7 @@ public class MediaSearchService {
             throw new IllegalArgumentException("Invalid search string");
         }
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.search(Long.parseLong(userId), MEDIA_INDEX_NAME, searchString, page, size, sortBy, sortOrder),
+                userId, openSearchService.search(Long.parseLong(userId), MEDIA_INDEX_NAME, searchString, page, size, sortBy, sortOrder),
                 page, size);
 
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
@@ -135,7 +135,7 @@ public class MediaSearchService {
                                               SortBy sortBy, SortOrder sortOrder) throws Exception {
         ContentMetaData.validateSearchFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.searchTermByOneField(Long.parseLong(userId), MEDIA_INDEX_NAME, field + "." + ContentMetaData.ID, keywords, matchAll, page, size, sortBy, sortOrder),
+                userId, openSearchService.searchTermByOneField(Long.parseLong(userId), MEDIA_INDEX_NAME, field + "." + ContentMetaData.ID, keywords, matchAll, page, size, sortBy, sortOrder),
                 page, size);
 
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
@@ -147,7 +147,7 @@ public class MediaSearchService {
 
     public MediaSearchResult searchMatchAll(String userId, int page, int size, SortBy sortBy, SortOrder sortOrder) throws Exception {
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                openSearchService.searchMatchAll(MEDIA_INDEX_NAME, Long.parseLong(userId), page, size, sortBy, sortOrder), page, size);
+                userId, openSearchService.searchMatchAll(MEDIA_INDEX_NAME, Long.parseLong(userId), page, size, sortBy, sortOrder), page, size);
 
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
             thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
@@ -161,7 +161,7 @@ public class MediaSearchService {
             Collection<MediaSearchItem> searchItems
     ) {}
 
-    private MapSearchResult mapResponseToMediaSearchResult(SearchResponse<Object> response, int page, int size) throws Exception {
+    private MapSearchResult mapResponseToMediaSearchResult(String userId, SearchResponse<Object> response, int page, int size) throws Exception {
         List<MediaSearchItem> items = new ArrayList<>();
         List<MediaSearchItemResponse> itemResponses = new ArrayList<>();
         for (Hit<Object> hit : response.hits().hits()) {
@@ -170,7 +170,7 @@ public class MediaSearchService {
             MediaSearchItemResponse itemResponse = mediaMapper.map(searchItem);
             if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
                 itemResponse.setThumbnail(searchItem.hasThumbnail()
-                        ? minIOService.getObjectUrl(ContentMetaData.THUMBNAIL_BUCKET, searchItem.getThumbnail())
+                        ? minIOService.getObjectUrl(ContentMetaData.THUMBNAIL_BUCKET, ContentMetaData.removeUserIdDirFromObjectKey(userId, searchItem.getThumbnail()))
                         : null);
             } else {
                 itemResponse.setThumbnail(searchItem.hasThumbnail()

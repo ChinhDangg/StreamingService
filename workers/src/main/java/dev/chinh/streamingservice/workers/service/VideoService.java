@@ -104,7 +104,8 @@ public class VideoService extends MediaService implements ResourceCleanable {
     }
 
     private String getOriginalVideoUrl(MediaJobDescription mediaJobDescription) {
-        return minIOService.getObjectUrl(mediaJobDescription.getBucket(), mediaJobDescription.getKey().substring(mediaJobDescription.getKey().indexOf("/") + 1));
+        String key = ContentMetaData.removeUserIdDirFromObjectKey(mediaJobDescription.getUserId(), mediaJobDescription.getKey());
+        return minIOService.getObjectUrl(mediaJobDescription.getBucket(), key);
     }
 
     private String getPreviewVideoUrl(String tokenKey, MediaJobDescription mediaJobDescription) throws Exception {

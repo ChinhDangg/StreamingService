@@ -83,13 +83,14 @@ public class AlbumService extends MediaService implements ResourceCleanable {
     private List<MediaUrl> processAlbumList(MediaJobDescription mediaJobDescription) throws Exception {
         long albumId = mediaJobDescription.getId();
         Resolution resolution = mediaJobDescription.getResolution();
+        String userId = mediaJobDescription.getUserId();
 
         boolean noFileId = false;
         Map<Object, Object> albumInfo = getCacheAlbumJobInfo(albumId);
         if (albumInfo.isEmpty()) {
             noFileId = true;
             try {
-                var response = fileService.findFileByMId(mediaJobDescription.getUserId(), albumId);
+                var response = fileService.findFileByMId(userId, albumId);
                 if (response.getContentCount() > 0) {
                     String fileId = response.getContent(0).getId();
                     if (fileId.isBlank())
@@ -104,7 +105,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             }
         }
 
-        var response = fileService.listFiles(mediaJobDescription.getUserId(), albumInfo.get("fileId").toString(), mediaJobDescription.getOffset());
+        var response = fileService.listFiles(userId, albumInfo.get("fileId").toString(), mediaJobDescription.getOffset());
 
         String albumDir = "/stream/album/" + albumId + "/" + resolution.name();
         long size = 0;
@@ -116,7 +117,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         List<String> pathList = new ArrayList<>();
         for (FileItem f : response.getContentList()) {
             String objectName = f.getObjectName();
-            String objectNameOmittedUserDir = objectName.substring(objectName.indexOf("/") + 1);
+            String objectNameOmittedUserDir = ContentMetaData.removeUserIdDirFromObjectKey(userId, objectName);
 
             MediaType mediaType = MediaType.detectMediaType(objectName);
 
@@ -149,12 +150,12 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                 return response.getContentList().stream()
                         .map(i ->
                                 new MediaUrl(MediaType.detectMediaType(i.getObjectName()),
-                                        minIOService.getObjectUrl(i.getBucket(), i.getObjectName())))
+                                        minIOService.getObjectUrl(i.getBucket(), ContentMetaData.removeUserIdDirFromObjectKey(userId, i.getObjectName()))))
                         .toList();
             }
 
             AlbumUrlInfo urlInfo = new AlbumUrlInfo(mediaImageOutputList, bucketList, pathList);
-            String saveDir = mediaJobDescription.getUserId() + "/" + albumId + "/" + resolution.name();
+            String saveDir = userId + "/" + albumId + "/" + resolution.name();
             int exitCode = processResizedImagesInBatch(urlInfo, resolution, saveDir, false);
             if (exitCode != 0) {
                 System.err.println("Failed to resize images for albumId: " + albumId);

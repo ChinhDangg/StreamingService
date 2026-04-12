@@ -52,7 +52,7 @@ public class MediaNameEntityService {
             if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
                 nameEntries.forEach(nameEntry -> {
                     try {
-                        nameEntry.setThumbnail(minIOService.getObjectUrl(ContentMetaData.THUMBNAIL_BUCKET, nameEntry.getThumbnail()));
+                        nameEntry.setThumbnail(minIOService.getObjectUrl(ContentMetaData.THUMBNAIL_BUCKET, ContentMetaData.removeUserIdDirFromObjectKey(userId, nameEntry.getThumbnail())));
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }

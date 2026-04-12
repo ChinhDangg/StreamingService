@@ -32,14 +32,14 @@ public class VideoService extends MediaService {
 
     public String getOriginalVideoUrl(String userId, long videoId) {
         MediaDescription mediaDescription = getMediaDescription(userId, videoId);
-        return minIOService.getObjectUrl(mediaDescription.getBucket(), mediaDescription.getKey().substring(mediaDescription.getKey().indexOf("/") + 1));
+        return minIOService.getObjectUrl(mediaDescription.getBucket(), ContentMetaData.removeUserIdDirFromObjectKey(userId, mediaDescription.getKey()));
     }
 
     @Transactional
     public String getPreviewVideoUrl(String userId, long videoId) throws Exception {
         MediaDescription mediaDescription = getMediaDescription(userId, videoId);
         if (mediaDescription.getPreview() != null) {
-            return minIOService.getObjectUrl(ContentMetaData.PREVIEW, mediaDescription.getPreview());
+            return minIOService.getObjectUrl(ContentMetaData.PREVIEW, ContentMetaData.removeUserIdDirFromObjectKey(userId, mediaDescription.getPreview()));
         }
         String cacheJobId = getCachePreviewJobId(videoId);
         addCacheVideoLastAccess(cacheJobId, null);

@@ -82,4 +82,8 @@ public class ContentMetaData {
             throw new IllegalArgumentException("Text must be at most 100 chars");
         }
     }
+
+    public static String removeUserIdDirFromObjectKey(String userId, String objectKey) {
+        return objectKey.startsWith(userId + "/") ? objectKey.substring(userId.length() + 1) : objectKey;
+    }
 }

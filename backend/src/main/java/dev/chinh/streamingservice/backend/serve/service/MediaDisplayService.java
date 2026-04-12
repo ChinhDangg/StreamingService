@@ -54,7 +54,7 @@ public class MediaDisplayService {
         if (mediaItem.hasThumbnail()) {
             if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
                 String thumbnailBucket = mediaItem.getMediaType() == MediaType.ALBUM ? mediaItem.getBucket() : ContentMetaData.THUMBNAIL_BUCKET;
-                mediaDisplayContent.setThumbnail(minIOService.getObjectUrl(thumbnailBucket, mediaItem.getThumbnail()));
+                mediaDisplayContent.setThumbnail(minIOService.getObjectUrl(thumbnailBucket, ContentMetaData.removeUserIdDirFromObjectKey(userId, mediaItem.getThumbnail())));
             } else {
                 mediaDisplayContent.setThumbnail(ThumbnailService.getThumbnailPath(ThumbnailService.getThumbnailUrlParentPath(), mediaId, mediaItem.getThumbnail()));
                 thumbnailService.processThumbnails(userId, List.of(mediaItem));
