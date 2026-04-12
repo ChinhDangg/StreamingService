@@ -65,7 +65,10 @@ public class FileService {
     public record FileSearchResult(String parentId, String parentName, List<FileSystemItem> content, Pageable pageable, boolean hasNext) {}
 
     public Slice<FileSystemItem> findFilesInDirectory(String userId, String parentId, int page, SortBy sortBy, Sort.Direction sortOrder) {
-        return fileSystemRepository.findByUserIdAndParentId(Long.parseLong(userId), parentId, getPageable(page, sortBy, sortOrder));
+        FileSystemItem parent = getFileSystemItem(userId, parentId, true);
+        String regexPath = "^" + Pattern.quote(parent.getPath() + parent.getId() + "/");
+
+        return fileSystemRepository.findByUserIdAndPathRegex(Long.parseLong(userId), regexPath, getPageable(page, sortBy, sortOrder));
     }
 
     public FileSearchResult findFilesAtRoot(String userId, int page, SortBy sortBy, Sort.Direction sortOrder) {
