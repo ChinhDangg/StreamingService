@@ -41,7 +41,9 @@
 </head>
 <body class="bg-black flex flex-col items-center justify-center min-h-screen text-white">
 
-<div th:fragment="video-player-html" data-player="videoPlayerContainer" tabindex="0" class="relative aspect-video bg-black flex items-center justify-center overflow-hidden rounded-lg select-none">
+<div th:fragment="video-player-html" data-player="videoPlayerContainer" tabindex="0" class="relative aspect-video bg-black flex flex-col rounded-lg select-none">
+    <div class="padding-block block md:hidden h-20 flex-shrink-0"></div>
+
     <video class="video-node w-full h-full bg-black cursor-pointer"></video>
 
     <!-- Controls -->
@@ -56,6 +58,11 @@
         <!-- Control Buttons -->
         <div class="flex items-center justify-between text-sm">
             <div class="flex items-center space-x-1 sm:space-x-3">
+                <!-- Fullscreen -->
+                <button class="fullscreen-button p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Fullscreen">
+                    <i data-lucide="maximize" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+                </button>
+
                 <button class="play-pause-button p-2 rounded-full bg-white/20 hover:bg-white/40 transition">
                     <i data-lucide="play" class="w-4 h-4 sm:w-5 sm:h-5"></i>
                 </button>
@@ -77,7 +84,7 @@
                 <span class="total-time text-gray-300 sm:text-xs">0:00</span>
 
                 <!-- Volume -->
-                <div class="flex items-center space-x-2">
+                <div class="hidden sm:flex items-center space-x-2">
                     <button class="mute-button p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Mute/Unmute">
                         <i data-lucide="volume-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>
                     </button>
@@ -106,14 +113,11 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Fullscreen -->
-                <button class="fullscreen-button p-2 rounded-full bg-white/20 hover:bg-white/40 transition" title="Fullscreen">
-                    <i data-lucide="maximize" class="w-4 h-4 sm:w-5 sm:h-5"></i>
-                </button>
             </div>
         </div>
     </div>
+
+    <div class="padding-block block md:hidden h-20 flex-shrink-0"></div>
 </div>
 
 <script th:src="@{/static/js/video-player/video-player.js}" src="/static/js/video-player/video-player.js"></script>

@@ -818,7 +818,7 @@ let videoContainer = document.getElementById('videoContainer-preview');
 const currentItemTypeMap = new Map();
 let currentViewItemIndex = null;
 
-function displaySearchItems(searchItems) {
+async function displaySearchItems(searchItems) {
     const mainItemContainer = document.getElementById('main-item-container');
     if (searchItems.length === 0) {
         mainItemContainer.innerHTML = 'No results found.';
@@ -843,7 +843,9 @@ function displaySearchItems(searchItems) {
         });
     }
 
-    searchItems.forEach(async (item, index) => {
+    for (let i = 0; i < searchItems.length; i++) {
+        const item = searchItems[i];
+        const index = i;
         let itemContainer;
         if (item.thumbnail != null && !item.thumbnail.endsWith('null')) {
             const loadedImage = document.createElement('img');
@@ -914,7 +916,7 @@ function displaySearchItems(searchItems) {
             itemContainer.querySelector('.time-note').remove();
 
         mainItemContainer.appendChild(itemContainer);
-    });
+    }
 }
 
 function sanitizeRelativeSrc(rawPath) {

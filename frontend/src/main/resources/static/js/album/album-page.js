@@ -152,6 +152,27 @@ const addMediaItem = (start, end) => {
     }
 }
 
+let gridCol = 'grid-cols-1';
+const albumAllContainer = document.getElementById('album-all-container');
+const gridSelect = document.getElementById('grid-select');
+gridSelect.addEventListener('change', () => {
+    let gridSelectValue = gridSelect.value;
+    gridSelectValue = Number(gridSelectValue);
+    gridSelectValue = (!isNaN(gridSelectValue) && gridSelectValue >= 1 && gridSelectValue <= 5) ? gridSelectValue : 1;
+    imageContainer.classList.remove(gridCol);
+    const newGridCol = 'grid-cols-' + gridSelectValue;
+    imageContainer.classList.add(newGridCol);
+    gridCol = newGridCol;
+    if (gridSelectValue > 2) {
+        albumAllContainer.classList.remove('max-w-4xl');
+        albumAllContainer.classList.add('max-w-7xl');
+    } else {
+        albumAllContainer.classList.remove('max-w-7xl');
+        albumAllContainer.classList.add('max-w-4xl');
+    }
+});
+
+
 function initializeResolutionSelector() {
     const resolutionSelector = document.getElementById('resolution-select');
     resolutionSelector.innerHTML = '';

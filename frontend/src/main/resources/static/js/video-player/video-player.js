@@ -52,6 +52,13 @@ video.addEventListener('timeupdate', () => {
 });
 video.addEventListener('loadedmetadata', () => {
     totalTimeEl.textContent = formatTime(video.duration);
+    const isVertical = video.videoHeight > video.videoWidth;
+
+    if (isVertical) {
+        container.querySelectorAll('.padding-block').forEach(el => el.classList.add('hidden'));
+    } else {
+        container.querySelectorAll('.padding-block').forEach(el => el.classList.remove('hidden'));
+    }
 }, { once: true });
 
 seekSlider.addEventListener('input', e => {
@@ -210,39 +217,38 @@ forwardBtn.addEventListener('click', () => {
 let holdTimer;
 const holdDuration = 1000;
 let isLongPress = false;
-let videoSpeedWithLongPress = 1.00;
+let videoSpeedWithLongPress = 2.00;
 
 function handleLongPress() {
     isLongPress = false;
     holdTimer = setTimeout(() => {
         console.log("Hold detected! Triggering action...");
         isLongPress = true;
-        if (videoSpeedWithLongPress === 1.00) {
-            videoSpeedWithLongPress = 2.00;
-        } else if (videoSpeedWithLongPress === 2.00) {
+        if (videoSpeedWithLongPress === 2.00) {
             videoSpeedWithLongPress = 3.00;
-        } else
-            videoSpeedWithLongPress = 1.00;
+        } else if (videoSpeedWithLongPress === 3.00)
+            videoSpeedWithLongPress = 2.00;
         video.playbackRate = videoSpeedWithLongPress;
         showFeedback(videoSpeedWithLongPress + "x");
     }, holdDuration);
 }
 
-video.addEventListener('pointerdown', () => {
+container.addEventListener('pointerdown', () => {
     handleLongPress();
 });
 
-video.addEventListener('pointerup', () => {
+container.addEventListener('pointerup', () => {
     clearTimeout(holdTimer);
+    video.playbackRate = 1.00;
 });
 
-video.addEventListener('pointerleave', () => {
+container.addEventListener('pointerleave', () => {
     clearTimeout(holdTimer);
+    video.playbackRate = 1.00;
 });
 
-video.addEventListener('click', e => {
+container.addEventListener('click', e => {
     if (!isLongPress) {
-        showControls();
         resetHideTimer();
         handleClickOrTap(e.clientY, e.timeStamp, false);
     }

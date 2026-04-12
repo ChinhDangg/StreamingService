@@ -34,7 +34,7 @@
 
 <header th:replace="~{header :: header-html}"></header>
 
-<main th:fragment="album-html" th:id="${mainAlbumContainerId}" class="max-w-7xl mx-auto px-4 py-8">
+<main th:fragment="album-html" th:id="${mainAlbumContainerId}" class="max-w-7xl mx-auto py-8">
     <div class="px-4 py-4 sm:px-0">
 
         <div th:replace="~{metadata-content :: metadata-title-html('font-extrabold text-4xl tracking-tight text-white')}"></div>
@@ -64,7 +64,23 @@
 
     <div th:replace="~{upload/modify-thumbnail :: edit-thumbnail-section-html}"></div>
 
-    <div id="resolution-selector-container" class="w-full max-w-xs">
+    <div class="w-full max-w-xs">
+        <label for="grid-select" class="block mb-2 text-sm font-medium text-gray-200">
+            Grid Select
+        </label>
+
+        <select id="grid-select" class="block w-full rounded-xl bg-gray-800 text-gray-100 border border-gray-700
+           px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500
+           focus:border-blue-500 cursor-pointer">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+        </select>
+    </div>
+
+    <div id="resolution-selector-container" class="w-full mt-2 max-w-xs">
         <label for="resolution-select" class="block mb-2 text-sm font-medium text-gray-200">
             Image Resolution
         </label>
@@ -75,7 +91,7 @@
         </select>
     </div>
 
-    <div class="max-w-4xl mx-auto px-4 py-8 sm:px-0">
+    <div id="album-all-container" class="max-w-4xl mx-auto px-0 py-8 sm:px-4">
         <div id="album-video-container" class="grid grid-cols-1 gap-6 mb-5">
             <div class="aspect-[16/9] w-2/3 mx-auto relative hidden video-container-wrapper">
                 <div class="temp-video-holder relative w-full h-full">
@@ -90,24 +106,27 @@
             </div>
         </div> <!-- End of album-video-container -->
 
-        <div id="album-image-container" class="grid grid-cols-1 gap-6 min-h-[2000px]">
-            <div class="image-container-wrapper hidden group relative overflow-hidden rounded-xl shadow-lg bg-gray-800 hover:shadow-2xl transition-shadow duration-300">
-                <img class="image-to-fix object-cover w-full h-auto max-w-full transition-transform duration-500 group-hover:scale-105"
-                        src="" alt="A beautiful landscape view"/>
+        <div class="max-w-4xl max-w-7xl max-w- grid-cols-1 grid-cols-2 grid-cols-3 grid-cols-4 grid-cols-5 grid-cols-6"></div>
+        <div class="min-h-[2000px]">
+            <div id="album-image-container" class="grid grid-cols-1 gap-2">
+                <div class="image-container-wrapper hidden group relative overflow-hidden rounded-xl shadow-lg bg-gray-800 hover:shadow-2xl transition-shadow duration-300">
+                    <img class="image-to-fix object-cover w-full h-auto max-w-full transition-transform duration-500 group-hover:scale-105"
+                         src="" alt="A beautiful landscape view"/>
 
-                <button aria-label="View image in full screen"
-                        class="fullscreen-trigger absolute top-4 right-4
+                    <button aria-label="View image in full screen"
+                            class="fullscreen-trigger absolute top-4 right-4
                               p-3 rounded-full bg-black/50 text-white
                               opacity-0 group-hover:opacity-100
                               transition-opacity duration-300
                               hover:bg-black/70 hover:scale-110">
 
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-6 h-6 pointer-events-none">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 16.5h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                    </svg>
-                </button>
-            </div>
-        </div> <!-- End of album-image-container -->
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-6 h-6 pointer-events-none">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 16.5h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                        </svg>
+                    </button>
+                </div>
+            </div> <!-- End of album-image-container -->
+        </div>
         <div id="image-wrapper-fullscreen" class="image-container-wrapper hidden group relative overflow-hidden rounded-xl shadow-lg bg-gray-800 hover:shadow-2xl transition-shadow duration-300">
             <img class="image-to-fix object-cover w-full h-auto max-w-full transition-transform duration-500 group-hover:scale-105"
                  src=""
