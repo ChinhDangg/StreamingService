@@ -2,7 +2,6 @@ package dev.chinh.streamingservice.workers;
 
 import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaJobStatus;
-import dev.chinh.streamingservice.workers.service.AlbumService;
 import dev.chinh.streamingservice.workers.service.ThumbnailService;
 import dev.chinh.streamingservice.workers.service.VideoService;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +14,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -65,6 +63,7 @@ public class ScheduleService {
     }
 
     private void stopNonViewingVideoRunningJob() {
+        System.out.println("Checking for non-viewing video running jobs");
         Set<String> runningVideoJobs = videoService.getCacheRunningJobs(System.currentTimeMillis());
         for (String videoJobId: runningVideoJobs) {
 

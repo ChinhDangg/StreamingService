@@ -247,7 +247,7 @@ container.addEventListener('pointerleave', () => {
     video.playbackRate = 1.00;
 });
 
-container.addEventListener('click', e => {
+video.addEventListener('click', e => {
     if (!isLongPress) {
         resetHideTimer();
         handleClickOrTap(e.clientY, e.timeStamp, false);
