@@ -200,11 +200,11 @@ public class FileService {
             throw new IllegalArgumentException("File is not a video");
         }
         if (item.getMId() != null && item.getMId() != 0) {
-            return "Item is already marked as video";
+            throw new IllegalArgumentException("Item is already marked as video");
         }
         String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
         if (statusCodeStr != null) {
-            return statusCodeStr;
+            throw new IllegalArgumentException(statusCodeStr);
         }
         updateStatusCode(fileId, FileStatus.PROCESSING);
         publisher.publishEvent(new FileEventProducer.EventWrapper(
@@ -229,17 +229,17 @@ public class FileService {
     public String addDirectoryAsAlbumMedia(String userId, String fileId) {
         FileSystemItem item = getFileSystemItem(userId, fileId, false);
         if (item.getFileType() == FileType.ALBUM) {
-            return "Item is already an album";
+            throw new IllegalArgumentException("Item is already an album");
         }
         if (item.getFileType() != FileType.DIR) {
             throw new IllegalArgumentException("File is not a directory");
         }
         if (item.getMId() != null && item.getMId() != 0) {
-            return "Item is already marked as media";
+            throw new IllegalArgumentException("Item is already marked as media");
         }
         String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
         if (statusCodeStr != null) {
-            return statusCodeStr;
+            throw new IllegalArgumentException(statusCodeStr);
         }
         FolderLocks folderIsLocked = checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), null);
         if (folderIsLocked != null) {
@@ -249,7 +249,7 @@ public class FileService {
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
         List<FileSystemItem> items = getItemInIds(getCommonIds(item.getPath()), criteria);
         if (!items.isEmpty()) {
-            return "Has parent as album - cannot have album in an album";
+            throw new IllegalArgumentException("Has parent as album - cannot have album in an album");
         }
 
         updateStatusCode(fileId, FileStatus.PROCESSING);
@@ -294,17 +294,17 @@ public class FileService {
     public String addDirectoryAsGrouperMedia(String userId, String fileId) {
         FileSystemItem item = getFileSystemItem(userId, fileId, false);
         if (item.getFileType() == FileType.GROUPER) {
-            return "Item is already a grouper";
+            throw new IllegalArgumentException("Item is already a grouper");
         }
         if (item.getFileType() != FileType.DIR) {
             throw new IllegalArgumentException("File is not a directory");
         }
         if (item.getMId() != null && item.getMId() != 0) {
-            return "Item is already marked as media";
+            throw new IllegalArgumentException("Item is already marked as media");
         }
         String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
         if (statusCodeStr != null) {
-            return statusCodeStr;
+            throw new IllegalArgumentException(statusCodeStr);
         }
         FolderLocks folderIsLocked = checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), null);
         if (folderIsLocked != null) {
@@ -314,7 +314,7 @@ public class FileService {
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
         List<FileSystemItem> items = getItemInIds(getCommonIds(item.getPath()), criteria);
         if (!items.isEmpty()) {
-            return "Has parent as album - cannot have grouper in an album";
+            throw new IllegalArgumentException("Has parent as album - cannot have grouper in an album");
         }
 
         updateStatusCode(fileId, FileStatus.PROCESSING);
@@ -324,7 +324,7 @@ public class FileService {
                         .and(FileItemField.FILE_TYPE).nin(FileType.DIR, FileType.ALBUM, FileType.GROUPER)),
                 FileSystemItem.class);
         if (anyDirectFile) {
-            return "Contains direct files - can't be grouped - must include only direct directories";
+            throw new IllegalArgumentException("Contains direct files - can't be grouped - must include only direct directories");
         }
         FileSystemItem first = findFirstImageOrVideo(userId, getPathForFileItem(item.getPath(), item.getId()));
 
