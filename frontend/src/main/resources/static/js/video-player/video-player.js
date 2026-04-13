@@ -1,6 +1,7 @@
 lucide.createIcons();
 
 const container = document.querySelector('[data-player="videoPlayerContainer"]');
+const videoWrapper = container.querySelector('.video-wrapper');
 const video = container.querySelector('.video-node');
 const controls = container.querySelector('.video-controls');
 const seekSlider = container.querySelector('.seek-slider');
@@ -148,13 +149,13 @@ const hideControls = () => {
     speedMenu.classList.add('hidden');
 };
 const resetHideTimer = () => {
+    console.log("Resetting hide timer: ");
     showControls();
     clearTimeout(hideTimer);
     hideTimer = setTimeout(hideControls, 3000);
 };
 
 // desktop
-container.addEventListener('mousemove', resetHideTimer);
 container.addEventListener('mouseleave', hideControls);
 container.addEventListener('mouseenter', showControls);
 
@@ -165,7 +166,7 @@ container.addEventListener('contextmenu', (event) => {
 // --- Unified Skip Controls ---
 const SKIP_SECONDS = 5;
 let lastClickTime = 0;
-const DOUBLE_TAP_THRESHOLD = 250; // ms
+const DOUBLE_TAP_THRESHOLD = 300; // ms
 let singleTapTimer = null;
 let skipTimeTotalTimer = null;
 let skipTimeTotal = 0;
@@ -217,7 +218,7 @@ forwardBtn.addEventListener('click', () => {
 let holdTimer;
 const holdDuration = 1000;
 let isLongPress = false;
-let videoSpeedWithLongPress = 2.00;
+let videoSpeedWithLongPress = 3.00;
 
 function handleLongPress() {
     isLongPress = false;
@@ -233,23 +234,22 @@ function handleLongPress() {
     }, holdDuration);
 }
 
-container.addEventListener('pointerdown', () => {
+videoWrapper.addEventListener('pointerdown', () => {
     handleLongPress();
 });
 
-container.addEventListener('pointerup', () => {
+videoWrapper.addEventListener('pointerup', () => {
     clearTimeout(holdTimer);
     video.playbackRate = 1.00;
 });
 
-container.addEventListener('pointerleave', () => {
+videoWrapper.addEventListener('pointerleave', () => {
     clearTimeout(holdTimer);
     video.playbackRate = 1.00;
 });
 
-video.addEventListener('click', e => {
+videoWrapper.addEventListener('click', e => {
     if (!isLongPress) {
-        resetHideTimer();
         handleClickOrTap(e.clientY, e.timeStamp, false);
     }
 });
@@ -266,8 +266,9 @@ function handleClickOrTap(clientY, time) {
     } else {
         // Delay single tap a bit to check if second comes
         singleTapTimer = setTimeout(() => {
+            resetHideTimer();
             togglePlay();
-        }, DOUBLE_TAP_THRESHOLD + 30);
+        }, DOUBLE_TAP_THRESHOLD + 100);
     }
 }
 
