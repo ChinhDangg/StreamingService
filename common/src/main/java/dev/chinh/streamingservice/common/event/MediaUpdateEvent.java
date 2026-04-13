@@ -48,6 +48,12 @@ public interface MediaUpdateEvent {
             String newThumbnail
     ) implements MediaUpdateEvent{}
 
+    record MediaPreviewUpdated(
+            String userId,
+            long mediaId,
+            String previewObject
+    ) implements MediaUpdateEvent{}
+
 
     record MediaEnriched(
             String userId,

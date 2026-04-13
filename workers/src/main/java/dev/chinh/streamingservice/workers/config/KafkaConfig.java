@@ -1,0 +1,136 @@
+package dev.chinh.streamingservice.workers.config;
+
+import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.mapping.MappingException;
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.config.TopicBuilder;
+import org.springframework.kafka.core.*;
+import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
+import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.util.backoff.FixedBackOff;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Configuration
+public class KafkaConfig {
+
+    @Value("${kafka.bootstrap-servers}")
+    private String BOOTSTRAP_SERVERS;
+
+    public static final String MEDIA_GROUP_ID = "media-worker-service";
+
+    @Bean
+    public KafkaAdmin kafkaAdmin() {
+        return new KafkaAdmin(Map.of(
+                AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS
+        ));
+    }
+
+    @Bean
+    public DefaultKafkaConsumerFactory<String, MediaUpdateEvent> consumerFactory() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, MEDIA_GROUP_ID);
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+
+        JsonDeserializer<MediaUpdateEvent> jsonDeserializer = new JsonDeserializer<>(MediaUpdateEvent.class);
+        jsonDeserializer.addTrustedPackages("dev.chinh.streamingservice.common.event");
+        jsonDeserializer.setUseTypeHeaders(true);
+
+        ErrorHandlingDeserializer<MediaUpdateEvent> valueDeserializer = new ErrorHandlingDeserializer<>(jsonDeserializer);
+        ErrorHandlingDeserializer<String> keyDeserializer = new ErrorHandlingDeserializer<>(new StringDeserializer());
+
+        return new DefaultKafkaConsumerFactory<>(props, keyDeserializer, valueDeserializer);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, MediaUpdateEvent> kafkaListenerContainerFactory(
+            ConsumerFactory<String, MediaUpdateEvent> consumerFactory,
+            DefaultErrorHandler errorHandler
+    ) {
+        ConcurrentKafkaListenerContainerFactory<String, MediaUpdateEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory);
+
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+        factory.setCommonErrorHandler(errorHandler);
+
+        return factory;
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, MediaUpdateEvent> dlqListenerContainerFactory(
+            ConsumerFactory<String, MediaUpdateEvent> consumerFactory
+    ) {
+        ConcurrentKafkaListenerContainerFactory<String, MediaUpdateEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory);
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(new FixedBackOff(0L, 0));
+        errorHandler.setAckAfterHandle(false);
+
+        factory.setCommonErrorHandler(errorHandler);
+        return factory;
+    }
+
+    @Bean
+    public ProducerFactory<String, Object> dlqProducerFactory() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        props.put(ProducerConfig.ACKS_CONFIG, "all");
+        props.put(ProducerConfig.RETRIES_CONFIG, 3);
+
+        return new DefaultKafkaProducerFactory<>(props, new StringSerializer(), new JsonSerializer<>());
+    }
+
+    @Bean
+    public KafkaTemplate<String, Object> dlqKafkaTemplate() {
+        return new KafkaTemplate<>(dlqProducerFactory());
+    }
+
+    public static final String MEDIA_FILE_DLQ_TOPIC = "media-worker-dlq";
+
+    @Bean
+    public NewTopic mediaFileDlqTopic() {
+        return TopicBuilder.name(MEDIA_FILE_DLQ_TOPIC)
+                .partitions(1)
+                .replicas(1)
+                .config("retention.ms", "604800000")
+                .build();
+    }
+
+    @Bean
+    public DefaultErrorHandler kafkaErrorHandler(KafkaTemplate<String, Object> dlqKafkaTemplate) {
+        DeadLetterPublishingRecoverer recoverer =
+                new DeadLetterPublishingRecoverer(dlqKafkaTemplate,
+                        (record, ex) -> new TopicPartition(
+                                MEDIA_FILE_DLQ_TOPIC,
+                                record.partition()
+                        )
+                );
+
+        FixedBackOff fixedBackOff = new FixedBackOff(3000L, 3);
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, fixedBackOff);
+
+        errorHandler.addNotRetryableExceptions(IllegalArgumentException.class);
+        errorHandler.addNotRetryableExceptions(MappingException.class);
+        errorHandler.addNotRetryableExceptions(NullPointerException.class);
+
+        return errorHandler;
+    }
+}

@@ -110,6 +110,13 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     """)
     List<NameEntityDTO> findTagsByMediaId(@Param("userId") long userId, @Param("mediaId") long mediaId);
 
+    @Query("""
+        SELECT m.preview
+        FROM MediaMetaData m
+        WHERE m.id = :mediaId
+            AND m.userId = :userId
+    """)
+    String getMediaPreview(@Param("userId") long userId, @Param("mediaId") long mediaId);
 
     @Transactional
     @Modifying

@@ -82,6 +82,8 @@ public class MediaSearchEventConsumer {
     private void onUpdateMediaTitleSearch(MediaUpdateEvent.MediaTitleUpdated event) {
         System.out.println("Received update media title event: " + event.mediaId());
         String title = mediaMetaDataRepository.getMediaTitle(Long.parseLong(event.userId()), event.mediaId());
+        if (title == null)
+            throw new NullPointerException("Title not found for mediaId: " + event.mediaId() + " userId: " + event.userId());
         try {
             openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, event.mediaId(), Map.of(ContentMetaData.TITLE, title));
         } catch (IOException e) {
@@ -104,6 +106,18 @@ public class MediaSearchEventConsumer {
             openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, event.mediaId(), Map.of(ContentMetaData.LENGTH, event.newLength()));
         } catch (IOException e) {
             throw new RuntimeException("Failed to update Search index length field for media " + event.mediaId(), e);
+        }
+    }
+
+    private void onUpdateMediaPreview(MediaUpdateEvent.MediaPreviewUpdated event) {
+        System.out.println("Received create media preview: " + event.mediaId());
+        String previewObject = mediaMetaDataRepository.getMediaPreview(Long.parseLong(event.userId()), event.mediaId());
+        if (previewObject == null)
+            throw new NullPointerException("Preview not found for mediaId: " + event.mediaId() + " userId: " + event.userId());
+        try {
+            openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, event.mediaId(), Map.of(ContentMetaData.PREVIEW, previewObject));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to create media preview: " + event.mediaId(), e);
         }
     }
 
@@ -188,6 +202,7 @@ public class MediaSearchEventConsumer {
                 case MediaUpdateEvent.MediaNameEntityUpdated e -> onUpdateMediaNameEntitySearch(e);
                 case MediaUpdateEvent.LengthUpdated e -> onUpdateLengthSearch(e);
                 case MediaUpdateEvent.MediaTitleUpdated e -> onUpdateMediaTitleSearch(e);
+                case MediaUpdateEvent.MediaPreviewUpdated e -> onUpdateMediaPreview(e);
 
                 case MediaUpdateEvent.NameEntityCreated e -> onCreateNameEntitySearch(e);
                 case MediaUpdateEvent.NameEntityUpdated e -> onUpdateNameEntitySearch(e);
@@ -232,6 +247,8 @@ public class MediaSearchEventConsumer {
                     System.out.println("Received update length event: " + e.mediaId() + " newLength: " + e.newLength());
             case MediaUpdateEvent.MediaTitleUpdated e ->
                     System.out.println("Received update media title event: " + e.mediaId());
+            case MediaUpdateEvent.MediaPreviewUpdated e ->
+                    System.out.println("Received create media preview event: " + e.mediaId());
 
             case MediaUpdateEvent.NameEntityCreated e ->
                     System.out.println("Received create name entity: " + e.nameEntityConstant() + " nameEntityId: " + e.nameEntityId());

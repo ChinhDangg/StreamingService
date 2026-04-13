@@ -43,14 +43,10 @@ public class VideoService extends MediaService {
         }
         String cacheJobId = getCachePreviewJobId(videoId);
         addCacheVideoLastAccess(cacheJobId, null);
-        String previewName = "preview_" + mediaDescription.getKey();
+        String previewName = mediaDescription.getUserId() + "/preview_"  + ContentMetaData.removeUserIdDirFromObjectKey(String.valueOf(mediaDescription.getUserId()), mediaDescription.getKey());
         MediaJobDescription jobDescription = getMediaJobDescription(userId, mediaDescription, cacheJobId, null, "preview");
         jobDescription.setPreview(previewName);
-        String status = addJobToFfmpegQueue(ffmpegQueueKey, cacheJobId, "result", jobDescription);
-        if (Arrays.stream(MediaJobStatus.values()).noneMatch(s -> s.name().equals(status))) {
-            mediaRepository.updateMediaPreview(Long.parseLong(userId), mediaDescription.getId(), previewName);
-        }
-        return status;
+        return addJobToFfmpegQueue(ffmpegQueueKey, cacheJobId, "result", jobDescription);
     }
 
     public String getPartialVideoUrl(String userId, long videoId, Resolution res) throws Exception {

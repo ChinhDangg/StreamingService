@@ -6,12 +6,16 @@ import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.constant.Resolution;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
+import dev.chinh.streamingservice.common.event.EventTopics;
+import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.workers.VideoWorker;
+import dev.chinh.streamingservice.workers.event.WorkerEventProducer;
 import jakarta.annotation.PostConstruct;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -30,6 +34,8 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
     private static final Logger log = LogManager.getLogger(VideoService.class);
 
+    private final ApplicationEventPublisher publisher;
+
     @Qualifier("ffmpegExecutor")
     private final ExecutorService ffmpegExecutor;
 
@@ -45,10 +51,12 @@ public class VideoService extends MediaService implements ResourceCleanable {
                         MinIOService minIOService,
                         WorkerRedisService workerRedisService,
                         MemoryManager memoryManager,
-                        ExecutorService ffmpegExecutor) {
+                        ExecutorService ffmpegExecutor,
+                        ApplicationEventPublisher publisher) {
         super(redisTemplate, objectMapper, minIOService, workerRedisService);
         this.memoryManager = memoryManager;
         this.ffmpegExecutor = ffmpegExecutor;
+        this.publisher = publisher;
     }
 
     @PostConstruct
@@ -280,13 +288,17 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
     private void saveVideoPreviewToObjectStorage(MediaJobDescription jobDescription) {
         long videoId = jobDescription.getId();
+        String userId = jobDescription.getUserId();
         String videoDir = videoId + "/preview";
-        String containerDir = "/chunks/" + videoDir;
+        String userDir = userId + "/" + videoDir;
+        String containerDir = "/chunks/" + userDir;
         String inputPath = containerDir + masterFileName;
+
+        String previewObject = jobDescription.getPreview();
 
         try {
             String output = OSUtil.createDirInRAMDiskElseDisk("disk", "preview-generated") +
-                    "/" + videoId + "_preview_full_output.mp4";
+                    "/" + videoId + "_preview_full_output" + previewObject.substring(previewObject.lastIndexOf("."));
 
             List<String> commands = new ArrayList<>();
             if (ffmpegName != null && !ffmpegName.isEmpty()) {
@@ -304,12 +316,14 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
             OSUtil.runCommandAndLog(commands.toArray(new String[0]), null);
 
-            String previewObject = jobDescription.getPreview();
             minIOService.moveFileToObject(ContentMetaData.PREVIEW_BUCKET, previewObject, output);
             Files.deleteIfExists(Path.of(output));
+            publisher.publishEvent(new WorkerEventProducer.ImmediateEventWrapper(
+                    EventTopics.MEDIA_UPLOAD_TOPIC,
+                    new MediaUpdateEvent.MediaPreviewUpdated(userId, videoId, previewObject)
+            ));
         } catch (Exception e) {
             log.error("e: ", e);
-            throw new RuntimeException(e);
         }
     }
 

@@ -218,6 +218,18 @@ public class MediaMetadataModifyService {
         mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
     }
 
+    @Transactional
+    public void updateMediaPreview(String userId, long mediaId, String previewObject) {
+        int updated = mediaMetaDataRepository.updateMediaPreview(Long.parseLong(userId), mediaId, previewObject);
+        if (updated == 0) throw new IllegalArgumentException("Media not found: " + mediaId + " for user: " + userId);
+
+        eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                EventTopics.MEDIA_SEARCH_TOPIC,
+                new MediaUpdateEvent.MediaPreviewUpdated(userId, mediaId, previewObject)
+        ));
+        mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
+    }
+
     private MediaMetaData getMediaMetaData(long mediaId) {
         return mediaMetaDataRepository.findById(mediaId).orElseThrow(
                 () -> new IllegalArgumentException("Media not found: " + mediaId)
