@@ -884,21 +884,20 @@ async function displaySearchItems(searchItems) {
             const thumbnailContainer = itemContainer.querySelector('.thumbnail-container');
             const imageContainer = thumbnailContainer.querySelector('.image-container');
             let hoverTimer = null;
-            let triggerDelay = 400;
+            let triggerDelay = 1000;
             thumbnailContainer.addEventListener('mouseenter', async () => {
                 hoverTimer = setTimeout(() => {
                     requestVideoPreview(item.id, thumbnailContainer);
                     hoverTimer = null;
                 }, triggerDelay);
             });
-            thumbnailContainer.addEventListener('touchstart', async () => {
-                if (hoverTimer) clearTimeout(hoverTimer);
+            thumbnailContainer.addEventListener('pointerdown', async () => {
                 hoverTimer = setTimeout(() => {
                     requestVideoPreview(item.id, thumbnailContainer);
                     hoverTimer = null;
                 }, triggerDelay);
             });
-            thumbnailContainer.addEventListener('mouseleave', async () => {
+            thumbnailContainer.addEventListener('pointerup', async () => {
                 if (hoverTimer) {
                     clearTimeout(hoverTimer);
                     hoverTimer = null;
@@ -906,36 +905,22 @@ async function displaySearchItems(searchItems) {
                 thumbnailContainer.querySelector('.video-container-preview')?.classList.add('hidden');
                 imageContainer.classList.remove('hidden');
             });
-            thumbnailContainer.addEventListener('touchend', async () => {
-                if (hoverTimer) clearTimeout(hoverTimer);
+            thumbnailContainer.addEventListener('pointerleave', async () => {
+                if (hoverTimer) {
+                    clearTimeout(hoverTimer);
+                    hoverTimer = null;
+                }
                 thumbnailContainer.querySelector('.video-container-preview')?.classList.add('hidden');
                 imageContainer.classList.remove('hidden');
+            });
+            thumbnailContainer.addEventListener('contextmenu', async (e) => {
+                e.preventDefault();
             });
         }
         else
             itemContainer.querySelector('.time-note').remove();
 
         mainItemContainer.appendChild(itemContainer);
-    }
-}
-
-function sanitizeRelativeSrc(rawPath) {
-    try {
-        const url = new URL(rawPath, window.location.origin);
-
-        // Combine the path and the hash (the part after #)
-        // If rawPath is "/media/file#2.mp4",
-        // url.pathname is "/media/file" and url.hash is "#2.mp4"
-        url.pathname = url.pathname + url.hash;
-
-        // 4. Clear the hash so the browser doesn't append a literal # at the end
-        url.hash = "";
-
-        // 5. Return just the path + search (keeping it relative)
-        return url.pathname + url.search;
-    } catch (e) {
-        console.error("Path sanitization failed", e);
-        return rawPath;
     }
 }
 
@@ -1070,17 +1055,17 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
             if (video.src)
                 video.play();
         });
-        video.addEventListener('touchstart', () => {
+        video.addEventListener('pointerdown', () => {
             if (video.src)
                 video.play();
         });
-        video.addEventListener('mouseleave', () => {
+        video.addEventListener('pointerup', () => {
             if (window.currentPreviewPolling)
                 window.currentPreviewPolling.cancel();
             video.currentTime = 0;
             video.pause();
         });
-        video.addEventListener('touchend', () => {
+        video.addEventListener('pointerleave', () => {
             if (window.currentPreviewPolling)
                 window.currentPreviewPolling.cancel();
             video.currentTime = 0;
