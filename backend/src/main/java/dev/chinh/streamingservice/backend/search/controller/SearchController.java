@@ -63,8 +63,8 @@ public class SearchController {
 
     @GetMapping("/name/{nameEntity}")
     public List<?> searchNameEntity(@PathVariable MediaNameEntityConstant nameEntity,
-                                    @RequestParam(name = "s") String authorSearchString,
+                                    @RequestParam(name = "s") String nameSearchString,
                                     @AuthenticationPrincipal Jwt jwt) throws IOException {
-        return mediaSearchService.searchContaining(jwt.getSubject(), nameEntity.getName(), authorSearchString);
+        return mediaSearchService.searchContaining(jwt.getSubject(), nameEntity.getName(), nameSearchString);
     }
 }
