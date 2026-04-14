@@ -60,7 +60,7 @@ video.addEventListener('loadedmetadata', () => {
     } else {
         container.querySelectorAll('.padding-block').forEach(el => el.classList.remove('hidden'));
     }
-}, { once: true });
+});
 
 seekSlider.addEventListener('input', e => {
     resetHideTimer();
