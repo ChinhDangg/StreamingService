@@ -88,7 +88,7 @@ public class MediaBackupEventConsumer {
     }
 
 
-    private void onThumbnailDeleted(MediaUpdateEvent.ThumbnailDeleted event) {
+    private void onThumbnailDeleted(MediaUpdateEvent.ThumbnailDeleted event) throws IOException {
         deleteThumbnailBackup(event.objectName());
     }
 
@@ -104,7 +104,7 @@ public class MediaBackupEventConsumer {
         updateThumbnail(event.nameEntityId(), sameName ? null : event.oldThumbnail(), event.newThumbnail());
     }
 
-    private void onNameEntityDeleted(MediaUpdateEvent.NameEntityDeleted event) {
+    private void onNameEntityDeleted(MediaUpdateEvent.NameEntityDeleted event) throws IOException {
         System.out.println("Received name entity delete backup event: " + event.nameEntityId());
         if (event.thumbnailPath() != null)
             deleteThumbnailBackup(event.thumbnailPath());
@@ -138,17 +138,18 @@ public class MediaBackupEventConsumer {
         }
     }
 
-    private void deleteThumbnailBackup(String oldThumbnail) {
+    private void deleteThumbnailBackup(String oldThumbnail) throws IOException {
         System.out.println("Received thumbnail delete backup event, old: " + oldThumbnail);
         try {
             Path path = Paths.get(addBackupLocationToPath(ContentMetaData.THUMBNAIL_BUCKET + "/" + oldThumbnail));
             System.out.println("Deleted: " + Files.deleteIfExists(path));
         } catch (IOException e) {
             System.err.println("Failed to delete thumbnail file: " + oldThumbnail);
+            throw e;
         }
     }
 
-    private void onCreateDirectory(MediaUpdateEvent.DirectoryCreated event) {
+    private void onCreateDirectory(MediaUpdateEvent.DirectoryCreated event) throws IOException {
         System.out.println("Received create directory: " + event.fileId() + " " + event.dirPath());
         try {
             String dirPath = addRootToPath(event.dirPath());
@@ -158,6 +159,7 @@ public class MediaBackupEventConsumer {
             }
         } catch (Exception e) {
             System.err.println("Failed to create directory: " + event.fileId() + " : " + e.getMessage());
+            throw e;
         }
     }
 
@@ -187,12 +189,13 @@ public class MediaBackupEventConsumer {
         }
     }
 
-    private void onMoveFile(MediaUpdateEvent.FileMoved event) {
+    private void onMoveFile(MediaUpdateEvent.FileMoved event) throws Exception {
         System.out.println("Received move file: " + event.fileId() + ", old: " + event.oldPath() + ", new: " + event.newPath());
         try {
             moveFile(event.oldPath(), event.newPath());
         } catch (Exception e) {
             System.err.println("Failed to move file: " + event.fileId() + " : " + e.getMessage());
+            throw e;
         }
     }
 
@@ -270,7 +273,7 @@ public class MediaBackupEventConsumer {
     )
     public void handleDlq(@Payload MediaUpdateEvent event,
                           Acknowledgment ack,
-                          @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) byte[] errorMessage) {
+                          @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) byte[] errorMessage) throws Exception {
         System.out.println("======= DLQ EVENT DETECTED =======");
         System.out.printf("Error Message: %s\n", errorMessage == null ? "No error message found" : new String(errorMessage));
 
