@@ -98,8 +98,8 @@ export class FileManager {
             if (!varA || !varB) {
                 return 0;
             }
-            const valA = (typeof varA === 'string') ? varA.toUpperCase() : varA;
-            const valB = (typeof varB === 'string') ? varB.toUpperCase() : varB;
+            const valA = (typeof varA === 'string') ? varA.toLowerCase() : varA;
+            const valB = (typeof varB === 'string') ? varB.toLowerCase() : varB;
             let comparison = 0;
             if (valA > valB) {
                 comparison = 1;
