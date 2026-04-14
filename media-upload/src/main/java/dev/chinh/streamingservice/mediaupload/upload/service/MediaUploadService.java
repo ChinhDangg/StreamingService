@@ -73,7 +73,10 @@ public class MediaUploadService {
 
         String objectName = combinedName.substring(0, combinedName.indexOf(":|:"));
         String fileName = combinedName.substring(combinedName.indexOf(":|:") + 3);
-        return objectUploadService.getPresignedPartUrl(getBucketOnMediaType(fileName), objectName, uploadId, partNumber, uploadSessionTimeout);
+        String minioPresignedUrl = objectUploadService.getPresignedPartUrl(getBucketOnMediaType(fileName), objectName, uploadId, partNumber, uploadSessionTimeout);
+        minioPresignedUrl = minioPresignedUrl.substring("http://localhost:9000".length());
+        minioPresignedUrl = "/stream/upload" + minioPresignedUrl;
+        return minioPresignedUrl;
     }
 
     public record UploadedPart(@Max(1500) int partNumber, @Size(max = 100) String etag) {}
