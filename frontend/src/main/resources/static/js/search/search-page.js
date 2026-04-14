@@ -885,35 +885,37 @@ async function displaySearchItems(searchItems) {
             const imageContainer = thumbnailContainer.querySelector('.image-container');
             let hoverTimer = null;
             let triggerDelay = 1000;
-            thumbnailContainer.addEventListener('mouseenter', async () => {
+            const clearHoverTimer = () => {
+                if (hoverTimer) {
+                    clearTimeout(hoverTimer);
+                    hoverTimer = null;
+                }
+            }
+            thumbnailContainer.addEventListener('pointerenter', () => {
+                clearHoverTimer();
                 hoverTimer = setTimeout(() => {
                     requestVideoPreview(item.id, thumbnailContainer);
                     hoverTimer = null;
                 }, triggerDelay);
             });
-            thumbnailContainer.addEventListener('pointerdown', async () => {
+            thumbnailContainer.addEventListener('pointerdown', () => {
+                clearHoverTimer();
                 hoverTimer = setTimeout(() => {
                     requestVideoPreview(item.id, thumbnailContainer);
                     hoverTimer = null;
                 }, triggerDelay);
             });
-            thumbnailContainer.addEventListener('pointerup', async () => {
-                if (hoverTimer) {
-                    clearTimeout(hoverTimer);
-                    hoverTimer = null;
-                }
-                thumbnailContainer.querySelector('.video-container-preview')?.classList.add('hidden');
-                imageContainer.classList.remove('hidden');
+            thumbnailContainer.addEventListener('pointerup', () => {
+                clearHoverTimer();
+                // thumbnailContainer.querySelector('.video-container-preview')?.classList.add('hidden');
+                // imageContainer.classList.remove('hidden');
             });
-            thumbnailContainer.addEventListener('pointerleave', async () => {
-                if (hoverTimer) {
-                    clearTimeout(hoverTimer);
-                    hoverTimer = null;
-                }
-                thumbnailContainer.querySelector('.video-container-preview')?.classList.add('hidden');
-                imageContainer.classList.remove('hidden');
+            thumbnailContainer.addEventListener('pointerleave', () => {
+                clearHoverTimer();
+                // thumbnailContainer.querySelector('.video-container-preview')?.classList.add('hidden');
+                // imageContainer.classList.remove('hidden');
             });
-            thumbnailContainer.addEventListener('contextmenu', async (e) => {
+            thumbnailContainer.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
             });
         }
@@ -1033,9 +1035,10 @@ function initializeViewStepButtons() {
 let isRequestingVideoPreview = false;
 async function requestVideoPreview(videoId, thumbnailContainer) {
     const requestPreview = async () => {
-        thumbnailContainer.querySelector('.image-container').classList.add('hidden');
-
         const videoContainerPreview = thumbnailContainer.querySelector('.video-container-preview');
+        const imageContainer = thumbnailContainer.querySelector('.image-container');
+
+        imageContainer.classList.add('hidden');
         if (videoContainerPreview) {
             if (videoContainerPreview.querySelector('video').src) {
                 videoContainerPreview.classList.remove('hidden');
@@ -1051,25 +1054,29 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
         thumbnailContainer.appendChild(videoContainerCopy);
 
         const video = videoContainerCopy.querySelector('video');
-        video.addEventListener('mouseenter', () => {
+        imageContainer.addEventListener('pointerenter', () => {
             if (video.src)
                 video.play();
         });
-        video.addEventListener('pointerdown', () => {
+        imageContainer.addEventListener('pointerdown', () => {
             if (video.src)
                 video.play();
         });
-        video.addEventListener('pointerup', () => {
+        imageContainer.addEventListener('pointerup', () => {
             if (window.currentPreviewPolling)
                 window.currentPreviewPolling.cancel();
             video.currentTime = 0;
             video.pause();
+            thumbnailContainer.querySelector('.video-container-preview')?.classList.add('hidden');
+            imageContainer.classList.remove('hidden');
         });
-        video.addEventListener('pointerleave', () => {
+        imageContainer.addEventListener('pointerleave', () => {
             if (window.currentPreviewPolling)
                 window.currentPreviewPolling.cancel();
             video.currentTime = 0;
             video.pause();
+            thumbnailContainer.querySelector('.video-container-preview')?.classList.add('hidden');
+            imageContainer.classList.remove('hidden');
         });
 
         if (window.currentPreviewPolling) {

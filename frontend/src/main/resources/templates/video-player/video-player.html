@@ -42,10 +42,10 @@
 </head>
 <body class="bg-black flex flex-col items-center justify-center min-h-screen text-white">
 
-<div th:fragment="video-player-html" data-player="videoPlayerContainer" tabindex="0" class="relative bg-black flex flex-col rounded-lg select-none">
-    <div class="video-wrapper w-full h-full">
+<div th:fragment="video-player-html" data-player="videoPlayerContainer" tabindex="0" class="relative bg-black h-[70vh] max-h-[70vh] flex flex-col rounded-lg select-none overflow-hidden">
+    <div class="video-wrapper w-full h-full flex items-center justify-center bg-black">
         <div class="padding-block block md:hidden h-20 flex-shrink-0"></div>
-        <video class="video-node w-full h-full bg-black cursor-pointer"></video>
+        <video class="video-node max-w-full max-h-full object-contain block bg-black cursor-pointer"></video>
         <div class="padding-block block md:hidden h-20 flex-shrink-0"></div>
     </div>
 
