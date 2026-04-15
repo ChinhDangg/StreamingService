@@ -107,63 +107,77 @@ export async function uploadFile(sessionId, file, fileName,
     if (uploadingFiles)
         uploadingFiles.get(fileName).uploadId = uploadId;
 
-    const start = chunks.partNumber ? chunks.partNumber : 0;
 
-    for (let i = start; i < chunks.length; i++) {
-        const c = chunks[i];
-        const urlResponse = await apiRequest('/api/upload/media/presign-part-url', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                uploadId: uploadId,
-                partNumber: c.partNumber
-            })
-        });
-        if (!urlResponse.ok) {
-            if (currentFailTexts)
-                currentFailTexts.push('Presign: ' + await urlResponse.text());
-            return false;
+    const startIdx = chunks.partNumber ? chunks.partNumber : 0;
+    const CONCURRENCY_LIMIT = 4; // 4 parallel uploads
+    const tasks = chunks.slice(startIdx); // The remaining chunks to upload
+    let hasError = false; // Flag to stop other workers if one fails
+
+    const worker = async () => {
+        // Keep looping as long as there are tasks and no errors have occurred
+        while (tasks.length > 0 && !hasError) {
+            const c = tasks.shift();
+
+            try {
+                const urlResponse = await apiRequest('/api/upload/media/presign-part-url', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        uploadId: uploadId,
+                        partNumber: c.partNumber
+                    })
+                });
+                if (!urlResponse.ok) throw new Error('Presign: ' + await urlResponse.text());
+                const urlRes = await urlResponse.text();
+
+
+                const res = await apiRequest(urlRes, {
+                    method: 'PUT',
+                    body: c.blob
+                });
+                if (!res.ok) throw new Error('Upload: ' + await res.text());
+
+                eTags.push({
+                    partNumber: c.partNumber,
+                    etag: res.headers.get('ETag').replace(/"/g, '')
+                });
+
+                if (uploadingFiles) uploadingFiles.get(fileName).partNumber++;
+                if (showProgressFn) showProgressFn(c.size);
+
+            } catch (error) {
+                hasError = true;
+                if (currentFailTexts) currentFailTexts.push(error.message);
+            }
         }
-        const urlRes = await urlResponse.text();
-        console.log('Presigned url: ' + urlRes);
-
-        const res = await apiRequest(urlRes, {
-            method: 'PUT',
-            body: c.blob
-        });
-        if (!res.ok) {
-            if (currentFailTexts)
-                currentFailTexts.push('Upload: ' + await res.text());
-            return false;
-        }
-        console.log('blob upload result: ' + res);
-
-        eTags.push({
-            partNumber: c.partNumber,
-            etag: res.headers.get('ETag').replace(/"/g, '')
-        });
-
-        if (uploadingFiles)
-            uploadingFiles.get(fileName).partNumber++;
-
-        if (showProgressFn)
-            showProgressFn(c.size);
     }
+
+    // Start 4 workers at the same time
+    const workers = Array(Math.min(CONCURRENCY_LIMIT, tasks.length))
+        .fill(null)
+        .map(() => worker());
+
+    await Promise.all(workers);
+
+    if (hasError) return false;
+
+    // S3 requires part numbers to be in strictly ascending order
+    eTags.sort((a, b) => a.partNumber - b.partNumber);
 
     return true;
 }
 
 function chunkFile(file) {
-    const MAX_PARTS = 1000;
+    const MAX_PARTS = 10000;
     const MIN_CHUNK = 5 * 1024 * 1024;       // 5 MB
-    const DEFAULT_CHUNK = 8 * 1024 * 1024;   // 8 MB
+    const DEFAULT_CHUNK = 15 * 1024 * 1024;  // 15 MB
     const MAX_CHUNK = 64 * 1024 * 1024;      // 64 MB
 
     let chunkSize = DEFAULT_CHUNK;
 
-    // Dynamically resize chunk to avoid more than 1000 parts
+    // Dynamically resize chunk to avoid more than 10,000 parts
     const estimatedParts = Math.ceil(file.size / chunkSize);
     if (estimatedParts > MAX_PARTS) {
         chunkSize = Math.ceil(file.size / MAX_PARTS);
@@ -189,38 +203,4 @@ function chunkFile(file) {
     }
 
     return chunks;
-}
-
-export function validateDirectory(path) {
-    const INVALID = /[<>:"|?*\x00-\x1F]/; // Windows + control chars
-    const trimmed = path.trim();
-    let errors = [];
-
-    // Must not be empty
-    if (!trimmed.length) {
-        errors.push("Path cannot be empty.");
-    }
-
-    // Contains invalid characters
-    if (INVALID.test(trimmed)) {
-        errors.push(`Path contains invalid characters: "${path}"`);
-    }
-
-    // Cannot end with slash or backslash
-    if (/[/\\]$/.test(trimmed)) {
-        errors.push("Directory path must not end with a slash.");
-    }
-
-    // Must contain at least ONE letter (any language)
-    // \p{L} covers all alphabets: Chinese, Vietnamese, Arabic, etc.
-    if (!/\p{L}/u.test(trimmed)) {
-        errors.push("Path must contain at least one letter (any language).");
-    }
-
-    if (errors.length) {
-        alert("Invalid directory:\n\n" + errors.join("\n"));
-        return null;
-    }
-
-    return trimmed;
 }
