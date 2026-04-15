@@ -377,34 +377,59 @@
         </div>
 
         <div class="flex flex-wrap items-center mt-2 gap-4">
-            <div class="flex items-center gap-2">
-                <label for="file-sort-by-select">Sort by:</label>
-                <select id="file-sort-by-select" class="block w-56 rounded-md bg-gray-600 px-3 py-2 text-sm text-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                    <optgroup label="Name">
-                        <option value="NAME-ASC" selected>Name (A → Z)</option>
-                        <option value="NAME-DESC">Name (Z → A)</option>
-                    </optgroup>
-
-                    <optgroup label="Size">
-                        <option value="SIZE-ASC">Size (Smallest)</option>
-                        <option value="SIZE-DESC">Size (Largest)</option>
-                    </optgroup>
-
-                    <optgroup label="Length">
-                        <option value="LENGTH-ASC">Length (Shortest)</option>
-                        <option value="LENGTH-DESC">Length (Longest)</option>
-                    </optgroup>
-
-                    <optgroup label="Resolution">
-                        <option value="RESOLUTION-ASC">Resolution (Smallest)</option>
-                        <option value="RESOLUTION-DESC">Resolution (Largest)</option>
-                    </optgroup>
-
-                    <optgroup label="Last modified">
-                        <option value="UPLOAD-ASC">Last modified (Oldest)</option>
-                        <option value="UPLOAD-DESC">Last modified (Newest)</option>
-                    </optgroup>
-                </select>
+            <div class="flex flex-col items-start gap-1">
+                <div class="flex items-center gap-2">
+                    <label for="file-sort-by-select">Sort:</label>
+                    <select id="file-sort-by-select" class="block w-56 rounded-md bg-gray-600 px-3 py-2 text-sm text-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        <optgroup label="Name">
+                            <option value="NAME-ASC" selected>Name (A → Z)</option>
+                            <option value="NAME-DESC">Name (Z → A)</option>
+                        </optgroup>
+                        <optgroup label="Size">
+                            <option value="SIZE-ASC">Size (Smallest)</option>
+                            <option value="SIZE-DESC">Size (Largest)</option>
+                        </optgroup>
+                        <optgroup label="Length">
+                            <option value="LENGTH-ASC">Length (Shortest)</option>
+                            <option value="LENGTH-DESC">Length (Longest)</option>
+                        </optgroup>
+                        <optgroup label="Resolution">
+                            <option value="RESOLUTION-ASC">Resolution (Smallest)</option>
+                            <option value="RESOLUTION-DESC">Resolution (Largest)</option>
+                        </optgroup>
+                        <optgroup label="Upload date">
+                            <option value="UPLOAD-ASC">Upload (Oldest)</option>
+                            <option value="UPLOAD-DESC">Upload (Newest)</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium">View:</span>
+                    <div class="relative w-56" id="custom-select-container">
+                        <button type="button" id="dropdown-button" class="flex w-full items-center justify-between rounded-md bg-gray-600 px-3 py-2 text-sm text-left text-white shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                            <span id="button-text">Select views...</span>
+                            <svg class="h-4 w-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <div id="dropdown-menu" class="absolute z-10 mt-1 hidden max-h-60 w-full overflow-auto rounded-md bg-gray-600 py-1 text-sm text-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                            <label class="flex cursor-pointer items-center px-3 py-2 hover:bg-gray-500">
+                                <input type="checkbox" value="SIZE" class="h-4 w-4 rounded border-gray-400 bg-gray-700 text-blue-500 focus:ring-blue-500">
+                                <span class="ml-2">Size</span>
+                            </label>
+                            <label class="flex cursor-pointer items-center px-3 py-2 hover:bg-gray-500">
+                                <input type="checkbox" value="LENGTH" class="h-4 w-4 rounded border-gray-400 bg-gray-700 text-blue-500 focus:ring-blue-500">
+                                <span class="ml-2">Length</span>
+                            </label>
+                            <label class="flex cursor-pointer items-center px-3 py-2 hover:bg-gray-500">
+                                <input type="checkbox" value="RESOLUTION" class="h-4 w-4 rounded border-gray-400 bg-gray-700 text-blue-500 focus:ring-blue-500">
+                                <span class="ml-2">Resolution</span>
+                            </label>
+                            <label class="flex cursor-pointer items-center px-3 py-2 hover:bg-gray-500">
+                                <input type="checkbox" value="UPLOAD" class="h-4 w-4 rounded border-gray-400 bg-gray-700 text-blue-500 focus:ring-blue-500">
+                                <span class="ml-2">Upload</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div>
                 <form id="search-form" class="flex items-center gap-1">
@@ -453,8 +478,10 @@
                         <div class="name" title="">
                         </div>
                     </div>
-                    <div class="sorting-info text-center hidden">
-                    </div>
+                    <div class="size-info text-center hidden"></div>
+                    <div class="length-info text-center hidden"></div>
+                    <div class="resolution-info text-center hidden"></div>
+                    <div class="upload-info text-center hidden"></div>
                 </div>
             </div>
             <div class="end-of-file-text mt-[50px] flex w-full h-full text-sm items-center justify-center">
