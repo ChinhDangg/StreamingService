@@ -93,6 +93,8 @@ function displayFileItem(fileItems, fileItemManager = null, clearNode = true, cl
 
     fileViewWrapper.querySelector('.end-of-file-text').classList.add('hidden');
 
+    const selectedViews = getSelectedViews();
+
     const renderFileItem = (item) => {
         if (pushFileList && fileItemManager !== null) {
             fileItemManager.addFileItem(item);
@@ -120,23 +122,7 @@ function displayFileItem(fileItems, fileItemManager = null, clearNode = true, cl
         if (fileType === 'DIR' || fileType === 'ALBUM' || fileType === 'GROUPER') {
             fileNode.dataset.name = item.name;
         }
-        const sortingInfo = fileNode.querySelector('.sorting-info');
-        const sortInfo = getItemKeyFromSortSelectValue(getSortSelectValue().by);
-        if (sortInfo && item[sortInfo] && sortInfo !== 'name') {
-            if (sortInfo.startsWith('resolution')) {
-                sortingInfo.innerText = item.resolution.width + 'x' + item.resolution.height;
-            } else if (sortInfo === 'length') {
-                sortingInfo.innerText = fileType === 'VIDEO' ? formatDuration(item.length) : item[sortInfo];
-            } else if (sortInfo === 'size') {
-                sortingInfo.innerText = formatSize(item.size);
-            } else if (sortInfo === 'uploadDate') {
-                sortingInfo.innerText = formatDate(item[sortInfo]);
-            } else
-                sortingInfo.innerText = item[sortInfo];
-            sortingInfo.classList.remove('hidden');
-        } else {
-            sortingInfo.classList.add('hidden');
-        }
+        showSelectedViews(fileNode, item, selectedViews);
         fileViewContainer.appendChild(fileNode);
     }
 
@@ -203,6 +189,61 @@ function formatDate(isoString) {
 
     return `${day}/${month}/${year} ${hours}:${minutes}`;
 }
+
+function getSelectedViews() {
+    return new Map(Array.from(viewCheckboxes).map(cb => [cb.value, cb.checked]));
+}
+
+function showSelectedViews(fileNode, item, selectedViews) {
+    for (const [key, value] of selectedViews) {
+        const keyString = key.toString().toLowerCase();
+        const selectedNode = fileNode.querySelector('.' + keyString + '-info');
+        if (selectedNode === null) continue;
+        selectedNode.classList.toggle('hidden', !value);
+        if (!value)
+            continue;
+        if (keyString === 'resolution' && item.resolution) {
+            selectedNode.innerText = item.resolution.width + 'x' + item.resolution.height;
+        } else if (keyString === 'length') {
+            selectedNode.innerText = item.fileType === 'VIDEO' ? formatDuration(item.length) : item.length;
+        } else if (keyString === 'size') {
+            selectedNode.innerText = formatSize(item.size);
+        } else if (keyString === 'upload') {
+            selectedNode.innerText = formatDate(item.uploadDate);
+        }
+    }
+}
+
+const viewCheckboxes = document.querySelectorAll('#dropdown-menu input[type="checkbox"]');
+const button = document.getElementById('dropdown-button');
+const menu = document.getElementById('dropdown-menu');
+
+let selectedViewVisible = false;
+let previousSelectedViewSnapshot = '';
+function getSelectedViewSnapshot() {
+    return Array.from(viewCheckboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.value)
+        .sort()              // ensure consistent order
+        .join('|');          // cheap comparison
+}
+
+button.addEventListener('click', () => {
+    selectedViewVisible = !selectedViewVisible;
+    if (selectedViewVisible) {
+        menu.classList.remove('hidden');
+    } else {
+        const newSnapshot = getSelectedViewSnapshot();
+        menu.classList.add('hidden');
+        if (previousSelectedViewSnapshot === newSnapshot) {
+            console.log('No change');
+            return;
+        }
+        previousSelectedViewSnapshot = newSnapshot;
+        console.log('re-displaying');
+        displayFileItem([], currentMainFileItems, true, false, false, true);
+    }
+});
 
 const fileViewWrapper = document.getElementById('file-view-wrapper');
 const sortSelect = document.getElementById('file-sort-by-select');
