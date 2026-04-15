@@ -1407,6 +1407,7 @@ fileDropZone.addEventListener('click', async (event) => {
     const isDir = fileType === 'DIR' || fileType === 'ALBUM' || fileType === 'GROUPER';
 
     if (isInDeepSearch) {
+        clearSearch();
         if (isDir)
             await fetchMoreFilesAndMove(fileId, 0);
         else {
@@ -1757,8 +1758,8 @@ moveButton.addEventListener('click', async function () {
     }
     let currentFullPath;
     if (selectedFiles.size === 1) {
-        const currentFileItem = currentMainFileItems.getFileItemById(currentTargetNode.id);
-        currentFileItem.name;
+        const currentFileItem = currentMainFileItems.getFileItemById(selectedFiles.keys().next().value);
+        currentFullPath = currentFileItem.name;
     } else {
         currentFullPath = `${selectedFiles.size} files`;
     }
