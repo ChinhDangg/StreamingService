@@ -1062,7 +1062,7 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
             if (video.src)
                 video.play();
         });
-        imageContainer.addEventListener('pointerup', () => {
+        video.addEventListener('pointerup', () => {
             if (window.currentPreviewPolling)
                 window.currentPreviewPolling.cancel();
             video.currentTime = 0;
@@ -1070,7 +1070,7 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
             thumbnailContainer.querySelector('.video-container-preview')?.classList.add('hidden');
             imageContainer.classList.remove('hidden');
         });
-        imageContainer.addEventListener('pointerleave', () => {
+        video.addEventListener('pointerleave', () => {
             if (window.currentPreviewPolling)
                 window.currentPreviewPolling.cancel();
             video.currentTime = 0;
