@@ -172,7 +172,6 @@ public class JwtRefreshFilter extends OncePerRequestFilter {
     }
 
     private void setUnauthorizedResponse(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         String uri = request.getRequestURI();
         String query = request.getQueryString();
         String fullUri = (query == null ? uri : uri + "?" + query);
