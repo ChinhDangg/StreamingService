@@ -341,12 +341,16 @@ searchButton.addEventListener("click", async function () {
 
 const currentSearchFileItems = new FileManager();
 let isInDeepSearch = false;
+let isSearching = false;
 async function searchFiles(searchTerm) {
     if (!searchTerm || searchTerm.length === 0) {
         clearSearch();
     }
-    if (searchTerm.length < 2)
+    if (searchTerm.length < 2) {
+        isInDeepSearch = false;
         return;
+    }
+    isSearching = true;
     clearSearchButton.classList.remove('hidden');
     if (currentMainFileItems.getCurrentFilePage() === -1 && !recursiveToggle.checked) {
         console.log('searching locally');
@@ -398,6 +402,7 @@ clearSearchButton.addEventListener("click", async function () {
 });
 
 function clearSearch() {
+    isSearching = false;
     searchInput.value = '';
     clearSearchButton.classList.add('hidden');
     setObserverToFetchMore();
@@ -1804,7 +1809,10 @@ moveButton.addEventListener('click', async function () {
     }
     let currentFullPath;
     if (selectedFiles.size === 1) {
-        const currentFileItem = currentMainFileItems.getFileItemById(selectedFiles.keys().next().value);
+        const selectedFileId = selectedFiles.keys().next().value;
+        const currentFileItem = isSearching
+            ? currentSearchFileItems.getFileItemById(selectedFileId)
+            : currentMainFileItems.getFileItemById(selectedFileId);
         currentFullPath = currentFileItem.name;
     } else {
         currentFullPath = `${selectedFiles.size} files`;
