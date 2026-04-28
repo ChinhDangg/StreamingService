@@ -575,6 +575,10 @@ async function initialize() {
     homeButton.click();
 }
 
+window.addEventListener('popstate', async function (event) {
+    await initialize();
+});
+
 async function fetchMoreFilesAndMove(subId, page) {
     const subFiles = await fetchMoreFiles(subId, page, true);
     if (subFiles) {
