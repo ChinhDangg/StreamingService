@@ -129,7 +129,7 @@ function displayFileItem(fileItems, fileItemManager = null, clearNode = true, cl
     if (useGlobalMapItems && fileItemManager !== null) {
         if (fileItems && fileItems.length > 0)
             fileItemManager.loopAndDoWithGivenFileItemIds(fileItems, renderFileItem);
-        else
+        else if (fileItems && fileItems.length === 0)
             fileItemManager.loopAllAndDo(renderFileItem);
     } else {
         fileItems.forEach(item => {
@@ -139,7 +139,7 @@ function displayFileItem(fileItems, fileItemManager = null, clearNode = true, cl
 
     if (fileItemManager && fileItemManager.getCurrentFilePage() === -1) {
         const endOfFileText = fileViewWrapper.querySelector('.end-of-file-text');
-        if (fileItems.length === 0)
+        if (!fileItems || fileItems.length === 0)
             endOfFileText.innerText = 'No files found';
         else
             endOfFileText.innerText = 'End of file list';
@@ -350,7 +350,8 @@ async function searchFiles(searchTerm) {
     clearSearchButton.classList.remove('hidden');
     if (currentMainFileItems.getCurrentFilePage() === -1 && !recursiveToggle.checked) {
         console.log('searching locally');
-        const filteredFileIds = currentMainFileItems.findFileItemsWithNameAndReturnTheirIds(searchTerm);
+        let filteredFileIds = currentMainFileItems.findFileItemsWithNameAndReturnTheirIds(searchTerm);
+        filteredFileIds = filteredFileIds.length === 0 ? null : filteredFileIds;
         displayFileItem(filteredFileIds, currentMainFileItems, true, false, false, true);
     } else {
         if (recursiveToggle.checked)
