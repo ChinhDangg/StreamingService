@@ -92,6 +92,7 @@ function updateVolumeIcon() {
     lucide.createIcons();
 }
 
+let videoSpeedMenuRate = 1.00;
 // --- Speed Menu ---
 speedButton.addEventListener('click', () => {
     resetHideTimer();
@@ -101,7 +102,8 @@ speedButton.addEventListener('click', () => {
 speedMenu.querySelectorAll('button').forEach(btn => {
     btn.addEventListener('click', () => {
         const rate = parseFloat(btn.dataset.speed);
-        video.playbackRate = rate;
+        videoSpeedMenuRate = rate;
+        video.playbackRate = videoSpeedMenuRate;
         speedButton.textContent = `${rate}x`;
         speedMenu.classList.add('hidden');
     });
@@ -137,9 +139,11 @@ function requestFullscreenVideo() {
 
 // --- Auto-hide Controls (all screen sizes) ---
 let hideTimer;
+let isControlsVisible = true;
 const showControls = () => {
     controls.style.opacity = '1';
     controls.style.pointerEvents = 'auto';
+    isControlsVisible = true;
 };
 const hideControls = () => {
     controls.style.opacity = '0';
@@ -147,6 +151,7 @@ const hideControls = () => {
 
     resMenu.classList.add('hidden');
     speedMenu.classList.add('hidden');
+    isControlsVisible = false;
 };
 const resetHideTimer = () => {
     console.log("Resetting hide timer: ");
@@ -225,12 +230,11 @@ function handleLongPress() {
     holdTimer = setTimeout(() => {
         console.log("Hold detected! Triggering action...");
         isLongPress = true;
-        if (videoSpeedWithLongPress === 2.00) {
-            videoSpeedWithLongPress = 3.00;
-        } else if (videoSpeedWithLongPress === 3.00)
-            videoSpeedWithLongPress = 2.00;
-        video.playbackRate = videoSpeedWithLongPress;
-        showFeedback(videoSpeedWithLongPress + "x");
+
+        videoSpeedWithLongPress = videoSpeedWithLongPress === 2.00 ? 3.00 : 2.00;
+        const newSpeed = video.playbackRate === videoSpeedMenuRate ? videoSpeedWithLongPress : videoSpeedMenuRate;
+        video.playbackRate = newSpeed;
+        showFeedback(newSpeed + "x");
     }, holdDuration);
 }
 
@@ -240,12 +244,10 @@ videoWrapper.addEventListener('pointerdown', () => {
 
 videoWrapper.addEventListener('pointerup', () => {
     clearTimeout(holdTimer);
-    video.playbackRate = 1.00;
 });
 
 videoWrapper.addEventListener('pointerleave', () => {
     clearTimeout(holdTimer);
-    video.playbackRate = 1.00;
 });
 
 videoWrapper.addEventListener('click', e => {
@@ -266,8 +268,11 @@ function handleClickOrTap(clientY, time) {
     } else {
         // Delay single tap a bit to check if second comes
         singleTapTimer = setTimeout(() => {
-            resetHideTimer();
-            togglePlay();
+            if (isControlsVisible) {
+                togglePlay();
+            } else {
+                resetHideTimer();
+            }
         }, DOUBLE_TAP_THRESHOLD + 100);
     }
 }
