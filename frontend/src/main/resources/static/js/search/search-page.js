@@ -6,7 +6,7 @@ import {
     setAlertStatus,
     validateSearchString
 } from "/static/js/header.js";
-import {quickViewContentInOverlay} from "/static/js/overlay.js";
+import {closeOverlay, quickViewContentInOverlay} from "/static/js/overlay.js";
 import {apiRequest} from "/static/js/common.js";
 
 const SORT_BY = Object.freeze({
@@ -882,7 +882,7 @@ async function displaySearchItems(searchItems) {
         else if (item.mediaType === 'VIDEO') {
             itemContainer.querySelector('.time-note').textContent = formatTime(item.length);
             const thumbnailContainer = itemContainer.querySelector('.thumbnail-container');
-            const imageContainer = thumbnailContainer.querySelector('.image-container');
+            //const imageContainer = thumbnailContainer.querySelector('.image-container');
             let hoverTimer = null;
             let triggerDelay = 1000;
             const clearHoverTimer = () => {
@@ -1116,7 +1116,9 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
     isRequestingVideoPreview = false;
 }
 
-
+window.addEventListener('popstate', () => {
+    closeOverlay();
+});
 
 
 

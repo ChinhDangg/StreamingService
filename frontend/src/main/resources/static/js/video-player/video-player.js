@@ -318,5 +318,9 @@ document.addEventListener('keydown', e => {
     }
 });
 
+window.addEventListener('popstate', () => {
+    video.pause();
+});
+
 // Start timer immediately
 resetHideTimer();

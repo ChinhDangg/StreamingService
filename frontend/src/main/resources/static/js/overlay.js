@@ -124,7 +124,7 @@ function openOverlay(scrollToTop = false) {
         document.getElementById('overlayContent').scrollTop = 0;
 }
 
-function closeOverlay() {
+export function closeOverlay() {
     // close only if clicked outside main content
     //if (e.target === e.currentTarget || e.target === overlay) {
     overlay.classList.add('hidden');
