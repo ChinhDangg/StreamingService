@@ -432,6 +432,8 @@ function initializeObserveFileViewContainer() {
 }
 
 function setObserverToFetchMore() {
+    if (observer)
+        observer.disconnect();
     observer = new IntersectionObserver(async (entries) => {
         if (entries[0].isIntersecting) {
             console.log('Intersecting');
@@ -458,6 +460,8 @@ function setObserverToFetchMore() {
 }
 
 function setObserverToSearch(searchString) {
+    if (observer)
+        observer.disconnect();
     observer = new IntersectionObserver(async (entries) => {
         if (entries[0].isIntersecting) {
             console.log('Intersecting in search');
