@@ -125,14 +125,28 @@ public class FileService {
         FileSystemItem parent = getFileSystemItem(userId, parentId, true);
 
         List<AggregationOperation> stages = new ArrayList<>();
-
         String indexName = "fileNameSearchIndex";
+
+        // Split words and enforce AND matching ---
+        List<Document> mustClauses = new ArrayList<>();
+
+        // Split the search string by one or more spaces
+        String[] searchWords = fileName.trim().split("\\s+");
+
+        for (String word : searchWords) {
+            // Create a wildcard clause for EACH word
+            mustClauses.add(new Document("wildcard",
+                    new Document("query", "*" + word + "*")
+                            .append("path", FileItemField.NAME)
+                            .append("allowAnalyzedField", true)
+            ));
+        }
+
+        // Wrap the clauses in a compound "must" (which acts as an AND operator)
         Document searchDoc = new Document("$search", new Document("index", indexName)
-                .append("wildcard", new Document("query", "*" + fileName + "*")
-                        .append("path", FileItemField.NAME)
-                        .append("allowAnalyzedField", true)
-                )
+                .append("compound", new Document("must", mustClauses))
         );
+
         stages.add(context -> searchDoc);
 
         if (isRecursive) {
