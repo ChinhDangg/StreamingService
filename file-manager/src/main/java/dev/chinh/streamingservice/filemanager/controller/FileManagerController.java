@@ -103,6 +103,11 @@ public class FileManagerController {
     }
 
 
+    @GetMapping("/download/{fileId}")
+    public ResponseEntity<?> getFileObjectUrl(@PathVariable String fileId, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().body(fileService.getFileObjectUrl(jwt.getSubject(), fileId));
+    }
+
     public record InitiateMultipartUploadRequest(@NotBlank @Size(max = 1000) String filePath) {}
     @PostMapping("/upload/create-session")
     public String initiateSession(@RequestBody @Valid InitiateMultipartUploadRequest request, @AuthenticationPrincipal Jwt jwt) {

@@ -252,6 +252,7 @@ let observer;
 async function fetchMoreFiles(subId, page = 0, getParentInfo = false) {
     if (isProcessing) return false;
     isProcessing = true;
+    isSearching = false;
     const params = new URLSearchParams();
     if (subId) params.append('id', subId);
     const sortSelectValue = getSortSelectValue();
@@ -575,7 +576,7 @@ async function initialize() {
     homeButton.click();
 }
 
-window.addEventListener('popstate', async function (event) {
+window.addEventListener('popstate', async function () {
     await initialize();
 });
 
@@ -615,6 +616,7 @@ homeButton.addEventListener('click', async function () {
 
     const rootInfo = await getRootDir();
     if (!rootInfo) return;
+    isSearching = false;
     addToCurrentPath(rootInfo.parentId, rootInfo.parentName, true);
     displayFileItem(rootInfo.content, currentMainFileItems);
     if (!isMovingFile)
@@ -1486,6 +1488,8 @@ fileDropZone.addEventListener('click', async (event) => {
         if (!subFiles) return;
         displayFileItem(subFiles, currentMainFileItems);
         addToCurrentPath(fileId, fileName);
+    } else if (fileType === 'IMAGE' || fileType === 'VIDEO') {
+        await openPreview(fileType, fileId);
     }
 });
 
@@ -1643,9 +1647,13 @@ deleteFileButton.addEventListener('click', async function () {
         idsToDelete.push(fileId);
         removeSelectedFile(fileId);
         fileInfo.fileNode.remove();
+        if (isSearching)
+            currentSearchFileItems.removeFileItemInMapOnly(fileId);
         currentMainFileItems.removeFileItemInMapOnly(fileId);
     }
     const toDeleteSet = new Set(idsToDelete);
+    if (isSearching)
+        currentSearchFileItems.removeFileItemsInIdListOnly(toDeleteSet);
     currentMainFileItems.removeFileItemsInIdListOnly(toDeleteSet);
     displayInfoMessage(`Successfully deleted ${deleteText}`);
 });
@@ -1702,8 +1710,14 @@ newFolderButton.addEventListener('click', async function () {
     openOverlayTextPrompt('New Folder', 'Untitled Folder', sendCreateNewFolderRequest);
 });
 
+function getCurrentFileItemById(id) {
+    if (isSearching)
+        return currentSearchFileItems.getFileItemById(id);
+    return currentMainFileItems.getFileItemById(id);
+}
+
 renameButton.addEventListener('click', async function () {
-    const currentFileItem = currentMainFileItems.getFileItemById(currentTargetNode.id);
+    const currentFileItem = getCurrentFileItemById(currentTargetNode.id);
     if (!currentFileItem) {
         alert('No current file item');
         return;
@@ -1734,6 +1748,8 @@ renameButton.addEventListener('click', async function () {
             return;
         }
         currentFileItem.name = newName;
+        const currentItem = currentMainFileItems.getFileItemById(currentTargetNode.id);
+        if (currentItem) currentItem.name = newName;
         currentTargetNode.node.querySelector('.name').textContent = await response.text();
         displayInfoMessage(`Renamed: ${newName}`, true, 30000);
     }
@@ -1797,7 +1813,7 @@ moveButton.addEventListener('click', async function () {
 
     const movingFiles = [];
     for (const fileId of selectedFiles.keys()) {
-        movingFiles.push(currentMainFileItems.getFileItemById(fileId));
+        movingFiles.push(getCurrentFileItemById(fileId));
     }
 
     const moveFiles = async () => {
@@ -1814,9 +1830,7 @@ moveButton.addEventListener('click', async function () {
     let currentFullPath;
     if (selectedFiles.size === 1) {
         const selectedFileId = selectedFiles.keys().next().value;
-        const currentFileItem = isSearching
-            ? currentSearchFileItems.getFileItemById(selectedFileId)
-            : currentMainFileItems.getFileItemById(selectedFileId);
+        const currentFileItem = getCurrentFileItemById(selectedFileId);
         currentFullPath = currentFileItem.name;
     } else {
         currentFullPath = `${selectedFiles.size} files`;
@@ -1960,6 +1974,64 @@ function openOverlayTextPrompt(title, text, okFunc) {
 }
 
 
+
+const previewOverlay = document.getElementById('previewOverlay');
+const content = previewOverlay.querySelector('.previewContent');
+const imgPreview = previewOverlay.querySelector('.previewImage');
+const videoPreview = previewOverlay.querySelector('.previewVideo');
+
+async function openPreview(type, fileId) {
+    previewOverlay.classList.remove('hidden');
+    previewOverlay.classList.add('flex');
+
+    // Reset
+    imgPreview.classList.add('hidden');
+    videoPreview.classList.add('hidden');
+    videoPreview.pause();
+    videoPreview.src = "";
+
+    const srcResponse = await apiRequest(`/api/file/download/${fileId}`);
+    if (!srcResponse.ok) {
+        alert('Failed to get preview: ' + await src.text());
+        return;
+    }
+    const src = await srcResponse.text();
+
+    if (type === 'IMAGE') {
+        imgPreview.src = src;
+        imgPreview.classList.remove('hidden');
+    } else if (type === 'VIDEO') {
+        videoPreview.src = src;
+        videoPreview.classList.remove('hidden');
+    }
+
+    // Animate in
+    setTimeout(() => {
+        previewOverlay.classList.remove('opacity-0');
+        content.classList.remove('scale-95', 'opacity-0');
+        content.classList.add('scale-100', 'opacity-100');
+    }, 10);
+}
+
+function closePreview() {
+    previewOverlay.classList.add('opacity-0');
+    content.classList.add('scale-95', 'opacity-0');
+
+    setTimeout(() => {
+        previewOverlay.classList.add('hidden');
+        previewOverlay.classList.remove('flex');
+        videoPreview.pause();
+    }, 200);
+}
+
+previewOverlay.querySelector('.preview-close-btn').addEventListener('click', closePreview);
+
+// Close when clicking outside content
+previewOverlay.addEventListener('click', (e) => {
+    if (e.target === previewOverlay) {
+        closePreview();
+    }
+});
 
 
 

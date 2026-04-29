@@ -36,7 +36,9 @@ import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.util.UriUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -167,6 +169,16 @@ public class FileService {
         List<FileSystemItem> results = mongoTemplate.aggregate(aggregation, "fs_metadata", FileSystemItem.class).getMappedResults();
         getUpdatedThumbnailUrl(userId, results);
         return new FileSearchResult(null, null, results, null, results.size() == size);
+    }
+
+
+    public String getFileObjectUrl(String userId, String fileId) {
+        var item = getFileSystemItem(userId, fileId, true);
+        if (!FileType.isNotDir(item.getFileType())) {
+            throw new IllegalArgumentException("File is a directory");
+        }
+        String objectWithoutUserId = ContentMetaData.removeUserIdDirFromObjectKey(userId, item.getObjectName());
+        return "/stream/object/" + UriUtils.encodePathSegment(item.getBucket(), StandardCharsets.UTF_8) + "/" + UriUtils.encodePath(objectWithoutUserId, StandardCharsets.UTF_8);
     }
 
 
