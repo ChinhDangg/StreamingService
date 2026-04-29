@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File Explorer Layout</title>
-    <link rel="stylesheet" th:href="@{/static/css/tailwind.css}" href="/static/css/tailwind.css">
-<!--    <script src="https://cdn.tailwindcss.com"></script>-->
+<!--    <link rel="stylesheet" th:href="@{/static/css/tailwind.css}" href="/static/css/tailwind.css">-->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .grid-view {
             display: grid;
@@ -681,6 +681,99 @@
         </div>
     </div>
 </div>
+
+
+
+
+
+<!-- Trigger button (example) -->
+<button onclick="openPreview('image', 'https://picsum.photos/1200/800')"
+        class="px-4 py-2 bg-gray-800 text-white rounded-lg">
+    Open Image Preview
+</button>
+
+<button onclick="openPreview('video', 'https://www.w3schools.com/html/mov_bbb.mp4')"
+        class="px-4 py-2 bg-gray-800 text-white rounded-lg ml-2">
+    Open Video Preview
+</button>
+
+<!-- Overlay -->
+<div id="previewOverlay"
+     class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300">
+
+    <!-- Content container -->
+    <div id="previewContent"
+         class="relative max-w-5xl w-full mx-4 transform scale-95 opacity-0 transition-all duration-300">
+
+        <!-- Close button -->
+        <button onclick="closePreview()"
+                class="absolute -top-12 right-0 text-gray-300 hover:text-white text-3xl">
+            ✕
+        </button>
+
+        <!-- Media container -->
+        <div class="rounded-2xl overflow-hidden shadow-2xl bg-black">
+            <img id="previewImage" class="hidden w-full h-auto object-contain max-h-[80vh]" />
+
+            <video id="previewVideo"
+                   class="hidden w-full max-h-[80vh]"
+                   controls autoplay></video>
+        </div>
+    </div>
+</div>
+
+<script>
+    const overlay = document.getElementById('previewOverlay');
+    const content = document.getElementById('previewContent');
+    const img = document.getElementById('previewImage');
+    const video = document.getElementById('previewVideo');
+
+    function openPreview(type, src) {
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+
+        // Reset
+        img.classList.add('hidden');
+        video.classList.add('hidden');
+        video.pause();
+        video.src = "";
+
+        if (type === 'image') {
+            img.src = src;
+            img.classList.remove('hidden');
+        } else if (type === 'video') {
+            video.src = src;
+            video.classList.remove('hidden');
+        }
+
+        // Animate in
+        setTimeout(() => {
+            overlay.classList.remove('opacity-0');
+            content.classList.remove('scale-95', 'opacity-0');
+            content.classList.add('scale-100', 'opacity-100');
+        }, 10);
+    }
+
+    function closePreview() {
+        overlay.classList.add('opacity-0');
+        content.classList.add('scale-95', 'opacity-0');
+
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+            video.pause();
+        }, 200);
+    }
+
+    // Close when clicking outside content
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            closePreview();
+        }
+    });
+</script>
+
+
 
 
 <script type="module" th:src="@{/static/js/file-manager/file-manager-page.js}" src="/static/js/file-manager/file-manager-page.js"></script>
