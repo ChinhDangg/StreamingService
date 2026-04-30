@@ -173,6 +173,14 @@
             pointer-events: none;
             z-index: 999;
         }
+
+        #file-zone {
+            /* Prevents the native iOS context menu from appearing */
+            -webkit-touch-callout: none;
+            /* Prevents text selection while holding down */
+            -webkit-user-select: none;
+            user-select: none;
+        }
     </style>
 </head>
 
