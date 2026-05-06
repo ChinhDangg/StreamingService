@@ -26,9 +26,4 @@ public class GlobalModelAttributes {
     public boolean modifyAllow(Authentication authentication) {
         return authentication != null && authentication.getAuthorities().stream().anyMatch(o -> o.getAuthority().equals("ADMIN"));
     }
-
-    @ModelAttribute("modifyAllow")
-    public boolean modifyAllow() {
-        return true;
-    }
 }
