@@ -63,11 +63,9 @@ public class DirectoryCacheService {
                 String fileId = getOrCreateFolder(userId, dirName, dirParentId, dirPath, FileType.DIR);
                 Set<String> users = ConcurrentHashMap.newKeySet();
                 users.add(userId);
-                addDirectoryToUserUsingList(userId, dirName, dirParentId);
                 return new ApplicationConfig.DirectoryCached(fileId, users);
             } else {
                 ((ApplicationConfig.DirectoryCached) existing).userUsing().add(userId);
-                addDirectoryToUserUsingList(userId, dirName, dirParentId);
                 return existing;
             }
         });
