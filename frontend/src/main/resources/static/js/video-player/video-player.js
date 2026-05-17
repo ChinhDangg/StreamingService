@@ -157,12 +157,12 @@ const resetHideTimer = () => {
     console.log("Resetting hide timer: ");
     showControls();
     clearTimeout(hideTimer);
-    hideTimer = setTimeout(hideControls, 3000);
+    hideTimer = setTimeout(hideControls, 5000);
 };
 
 // desktop
 container.addEventListener('mouseleave', hideControls);
-container.addEventListener('mouseenter', showControls);
+container.addEventListener('mouseenter', resetHideTimer);
 
 container.addEventListener('contextmenu', (event) => {
     event.preventDefault();
@@ -224,6 +224,7 @@ let holdTimer;
 const holdDuration = 1000;
 let isLongPress = false;
 let videoSpeedWithLongPress = 3.00;
+let isLongPressSpeeding = false;
 
 function handleLongPress() {
     isLongPress = false;
@@ -231,8 +232,10 @@ function handleLongPress() {
         console.log("Hold detected! Triggering action...");
         isLongPress = true;
 
-        videoSpeedWithLongPress = videoSpeedWithLongPress === 2.00 ? 3.00 : 2.00;
-        const newSpeed = video.playbackRate === videoSpeedMenuRate ? videoSpeedWithLongPress : videoSpeedMenuRate;
+        isLongPressSpeeding = !isLongPressSpeeding;
+        if (isLongPressSpeeding)
+            videoSpeedWithLongPress = videoSpeedWithLongPress === 2.00 ? 3.00 : 2.00;
+        const newSpeed = isLongPressSpeeding ? videoSpeedWithLongPress : videoSpeedMenuRate;
         video.playbackRate = newSpeed;
         showFeedback(newSpeed + "x");
     }, holdDuration);
