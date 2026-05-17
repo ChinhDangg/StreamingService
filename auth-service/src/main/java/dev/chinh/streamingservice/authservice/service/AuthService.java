@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -20,6 +21,7 @@ import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
@@ -33,18 +35,28 @@ public class AuthService {
 
     private final UserRepository userRepository;
 
-    public void authenticateLogin(AuthenticationRequest authRequest, HttpServletRequest request, HttpServletResponse response) {
+    public void authenticateLogin(AuthenticationRequest authRequest, HttpServletRequest request, HttpServletResponse response) throws IOException {
         String isValid = authRequest.isValid(true);
         if (isValid != null) {
             System.out.println("Invalid login request: " + isValid);
             logout(response);
-            throw new BadCredentialsException(isValid);
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            response.getWriter().println(isValid);
+            return;
         }
 
         String username = new String(Base64.getDecoder().decode(authRequest.username()), StandardCharsets.UTF_8);
         String password = new String(Base64.getDecoder().decode(authRequest.password()), StandardCharsets.UTF_8);
         UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(username, password);
-        Authentication authentication = authenticationManager.authenticate(authToken);
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(authToken);
+        } catch (BadCredentialsException e) {
+            logout(response);
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            response.getWriter().println("Invalid username or password");
+            return;
+        }
 
         CsrfToken csrfToken = addCsrfCookie(request, response);
 

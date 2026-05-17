@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/auth")
@@ -19,7 +21,7 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/login")
-    public void authenticate(@RequestBody AuthenticationRequest authRequest, HttpServletRequest request, HttpServletResponse response) {
+    public void authenticate(@RequestBody AuthenticationRequest authRequest, HttpServletRequest request, HttpServletResponse response) throws IOException {
         authService.authenticateLogin(authRequest, request, response);
     }
 
