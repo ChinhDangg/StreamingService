@@ -1,5 +1,5 @@
 import {initializeHeader, setAlertStatus} from "/static/js/header.js";
-import {setVideoResolution, pollPlaylistUrl, requestVideoPartial} from "/static/js/set-video-url.js";
+import {setVideoResolution, pollPlaylistUrl, requestVideoPartial, setVideoUrl} from "/static/js/set-video-url.js";
 import { displayContentInfo, helperCloneAndUnHideNode } from "/static/js/metadata-display.js";
 import {apiRequest, setMediaId, setMediaLength} from "/static/js/common.js";
 
@@ -453,12 +453,17 @@ async function requestVideo(videoUrlRequest, videoWrapper) {
     videoWrapper.querySelector('.temp-video-holder').classList.add('hidden');
     videoWrapper.querySelector('.video-holder').appendChild(videoPlayer);
 
-    const videoDefaultRes = 'p480';
-    const fetchUrl = videoUrlRequest + "/" + videoDefaultRes;
-    const requestMessage = await requestVideoPartial(fetchUrl, videoPlayer);
-    if (requestMessage !== null) {
-        setAlertStatus(requestMessage);
-        return;
+    if (videoUrlRequest.startsWith('/stream/')) {
+        setVideoUrl(videoPlayer, videoUrlRequest, true, true);
+    }
+    else {
+        const videoDefaultRes = 'p480';
+        const fetchUrl = videoUrlRequest + "/" + videoDefaultRes;
+        const requestMessage = await requestVideoPartial(fetchUrl, videoPlayer);
+        if (requestMessage !== null) {
+            setAlertStatus(requestMessage);
+            return;
+        }
     }
     setVideoResolution(videoPlayer, videoUrlRequest, 1080, videoDefaultRes);
 }

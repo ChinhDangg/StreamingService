@@ -110,7 +110,7 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     private boolean checkTooManyAttempts(String attemptsKey, String blockKey, HttpServletResponse response) throws IOException {
         if (redisStringTemplate.hasKey(blockKey)) {
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-            response.getWriter().println("Too many login attempts from this IP. Try again later.");
+            response.getWriter().println("Too many login attempts. Try again later.");
             return true;
         }
 
@@ -124,7 +124,7 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
         } else if (attempts > MAX_ATTEMPTS) {
             redisStringTemplate.opsForValue().set(blockKey, "true", Duration.ofSeconds(LOCKOUT_SECONDS));
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-            response.getWriter().println("Too many login attempts from this IP. Try again later.");
+            response.getWriter().println("Too many login attempts. Try again later.");
             return true;
         }
 

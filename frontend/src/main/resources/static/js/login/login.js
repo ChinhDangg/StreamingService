@@ -17,7 +17,7 @@ document.getElementById('login-form').addEventListener('submit', async function 
     if (response.ok) {
         const params = new URLSearchParams(window.location.search);
         window.location.href = params.get('r') || '/';
-    } else if (response.status === 401) {
+    } else {
         const loginErrorContainer = document.getElementById('login-error');
         loginErrorContainer.textContent = await response.text();
         loginErrorContainer.classList.remove('hidden');
