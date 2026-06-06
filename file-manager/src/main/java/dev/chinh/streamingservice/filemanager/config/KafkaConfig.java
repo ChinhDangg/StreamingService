@@ -128,6 +128,7 @@ public class KafkaConfig {
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, fixedBackOff);
 
         errorHandler.addNotRetryableExceptions(IllegalArgumentException.class);
+        errorHandler.addNotRetryableExceptions(IllegalStateException.class);
         errorHandler.addNotRetryableExceptions(MappingException.class);
         errorHandler.addNotRetryableExceptions(NullPointerException.class);
 
