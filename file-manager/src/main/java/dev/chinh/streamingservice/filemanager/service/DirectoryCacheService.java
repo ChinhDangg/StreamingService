@@ -58,17 +58,19 @@ public class DirectoryCacheService {
 
     public ApplicationConfig.DirectoryCached getCachedOrCreateDirectory(String dirName, String dirParentId, String dirPath, String userId) {
         String dirKey = getDirKey(dirName, dirParentId);
-        return (ApplicationConfig.DirectoryCached) directoryIdCache.asMap().compute(dirKey, (_, existing) -> {
-            if (existing == null) {
-                String fileId = getOrCreateFolder(userId, dirName, dirParentId, dirPath, FileType.DIR);
-                Set<String> users = ConcurrentHashMap.newKeySet();
-                users.add(userId);
-                return new ApplicationConfig.DirectoryCached(fileId, users);
-            } else {
-                ((ApplicationConfig.DirectoryCached) existing).userUsing().add(userId);
-                return existing;
-            }
+        ApplicationConfig.EntryCached entry = directoryIdCache.get(dirKey, k -> {
+            // Only executes if the key is missing
+            String fileId = getOrCreateFolder(userId, dirName, dirParentId, dirPath, FileType.DIR);
+            return new ApplicationConfig.DirectoryCached(fileId, ConcurrentHashMap.newKeySet());
         });
+
+        if (entry instanceof ApplicationConfig.DirectoryCached directoryCached) {
+            // Thread-safe mutation of the set
+            directoryCached.userUsing().add(userId);
+            return directoryCached;
+        }
+
+        throw new IllegalStateException("Unexpected cache entry type for key: " + dirKey);
     }
 
     private String getOrCreateFolder(String userId, String name, String parentId, String currentPath, FileType fileType) {
@@ -100,36 +102,37 @@ public class DirectoryCacheService {
 
     public void addDirectoryToUserUsingList(String userId, String dirName, String dirParentId) {
         String dirKey = getDirKey(dirName, dirParentId);
-        directoryIdCache.asMap().compute(userId, (_, existing) -> {
-            if (existing == null) {
-                Set<String> dirUserUsing = ConcurrentHashMap.newKeySet();
-                dirUserUsing.add(dirKey); // add dirKey to get dir info from cache back (not using the dirId)
-                return new ApplicationConfig.UserDirUsing(dirUserUsing);
-            } else {
-                Set<String> updatedSet = ((ApplicationConfig.UserDirUsing) existing).dirUserUsing();
-                updatedSet.add(dirKey);
-                // Return a new record/object so Caffeine sees a state change
-                return new ApplicationConfig.UserDirUsing(updatedSet);
-            }
-        });
+        // .get() is atomic for creation, and returns the existing item if present
+        ApplicationConfig.EntryCached entry = directoryIdCache.get(userId, k ->
+                new ApplicationConfig.UserDirUsing(ConcurrentHashMap.newKeySet())
+        );
+
+        if (entry instanceof ApplicationConfig.UserDirUsing(Set<String> dirUserUsing)) {
+            // Mutate the thread-safe set directly without replacing the cache record!
+            dirUserUsing.add(dirKey);
+        }
     }
 
     public void removeAllDirectoriesUserUsing(String userId) {
-        directoryIdCache.asMap().computeIfPresent(userId, (_, value) -> {
-            for (String dirKey : ((ApplicationConfig.UserDirUsing) value).dirUserUsing()) {
+        // Get the value safely WITHOUT locking the map in a compute block
+        ApplicationConfig.EntryCached value = directoryIdCache.getIfPresent(userId);
+        if (value instanceof ApplicationConfig.UserDirUsing(Set<String> dirUserUsing)) {
+            // Invalidate the user immediately so no new directories are added to them
+            directoryIdCache.invalidate(userId);
+            // Iterate over the set outside of any parent locks
+            for (String dirKey : dirUserUsing) {
                 directoryIdCache.asMap().computeIfPresent(dirKey, (_, dirValue) -> {
                     var dirCached = (ApplicationConfig.DirectoryCached) dirValue;
                     dirCached.userUsing().remove(userId);
 
                     if (dirCached.userUsing().isEmpty()) {
                         removeFileStatus(dirCached.dirId());
-                        return null; // null to remove the key
+                        return null; // Return null to remove the directory key
                     }
                     return dirValue;
                 });
             }
-            return null;
-        });
+        }
     }
 
     private void removeFileStatus(String fileId) {

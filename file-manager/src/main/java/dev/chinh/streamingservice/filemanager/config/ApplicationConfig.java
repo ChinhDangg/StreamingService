@@ -15,6 +15,7 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.retry.annotation.EnableRetry;
 
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
@@ -30,17 +31,22 @@ public class ApplicationConfig {
         return Caffeine.newBuilder()
                 .expireAfterAccess(15, TimeUnit.MINUTES)
                 .removalListener((String key, EntryCached value, RemovalCause cause) -> {
-                    Cache<String, EntryCached> cache = cacheProvider.getIfAvailable();
-
                     if (cause.wasEvicted()) { // if come from the expiry and not by a manual remove
-                        if (value instanceof UserDirUsing(Set<String> dirUserUsing)) {
-                            for (String dirId : dirUserUsing) {
-                                if (cache != null)
-                                    cleanupDirAccessCache(cache, dirId, key, safeWriteMongoTemplate, fileCache);
+                        // Offload cache mutations to a separate thread to prevent
+                        // ConcurrentHashMap Recursive Update exceptions
+                        CompletableFuture.runAsync(() -> {
+                            Cache<String, EntryCached> cache = cacheProvider.getIfAvailable();
+                            if (cache != null) {
+                                if (value instanceof UserDirUsing(Set<String> dirUserUsing)) {
+                                    for (String dirId : dirUserUsing) {
+                                        cleanupDirAccessCache(cache, dirId, key, safeWriteMongoTemplate, fileCache);
+                                    }
+                                } else if (value instanceof DirectoryCached directoryCached) {
+                                    removeFileStatus(safeWriteMongoTemplate, directoryCached.dirId(), fileCache);
+                                }
                             }
-                        } else if (value instanceof DirectoryCached directoryCached) {
-                            removeFileStatus(safeWriteMongoTemplate, directoryCached.dirId(), fileCache);
-                        }
+                        });
+
                     }
                 })
                 .build();
