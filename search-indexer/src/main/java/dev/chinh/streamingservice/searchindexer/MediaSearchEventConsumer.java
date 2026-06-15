@@ -144,7 +144,12 @@ public class MediaSearchEventConsumer {
         String name = getNameEntityName(Long.parseLong(event.userId()), event.nameEntityConstant(), event.nameEntityId());
         if (name != null) {
             try {
-                openSearchService.partialUpdateDocument(event.nameEntityConstant().getName(), event.nameEntityId(), Map.of(ContentMetaData.NAME, name));
+                Map<String, Object> fields = new HashMap<>();
+                fields.put(ContentMetaData.NAME, name);
+                if (event.oldThumbnail() != null && event.newThumbnail() != null && !event.oldThumbnail().equals(event.newThumbnail())) {
+                    fields.put(ContentMetaData.THUMBNAIL, event.newThumbnail());
+                }
+                openSearchService.partialUpdateDocument(event.nameEntityConstant().getName(), event.nameEntityId(), fields);
                 openSearchService.updateAllNestedFieldNameWithIdInIndex(
                         OpenSearchService.MEDIA_INDEX_NAME,
                         event.nameEntityConstant().getName(),
