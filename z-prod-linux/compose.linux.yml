@@ -371,6 +371,18 @@ services:
     volumes:
       - ${OPENSEARCH_VOLUME}:/usr/share/opensearch/data
 
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:3.3.0
+    container_name: opensearch-dashboards
+    ports:
+      - "127.0.0.1:5601:5601"
+    environment:
+      - OPENSEARCH_HOSTS=http://opensearch:9200 # HTTP because security is disabled
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true # Matches the disabled security in OpenSearch
+    depends_on:
+      opensearch:
+        condition: service_healthy
+
   redis:
     image: redis:7.4.7-alpine
     container_name: redis
