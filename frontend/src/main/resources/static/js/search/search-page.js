@@ -833,10 +833,10 @@ async function displaySearchItems(searchItems) {
     const loadImage = (imgElement, src) => {
         return new Promise((resolve, reject) => {
             imgElement.onload = () => {
-                resolve(imgElement);
+                resolve({ success: true, img: imgElement });
             };
             imgElement.onerror = () => {
-                reject(null);
+                reject({ success: false, img: null });
             };
             // start fetching the image data
             imgElement.src = src;
@@ -849,7 +849,7 @@ async function displaySearchItems(searchItems) {
         let itemContainer;
         if (item.thumbnail != null && !item.thumbnail.endsWith('null')) {
             const loadedImage = document.createElement('img');
-            const result = await loadImage(loadedImage, item.thumbnail);
+            const result = (await loadImage(loadedImage, item.thumbnail)).img;
 
             const horizontal = result == null ? true : loadedImage.naturalWidth >= loadedImage.naturalHeight;
             itemContainer = (horizontal) ? helperCloneAndUnHideNode(horizontalItemTem)
