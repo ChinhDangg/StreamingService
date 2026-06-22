@@ -836,7 +836,7 @@ async function displaySearchItems(searchItems) {
                 resolve({ success: true, img: imgElement });
             };
             imgElement.onerror = () => {
-                reject({ success: false, img: null });
+                resolve({ success: false, img: null });
             };
             // start fetching the image data
             imgElement.src = src;
