@@ -177,7 +177,7 @@ public class ThumbnailService {
 
                 String ffmpegCmd = String.format(
                         "ffmpeg -n -hide_banner -loglevel info " +
-                                "-i \"%s\" -vf %s -q:v 2 -frames:v 1 \"%s\"",
+                                "-i \"%s\" -vf %s -q:v 2 -frames:v 1 -update 1 \"%s\"",
                         input, scale, output
                 );
                 writer.write(ffmpegCmd + "\n");
