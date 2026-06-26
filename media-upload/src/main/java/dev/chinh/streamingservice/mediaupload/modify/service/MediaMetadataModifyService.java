@@ -284,7 +284,7 @@ public class MediaMetadataModifyService {
                                 userId,
                                 mediaMetaData.getId(),
                                 mediaType,
-                                Integer.parseInt(num.toString())
+                                (int) num.doubleValue()
                         )
                 ));
             }
