@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
@@ -39,16 +40,18 @@ public class ThumbnailService {
             return albumUrlInfo.fullUrlList;
         counter.decrementAndGet();
         try {
-            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailOutputParentPath(userId), false);
-            if (exitCode != 0) {
-                throw new RuntimeException("Failed to resize thumbnails");
-            }
-            long now = System.currentTimeMillis() + 60 * 60 * 1000;
-            addCacheThumbnails(albumUrlInfo.mediaUrlList, now, (name) -> name.replaceFirst("/chunks/thumbnail-cache/", ""));
+//            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailOutputParentPath(userId), false);
+//            if (exitCode != 0) {
+//                throw new RuntimeException("Failed to resize thumbnails");
+//            }
+            processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailOutputParentPath(userId), false);
+//            long now = System.currentTimeMillis() + 60 * 60 * 1000;
+//            addCacheThumbnails(albumUrlInfo.mediaUrlList, now, (name) -> name.replaceFirst("/chunks/thumbnail-cache/", ""));
         } catch (Exception e) {
             System.err.println(e.getMessage());
+        } finally {
+            counter.incrementAndGet();
         }
-        counter.incrementAndGet();
         return albumUrlInfo.fullUrlList;
     }
 
@@ -135,7 +138,11 @@ public class ThumbnailService {
         });
     }
 
-    private int processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String albumDir, boolean isAlbum) throws InterruptedException, IOException {
+    private void addCacheThumbnails(String thumbnailFileNames, long expiry) {
+        redisStringTemplate.opsForZSet().add("thumbnail-cache", thumbnailFileNames, expiry);
+    }
+
+    private int processResizedImagesInBatch2(AlbumUrlInfo albumUrlInfo, Resolution resolution, String albumDir, boolean isAlbum) throws InterruptedException, IOException {
         String ffmpegName = System.getenv("FFMPEG_NAME");
         String[] shellCmd;
         if (ffmpegName == null || ffmpegName.isEmpty()) {
@@ -200,6 +207,91 @@ public class ThumbnailService {
         }
         return exit;
     }
+
+
+    private void processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String albumDir, boolean isAlbum) throws InterruptedException, IOException {
+        String ffmpegName = System.getenv("FFMPEG_NAME");
+
+        try (ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor()) {
+            Semaphore semaphore = new Semaphore(4);
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+            OSUtil.createTempDir(albumDir, ffmpegName);
+
+            String scale = getFfmpegScaleString(resolution, false);
+
+            for (int i = 0; i < albumUrlInfo.mediaUrlList.size(); i++) {
+                final int index = i;
+
+                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                    try {
+                        semaphore.acquire();
+
+                        List<String> cmd = new ArrayList<>();
+                        if (ffmpegName != null && !ffmpegName.isEmpty()) {
+                            // DEV: Start a bash session inside the ffmpeg container
+                            cmd.addAll(List.of("docker", "exec", ffmpegName));
+                        }
+
+                        String output = albumUrlInfo.mediaUrlList.get(index);
+                        String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(index);
+                        String input = minIOService.getObjectUrlForContainer(bucket, albumUrlInfo.pathList.get(index));
+
+                        cmd.addAll(List.of(
+                                "ffmpeg",
+                                "-n", "-hide_banner", "-loglevel", "error",
+                                "-i", input,
+                                "-vf", scale,
+                                "-q:v", "2",
+                                "-frames:v", "1",
+                                "-update", "1",
+                                output
+                        ));
+
+                        ProcessBuilder pb = new ProcessBuilder(cmd).redirectErrorStream(true);
+                        Process process = pb.start();
+
+                        // Capture ffmpeg combined logs in a thread-safe list
+                        List<String> logs = Collections.synchronizedList(new ArrayList<>());
+                        Thread logConsumer = Thread.ofVirtual().unstarted(() -> {
+                            try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                                String line;
+                                while ((line = br.readLine()) != null) {
+                                    logs.add("[ffmpeg] " + line);
+                                }
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+                        logConsumer.start();
+
+                        int exitCode = process.waitFor();
+                        if (exitCode != 0) {
+                            logs.forEach(System.out::println);
+                            System.out.println();
+                        } else {
+                            String name = output.replaceFirst("/chunks/thumbnail-cache/", "");
+                            long now = System.currentTimeMillis() + 60 * 60 * 1000;
+                            addCacheThumbnails(name, now);
+                        }
+
+                    } catch (Exception e) {
+                        System.err.println("Failed to execute ffmpeg command: " + e.getMessage());
+                    } finally {
+                        semaphore.release();
+                    }
+                }, executorService);
+
+                futures.add(future);
+            }
+
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
 
     private String getFfmpegScaleString(Resolution resolution, boolean wrapInDoubleQuotes) {
         if (wrapInDoubleQuotes)
