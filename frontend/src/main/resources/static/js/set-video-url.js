@@ -1,4 +1,6 @@
 import {apiRequest} from "/static/js/common.js";
+import Hls from "/static/js/lib/hls.mjs"
+import {Client} from "/static/js/lib/stomp/index.js";
 
 export function setVideoUrl(videoContainerNode, playlistUrl, restart = true, startPlaying = false, autoReplay = true) {
     const video = videoContainerNode.querySelector('video');
@@ -110,7 +112,7 @@ export async function requestVideoPartial(fetchUrl, container, restart = true, s
     let playlistUrl;
     try {
         container.appendChild(loader);
-        const urlPolling = pollPlaylistUrl(fetchUrl);
+        const urlPolling = pollPlaylistUrl(fetchUrl, (_) => { return true; });
         playlistUrl = await urlPolling.promise;
     } catch (err) {
         if (err === 'cancelled') {
@@ -127,18 +129,24 @@ export async function requestVideoPartial(fetchUrl, container, restart = true, s
     return null;
 }
 
-export function pollPlaylistUrl(fetchUrl, maxWaitMs = 5000, intervalMs = 500) {
+export function pollPlaylistUrl(fetchUrl, disconnectAfterResult = null, maxWaitMs = 15000, intervalMs = 300) {
     let cancelRequested = false;
     let previewInterval = null;
     let previewTimeout = null;
 
-    const promise = new Promise((resolve, reject) => {
+    const promise = new Promise(async (resolve, reject) => {
+        const disconnectSocket = (result) => {
+            if (disconnectAfterResult && disconnectAfterResult(result)) {
+                disconnectStomp();
+            }
+        }
+
         previewTimeout = setTimeout(() => {
             clearInterval(previewInterval);
             if (!cancelRequested) reject('Timeout');
         }, maxWaitMs);
 
-        previewInterval = setInterval(async () => {
+        previewInterval = setInterval(() => {
             if (cancelRequested) {
                 console.log('request cancelled');
                 clearInterval(previewInterval);
@@ -147,29 +155,40 @@ export function pollPlaylistUrl(fetchUrl, maxWaitMs = 5000, intervalMs = 500) {
                 return;
             }
 
-            let response;
-            try {
-                response = await apiRequest(fetchUrl);
-            } catch (err) {
+            if (stompPayload && stompPayload.jobId === jobStatusInfo.jobId) {
                 clearInterval(previewInterval);
                 clearTimeout(previewTimeout);
-                reject('network error: ' + err);
-                return;
-            }
-            if (!response.ok) {
-                clearInterval(previewInterval);
-                clearTimeout(previewTimeout);
-                reject(await response.text());
-                return;
-            }
-
-            const playlistUrl = await response.text();
-            if (playlistUrl !== 'PROCESSING') {
-                clearInterval(previewInterval);
-                clearTimeout(previewTimeout);
-                resolve(playlistUrl);
+                resolve(stompPayload.result);
+                disconnectSocket(stompPayload.result);
+                stompPayload = null;
             }
         }, intervalMs);
+
+        const response = await apiRequest(fetchUrl);
+        if (!response.ok) {
+            clearInterval(previewInterval);
+            clearTimeout(previewTimeout);
+            reject(await response.text());
+            return;
+        }
+
+        const jobStatusInfo = await response.json();
+        if (jobStatusInfo.result !== 'PROCESSING') {
+            clearInterval(previewInterval);
+            clearTimeout(previewTimeout);
+            let result;
+            try {
+                result = JSON.parse(jobStatusInfo.result);
+            } catch (ignored) {
+                result = jobStatusInfo.result;
+            }
+            disconnectSocket(result);
+            resolve(result);
+            return;
+        }
+
+        if (!stompClient || stompClient.connected === false)
+            connectStomp();
     });
 
     return {
@@ -179,6 +198,54 @@ export function pollPlaylistUrl(fetchUrl, maxWaitMs = 5000, intervalMs = 500) {
         }
     };
 }
+
+let stompPayload = null;
+let stompClient = null;
+function connectStomp() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const dynamicBrokerURL = `${protocol}//${host}/ws-stomp`;
+
+    stompClient = new Client({
+        brokerURL: dynamicBrokerURL,
+        // reconnectDelay: 5000
+    });
+
+    stompClient.onConnect = (frame) => {
+        console.log('Connected successfully to STOMP broker: ' + frame);
+
+        stompClient.subscribe('/user/queue/job-reply', (message) => {
+            if (message.body) {
+                const payload = JSON.parse(message.body);
+                try {
+                    payload.result = JSON.parse(payload.result);
+                } catch (ignored) {}
+                stompPayload = payload;
+                console.log('Received message: ');
+                console.log(payload);
+            } else {
+                console.log('Received empty message');
+            }
+        });
+    }
+
+    stompClient.onStompError = (frame) => {
+        console.log('Broker reported error: ' + frame.headers['message']);
+        console.log('Additional details: ' + frame.body);
+    }
+
+    stompClient.activate();
+}
+
+function disconnectStomp() {
+    if (stompClient) {
+        console.log('Disconnecting STOMP client');
+        stompClient.deactivate();
+        stompClient = null;
+    }
+}
+
+
 
 export function createLoader() {
     // Create overlay wrapper

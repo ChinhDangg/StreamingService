@@ -213,18 +213,19 @@ async function fetchAlbumItemUrlsByResolution(albumId, resolution, page = 0) {
     if (albumUrlPageMap.get(albumResolution) === -1) return [];
     const fetchAlbumUrls = `/api/album/${albumId}/${resolution}/${page}`;
     try {
-        const urlPolling = pollPlaylistUrl(fetchAlbumUrls);
+        const urlPolling = pollPlaylistUrl(fetchAlbumUrls, (result) => {
+            return result.length !== 25;
+        });
         const albumUrls = await urlPolling.promise;
-        const urls = JSON.parse(albumUrls);
 
         const previousPage = albumUrlPageMap.get(albumResolution) == null ? -1 : albumUrlPageMap.get(albumResolution);
         const newPage = previousPage < page ? page : albumUrlPageMap.get(albumResolution); // ensure page is fetched sequentially otherwise it will skip some items - only stored the highest page fetched
         if (!albumResUrlMap.get(albumResolution)) {
-            albumResUrlMap.set(albumResolution, urls);
+            albumResUrlMap.set(albumResolution, albumUrls);
         } else if (newPage > previousPage)
-            albumResUrlMap.get(albumResolution).push(...urls);
-        albumUrlPageMap.set(albumResolution, urls.length === 25 ? newPage : -1); // -1 means no more items
-        return urls;
+            albumResUrlMap.get(albumResolution).push(...albumUrls);
+        albumUrlPageMap.set(albumResolution, albumUrls.length === 25 ? newPage : -1); // -1 means no more items
+        return albumUrls;
     } catch (err) {
         if (err === 'timeout') {
             setAlertStatus('Error', 'Time out');

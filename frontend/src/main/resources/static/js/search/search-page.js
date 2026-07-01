@@ -1083,7 +1083,7 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
             window.currentPreviewPolling.cancel();
         }
 
-        window.currentPreviewPolling = pollPlaylistUrl(`/api/videos/preview/${videoId}`);
+        window.currentPreviewPolling = pollPlaylistUrl(`/api/videos/preview/${videoId}`, (_) => { return true; });
 
         const loader = createLoader();
 
