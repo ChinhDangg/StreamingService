@@ -96,7 +96,7 @@ public class MediaObjectService {
     public void handleUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdated event) throws Exception {
         MediaMetaData mediaMetaData = getMediaMetadataById(Long.parseLong(event.userId()), event.mediaId());
 
-        boolean sameName = event.thumbnailObject().equals(mediaMetaData.getThumbnail());
+        boolean sameName = getFileExtension(event.thumbnailObject()).equals(getFileExtension(mediaMetaData.getThumbnail()));
 
         if (event.num() != null && event.mediaType() == MediaType.VIDEO) {
             thumbnailService.generateThumbnailFromVideo(
@@ -118,6 +118,7 @@ public class MediaObjectService {
                 mediaMetaData.setWidth(videoMetadata.width());
                 mediaMetaData.setHeight(videoMetadata.height());
             }
+            minIOService.copyObjectToAnotherBucket(event.bucket(), event.thumbnailObject(), ContentMetaData.THUMBNAIL_BUCKET, mediaMetaData.getThumbnail());
         } else if (!sameName) {
             minIOService.removeFile(event.bucket(), mediaMetaData.getThumbnail());
 
@@ -127,7 +128,7 @@ public class MediaObjectService {
         String topic = sameName ? EventTopics.MEDIA_BACKUP_TOPIC : EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC;
         eventPublisher.publishEvent(new MediaObjectEventProducer.EventWrapper(
                 topic,
-                new MediaUpdateEvent.MediaThumbnailUpdatedReady(event.mediaId(), mediaMetaData.getThumbnail(), event.thumbnailObject()))
+                new MediaUpdateEvent.MediaThumbnailUpdatedReady(event.mediaId(), mediaMetaData.getThumbnail(), sameName ? mediaMetaData.getThumbnail() : event.thumbnailObject()))
         );
     }
 
@@ -140,5 +141,13 @@ public class MediaObjectService {
         return mediaMetaDataRepository.findByUserIdAndId(userId, id).orElseThrow(
                 () -> new IllegalArgumentException("Media not found: " + id)
         );
+    }
+
+    public static String getFileExtension(String name) {
+        if (name == null) return "";
+        name = name.toLowerCase();
+        int lastDotIndex = name.lastIndexOf(".");
+        if (lastDotIndex == -1) return "";
+        return name.substring(lastDotIndex);
     }
 }
