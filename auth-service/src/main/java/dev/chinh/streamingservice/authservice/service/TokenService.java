@@ -53,7 +53,7 @@ public class TokenService {
                 .maxAge(expirySeconds + 60)
                 .httpOnly(true)
                 .sameSite("Strict")
-                .secure(false) // change to true in production
+                .secure(true)
                 .path("/")
                 .build();
     }
