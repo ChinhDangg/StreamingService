@@ -250,14 +250,14 @@ public class MediaMetadataModifyService {
 
         if (hasFile) {
             String extension = MediaUploadService.getFileExtension(multipartFile.getOriginalFilename());
-            String newThumbnail = mediaMetaData.getThumbnail().endsWith(extension)
+            String newThumbnailName = mediaMetaData.getThumbnail().endsWith(extension)
                     ? mediaMetaData.getThumbnail()
                     : MediaUploadService.createMediaThumbnailString(userId, mediaType, mediaId, multipartFile.getOriginalFilename());
-            minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnail, multipartFile);
-            if (newThumbnail != null && !newThumbnail.equals(mediaMetaData.getThumbnail())) {
+            minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnailName, multipartFile);
+            if (newThumbnailName != null && !newThumbnailName.equals(mediaMetaData.getThumbnail())) {
                 eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                         EventTopics.MEDIA_OBJECT_TOPIC,
-                        new MediaUpdateEvent.MediaThumbnailUpdated(userId, mediaId, mediaType, null, mediaMetaData.getBucket(), newThumbnail)
+                        new MediaUpdateEvent.MediaThumbnailUpdated(userId, mediaId, mediaType, null, mediaMetaData.getBucket(), newThumbnailName)
                 ));
             }
         } else if (mediaType == MediaType.VIDEO || mediaType == MediaType.ALBUM) {
