@@ -287,6 +287,20 @@ services:
     volumes:
       - ${BACKUP_PATH}:${BACKUP_LOCATION}
 
+  task-responder:
+    build:
+      context: ../task-responder
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PORT: ${TASK_RESPONDER_PORT}
+    ports:
+      - "127.0.0.1:${TASK_RESPONDER_PORT}:${TASK_RESPONDER_PORT}"
+    environment:
+      - AUTH_SERVER=${AUTH_SERVER}
+
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
 
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
