@@ -21,7 +21,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 @Service
 public class AlbumService extends MediaService implements ResourceCleanable {
@@ -64,11 +64,13 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                     String mediaUrlListString = objectMapper.writeValueAsString(mediaUrlList);
                     workerRedisService.addResultToStatus(description.getWorkId(), "page::"+description.getOffset(), mediaUrlListString);
                     workerRedisService.releaseToken(tokenKey);
+                    workerRedisService.sendJobNotification(description.getWorkId(), description.getUserId(), mediaUrlListString);
                 }
                 case "albumVideoUrl" -> {
                     String videoPartialUrl = getAlbumPartialVideoUrl(tokenKey, description);
                     workerRedisService.addResultToStatus(description.getWorkId(), "result", videoPartialUrl);
                     workerRedisService.updateStatus(description.getWorkId(), MediaJobStatus.RUNNING.name());
+                    workerRedisService.sendJobNotification(description.getWorkId(), description.getUserId(), videoPartialUrl);
                 }
                 default -> throw new BadRequestException("Invalid jobType: " + description.getJobType());
             }
@@ -156,10 +158,10 @@ public class AlbumService extends MediaService implements ResourceCleanable {
 
             AlbumUrlInfo urlInfo = new AlbumUrlInfo(mediaImageOutputList, bucketList, pathList);
             String saveDir = userId + "/" + albumId + "/" + resolution.name();
-            int exitCode = processResizedImagesInBatch(urlInfo, resolution, saveDir, false);
-            if (exitCode != 0) {
+            try {
+                processResizedImagesInBatch(urlInfo, resolution, saveDir, false, false);
+            } catch (Exception e) {
                 System.err.println("Failed to resize images for albumId: " + albumId);
-                throw new RuntimeException("Failed to resize images for albumId: " + albumId);
             }
         }
 
@@ -175,74 +177,89 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         return mediaAllUrlList;
     }
 
-    private int processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String saveDir, boolean isAlbum) throws InterruptedException, IOException {
-        String[] shellCmd;
-        if (ffmpegName == null || ffmpegName.isEmpty()) {
-            // PROD: Start a local bash session
-            shellCmd = new String[]{"sh"};
-        } else {
-            // DEV: Start a bash session inside the ffmpeg container
-            shellCmd = new String[]{"docker", "exec", "-i", ffmpegName, "sh"};
-        }
-        // Start one persistent bash session inside ffmpeg container
-        ProcessBuilder pb = new ProcessBuilder(shellCmd).redirectErrorStream(true);
-        Process process = pb.start();
-
-        // Setup thread-safe list to hold logs
-        List<String> logs = Collections.synchronizedList(new ArrayList<>());
-        Thread logConsumer = Thread.ofVirtual().unstarted(() -> getLogsFromInputStream(logs, process.getInputStream()));
-        logConsumer.start();
-
-        try (BufferedWriter writer = new BufferedWriter(
-                new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8))) {
+    private void processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String saveDir, boolean isAlbum, boolean addThumbnailCache) throws InterruptedException, IOException {
+        try (ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor()) {
+            Semaphore semaphore = new Semaphore(4);
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
 
             OSUtil.createTempDir(saveDir, ffmpegName);
+            String scale = getFfmpegScaleString(resolution, false);
 
-            String scale = getFfmpegScaleString(resolution, true);
             for (int i = 0; i < albumUrlInfo.mediaUrlList.size(); i++) {
-                String output = albumUrlInfo.mediaUrlList.get(i).url;
-                output = "/chunks/" + saveDir + "/" + output;
+                final int index = i;
 
-                String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(i);
-                String input = minIOService.getObjectUrlForContainer(bucket, albumUrlInfo.pathList.get(i));
+                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                    try {
+                        semaphore.acquire();
 
-                String ffmpegCmd = String.format(
-                        "ffmpeg -n -hide_banner -loglevel info " +
-                                "-i \"%s\" -vf %s -q:v 2 -frames:v 1 -update 1 \"%s\"",
-                        input, scale, output
-                );
-                writer.write(ffmpegCmd + "\n");
-                writer.flush();
+                        List<String> cmd = new ArrayList<>();
+                        if (ffmpegName != null && !ffmpegName.isEmpty()) {
+                            // DEV: Start a bash session inside the ffmpeg container
+                            cmd.addAll(List.of("docker", "exec", ffmpegName));
+                        }
+
+                        String output = albumUrlInfo.mediaUrlList.get(index).url;
+                        output = "/chunks/" + saveDir + "/" + output;
+                        String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(index);
+                        String input = minIOService.getObjectUrlForContainer(bucket, albumUrlInfo.pathList.get(index));
+
+                        cmd.addAll(List.of(
+                                "ffmpeg",
+                                "-n", "-hide_banner", "-loglevel", "error",
+                                "-i", input,
+                                "-vf", scale,
+                                "-q:v", "2",
+                                "-frames:v", "1",
+                                "-update", "1",
+                                output
+                        ));
+
+                        Process process = new ProcessBuilder(cmd).redirectErrorStream(true).start();
+
+                        // Setup thread-safe list to hold logs
+                        List<String> logs = Collections.synchronizedList(new ArrayList<>());
+                        Thread logConsumer = Thread.ofVirtual().unstarted(() -> getLogsFromInputStream(logs, process.getInputStream()));
+                        logConsumer.start();
+
+                        int exitCode = process.waitFor();
+                        if (exitCode != 0) {
+                            logs.forEach(System.out::println);
+                            System.out.println();
+                        } else if (addThumbnailCache) {
+                            String name = output.replaceFirst("/chunks/thumbnail-cache/", "");
+                            long now = System.currentTimeMillis() + 60 * 60 * 1000;
+                            addCacheThumbnails(name, now);
+                        }
+
+                    } catch (Exception e) {
+                        System.err.println("Failed to execute ffmpeg command: " + e.getMessage());
+                    } finally {
+                        semaphore.release();
+                    }
+                }, executorService);
+
+                futures.add(future);
             }
 
-            // close stdin to end the bash session
-            writer.write("exit\n");
-            writer.flush();
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
         } catch (Exception e) {
-            process.destroy();
-            System.err.println("Error processing resized images: " + e.getMessage());
+            throw new RuntimeException(e);
         }
-
-        int exit = process.waitFor();
-        System.out.println("ffmpeg Resizing Images exited with code " + exit);
-        if (exit != 0) {
-            logs.forEach(System.out::println);
-        }
-        return exit;
     }
 
-    public String getAlbumVidCacheJobIdString(long albumId, String objectName, Resolution resolution) {
-        return albumId + ":" + resolution + ":" + objectName;
+    private void addCacheThumbnails(String thumbnailFileNames, long expiry) {
+        redisTemplate.opsForZSet().add("thumbnail-cache", thumbnailFileNames, expiry);
     }
 
-    private String getAlbumPartialVideoUrl(String tokenKey, MediaJobDescription mediaJobDescription) throws Exception {
-        long albumId = mediaJobDescription.getId();
-        Resolution albumRes = mediaJobDescription.getResolution();
-        String objectName = mediaJobDescription.getUserId() + "/" + mediaJobDescription.getKey();
-        String objectNameOmittedUserDir = mediaJobDescription.getKey();
-        Resolution res = mediaJobDescription.getVidResolution();
 
-        final String albumVidCacheJobId = getAlbumVidCacheJobIdString(albumId, objectNameOmittedUserDir, res);
+    private String getAlbumPartialVideoUrl(String tokenKey, MediaJobDescription jobDescription) throws Exception {
+        long albumId = jobDescription.getId();
+        Resolution albumRes = jobDescription.getResolution();
+        String objectName = jobDescription.getUserId() + "/" + jobDescription.getKey();
+        String objectNameOmittedUserDir = jobDescription.getKey();
+        Resolution res = jobDescription.getVidResolution();
+
+        final String albumVidCacheJobId = jobDescription.getUserId();
 
         if (MediaType.detectMediaType(objectName) != MediaType.VIDEO)
             throw new BadRequestException("Invalid video path: " + objectName);
@@ -277,7 +294,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             return minIOService.getObjectUrl(bucket, objectNameOmittedUserDir);
 
         final String videoDir = albumId + "/" + objectNameOmittedUserDir + "/" + res.name();
-        String userDir = mediaJobDescription.getUserId() + "/" + videoDir;
+        String userDir = jobDescription.getUserId() + "/" + videoDir;
         OSUtil.createTempDir(userDir, ffmpegName);
         String containerDir = "/chunks/" + userDir;
         String outPath = containerDir + masterFileName;

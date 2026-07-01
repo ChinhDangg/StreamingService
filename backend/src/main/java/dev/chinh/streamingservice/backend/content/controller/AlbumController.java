@@ -34,7 +34,7 @@ public class AlbumController {
     }
 
     @GetMapping("/{albumId}/{albumRes}/vid/{objectName}/{vidRes}")
-    public ResponseEntity<String> getAlbumVideoUrl(@PathVariable long albumId,
+    public ResponseEntity<?> getAlbumVideoUrl(@PathVariable long albumId,
                                                    @PathVariable Resolution albumRes,
                                                    @PathVariable String objectName,
                                                    @PathVariable Resolution vidRes,

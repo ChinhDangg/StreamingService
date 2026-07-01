@@ -81,10 +81,6 @@ public abstract class MediaService {
                 .rangeByScoreWithScores(key, 0, max, 0, 50);
     }
 
-    protected String getCacheMediaJobIdString(long mediaId, Resolution res) {
-        return mediaId + ":" + res;
-    }
-
     protected boolean checkSrcSmallerThanTarget(int width, int height, int target) {
         if (width >= height) { // Landscape
             return height <= target;

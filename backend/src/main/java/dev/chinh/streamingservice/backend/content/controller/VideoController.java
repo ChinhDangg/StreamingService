@@ -29,7 +29,7 @@ public class VideoController {
     }
 
     @GetMapping("/preview/{id}")
-    public ResponseEntity<String> preview(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) throws Exception {
+    public ResponseEntity<?> preview(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) throws Exception {
         return ResponseEntity.ok(videoService.getPreviewVideoUrl(jwt.getSubject(), id));
     }
 

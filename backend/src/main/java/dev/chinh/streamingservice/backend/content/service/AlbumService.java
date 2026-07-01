@@ -44,7 +44,7 @@ public class AlbumService extends MediaService {
         addCacheLastAccess(albumLastAccessKey, getCacheMediaJobId(albumId, albumRes), now);
     }
 
-    public String getAlbumContent(String userId, long albumId, Resolution resolution, int page, int batch,
+    public JobStatus getAlbumContent(String userId, long albumId, Resolution resolution, int page, int batch,
                                   HttpServletRequest request) throws Exception {
         MediaDescription album = getMediaDescription(userId, albumId);
 
@@ -60,9 +60,9 @@ public class AlbumService extends MediaService {
             try {
                 MediaJobStatus status = MediaJobStatus.valueOf(result.toString());
                 if (status == MediaJobStatus.PROCESSING)
-                    return status.name();
+                    return new JobStatus(albumJobId, status.name());
             } catch (Exception ignored) {
-                return result.toString();
+                return new JobStatus(albumJobId, result.toString());
             }
         }
 
@@ -74,14 +74,14 @@ public class AlbumService extends MediaService {
         jobDescription.setAcceptHeader(request.getHeader("Accept"));
         addJobToQueue(ffmpegQueueKey, jobDescription);
         updateQueueJobStatus(albumJobId, MediaJobStatus.PROCESSING.name(), "page::" + page);
-        return MediaJobStatus.PROCESSING.name();
+        return new JobStatus(albumJobId, MediaJobStatus.PROCESSING.name());
     }
 
     public String getAlbumVidCacheJobIdString(long albumId, String objectName, Resolution resolution) {
         return albumId + ":" + resolution + ":" + objectName;
     }
 
-    public String getAlbumPartialVideoUrl(String userId, long albumId, Resolution albumRes, String objectName, Resolution res,
+    public JobStatus getAlbumPartialVideoUrl(String userId, long albumId, Resolution albumRes, String objectName, Resolution res,
                                           HttpServletRequest request) throws Exception {
         MediaDescription album = getMediaDescription(userId, albumId);
         final String albumVidJobId = getAlbumVidCacheJobIdString(albumId, objectName, res);
@@ -91,7 +91,7 @@ public class AlbumService extends MediaService {
         jobDescription.setVidResolution(res);
         jobDescription.setAcceptHeader(request.getHeader("Accept"));
         addCacheAlbumVideoLastAccess(albumId, albumVidJobId, albumRes);
-        return addJobToFfmpegQueue(ffmpegQueueKey, albumVidJobId, "result", jobDescription);
+        return new JobStatus(albumVidJobId, addJobToFfmpegQueue(ffmpegQueueKey, albumVidJobId, "result", jobDescription));
     }
 
     @Override

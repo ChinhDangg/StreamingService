@@ -2,7 +2,6 @@ package dev.chinh.streamingservice.backend.content.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.backend.MediaMapper;
-import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.constant.Resolution;
 import dev.chinh.streamingservice.backend.search.service.MediaSearchCacheService;
@@ -13,8 +12,6 @@ import dev.chinh.streamingservice.mediapersistence.repository.MediaMetaDataRepos
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Arrays;
 
 @Service
 public class VideoService extends MediaService {
@@ -36,28 +33,28 @@ public class VideoService extends MediaService {
     }
 
     @Transactional
-    public String getPreviewVideoUrl(String userId, long videoId) throws Exception {
+    public JobStatus getPreviewVideoUrl(String userId, long videoId) throws Exception {
         MediaDescription mediaDescription = getMediaDescription(userId, videoId);
+        String jobId = getCachePreviewJobId(videoId);
         if (mediaDescription.getPreview() != null) {
-            return minIOService.getObjectUrl(ContentMetaData.PREVIEW, ContentMetaData.removeUserIdDirFromObjectKey(userId, mediaDescription.getPreview()));
+            return new JobStatus(jobId, minIOService.getObjectUrl(ContentMetaData.PREVIEW, ContentMetaData.removeUserIdDirFromObjectKey(userId, mediaDescription.getPreview())));
         }
-        String cacheJobId = getCachePreviewJobId(videoId);
-        addCacheVideoLastAccess(cacheJobId, null);
+        addCacheVideoLastAccess(jobId, null);
         String previewName = mediaDescription.getUserId() + "/preview_"  + ContentMetaData.removeUserIdDirFromObjectKey(String.valueOf(mediaDescription.getUserId()), mediaDescription.getKey());
-        MediaJobDescription jobDescription = getMediaJobDescription(userId, mediaDescription, cacheJobId, null, "preview");
+        MediaJobDescription jobDescription = getMediaJobDescription(userId, mediaDescription, jobId, null, "preview");
         jobDescription.setPreview(previewName);
-        return addJobToFfmpegQueue(ffmpegQueueKey, cacheJobId, "result", jobDescription);
+        return new JobStatus(jobId, addJobToFfmpegQueue(ffmpegQueueKey, jobId, "result", jobDescription));
     }
 
-    public String getPartialVideoUrl(String userId, long videoId, Resolution res) throws Exception {
+    public JobStatus getPartialVideoUrl(String userId, long videoId, Resolution res) throws Exception {
+        String jobId = getCacheMediaJobId(videoId, res);
         if (res == Resolution.original)
-            return getOriginalVideoUrl(userId, videoId);
+            return new JobStatus(jobId, getOriginalVideoUrl(userId, videoId));
 
         MediaDescription mediaDescription = getMediaDescription(userId, videoId);
 
-        String cacheJobId = getCacheMediaJobId(videoId, res);
-        addCacheVideoLastAccess(cacheJobId, null);
-        return addJobToFfmpegQueue(ffmpegQueueKey, cacheJobId, "result", getMediaJobDescription(userId, mediaDescription, cacheJobId, res, "partial"));
+        addCacheVideoLastAccess(jobId, null);
+        return new JobStatus(jobId, addJobToFfmpegQueue(ffmpegQueueKey, jobId, "result", getMediaJobDescription(userId, mediaDescription, jobId, res, "partial")));
     }
 
     public void addCacheVideoLastAccess(String videoId, Long expiry) {

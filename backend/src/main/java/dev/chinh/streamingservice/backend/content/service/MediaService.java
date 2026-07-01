@@ -29,6 +29,8 @@ public abstract class MediaService {
     protected final MinIOService minIOService;
     protected final MediaSearchCacheService mediaSearchCacheService;
 
+    public record JobStatus(String jobId, String result) {}
+
     protected String addJobToFfmpegQueue(String queueKey, String cacheJobId, String resultField, MediaJobDescription mediaJobDescription) throws JsonProcessingException {
         Object jobQueueStatus = getQueueJobStatus(cacheJobId);
         if (jobQueueStatus != null) {

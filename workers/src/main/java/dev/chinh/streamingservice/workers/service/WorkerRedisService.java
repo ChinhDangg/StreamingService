@@ -1,5 +1,7 @@
 package dev.chinh.streamingservice.workers.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.stream.*;
@@ -15,11 +17,14 @@ import java.util.List;
 public class WorkerRedisService {
 
     private final RedisTemplate<String, String> redisTemplate;
+    private final ObjectMapper objectMapper;
 
     public WorkerRedisService(
-            @Qualifier("queueRedisTemplate") RedisTemplate<String, String> redisTemplate
+            @Qualifier("queueRedisTemplate") RedisTemplate<String, String> redisTemplate,
+            ObjectMapper objectMapper
     ) {
         this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
     }
 
     private static final DefaultRedisScript<Long> acquireScript;
@@ -73,6 +78,15 @@ public class WorkerRedisService {
         redisTemplate.delete("ffmpeg_job_status:" + jobId);
     }
 
+    public record JobStatus(String jobId, String userId, String result) {}
+    public void sendJobNotification(String jobId, String userId, String result) {
+        try {
+            String value = objectMapper.writeValueAsString(new JobStatus(jobId, userId, result));
+            redisTemplate.convertAndSend("job-status-channel", value);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     // stream init
     public void createGroupIfAbsent(String stream, String group) {

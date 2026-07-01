@@ -74,24 +74,26 @@ public class VideoService extends MediaService implements ResourceCleanable {
     }
 
     @Override
-    public void handleJob(String tokenKey, MediaJobDescription mediaJobDescription) {
+    public void handleJob(String tokenKey, MediaJobDescription jobDescription) {
         try {
-            boolean toHandleJob = isJobWithinHandleWindow(tokenKey, mediaJobDescription);
+            boolean toHandleJob = isJobWithinHandleWindow(tokenKey, jobDescription);
             if (!toHandleJob) { // check if job has passed too long or not
-                workerRedisService.updateStatus(mediaJobDescription.getWorkId(), MediaJobStatus.STOPPED.name());
+                workerRedisService.updateStatus(jobDescription.getWorkId(), MediaJobStatus.STOPPED.name());
                 workerRedisService.releaseToken(tokenKey);
                 return;
             }
-            switch (mediaJobDescription.getJobType()) {
+            switch (jobDescription.getJobType()) {
                 case "preview" -> {
-                    String url = getPreviewVideoUrl(tokenKey, mediaJobDescription);
-                    workerRedisService.updateStatus(mediaJobDescription.getWorkId(), MediaJobStatus.RUNNING.name());
-                    workerRedisService.addResultToStatus(mediaJobDescription.getWorkId(), "result", url);
+                    String url = getPreviewVideoUrl(tokenKey, jobDescription);
+                    workerRedisService.updateStatus(jobDescription.getWorkId(), MediaJobStatus.RUNNING.name());
+                    workerRedisService.addResultToStatus(jobDescription.getWorkId(), "result", url);
+                    workerRedisService.sendJobNotification(jobDescription.getWorkId(), jobDescription.getUserId(), url);
                 }
                 case "partial" -> {
-                    String url = getPartialVideoUrl(tokenKey, mediaJobDescription, mediaJobDescription.getResolution());
-                    workerRedisService.updateStatus(mediaJobDescription.getWorkId(), MediaJobStatus.RUNNING.name());
-                    workerRedisService.addResultToStatus(mediaJobDescription.getWorkId(), "result", url);
+                    String url = getPartialVideoUrl(tokenKey, jobDescription, jobDescription.getResolution());
+                    workerRedisService.updateStatus(jobDescription.getWorkId(), MediaJobStatus.RUNNING.name());
+                    workerRedisService.addResultToStatus(jobDescription.getWorkId(), "result", url);
+                    workerRedisService.sendJobNotification(jobDescription.getWorkId(), jobDescription.getUserId(), url);
                 }
                 case null, default -> throw new IllegalArgumentException("Unknown job type");
            };
@@ -116,13 +118,13 @@ public class VideoService extends MediaService implements ResourceCleanable {
         return minIOService.getObjectUrl(mediaJobDescription.getBucket(), key);
     }
 
-    private String getPreviewVideoUrl(String tokenKey, MediaJobDescription mediaJobDescription) throws Exception {
-        long videoId = mediaJobDescription.getId();
+    private String getPreviewVideoUrl(String tokenKey, MediaJobDescription jobDescription) throws Exception {
+        long videoId = jobDescription.getId();
         String videoDir = videoId + "/preview";
 
-        String cacheJobId = getCachePreviewJobId(videoId);
+        String jobId = jobDescription.getWorkId();
 
-        MediaJobStatus mediaJobStatus = getVideoJobStatus(cacheJobId);
+        MediaJobStatus mediaJobStatus = getVideoJobStatus(jobId);
         boolean prevJobStopped = false;
         if (mediaJobStatus != null) {
             if (mediaJobStatus.equals(MediaJobStatus.COMPLETED) || mediaJobStatus.equals(MediaJobStatus.RUNNING))
@@ -134,18 +136,18 @@ public class VideoService extends MediaService implements ResourceCleanable {
         // === resolution control ===
         final Resolution resolution = Resolution.p240;
 
-        double duration = mediaJobDescription.getLength();
+        double duration = jobDescription.getLength();
         int segments = Math.max(1, Math.min(Math.toIntExact(Math.round(duration / 60 / 5 * 10)), 20));
         double previewLength = Math.min(duration, 60);
         double clipLength = previewLength / segments;
         double interval = duration / segments;
 
         if (duration <= 60) {
-            return getPartialVideoUrl(tokenKey, mediaJobDescription, resolution);
+            return getPartialVideoUrl(tokenKey, jobDescription, resolution);
         }
 
         long estimatedSize = (long) (Resolution.getEstimatedSize(
-                mediaJobDescription.getSize(), mediaJobDescription.getWidth(), mediaJobDescription.getHeight(), resolution)
+                jobDescription.getSize(), jobDescription.getWidth(), jobDescription.getHeight(), resolution)
                 / (duration / previewLength));
         memoryManager.freeMemoryForSize(estimatedSize);
 
@@ -169,7 +171,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
             concatInputs.append(String.format("[v%d]", i));
         }
 
-        String scale = getFfmpegScaleString(mediaJobDescription.getWidth(), mediaJobDescription.getHeight(), resolution.getResolution());
+        String scale = getFfmpegScaleString(jobDescription.getWidth(), jobDescription.getHeight(), resolution.getResolution());
 
         // concat -> scale
         fc.append(String.format(
@@ -181,7 +183,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
         )); // scale=-2:%d[v]
         String filterComplex = fc.toString();
 
-        String nginxUrl = minIOService.getObjectUrlForContainer(mediaJobDescription.getBucket(), mediaJobDescription.getKey());
+        String nginxUrl = minIOService.getObjectUrlForContainer(jobDescription.getBucket(), jobDescription.getKey());
 
         int segmentDuration = 4;
         String partialVideoJobId = UUID.randomUUID().toString();
@@ -203,7 +205,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
             }
         }
 
-        String userDir = mediaJobDescription.getUserId() + "/" + videoDir;
+        String userDir = jobDescription.getUserId() + "/" + videoDir;
         OSUtil.createTempDir(userDir, ffmpegName);
         String containerDir = "/chunks/" + userDir;
         String outPath = containerDir + masterFileName;
@@ -225,28 +227,28 @@ public class VideoService extends MediaService implements ResourceCleanable {
                 "-hls_flags", "append_list+omit_endlist",
                 outPath
         ));
-        runAndLogAsync(tokenKey, command.toArray(new String[0]), cacheJobId, outPath, this::saveVideoPreviewToObjectStorage, mediaJobDescription);
+        runAndLogAsync(tokenKey, command.toArray(new String[0]), jobId, outPath, this::saveVideoPreviewToObjectStorage, jobDescription);
 
-        addCacheVideoLastAccess(cacheJobId, null);
-        addCacheVideoJobStatus(cacheJobId, partialVideoJobId, estimatedSize, MediaJobStatus.RUNNING);
-        addCacheRunningJob(cacheJobId);
+        addCacheVideoLastAccess(jobId, null);
+        addCacheVideoJobStatus(jobId, partialVideoJobId, estimatedSize, MediaJobStatus.RUNNING);
+        addCacheRunningJob(jobId);
 
         checkPlaylistCreated(userDir + masterFileName);
 
         return getNginxVideoStreamUrl(videoDir);
     }
 
-    private String getPartialVideoUrl(String tokenKey, MediaJobDescription mediaJobDescription, Resolution res) throws Exception {
+    private String getPartialVideoUrl(String tokenKey, MediaJobDescription jobDescription, Resolution res) throws Exception {
         if (res == Resolution.original)
-            return getOriginalVideoUrl(mediaJobDescription);
+            return getOriginalVideoUrl(jobDescription);
 
-        long videoId = mediaJobDescription.getId();
+        long videoId = jobDescription.getId();
 
         String videoDir = videoId + "/" + res;
 
-        String cacheJobId = getCacheMediaJobIdString(videoId, res);
+        String jobId = jobDescription.getWorkId();
 
-        MediaJobStatus mediaJobStatus = getVideoJobStatus(cacheJobId);
+        MediaJobStatus mediaJobStatus = getVideoJobStatus(jobId);
         boolean prevJobStopped = false;
         if (mediaJobStatus != null) {
             if (mediaJobStatus.equals(MediaJobStatus.COMPLETED) || mediaJobStatus.equals(MediaJobStatus.RUNNING))
@@ -255,34 +257,34 @@ public class VideoService extends MediaService implements ResourceCleanable {
                 prevJobStopped = true;
         }
 
-        if (checkSrcSmallerThanTarget(mediaJobDescription.getWidth(), mediaJobDescription.getHeight(), res.getResolution()))
-            return getOriginalVideoUrl(mediaJobDescription);
+        if (checkSrcSmallerThanTarget(jobDescription.getWidth(), jobDescription.getHeight(), res.getResolution()))
+            return getOriginalVideoUrl(jobDescription);
 
         long estimatedSize = Resolution.getEstimatedSize(
-                mediaJobDescription.getSize(), mediaJobDescription.getWidth(), mediaJobDescription.getHeight(), res);
+                jobDescription.getSize(), jobDescription.getWidth(), jobDescription.getHeight(), res);
         boolean enoughSpace = memoryManager.freeMemoryForSize(estimatedSize);
         if (!enoughSpace)
-            return getOriginalVideoUrl(mediaJobDescription);
+            return getOriginalVideoUrl(jobDescription);
 
-        String nginxUrl = minIOService.getObjectUrlForContainer(mediaJobDescription.getBucket(), mediaJobDescription.getKey());
+        String nginxUrl = minIOService.getObjectUrlForContainer(jobDescription.getBucket(), jobDescription.getKey());
 
         String scale = getFfmpegScaleString(
-                mediaJobDescription.getWidth(), mediaJobDescription.getHeight(), res.getResolution());
+                jobDescription.getWidth(), jobDescription.getHeight(), res.getResolution());
 
-        String userDir = mediaJobDescription.getUserId() + "/" + videoDir;
+        String userDir = jobDescription.getUserId() + "/" + videoDir;
         OSUtil.createTempDir(userDir, ffmpegName);
         String containerDir = "/chunks/" + userDir;
         String outPath = containerDir + masterFileName;
-        String partialVideoJobId = createPartialVideo(tokenKey, nginxUrl, scale, videoDir, outPath, prevJobStopped, cacheJobId);
+        String partialVideoJobId = createPartialVideo(tokenKey, nginxUrl, scale, videoDir, outPath, prevJobStopped, jobId);
 
-        addCacheVideoLastAccess(cacheJobId, null);
-        addCacheVideoJobStatus(cacheJobId, partialVideoJobId, estimatedSize, MediaJobStatus.RUNNING);
-        addCacheRunningJob(cacheJobId);
+        addCacheVideoLastAccess(jobId, null);
+        addCacheVideoJobStatus(jobId, partialVideoJobId, estimatedSize, MediaJobStatus.RUNNING);
+        addCacheRunningJob(jobId);
 
         // check the master file has been created. maybe check first chunks being created for smoother experience
         checkPlaylistCreated(userDir + masterFileName);
 
-        // 5. Return playlist URL for browser
+        // Return playlist URL for browser
         return getNginxVideoStreamUrl(videoDir);
     }
 
@@ -450,10 +452,6 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
     private String getNginxVideoStreamUrl(String videoDir) {
         return "/stream/chunks/" + videoDir + masterFileName;
-    }
-
-    private String getCachePreviewJobId(long videoId) {
-        return videoId + ":preview";
     }
 
     private final String videoLastAccessKey = "cache:lastAccess:video";
