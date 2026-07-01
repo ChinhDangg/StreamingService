@@ -4,7 +4,6 @@ npm init
 --command
 npm install hls.js
 --copy
-node_modules/hls.js/dist/hls.min.js
 node_modules/hls.js/dist/hls.js
 
 --command
