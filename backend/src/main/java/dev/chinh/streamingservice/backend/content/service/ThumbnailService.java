@@ -11,8 +11,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
@@ -24,6 +24,7 @@ public class ThumbnailService {
     private final MinIOService minIOService;
 
     public static final Resolution thumbnailResolution = Resolution.p360;
+    private final Set<String> thumbnailServiceCache = ConcurrentHashMap.newKeySet(); // service cache during request only, main cache is still in redis
     private static final AtomicInteger counter = new AtomicInteger(2);
 
     public record AlbumUrlInfo(List<String> mediaUrlList, List<String> buckets, List<String> pathList) {}
@@ -53,12 +54,7 @@ public class ThumbnailService {
                 counter.incrementAndGet();
                 return;
             }
-            int exitCode = processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailOutputParentPath(userId), true);
-            if (exitCode != 0) {
-                throw new RuntimeException("Failed to resize thumbnails");
-            }
-            long now = System.currentTimeMillis() + 60 * 60 * 1000;
-            addCacheThumbnails(albumUrlInfo.mediaUrlList, now, (name) -> name.replaceFirst("/chunks/thumbnail-cache/", ""));
+            processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailOutputParentPath(userId), true);
         } catch (Exception e) {
             System.err.println(e.getMessage());
         }
@@ -152,70 +148,91 @@ public class ThumbnailService {
         return "/thumbnail-cache/" + userId;
     }
 
-
-    private int processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String albumDir, boolean isAlbum) throws InterruptedException, IOException {
+    private void processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String albumDir, boolean isAlbum) {
         String ffmpegName = System.getenv("FFMPEG_NAME");
-        String[] shellCmd;
-        if (ffmpegName == null || ffmpegName.isEmpty()) {
-            // PROD: Start a local bash session
-            shellCmd = new String[]{"sh"};
-        } else {
-            // DEV: Start a bash session inside the ffmpeg container
-            shellCmd = new String[]{"docker", "exec", "-i", ffmpegName, "sh"};
-        }
-        // Start one persistent bash session inside ffmpeg container
-        ProcessBuilder pb = new ProcessBuilder(shellCmd).redirectErrorStream(true);
-        Process process = pb.start();
+        final Set<String> localThumbnailCache = ConcurrentHashMap.newKeySet();
 
-        // Capture ffmpeg combined logs in a thread-safe list
-        List<String> logs = Collections.synchronizedList(new ArrayList<>());
-        Thread logConsumer = Thread.ofVirtual().unstarted(() -> {
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = br.readLine()) != null) {
-                    logs.add("[ffmpeg] " + line);
-                }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
-        logConsumer.start();
-
-        try (BufferedWriter writer = new BufferedWriter(
-                new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8))) {
+        try (ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor()) {
+            Semaphore semaphore = new Semaphore(4);
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
 
             OSUtil.createTempDir(albumDir, ffmpegName);
 
-            String scale = getFfmpegScaleString(resolution, true);
+            String scale = getFfmpegScaleString(resolution, false);
+
             for (int i = 0; i < albumUrlInfo.mediaUrlList.size(); i++) {
-                String output = albumUrlInfo.mediaUrlList.get(i);
+                final int index = i;
+                final String output = albumUrlInfo.mediaUrlList.get(index);
+                final String name = output.replaceFirst("/chunks/thumbnail-cache/", "");
+                if (thumbnailServiceCache.contains(name))
+                    continue;
 
-                String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(i);
-                String input = minIOService.getObjectUrlForContainer(bucket, albumUrlInfo.pathList.get(i));
+                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                    try {
+                        semaphore.acquire();
 
-                String ffmpegCmd = String.format(
-                        "ffmpeg -n -hide_banner -loglevel info " +
-                                "-i \"%s\" -vf %s -q:v 2 -frames:v 1 -update 1 \"%s\"",
-                        input, scale, output
-                );
-                writer.write(ffmpegCmd + "\n");
-                writer.flush();
+                        List<String> cmd = new ArrayList<>();
+                        if (ffmpegName != null && !ffmpegName.isEmpty()) {
+                            // DEV: Start a bash session inside the ffmpeg container
+                            cmd.addAll(List.of("docker", "exec", ffmpegName));
+                        }
+
+                        String bucket = isAlbum ? albumUrlInfo.buckets.getFirst() : albumUrlInfo.buckets.get(index);
+                        String input = minIOService.getObjectUrlForContainer(bucket, albumUrlInfo.pathList.get(index));
+
+                        cmd.addAll(List.of(
+                                "ffmpeg",
+                                "-n", "-hide_banner", "-loglevel", "error",
+                                "-i", input,
+                                "-vf", scale,
+                                "-q:v", "2",
+                                "-frames:v", "1",
+                                "-update", "1",
+                                output
+                        ));
+
+                        ProcessBuilder pb = new ProcessBuilder(cmd).redirectErrorStream(true);
+                        Process process = pb.start();
+
+                        // Capture ffmpeg combined logs in a thread-safe list
+                        List<String> logs = Collections.synchronizedList(new ArrayList<>());
+                        Thread logConsumer = Thread.ofVirtual().unstarted(() -> {
+                            try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                                String line;
+                                while ((line = br.readLine()) != null) {
+                                    logs.add("[ffmpeg] " + line);
+                                }
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+                        logConsumer.start();
+
+                        int exitCode = process.waitFor();
+                        if (exitCode != 0) {
+                            logs.forEach(System.out::println);
+                            System.out.println();
+                        } else {
+                            thumbnailServiceCache.add(name);
+                            localThumbnailCache.add(name);
+                        }
+
+                    } catch (Exception e) {
+                        System.err.println("Failed to execute ffmpeg command: " + e.getMessage());
+                    } finally {
+                        semaphore.release();
+                    }
+                }, executorService);
+
+                futures.add(future);
             }
 
-            // close stdin to end the bash session
-            writer.write("exit\n");
-            writer.flush();
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            addCacheThumbnails(localThumbnailCache.stream().toList(), System.currentTimeMillis() + 60 * 60 * 1000, null);
+            localThumbnailCache.forEach(thumbnailServiceCache::remove);
         } catch (Exception e) {
-            process.destroy();
-            System.err.println("Failed to execute ffmpeg command: " + e.getMessage());
+            throw new RuntimeException(e);
         }
-
-        int exit = process.waitFor();
-        System.out.println("ffmpeg transcode media thumbnails exited with code " + exit);
-        if (exit != 0) {
-            logs.forEach(System.out::println);
-        }
-        return exit;
     }
 
     private String getFfmpegScaleString(Resolution resolution, boolean wrapInDoubleQuotes) {
