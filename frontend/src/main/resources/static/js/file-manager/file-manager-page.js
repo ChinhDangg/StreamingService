@@ -707,6 +707,7 @@ fileDropZone.addEventListener("drop", async (e) => {
         return entry ? traverseEntry(entry, fileArray) : null;
     });
     await Promise.all(promise);
+    if (fileArray.length === 0) return;
     await handleFileArray(fileArray);
 });
 
@@ -2032,21 +2033,3 @@ previewOverlay.addEventListener('click', (e) => {
         closePreview();
     }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
