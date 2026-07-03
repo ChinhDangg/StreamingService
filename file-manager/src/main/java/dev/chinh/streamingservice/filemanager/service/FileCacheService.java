@@ -23,6 +23,7 @@ public class FileCacheService {
 
     /*
         This service is used to cache file metadata in memory for general read not maintaining locked dir item - that is directory cache service
+        If multiple service of file-manager- remove this class as it will create inconsistency!
      */
 
     private final Cache<String, FileSystemItem> fileCache;
@@ -69,6 +70,10 @@ public class FileCacheService {
 
     public void invalidateFileCache(String id) {
         fileCache.invalidate(id);
+    }
+
+    public void invalidateFileCache(Collection<String> ids) {
+        fileCache.invalidateAll(ids);
     }
 
     private FileSystemItem findById(String userId, String id) {

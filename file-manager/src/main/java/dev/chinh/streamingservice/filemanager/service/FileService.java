@@ -277,7 +277,7 @@ public class FileService {
         }
 
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
-        List<FileSystemItem> items = getItemInIds(getCommonIds(item.getPath()), criteria, f -> f.getFileType() == FileType.ALBUM);
+        List<FileSystemItem> items = getItemInIds(getCommonIds(item.getPath()), true, criteria, f -> f.getFileType() == FileType.ALBUM);
         if (!items.isEmpty()) {
             throw new IllegalArgumentException("Has parent as album - cannot have album in an album");
         }
@@ -342,7 +342,7 @@ public class FileService {
         }
 
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
-        List<FileSystemItem> items = getItemInIds(getCommonIds(item.getPath()), criteria, f -> f.getFileType() == FileType.ALBUM);
+        List<FileSystemItem> items = getItemInIds(getCommonIds(item.getPath()), true, criteria, f -> f.getFileType() == FileType.ALBUM);
         if (!items.isEmpty()) {
             throw new IllegalArgumentException("Has parent as album - cannot have grouper in an album");
         }
@@ -692,7 +692,7 @@ public class FileService {
             return item.getName();
         }
 
-        List<FileSystemItem> parents = getItemInIds(pathIds, null, null);
+        List<FileSystemItem> parents = getItemInIds(pathIds, true, null, null);
 
         Map<String, String> nameMap = parents.stream().collect(Collectors.toMap(FileSystemItem::getId, FileSystemItem::getName));
 
@@ -750,8 +750,12 @@ public class FileService {
         return fileCacheService.getFileCacheElseFromDatabase(userId, id, getCachedFirst);
     }
 
-    public List<FileSystemItem> getItemInIds(Collection<String> ids, Criteria criteria, Predicate<FileSystemItem> filter) {
-        return fileCacheService.getCachedFilesElseFromDatabase(ids, criteria, filter);
+    public List<FileSystemItem> getItemInIds(Collection<String> ids, boolean getCachedFirst, Criteria criteria, Predicate<FileSystemItem> filter) {
+        if (getCachedFirst)
+            return fileCacheService.getCachedFilesElseFromDatabase(ids, criteria, filter);
+        Query query = new Query(Criteria.where("id").in(ids));
+        if (criteria != null) query.addCriteria(criteria);
+        return mongoTemplate.find(query, FileSystemItem.class);
     }
 
     public FileSystemItem getRootDirectoryItem() {

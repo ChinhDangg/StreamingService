@@ -32,6 +32,7 @@ public class FileConsumerService {
 
     private final MongoTemplate mongoTemplate;
     private final FileService fileService;
+    private final FileCacheService fileCacheService;
     private final DirectoryCacheService directoryCacheService;
     private final ApplicationEventPublisher publisher;
 
@@ -88,7 +89,7 @@ public class FileConsumerService {
 
         Set<String> parentIds = fileService.getCommonIds(fileItem.getPath());
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
-        List<FileSystemItem> parents = fileService.getItemInIds(parentIds, criteria, f -> f.getFileType() == FileType.ALBUM);
+        List<FileSystemItem> parents = fileService.getItemInIds(parentIds, true, criteria, f -> f.getFileType() == FileType.ALBUM);
         updateParentMediaLength(event.userId(), parents, 1);
     }
 
@@ -302,7 +303,7 @@ public class FileConsumerService {
 
         Set<String> parentIds = fileService.getCommonIds(fileItem.getPath());
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
-        List<FileSystemItem> parents = fileService.getItemInIds(parentIds, criteria, f -> f.getFileType() == FileType.ALBUM);
+        List<FileSystemItem> parents = fileService.getItemInIds(parentIds, true, criteria, f -> f.getFileType() == FileType.ALBUM);
 
         int batchSize = 500;
         while (hasMore) {
@@ -332,10 +333,12 @@ public class FileConsumerService {
             }
             updateParentMediaLength(userId, parents, -fileCount);
             mongoTemplate.remove(new Query(Criteria.where("id").in(ids)), FileSystemItem.class);
+            fileCacheService.invalidateFileCache(ids);
             System.out.println("Deleted " + ids.size() + " items");
         }
 
         mongoTemplate.remove(new Query(Criteria.where("id").is(fileItem.getId())), FileSystemItem.class);
+        fileCacheService.invalidateFileCache(fileItem.getId());
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_OBJECT_TOPIC,
                 new MediaUpdateEvent.ObjectDeleted(fileItem.getBucket(), Collections.singletonList(fileItem.getObjectName()))
