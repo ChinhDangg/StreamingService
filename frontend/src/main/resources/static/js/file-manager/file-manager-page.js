@@ -1,6 +1,12 @@
 import {endFileSession, endVideoUploadSession, uploadFile,} from "/static/js/upload/upload-file.js";
 import {apiRequest} from "/static/js/common.js";
 import {FileManager} from "/static/js/file-manager/FileManager.js";
+import {
+    currentSearchFileItems,
+    clearSearch,
+    getIsSearching,
+    setIsSearching, getIsInDeepSearch, setIsInDeepSearch
+} from "/static/js/file-manager/search-file.js";
 
 const view = document.getElementById("file-view-container");
 
@@ -72,7 +78,7 @@ function getIconNode(fileType) {
 }
 
 let isProcessing = false;
-const currentMainFileItems = new FileManager();
+export const currentMainFileItems = new FileManager();
 
 /*
     if useGlobalMapItems is true, then the fileItems will be a list of fileItemIds
@@ -80,7 +86,7 @@ const currentMainFileItems = new FileManager();
     and display them. This is useful when we want to display the fileItems in a
     different order than the order they are in the fileItems array.
  */
-function displayFileItem(fileItems, fileItemManager = null, clearNode = true, clearFileList = true, pushFileList = true, useGlobalMapItems = false) {
+export function displayFileItem(fileItems, fileItemManager = null, clearNode = true, clearFileList = true, pushFileList = true, useGlobalMapItems = false) {
     if (clearNode) {
         const first = fileViewContainer.firstElementChild;
         if (first) fileViewContainer.replaceChildren(first);
@@ -180,7 +186,6 @@ function formatDuration(totalSeconds) {
 function formatDate(isoString) {
     // isoString: "2026-03-18T19:47:37.151Z"
     // Positions:  012345678901234567890123
-
     const year = isoString.slice(0, 4);
     const month = isoString.slice(5, 7);
     const day = isoString.slice(8, 10);
@@ -249,10 +254,26 @@ const fileViewWrapper = document.getElementById('file-view-wrapper');
 const sortSelect = document.getElementById('file-sort-by-select');
 const sentinel = document.createElement("div");
 let observer;
+export function unobserveSentinel() {
+    if (observer)
+        observer.unobserve(sentinel);
+}
+export function observeSentinel() {
+    if (observer)
+        observer.observe(sentinel);
+}
+export function disconnectObserver() {
+    if (observer)
+        observer.disconnect();
+}
+export function setObserver(newObserver) {
+    observer = newObserver;
+}
+
 async function fetchMoreFiles(subId, page = 0, getParentInfo = false) {
     if (isProcessing) return false;
     isProcessing = true;
-    isSearching = false;
+    setIsSearching(false);
     const params = new URLSearchParams();
     if (subId) params.append('id', subId);
     const sortSelectValue = getSortSelectValue();
@@ -326,90 +347,6 @@ function getItemKeyFromSortSelectValue(value) {
     return null;
 }
 
-const searchForm = document.getElementById('search-form');
-const searchInput = searchForm.querySelector('.search-input');
-const searchButton = searchForm.querySelector('.search-btn');
-const clearSearchButton = searchForm.querySelector('.clear-search-btn');
-const recursiveToggle = searchForm.querySelector('.recursive-toggle');
-
-searchForm.addEventListener("submit", async function (e) {
-    e.preventDefault();
-});
-
-searchButton.addEventListener("click", async function () {
-    await searchFiles(searchInput.value);
-});
-
-const currentSearchFileItems = new FileManager();
-let isInDeepSearch = false;
-let isSearching = false;
-async function searchFiles(searchTerm) {
-    if (!searchTerm || searchTerm.length === 0) {
-        clearSearch();
-    }
-    if (searchTerm.length < 2) {
-        isInDeepSearch = false;
-        return;
-    }
-    isSearching = true;
-    clearSearchButton.classList.remove('hidden');
-    if (currentMainFileItems.getCurrentFilePage() === -1 && !recursiveToggle.checked) {
-        console.log('searching locally');
-        let filteredFileIds = currentMainFileItems.findFileItemsWithNameAndReturnTheirIds(searchTerm);
-        filteredFileIds = filteredFileIds.length === 0 ? null : filteredFileIds;
-        displayFileItem(filteredFileIds, currentMainFileItems, true, false, false, true);
-    } else {
-        if (recursiveToggle.checked)
-            isInDeepSearch = true;
-        displayFileItem([], currentSearchFileItems,true, true, false);
-        observer.unobserve(sentinel);
-        setObserverToSearch(searchTerm);
-        await fetchSearchFiles(searchTerm, 0);
-        observer.observe(sentinel);
-    }
-}
-
-async function fetchSearchFiles(searchString, page) {
-    const currentPath = getCurrentPath();
-    if (!currentPath)
-        return;
-    const response = await apiRequest('/api/file/search', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            parentId: currentPath.id,
-            searchString: searchString,
-            isRecursive: recursiveToggle.checked,
-            page: page
-        })
-    });
-    if (!response.ok) {
-        alert('Failed to search files');
-        return;
-    }
-    const searchResult = await response.json();
-    if (searchResult.hasNext)
-        currentSearchFileItems.setCurrentFilePage(page + 1);
-    else
-        currentSearchFileItems.setCurrentFilePage(-1);
-    const subFiles = searchResult.content;
-    displayFileItem(subFiles, currentSearchFileItems,false, false, true);
-}
-
-clearSearchButton.addEventListener("click", async function () {
-    clearSearch();
-});
-
-function clearSearch() {
-    isSearching = false;
-    searchInput.value = '';
-    clearSearchButton.classList.add('hidden');
-    setObserverToFetchMore();
-    displayFileItem([], currentMainFileItems, true, false, false, true);
-}
-
 
 let previousSubId = null;
 function setCurrentUri(subId) {
@@ -438,7 +375,7 @@ function initializeObserveFileViewContainer() {
     observer.observe(sentinel);
 }
 
-function setObserverToFetchMore() {
+export function setObserverToFetchMore() {
     if (observer)
         observer.disconnect();
     observer = new IntersectionObserver(async (entries) => {
@@ -466,20 +403,20 @@ function setObserverToFetchMore() {
     }, { rootMargin: '500px' });
 }
 
-function setObserverToSearch(searchString) {
-    if (observer)
-        observer.disconnect();
-    observer = new IntersectionObserver(async (entries) => {
-        if (entries[0].isIntersecting) {
-            console.log('Intersecting in search');
-            if (currentSearchFileItems.getCurrentFilePage() === -1) {
-                observer.unobserve(sentinel);
-                return;
-            }
-            await fetchSearchFiles(searchString, currentSearchFileItems.getCurrentFilePage());
-        }
-    }, { rootMargin: '500px' });
-}
+// function setObserverToSearch(searchString) {
+//     if (observer)
+//         observer.disconnect();
+//     observer = new IntersectionObserver(async (entries) => {
+//         if (entries[0].isIntersecting) {
+//             console.log('Intersecting in search');
+//             if (currentSearchFileItems.getCurrentFilePage() === -1) {
+//                 observer.unobserve(sentinel);
+//                 return;
+//             }
+//             await fetchSearchFiles(searchString, currentSearchFileItems.getCurrentFilePage());
+//         }
+//     }, { rootMargin: '500px' });
+// }
 
 const currentPathStack = [];
 
@@ -616,7 +553,7 @@ homeButton.addEventListener('click', async function () {
 
     const rootInfo = await getRootDir();
     if (!rootInfo) return;
-    isSearching = false;
+    setIsSearching(false);
     addToCurrentPath(rootInfo.parentId, rootInfo.parentName, true);
     displayFileItem(rootInfo.content, currentMainFileItems);
     if (!isMovingFile)
@@ -833,7 +770,7 @@ function validateAllowVideo(file) {
         (/\.(mp4|mov|mp3)$/i.test(file.name));
 }
 
-function getCurrentPath() {
+export function getCurrentPath() {
     if (currentPathStack.length === 0) return null;
     return currentPathStack[currentPathStack.length - 1];
 }
@@ -1464,7 +1401,7 @@ fileDropZone.addEventListener('click', async (event) => {
 
     const isDir = fileType === 'DIR' || fileType === 'ALBUM' || fileType === 'GROUPER';
 
-    if (isInDeepSearch) {
+    if (getIsInDeepSearch()) {
         clearSearch();
         if (isDir)
             await fetchMoreFilesAndMove(fileId, 0);
@@ -1476,7 +1413,7 @@ fileDropZone.addEventListener('click', async (event) => {
             }
             await fetchMoreFilesAndMove(parentId, 0);
         }
-        isInDeepSearch = false;
+        setIsInDeepSearch(false);
         return;
     }
 
@@ -1648,12 +1585,12 @@ deleteFileButton.addEventListener('click', async function () {
         idsToDelete.push(fileId);
         removeSelectedFile(fileId);
         fileInfo.fileNode.remove();
-        if (isSearching)
+        if (getIsSearching())
             currentSearchFileItems.removeFileItemInMapOnly(fileId);
         currentMainFileItems.removeFileItemInMapOnly(fileId);
     }
     const toDeleteSet = new Set(idsToDelete);
-    if (isSearching)
+    if (getIsSearching())
         currentSearchFileItems.removeFileItemsInIdListOnly(toDeleteSet);
     currentMainFileItems.removeFileItemsInIdListOnly(toDeleteSet);
     displayInfoMessage(`Successfully deleted ${deleteText}`);
@@ -1712,7 +1649,7 @@ newFolderButton.addEventListener('click', async function () {
 });
 
 function getCurrentFileItemById(id) {
-    if (isSearching)
+    if (getIsSearching())
         return currentSearchFileItems.getFileItemById(id);
     return currentMainFileItems.getFileItemById(id);
 }
