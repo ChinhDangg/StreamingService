@@ -21,7 +21,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.*;
 
 @Service
@@ -62,12 +61,6 @@ public class MediaSearchService {
                 .toList();
     }
 
-    private void cacheMediaSearchItems(Collection<MediaSearchItem> items) {
-        for (MediaSearchItem item : items) {
-            mediaSearchCacheService.cacheMediaSearchItem(item, Duration.ofMinutes(15));
-        }
-    }
-
     public MediaSearchResult advanceSearch(String userId, MediaSearchRequest request, int page, int size,
                                            SortBy sortBy, SortOrder sortOrder) throws Exception {
 
@@ -93,7 +86,7 @@ public class MediaSearchService {
 
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
             thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
-        cacheMediaSearchItems(mapSearchResult.searchItems);
+        mediaSearchCacheService.cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 
@@ -127,7 +120,7 @@ public class MediaSearchService {
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
             thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
 
-        cacheMediaSearchItems(mapSearchResult.searchItems);
+        mediaSearchCacheService.cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 
@@ -141,7 +134,7 @@ public class MediaSearchService {
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
             thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
 
-        cacheMediaSearchItems(mapSearchResult.searchItems);
+        mediaSearchCacheService.cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 
@@ -152,7 +145,7 @@ public class MediaSearchService {
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
             thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
 
-        cacheMediaSearchItems(mapSearchResult.searchItems);
+        mediaSearchCacheService.cacheMediaSearchItems(mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 
