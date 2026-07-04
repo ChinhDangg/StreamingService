@@ -123,9 +123,7 @@ export function displayFileItem(fileItems, fileItemManager = null, clearNode = t
             fileNode.dataset.mid = item.mId;
             setMediaBgColor(fileNode, fileType);
         }
-        if (fileType === 'DIR' || fileType === 'ALBUM' || fileType === 'GROUPER') {
-            fileNode.dataset.name = item.name;
-        }
+        fileNode.dataset.name = item.name;
         showSelectedViews(fileNode, item, selectedViews);
         fileViewContainer.appendChild(fileNode);
     }
@@ -566,10 +564,10 @@ const selectedFiles = new Map();
 const selectFileBanner = document.getElementById('select-file-banner');
 const selectFileBannerCancelBtn = selectFileBanner.querySelector('.cancel-btn');
 
-function addSelectedFile(fileId, mediaId, fileType, fileNode) {
+function addSelectedFile(fileId, mediaId, fileType, fileName, fileNode) {
     if (selectedFiles.has(fileId))
         return false;
-    selectedFiles.set(fileId, {mediaId: mediaId, fileType: fileType, fileNode: fileNode});
+    selectedFiles.set(fileId, {mediaId: mediaId, fileType: fileType, fileName: fileName, fileNode: fileNode});
     fileNode.classList.add('border-[3px]', 'border-white')
     selectFileBanner.querySelector('.selected-count-text').textContent = selectedFiles.size.toString();
     selectFileBanner.classList.remove('hidden');
@@ -670,8 +668,9 @@ window.addEventListener('mousemove', (e) => {
                 const fileId = file.element.getAttribute('data-id');
                 const fileMid = file.element.getAttribute('data-mId');
                 const fileType = file.element.getAttribute('data-type');
+                const fileName = file.element.getAttribute('data-name');
                 if (!removeSelectedFile(fileId))
-                    addSelectedFile(fileId, fileMid, fileType, file.element);
+                    addSelectedFile(fileId, fileMid, fileType, fileName, file.element);
             }
         }
     });
@@ -703,6 +702,7 @@ const currentTargetNode = {
     id: null,
     type: null,
     mId: null,
+    name: null,
     node: null
 }
 
@@ -710,6 +710,7 @@ function clearTargetNode() {
     currentTargetNode.id = null;
     currentTargetNode.type = null;
     currentTargetNode.mId = null;
+    currentTargetNode.name = null;
     currentTargetNode.node = null;
 }
 
@@ -723,6 +724,7 @@ fileDropZone.addEventListener('contextmenu', (event) => {
     addAsAlbumButton.disabled = true;
     addAsGrouperButton.disabled = true;
     openMediaButton.disabled = true;
+    addNameEntityButton.disabled = true;
     renameButton.disabled = true;
     moveButton.disabled = true;
     deleteFileButton.disabled = true;
@@ -730,6 +732,7 @@ fileDropZone.addEventListener('contextmenu', (event) => {
     addAsAlbumButton.classList.add('invisible');
     addAsGrouperButton.classList.add('invisible');
     openMediaButton.classList.add('invisible');
+    addNameEntityButton.classList.add('invisible');
     renameButton.classList.add('invisible');
     moveButton.classList.add('invisible');
     deleteFileButton.classList.add('invisible');
@@ -742,13 +745,16 @@ fileDropZone.addEventListener('contextmenu', (event) => {
     currentTargetNode.id = targetNode.getAttribute('data-id');
     currentTargetNode.type = targetNode.getAttribute('data-type');
     currentTargetNode.mId = targetNode.getAttribute('data-mId');
+    currentTargetNode.name = targetNode.getAttribute('data-name');
     currentTargetNode.node = targetNode;
 
-    addSelectedFile(currentTargetNode.id, currentTargetNode.mId, currentTargetNode.type, targetNode)
+    addSelectedFile(currentTargetNode.id, currentTargetNode.mId, currentTargetNode.type, currentTargetNode.name, targetNode)
 
     if (currentTargetNode.mId) {
         openMediaButton.disabled = false;
         openMediaButton.classList.remove('invisible');
+        addNameEntityButton.disabled = false;
+        addNameEntityButton.classList.remove('invisible');
     } else {
         if (currentTargetNode.type === 'VIDEO') {
             addAsVideoButton.disabled = false;
@@ -763,11 +769,11 @@ fileDropZone.addEventListener('contextmenu', (event) => {
     if (selectedFiles.size > 0) {
         renameButton.disabled = false;
         renameButton.classList.remove('invisible');
+        moveButton.disabled = false;
+        moveButton.classList.remove('invisible');
+        deleteFileButton.disabled = false;
+        deleteFileButton.classList.remove('invisible');
     }
-    moveButton.disabled = false;
-    moveButton.classList.remove('invisible');
-    deleteFileButton.disabled = false;
-    deleteFileButton.classList.remove('invisible');
 
     showCustomRightMenu(event.clientX, event.clientY);
 });
@@ -780,10 +786,11 @@ fileDropZone.addEventListener('click', async (event) => {
     const fileType = targetNode.getAttribute('data-type');
     const fileId = targetNode.getAttribute('data-id');
     const mediaId = targetNode.getAttribute('data-mId');
+    const fileName = targetNode.getAttribute('data-name');
 
     if (!isMovingFile && selectedFiles.size > 0) {
         if (!removeSelectedFile(fileId))
-            addSelectedFile(fileId, mediaId, fileType, targetNode);
+            addSelectedFile(fileId, mediaId, fileType, fileName, targetNode);
         return;
     }
 
@@ -941,7 +948,7 @@ deleteFileButton.addEventListener('click', async function () {
         console.log('No file selected');
         return;
     }
-    const deleteText = selectedFiles.size === 1 ? `file ${currentTargetNode.id}` : `${selectedFiles.size} files`;
+    const deleteText = selectedFiles.size === 1 ? `file ${currentTargetNode.name}` : `${selectedFiles.size} files`;
     const confirmDelete = confirm(`Are you sure to delete ${deleteText}?`);
     if (!confirmDelete) return;
     const idsToDelete = [];
@@ -963,7 +970,7 @@ deleteFileButton.addEventListener('click', async function () {
                 displayInfoMessage('Failed to delete file: ' + await response.text(), false);
                 return;
             }
-            displayInfoMessage("Processing to delete file: " + fileId);
+            displayInfoMessage("Processing to delete file: " + fileInfo.fileName);
         }
         idsToDelete.push(fileId);
         removeSelectedFile(fileId);
@@ -976,7 +983,8 @@ deleteFileButton.addEventListener('click', async function () {
     if (getIsSearching())
         currentSearchFileItems.removeFileItemsInIdListOnly(toDeleteSet);
     currentMainFileItems.removeFileItemsInIdListOnly(toDeleteSet);
-    displayInfoMessage(`Successfully deleted ${deleteText}`);
+    if (toDeleteSet.size > 1)
+        displayInfoMessage(`Processing to delete: ${deleteText}`);
 });
 
 function hasSameNameItem(name) {
@@ -1049,6 +1057,10 @@ renameButton.addEventListener('click', async function () {
             return;
         }
         newName = newName.trim();
+        if (newName.length === 0) {
+            alert('New name cannot be empty');
+            return;
+        }
         const sameNameItem = hasSameNameItem(newName);
         if (sameNameItem) {
             alert('An item the same name already exists');
@@ -1068,11 +1080,11 @@ renameButton.addEventListener('click', async function () {
             alert('Failed to rename file: ' + await response.text());
             return;
         }
-        currentFileItem.name = newName;
-        const currentItem = currentMainFileItems.getFileItemById(currentTargetNode.id);
-        if (currentItem) currentItem.name = newName;
-        currentTargetNode.node.querySelector('.name').textContent = await response.text();
-        displayInfoMessage(`Renamed: ${newName}`, true, 30000);
+        const respondedName = await response.text();
+        currentFileItem.name = respondedName;
+        currentTargetNode.node.querySelector('.name').textContent = respondedName;
+        currentTargetNode.node.dataset.name = respondedName;
+        displayInfoMessage(`Renamed: ${respondedName}`, true, 30000);
     }
     openOverlayTextPrompt('Rename', currentFileItem.name, sendRenameRequest);
 });
@@ -1257,7 +1269,7 @@ async function processQueue() {
     } catch (e) {
         // Aborted → just move on
     }
-
+``
     currentController = null;
 
     processQueue();
