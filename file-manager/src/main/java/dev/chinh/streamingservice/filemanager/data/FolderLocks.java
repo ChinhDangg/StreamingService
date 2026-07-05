@@ -22,8 +22,8 @@ public class FolderLocks {
     @Field(FileItemField.STATUS_CODE)
     private final FileStatus statusCode;
 
-    @Indexed(expireAfter = "PT0S")
-    private final Date expiryTime = Date.from(new Date().toInstant().plusSeconds(900));
+    @Indexed(expireAfter = "PT15M")
+    private final Date expiryTime = new Date();
 
     public FolderLocks(String id, String userId, FileStatus statusCode) {
         this.id = id;

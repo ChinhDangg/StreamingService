@@ -15,6 +15,7 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -27,18 +28,17 @@ public class DirectoryCacheService {
 
     private final Cache<String, ApplicationConfig.EntryCached> directoryIdCache;
     private final FileCacheService fileCacheService;
+    private final FileLockService fileLockService;
 
     public String getCachedElseDbDirectoryId(String parentId, String dirName, String userId, boolean mustBeDirectory) {
         String dirKey = getDirKey(dirName, parentId);
-        var cached = (ApplicationConfig.DirectoryCached) directoryIdCache.asMap().get(dirKey);
-        if (cached == null) {
+        var dirCached = (ApplicationConfig.DirectoryCached) directoryIdCache.get(dirKey, _ -> {
             Query query = Query.query(Criteria
                     .where(FileItemField.USER_ID).is(Long.parseLong(userId))
                     .and(FileItemField.PARENT_ID).is(parentId)
                     .and(FileItemField.NAME).is(dirName)
             );
-            Update update = new Update().set(FileItemField.STATUS_CODE, FileStatus.IN_USE.getValue());
-            FileSystemItem dir = safeWriteMongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), FileSystemItem.class);
+            FileSystemItem dir = safeWriteMongoTemplate.findOne(query, FileSystemItem.class);
             if (dir == null)
                 return null;
             if (mustBeDirectory && FileType.isNotDir(dir.getFileType())) {
@@ -46,19 +46,17 @@ public class DirectoryCacheService {
                 throw new IllegalArgumentException("File with name: " + dirName + " already exist but is not a directory");
             }
             fileCacheService.invalidateFileCache(dir.getId());
-            directoryIdCache.asMap().computeIfAbsent(dirKey, k -> {
-                Set<String> users = ConcurrentHashMap.newKeySet();
-                users.add(userId);
-                return new ApplicationConfig.DirectoryCached(dir.getId(), users);
-            });
-            return dir.getId();
-        }
-        return cached.dirId();
+
+            return new ApplicationConfig.DirectoryCached(dir.getId(), ConcurrentHashMap.newKeySet());
+        });
+        if (dirCached == null)
+            return null;
+        return dirCached.dirId();
     }
 
     public ApplicationConfig.DirectoryCached getCachedOrCreateDirectory(String dirName, String dirParentId, String dirPath, String userId) {
         String dirKey = getDirKey(dirName, dirParentId);
-        ApplicationConfig.EntryCached entry = directoryIdCache.get(dirKey, k -> {
+        ApplicationConfig.EntryCached entry = directoryIdCache.get(dirKey, _ -> {
             // Only executes if the key is missing
             String fileId = getOrCreateFolder(userId, dirName, dirParentId, dirPath, FileType.DIR);
             return new ApplicationConfig.DirectoryCached(fileId, ConcurrentHashMap.newKeySet());
@@ -87,7 +85,6 @@ public class DirectoryCacheService {
                 .setOnInsert(FileItemField.PARENT_ID, parentId)
                 .setOnInsert(FileItemField.PATH, currentPath)
                 .setOnInsert(FileItemField.FILE_TYPE, fileType)
-                .setOnInsert(FileItemField.STATUS_CODE, FileStatus.IN_USE.getValue())
                 .setOnInsert(FileItemField.UPLOAD_DATE, LocalDateTime.now());
 
         // upsert to create and return in one operation - atomic
@@ -96,6 +93,7 @@ public class DirectoryCacheService {
         FileSystemItem dir = mongoTemplate.findAndModify(query, update, options, FileSystemItem.class);
 
         if (dir == null) throw new RuntimeException("Failed to create folder");
+        fileLockService.lockFileItem(userId, Set.of(dir.getId()), Map.of(dir.getId(), FileStatus.IN_USE));
 
         return dir.getId();
     }
@@ -117,9 +115,9 @@ public class DirectoryCacheService {
         // Get the value safely WITHOUT locking the map in a compute block
         ApplicationConfig.EntryCached value = directoryIdCache.getIfPresent(userId);
         if (value instanceof ApplicationConfig.UserDirUsing(Set<String> dirUserUsing)) {
-            // Invalidate the user immediately so no new directories are added to them
+            // Invalidate the user immediately, so no new directories are added to them
             directoryIdCache.invalidate(userId);
-            // Iterate over the set outside of any parent locks
+            // Iterate over the set outside any parent locks
             for (String dirKey : dirUserUsing) {
                 directoryIdCache.asMap().computeIfPresent(dirKey, (_, dirValue) -> {
                     var dirCached = (ApplicationConfig.DirectoryCached) dirValue;
@@ -136,9 +134,7 @@ public class DirectoryCacheService {
     }
 
     private void removeFileStatus(String fileId) {
-        Query query = new Query(Criteria.where("id").is(fileId));
-        Update update = new Update().unset(FileItemField.STATUS_CODE);
-        mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+        fileLockService.releaseLockedFileItem(Set.of(fileId));
         fileCacheService.invalidateFileCache(fileId);
     }
 

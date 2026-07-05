@@ -3,15 +3,11 @@ package dev.chinh.streamingservice.filemanager.config;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
-import dev.chinh.streamingservice.filemanager.data.FileItemField;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
+import dev.chinh.streamingservice.filemanager.service.FileLockService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.retry.annotation.EnableRetry;
 
 import java.util.Set;
@@ -27,7 +23,7 @@ public class ApplicationConfig {
     public record DirectoryCached(String dirId, Set<String> userUsing) implements EntryCached {}
 
     @Bean
-    public Cache<String, EntryCached> DirectoryIdCache(MongoTemplate safeWriteMongoTemplate, ObjectProvider<Cache<String, EntryCached>> cacheProvider, Cache<String, FileSystemItem> fileCache) {
+    public Cache<String, EntryCached> DirectoryIdCache(FileLockService fileLockService, ObjectProvider<Cache<String, EntryCached>> cacheProvider, Cache<String, FileSystemItem> fileCache) {
         return Caffeine.newBuilder()
                 .expireAfterAccess(15, TimeUnit.MINUTES)
                 .removalListener((String key, EntryCached value, RemovalCause cause) -> {
@@ -39,10 +35,10 @@ public class ApplicationConfig {
                             if (cache != null) {
                                 if (value instanceof UserDirUsing(Set<String> dirUserUsing)) {
                                     for (String dirId : dirUserUsing) {
-                                        cleanupDirAccessCache(cache, dirId, key, safeWriteMongoTemplate, fileCache);
+                                        cleanupDirAccessCache(cache, dirId, key, fileLockService, fileCache);
                                     }
                                 } else if (value instanceof DirectoryCached directoryCached) {
-                                    removeFileStatus(safeWriteMongoTemplate, directoryCached.dirId(), fileCache);
+                                    removeFileStatus(fileLockService, directoryCached.dirId(), fileCache);
                                 }
                             }
                         });
@@ -52,22 +48,20 @@ public class ApplicationConfig {
                 .build();
     }
 
-    private void cleanupDirAccessCache(Cache<String, EntryCached> cache, String dirKey, String userId, MongoTemplate safeWriteMongoTemplate, Cache<String, FileSystemItem> fileCache) {
+    private void cleanupDirAccessCache(Cache<String, EntryCached> cache, String dirKey, String userId, FileLockService fileLockService, Cache<String, FileSystemItem> fileCache) {
         cache.asMap().computeIfPresent(dirKey, (_, v) -> {
             DirectoryCached directoryCached = (DirectoryCached) v;
             directoryCached.userUsing().remove(userId);
             if (directoryCached.userUsing().isEmpty()) {
-                removeFileStatus(safeWriteMongoTemplate, directoryCached.dirId(), fileCache);
+                removeFileStatus(fileLockService, directoryCached.dirId(), fileCache);
                 return null;
             }
             return directoryCached;
         });
     }
 
-    private void removeFileStatus(MongoTemplate safeWriteMongoTemplate, String fileId, Cache<String, FileSystemItem> fileCache) {
-        Query query = new Query(Criteria.where("id").is(fileId));
-        Update update = new Update().unset(FileItemField.STATUS_CODE);
-        safeWriteMongoTemplate.updateFirst(query, update, FileSystemItem.class);
+    private void removeFileStatus(FileLockService fileLockService, String fileId, Cache<String, FileSystemItem> fileCache) {
+        fileLockService.releaseLockedFileItem(Set.of(fileId));
         fileCache.invalidate(fileId);
     }
 

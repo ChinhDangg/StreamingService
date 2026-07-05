@@ -34,6 +34,7 @@ public class FileConsumerService {
     private final FileService fileService;
     private final FileCacheService fileCacheService;
     private final DirectoryCacheService directoryCacheService;
+    private final FileLockService fileLockService;
     private final ApplicationEventPublisher publisher;
 
     @Transactional
@@ -218,7 +219,7 @@ public class FileConsumerService {
 
     @Transactional
     public UpdateResult handleCompleteFileToMedia(MediaUpdateEvent.MediaCreatedReady event) {
-        return fileService.updateFileMetadataAsMedia(
+        var result = fileService.updateFileMetadataAsMedia(
                 event.userId(),
                 event.fileId(),
                 event.mediaId(),
@@ -228,6 +229,8 @@ public class FileConsumerService {
                 event.width(),
                 event.height()
         );
+        fileLockService.releaseLockedFileItem(Set.of(event.fileId()));
+        return result;
     }
 
     @Transactional
@@ -403,6 +406,6 @@ public class FileConsumerService {
         mongoTemplate.updateMulti(query, update, FileSystemItem.class);
 
         Set<String> commonIds = fileService.getCommonIds(oldPath + item.getId() + newParent.getPath() + newParent.getId());
-        fileService.releaseLockedFileItem(commonIds);
+        fileLockService.releaseLockedFileItem(commonIds);
     }
 }

@@ -54,7 +54,7 @@ public class FileCacheService {
      * If getCachedFirst is true, the file cache is checked first. Then from the database. The result is cached.
      * Else from database only, the result is still cached.
      */
-    public FileSystemItem getFileCacheElseFromDatabase(String userId, String id, boolean getCachedFirst) {
+    public FileSystemItem getCachedFileElseFromDatabase(String userId, String id, boolean getCachedFirst) {
         // atomic: if multiple threads request the same ID, the compute function runs only once.
         // get, else compute, save, and return the result.
         if (getCachedFirst)

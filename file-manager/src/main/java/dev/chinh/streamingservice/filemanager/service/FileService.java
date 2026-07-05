@@ -17,13 +17,10 @@ import dev.chinh.streamingservice.filemanager.event.FileEventProducer;
 import dev.chinh.streamingservice.filemanager.repository.FileSystemRepository;
 import lombok.RequiredArgsConstructor;
 import org.bson.Document;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.event.EventListener;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.domain.*;
 import org.springframework.data.mongodb.MongoTransactionException;
-import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -52,13 +49,13 @@ public class FileService {
 
     private final RedisTemplate<String, String> redisStringTemplate;
     private final MongoTemplate mongoTemplate;
-    private final MongoTemplate safeWriteMongoTemplate;
     private final ApplicationEventPublisher publisher;
     private final FileSystemRepository fileSystemRepository;
 
     private final ThumbnailService thumbnailService;
     private final DirectoryCacheService directoryCacheService;
     private final FileCacheService fileCacheService;
+    private final FileLockService fileLockService;
 
 
     private static final String mediaPath = ContentMetaData.MEDIA_BUCKET;
@@ -212,12 +209,6 @@ public class FileService {
         return sessionId;
     }
 
-
-    // using codeStatus as file status:
-    // -1 - processing to be added as media
-    // -2 - marked as deleted
-    // -3 - in-use being written into
-
     @Retryable(
             retryFor = { QueryTimeoutException.class, MongoTransactionException.class },
             maxAttempts = 3,
@@ -232,11 +223,16 @@ public class FileService {
         if (item.getMId() != null && item.getMId() != 0) {
             throw new IllegalArgumentException("Item is already marked as video");
         }
-        String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
-        if (statusCodeStr != null) {
-            throw new IllegalArgumentException(statusCodeStr);
+        Map<String, Set<FileStatus>> parentIgnoreStatus = getCommonIds(item.getPath()).stream()
+                .collect(Collectors.toMap(key -> key, _ -> Set.of(FileStatus.BEING_MOVED_INTO)));
+        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
+        if (folderIsLocked != null) {
+            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
         }
-        updateStatusCode(fileId, FileStatus.PROCESSING);
+
+        fileLockService.lockFileItem(userId, Set.of(item.getId()), Collections.emptyMap());
+        fileCacheService.invalidateFileCache(item.getId());
+
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
@@ -267,13 +263,11 @@ public class FileService {
         if (item.getMId() != null && item.getMId() != 0) {
             throw new IllegalArgumentException("Item is already marked as media");
         }
-        String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
-        if (statusCodeStr != null) {
-            throw new IllegalArgumentException(statusCodeStr);
-        }
-        FolderLocks folderIsLocked = checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), null);
+        Map<String, Set<FileStatus>> parentIgnoreStatus = getCommonIds(item.getPath()).stream()
+                .collect(Collectors.toMap(key -> key, _ -> Set.of(FileStatus.BEING_MOVED_INTO)));
+        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
         if (folderIsLocked != null) {
-            throw new IllegalArgumentException("File is locked: " + folderIsLocked.getId());
+            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
         }
 
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
@@ -282,9 +276,10 @@ public class FileService {
             throw new IllegalArgumentException("Has parent as album - cannot have album in an album");
         }
 
-        updateStatusCode(fileId, FileStatus.PROCESSING);
-        FileSystemItem first = findFirstImageOrVideo(userId, getPathForFileItem(item.getPath(), item.getId()));
+        fileLockService.lockFileItem(userId, Set.of(item.getId()), Collections.emptyMap());
+        fileCacheService.invalidateFileCache(item.getId());
 
+        FileSystemItem first = findFirstImageOrVideo(userId, getPathForFileItem(item.getPath(), item.getId()));
         if (!item.getParentId().equals(getROOT_FOLDER_ID())) {
             FileSystemItem parent = getFileSystemItem(userId, item.getParentId(), true);
             if (parent.getFileType() == FileType.GROUPER) {
@@ -332,13 +327,11 @@ public class FileService {
         if (item.getMId() != null && item.getMId() != 0) {
             throw new IllegalArgumentException("Item is already marked as media");
         }
-        String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
-        if (statusCodeStr != null) {
-            throw new IllegalArgumentException(statusCodeStr);
-        }
-        FolderLocks folderIsLocked = checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), null);
+        Map<String, Set<FileStatus>> parentIgnoreStatus = getCommonIds(item.getPath()).stream()
+                .collect(Collectors.toMap(key -> key, _ -> Set.of(FileStatus.BEING_MOVED_INTO)));
+        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
         if (folderIsLocked != null) {
-            throw new IllegalArgumentException("File is locked: " + folderIsLocked.getId());
+            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
         }
 
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
@@ -347,7 +340,6 @@ public class FileService {
             throw new IllegalArgumentException("Has parent as album - cannot have grouper in an album");
         }
 
-        updateStatusCode(fileId, FileStatus.PROCESSING);
         boolean anyDirectFile = mongoTemplate.exists(Query.query(Criteria
                         .where(FileItemField.USER_ID).is(Long.parseLong(userId))
                         .and(FileItemField.PARENT_ID).is(fileId)
@@ -356,8 +348,11 @@ public class FileService {
         if (anyDirectFile) {
             throw new IllegalArgumentException("Contains direct files - can't be grouped - must include only direct directories");
         }
-        FileSystemItem first = findFirstImageOrVideo(userId, getPathForFileItem(item.getPath(), item.getId()));
 
+        fileLockService.lockFileItem(userId, Set.of(item.getId()), Collections.emptyMap());
+        fileCacheService.invalidateFileCache(item.getId());
+
+        FileSystemItem first = findFirstImageOrVideo(userId, getPathForFileItem(item.getPath(), item.getId()));
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
                 new MediaUpdateEvent.FileToMediaInitiated(
@@ -381,13 +376,18 @@ public class FileService {
         String error = FileSystemValidator.isValidName(newFolderName);
         if (error != null)
             throw new IllegalArgumentException(error);
-        FileSystemItem parent = findById(userId, parentId, true);
+        FileSystemItem parent = findById(userId, parentId, false);
         if (parent == null)
             throw new IllegalArgumentException("Parent folder not found: " + parentId);
         if (FileType.isNotDir(parent.getFileType()))
             throw new IllegalArgumentException("Parent folder is not a directory: " + parentId);
         if (itemWithNameExists(userId, parentId, newFolderName))
             throw new IllegalArgumentException("Folder already exists: " + newFolderName);
+        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(getCommonIds(parent.getPath() + parent.getId()), null);
+        if (folderIsLocked != null) {
+            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
+        }
+
         FileSystemItem item = FileSystemItem.builder()
                 .userId(Long.parseLong(userId))
                 .parentId(parentId)
@@ -410,10 +410,6 @@ public class FileService {
     @Transactional
     public String renameFileItem(String userId, String fileId, String newName) {
         FileSystemItem item = getFileSystemItem(userId, fileId, true);
-        String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
-        if (statusCodeStr != null) {
-            throw new IllegalArgumentException(statusCodeStr);
-        }
         String error = FileSystemValidator.isValidName(newName);
         if (error != null) {
             throw new IllegalArgumentException(error);
@@ -424,6 +420,13 @@ public class FileService {
         if (itemWithNameExists(userId, item.getParentId(), newName)) {
             throw new IllegalArgumentException("File already exists with name: " + newName);
         }
+        Map<String, Set<FileStatus>> parentIgnoreStatus = getCommonIds(item.getPath()).stream()
+                .collect(Collectors.toMap(key -> key, _ -> Set.of(FileStatus.BEING_MOVED_INTO, FileStatus.BEING_MOVED, FileStatus.IN_USE, FileStatus.PROCESSING)));
+        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
+        if (folderIsLocked != null) {
+            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
+        }
+
         Query query = new Query(Criteria.where("id").is(fileId));
         Update update = new Update().set(FileItemField.NAME, newName);
         mongoTemplate.updateFirst(query, update, FileSystemItem.class);
@@ -440,17 +443,22 @@ public class FileService {
     @Transactional
     public void initiateDeleteFile(String userId, String fileId) {
         FileSystemItem item = getFileSystemItem(userId, fileId, false);
-        String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
-        if (statusCodeStr != null) {
-            throw new IllegalArgumentException(statusCodeStr);
-        }
         if (!FileType.isNotDir(item.getFileType())) { // if a directory
             boolean anyChildMedia = anyChildMedia(userId, getPathForFileItem(item.getPath(), item.getId()));
             if (anyChildMedia) {
                 throw new IllegalArgumentException("Directory is not empty - include media item");
             }
         }
-        updateStatusCode(fileId, FileStatus.DELETING);
+        Map<String, Set<FileStatus>> parentIgnoreStatus = getCommonIds(item.getPath()).stream()
+                .collect(Collectors.toMap(key -> key, _ -> Set.of(FileStatus.BEING_MOVED_INTO)));
+        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
+        if (folderIsLocked != null) {
+            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
+        }
+
+        fileLockService.lockFileItem(userId, Set.of(item.getId()), Map.of(item.getId(), FileStatus.DELETING));
+        fileCacheService.invalidateFileCache(item.getId());
+
         if (item.getMId() != null && item.getMId() > 0) {
             throw new IllegalArgumentException("File is already marked as media - delete through media file item instead: " + item.getMId());
         }
@@ -467,17 +475,21 @@ public class FileService {
         if (item == null) {
             throw new IllegalArgumentException("Media file not found: " + mediaId);
         }
-        String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
-        if (statusCodeStr != null) {
-            throw new IllegalArgumentException(statusCodeStr);
-        }
         if (!FileType.isNotDir(item.getFileType())) { // if a directory
             boolean anyChildMedia = anyChildMedia(userId, getPathForFileItem(item.getPath(), item.getId()));
             if (anyChildMedia) {
                 throw new IllegalArgumentException("Media is not empty - include nested media item");
             }
         }
-        updateStatusCode(item.getId(), FileStatus.DELETING);
+        Map<String, Set<FileStatus>> parentIgnoreStatus = getCommonIds(item.getPath()).stream()
+                .collect(Collectors.toMap(key -> key, _ -> Set.of(FileStatus.BEING_MOVED_INTO)));
+        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
+        if (folderIsLocked != null) {
+            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
+        }
+
+        fileLockService.lockFileItem(userId, Set.of(item.getId()), Map.of(item.getId(), FileStatus.DELETING));
+        fileCacheService.invalidateFileCache(item.getId());
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC,
@@ -489,20 +501,12 @@ public class FileService {
     @Transactional
     public FileSystemItem initiateMoveFileItem(String userId, String fileId, String newParentId) {
         FileSystemItem item = getFileSystemItem(userId, fileId, false);
-        String statusCodeStr = FileSystemItem.getStatusCodeAsString(item.getStatusCode());
-        if (statusCodeStr != null) {
-            throw new IllegalArgumentException(statusCodeStr);
-        }
         if (item.getParentId().equals(newParentId)) {
             throw new IllegalArgumentException("Cannot move item to same parent");
         }
         FileSystemItem newParent = findById(userId, newParentId, false);
         if (newParent == null) {
             throw new IllegalArgumentException("Parent folder not found: " + newParentId);
-        }
-        String statusCodeStr2 = FileSystemItem.getStatusCodeAsString(newParent.getStatusCode());
-        if (statusCodeStr2 != null) {
-            throw new IllegalArgumentException("Parent is busy: " + statusCodeStr2);
         }
         if (FileType.isNotDir(newParent.getFileType())) {
             throw new IllegalArgumentException("Parent is not a directory: " + newParentId);
@@ -513,13 +517,14 @@ public class FileService {
         if (newParent.getPath().contains(item.getId())) {
             throw new IllegalArgumentException("Cannot move item to a child of itself");
         }
-        Map<String, FileStatus> parentStatusMap = getCommonIds(newParent.getPath() + newParent.getId()).stream()
-                .collect(Collectors.toMap(id -> id, _ -> FileStatus.BEING_MOVED_INTO));
+        Set<String> parentIds = getCommonIds(newParent.getPath() + newParent.getId());
+        Map<String, Set<FileStatus>> parentStatusMap = parentIds.stream()
+                .collect(Collectors.toMap(id -> id, _ -> Set.of(FileStatus.BEING_MOVED_INTO)));
 
         Set<String> commonIds = getCommonIds(item.getPath() + item.getId() + newParent.getPath() + newParent.getId());
-        FolderLocks folderIsLocked = checkIfFileItemInLock(commonIds, parentStatusMap);
+        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(commonIds, parentStatusMap);
         if (folderIsLocked != null) {
-            throw new IllegalArgumentException("File is locked: " + folderIsLocked.getId());
+            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
         }
         if (itemWithNameExists(userId, newParentId, item.getName())) {
             throw new IllegalArgumentException("File already exists with name: " + item.getName());
@@ -531,7 +536,9 @@ public class FileService {
                 .set(FileItemField.PATH, newParent.getPath() + newParent.getId() + "/");
 
         if (!FileType.isNotDir(item.getFileType())) { // if a directory
-            lockFileItem(userId, commonIds, parentStatusMap);
+            fileLockService.lockFileItem(userId, commonIds, parentIds.stream().collect(Collectors.toMap(id -> id, _ -> FileStatus.BEING_MOVED_INTO)));
+            fileCacheService.invalidateFileCache(commonIds);
+
             publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
                     new MediaUpdateEvent.DirectoryMoved(
@@ -587,41 +594,8 @@ public class FileService {
         return commonIds;
     }
 
-    private void lockFileItem(String userId, Set<String> fileIds, Map<String, FileStatus> statusMap) {
-        if (fileIds.isEmpty()) return;
-        // Use UNORDERED to process everything even if some IDs already exist
-        BulkOperations bulkOps = safeWriteMongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, FolderLocks.class);
-
-        for (String id : fileIds) {
-            Query query = new Query(Criteria.where("id").is(id));
-            Update update = new Update()
-                    .setOnInsert(FileItemField.USER_ID, userId)
-                    .setOnInsert(FileItemField.STATUS_CODE, statusMap.getOrDefault(id, FileStatus.PROCESSING));
-            // use setOnInsert, if the ID exists, nothing happens.
-            // If it doesn't exist, a new document is created with these values.
-            bulkOps.upsert(query, update);
-        }
-        bulkOps.execute();
-    }
-
-    public void releaseLockedFileItem(Set<String> fileIds) {
-        if (fileIds.isEmpty()) return;
-        Query query = new Query(Criteria.where("id").in(fileIds));
-        safeWriteMongoTemplate.remove(query, FolderLocks.class);
-    }
-
-    private FolderLocks checkIfFileItemInLock(Set<String> fileIds, Map<String, FileStatus> ignoredStatusMap) {
-        if (fileIds.isEmpty()) return null;
-        Criteria criteria = Criteria.where("id").in(fileIds);
-        if (ignoredStatusMap != null && !ignoredStatusMap.isEmpty()) {
-            List<Criteria> excludeCriteria = new ArrayList<>();
-            ignoredStatusMap.forEach((id, status) -> {
-                excludeCriteria.add(Criteria.where("id").is(id).and(FileItemField.STATUS_CODE).is(status));
-            });
-            // "nor" ensures that none of these specific ID+Status pairs are returned
-            criteria.norOperator(excludeCriteria.toArray(new Criteria[0]));
-        }
-        return safeWriteMongoTemplate.findOne(new Query(criteria), FolderLocks.class);
+    private String getLockedInfoString(String userId, String fileId, FileStatus status) {
+        return "File " + fileCacheService.getCachedFileElseFromDatabase(userId, fileId, true).getName() + " is " + status;
     }
 
 
@@ -671,8 +645,7 @@ public class FileService {
         Update update = new Update()
                 .set(FileItemField.MEDIA_ID, mediaId)
                 .set(FileItemField.FILE_TYPE, fileType)
-                .set(FileItemField.LENGTH, length)
-                .unset(FileItemField.STATUS_CODE);
+                .set(FileItemField.LENGTH, length);
         if (thumbnailObject != null)
             update.set(FileItemField.THUMBNAIL, thumbnailObject);
         if (width != null && height != null)
@@ -712,23 +685,6 @@ public class FileService {
     }
 
 
-    private void updateStatusCode(String fileId, FileStatus status) {
-        Query query = new Query(Criteria.where("id").is(fileId));
-        Update update = new Update().set(FileItemField.STATUS_CODE, status.getValue());
-        safeWriteMongoTemplate.updateFirst(query, update, FileSystemItem.class);
-        fileCacheService.invalidateFileCache(fileId);
-    }
-
-    // since directories get set as in-use in caching for folder upload - reset all at startup for dangling status
-    @EventListener(ApplicationReadyEvent.class)
-    public void resetAllFileInUseStatus() {
-        mongoTemplate.updateMulti(
-                Query.query(Criteria
-                        .where(FileItemField.STATUS_CODE).is(FileStatus.IN_USE.getValue())),
-                new Update().unset(FileItemField.STATUS_CODE), FileSystemItem.class);
-    }
-
-
     public FileSystemItem findByMId(String userId, long mId) {
         Query query = new Query(Criteria
                 .where(FileItemField.USER_ID).is(Long.parseLong(userId))
@@ -747,7 +703,7 @@ public class FileService {
     public FileSystemItem findById(String userId, String id, boolean getCachedFirst) {
         if (id.equals(getROOT_FOLDER_ID()))
             return getRootDirectoryItem();
-        return fileCacheService.getFileCacheElseFromDatabase(userId, id, getCachedFirst);
+        return fileCacheService.getCachedFileElseFromDatabase(userId, id, getCachedFirst);
     }
 
     public List<FileSystemItem> getItemInIds(Collection<String> ids, boolean getCachedFirst, Criteria criteria, Predicate<FileSystemItem> filter) {
