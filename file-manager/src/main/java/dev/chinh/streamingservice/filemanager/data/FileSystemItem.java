@@ -2,7 +2,6 @@ package dev.chinh.streamingservice.filemanager.data;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
-import dev.chinh.streamingservice.filemanager.constant.FileStatus;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
 import lombok.*;
 import org.springframework.data.annotation.Id;
@@ -31,7 +30,7 @@ import java.time.Instant;
         // SortBy.LENGTH:
         @CompoundIndex(name = "user_parent_length_idx", def = "{'userId': 1, 'parentId': 1, 'length': 1}"),
         // SortBy.RESOLUTION: (Usually want the largest area to be first)
-        @CompoundIndex(name = "user_res_area_width_idx", def = "{'userId': 1, 'res.a': -1, 'res.w': -1}")
+        @CompoundIndex(name = "user_parent_res_area_width_idx", def = "{'userId': 1, 'parentId': 1, 'rs.a': -1, 'rs.w': -1}")
 })
 public class FileSystemItem {
 
@@ -46,7 +45,7 @@ public class FileSystemItem {
 
             @Field(FileItemField.AREA)
             @JsonProperty(ContentMetaData.AREA)
-            @Indexed long area) {
+            long area) {
         // Custom constructor to auto-calculate the area 'a'
         public ResolutionInfo(int width, int height) {
             this(width, height, (long) width * height);
@@ -104,17 +103,6 @@ public class FileSystemItem {
     @Field(FileItemField.UPLOAD_DATE)
     @JsonProperty(ContentMetaData.UPLOAD_DATE)
     private Instant uploadDate;
-
-    @Field(FileItemField.STATUS_CODE)
-    private Short statusCode;
-
-    public static String getStatusCodeAsString(Short statusCode) {
-        if (statusCode == null) return null;
-        if (statusCode == FileStatus.PROCESSING.getValue()) return "Processing as media in progress";
-        if (statusCode == FileStatus.DELETING.getValue()) return "Deleting in progress";
-        if (statusCode == FileStatus.IN_USE.getValue()) return "In use";
-        return null;
-    }
 
     public void setResolution(int w, int h) {
         this.resolution = new ResolutionInfo(w, h);
