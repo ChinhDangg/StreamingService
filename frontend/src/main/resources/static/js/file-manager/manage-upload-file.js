@@ -584,7 +584,7 @@ function addNameEntity(nameEntityNode, nameEntity, name, nameId) {
     editAreaContainer.querySelector('#currentArea').appendChild(tempEditNode);
 }
 
-function getNameEntityForMediaUpload() {
+export function getNameEntityForMediaUpload() {
     const body = [];
     nameEntityEditMap.forEach((value, key) => {
         const adding = [];

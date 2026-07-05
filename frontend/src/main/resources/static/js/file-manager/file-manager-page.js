@@ -6,6 +6,7 @@ import {
     getIsSearching,
     setIsSearching, getIsInDeepSearch, setIsInDeepSearch
 } from "/static/js/file-manager/search-file.js";
+import {getNameEntityForMediaUpload} from "/static/js/file-manager/manage-upload-file.js";
 
 const view = document.getElementById("file-view-container");
 const gridBtn = document.getElementById("grid-view-btn");
@@ -695,6 +696,7 @@ const addAsVideoButton = customRightMenu.querySelector('.add-as-video-btn');
 const addAsAlbumButton = customRightMenu.querySelector('.add-as-album-btn');
 const addAsGrouperButton = customRightMenu.querySelector('.add-as-grouper-btn');
 const openMediaButton = customRightMenu.querySelector('.open-media-btn');
+const addNameEntityButton = customRightMenu.querySelector('.add-name-entity-btn');
 const moveButton = customRightMenu.querySelector('.move-btn');
 const deleteFileButton = customRightMenu.querySelector('.delete-file-btn');
 
@@ -921,6 +923,37 @@ addAsGrouperButton.addEventListener('click', async function () {
         displayInfoMessage(await response.text());
     }
     displayInfoMessage(`Processing ${selectedFiles.size} dir(s) as grouper(s).`);
+});
+
+addNameEntityButton.addEventListener('click', async function () {
+    const body = getNameEntityForMediaUpload();
+    if (body === null) {
+        displayInfoMessage('Failed to get any name entity for media upload.', false);
+        return;
+    }
+
+    let count = 0;
+    for (const [fileId, fileInfo] of selectedFiles.entries()) {
+        if (!fileInfo.mediaId)
+            continue;
+        count++;
+        console.log(fileId);
+        console.log(fileInfo);
+
+        const response = await apiRequest(`/api/modify/media/update-batch/${fileInfo.mediaId}`, {
+            method: 'PUT',
+            body: JSON.stringify(body),
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        if (!response.ok) {
+            displayInfoMessage(`Failed to add name entity for media ${fileInfo.mediaId} with name ${fileInfo.fileName}: ` + await response.text(), false);
+        } else
+            displayInfoMessage(`Added name entity for media ${fileInfo.mediaId} with name ${fileInfo.fileName}.`);
+    }
+    if (count === 0)
+        displayInfoMessage('No file as media selected', false);
 });
 
 openMediaButton.addEventListener('click', async function () {
@@ -1230,6 +1263,10 @@ export function displayInfoMessage(message, hasTimeout = true, timeoutTime = 500
     }
 }
 
+infoMessageContainer.querySelector('.close-info-message-button').addEventListener('click', () => {
+    infoMessageContainer.classList.add('hidden');
+});
+
 async function processQueue() {
     if (messageQueue.length === 0) {
         isProcessingMessage = false;
@@ -1261,8 +1298,8 @@ async function processQueue() {
                 delay = currentItem.timeoutTime;
             }
         } else {
-            // Multiple messages → max 500ms
-            delay = 500;
+            // Multiple messages -> max 700ms
+            delay = 700;
         }
 
         await cancellableDelay(delay, currentController.signal);

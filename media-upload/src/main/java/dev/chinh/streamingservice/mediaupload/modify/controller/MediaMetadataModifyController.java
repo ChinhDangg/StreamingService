@@ -44,7 +44,7 @@ public class MediaMetadataModifyController {
     public ResponseEntity<Void> updateMediaNameEntityInfoInBatch(@PathVariable long id,
                                                                  @RequestBody List<MediaMetadataModifyService.UpdateList> updateLists,
                                                                  @AuthenticationPrincipal Jwt jwt) {
-        mediaMetadataModifyService.updateNameEntityInMediaInBatch(jwt.getSubject(), updateLists, id, false);
+        mediaMetadataModifyService.updateNameEntityInMediaInBatch(jwt.getSubject(), updateLists, id, true);
         return ResponseEntity.ok().build();
     }
 
