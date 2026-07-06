@@ -32,10 +32,6 @@ public class MediaSearchCacheService {
     }
 
     public void cacheMediaSearchItems(Collection<MediaSearchItem> items) {
-        for (MediaSearchItem item : items) {
-            cacheMediaSearchItem(item, Duration.ofMinutes(15));
-        }
-
         List<String> keys = new ArrayList<>(items.size());
         List<String> args = new ArrayList<>(items.size());
         args.add(String.valueOf(Duration.ofMinutes(15).getSeconds()));
@@ -82,7 +78,8 @@ public class MediaSearchCacheService {
                 "if redis.call('EXISTS', KEYS[1]) == 1 then " +
                 "    return redis.call('EXPIRE', KEYS[1], ARGV[2]) " + // If exists, just update TTL
                 "else " +
-                "    return redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2]) " + // If not, set value + TTL
+                "    local result = redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2]) " + // If not, set value + TTL
+                "    if result and result.ok == 'OK' then return 1 else return 0 end " +
                 "end";
         DefaultRedisScript<Long> script = new DefaultRedisScript<>(luaScript, Long.class);
 

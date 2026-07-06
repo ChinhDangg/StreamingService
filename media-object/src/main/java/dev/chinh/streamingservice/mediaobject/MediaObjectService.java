@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.mediaobject;
 
+import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
@@ -12,10 +13,12 @@ import dev.chinh.streamingservice.mediapersistence.repository.MediaMetaDataRepos
 import io.minio.messages.DeleteObject;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +29,7 @@ public class MediaObjectService {
     private final ThumbnailService thumbnailService;
 
     private final MediaMetaDataRepository mediaMetaDataRepository;
+    private final RedisTemplate<String, String> redisStringTemplate;
 
     private final ApplicationEventPublisher eventPublisher;
 
@@ -96,7 +100,10 @@ public class MediaObjectService {
     public void handleUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdated event) throws Exception {
         MediaMetaData mediaMetaData = getMediaMetadataById(Long.parseLong(event.userId()), event.mediaId());
 
-        boolean sameName = getFileExtension(event.thumbnailObject()).equals(getFileExtension(mediaMetaData.getThumbnail()));
+        String oldExtension = getFileExtension(mediaMetaData.getThumbnail());
+        String newExtension = getFileExtension(event.thumbnailObject());
+        boolean sameName = newExtension.equals(oldExtension);
+        String newThumbnailName = sameName ? mediaMetaData.getThumbnail() : event.num() != null ? createMediaThumbnailString(event.userId(), event.mediaType(), event.mediaId(), event.thumbnailObject()) : event.thumbnailObject();
 
         if (event.num() != null && event.mediaType() == MediaType.VIDEO) {
             thumbnailService.generateThumbnailFromVideo(
@@ -118,18 +125,30 @@ public class MediaObjectService {
                 mediaMetaData.setWidth(videoMetadata.width());
                 mediaMetaData.setHeight(videoMetadata.height());
             }
-            minIOService.copyObjectToAnotherBucket(event.bucket(), event.thumbnailObject(), ContentMetaData.THUMBNAIL_BUCKET, mediaMetaData.getThumbnail());
-        } else if (!sameName) {
-            minIOService.removeFile(event.bucket(), mediaMetaData.getThumbnail());
+            minIOService.copyObjectToAnotherBucket(event.bucket(), event.thumbnailObject(), ContentMetaData.THUMBNAIL_BUCKET, newThumbnailName);
+        }
+        if (!sameName) {
+            minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, mediaMetaData.getThumbnail());
 
-            mediaMetaDataRepository.updateMediaThumbnail(Long.parseLong(event.userId()), mediaMetaData.getId(), event.thumbnailObject());
+            mediaMetaDataRepository.updateMediaThumbnail(Long.parseLong(event.userId()), mediaMetaData.getId(), newThumbnailName);
         }
 
         String topic = sameName ? EventTopics.MEDIA_BACKUP_TOPIC : EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC;
         eventPublisher.publishEvent(new MediaObjectEventProducer.EventWrapper(
                 topic,
-                new MediaUpdateEvent.MediaThumbnailUpdatedReady(event.mediaId(), mediaMetaData.getThumbnail(), sameName ? mediaMetaData.getThumbnail() : event.thumbnailObject()))
+                new MediaUpdateEvent.MediaThumbnailUpdatedReady(event.mediaId(), mediaMetaData.getThumbnail(), newThumbnailName))
         );
+
+        String baseThumbnailCache = "/thumbnail-cache/";
+        String fileThumbnailCache = event.userId() + "/" + event.mediaId() + "_p144" + oldExtension;
+        String searchThumbnailCache = event.userId() + "/" + event.mediaId() + "_p360" + oldExtension;
+        String fileThumbnailWithBase = baseThumbnailCache.concat(fileThumbnailCache);
+        String searchThumbnailWithBase = baseThumbnailCache.concat(searchThumbnailCache);
+
+        OSUtil.deleteForceMemoryDirectory(fileThumbnailWithBase, null);
+        OSUtil.deleteForceMemoryDirectory(searchThumbnailWithBase, null);
+        redisStringTemplate.opsForZSet().remove("thumbnail-cache", fileThumbnailCache);
+        redisStringTemplate.opsForZSet().remove("thumbnail-cache", searchThumbnailCache);
     }
 
     public void handleDeleteThumbnail(MediaUpdateEvent.ThumbnailDeleted event) throws Exception {
@@ -149,5 +168,22 @@ public class MediaObjectService {
         int lastDotIndex = name.lastIndexOf(".");
         if (lastDotIndex == -1) return "";
         return name.substring(lastDotIndex);
+    }
+
+    private static final String defaultVidPath = "vid";
+    private static final String defaultAlbumPath = "album";
+    private static final String defaultGrouperPath = "grouper";
+    public static String createMediaThumbnailString(String userId, MediaType mediaType, long mediaId, String objectName) {
+        String extension = getFileExtension(objectName);
+        if (MediaType.detectMediaType(extension) != MediaType.IMAGE)
+            extension = ".jpg";
+        if (mediaType == MediaType.VIDEO) {
+            return userId + "/" + defaultVidPath + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb" + extension;
+        } else if (mediaType == MediaType.ALBUM) {
+            return userId + "/" + defaultAlbumPath + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb" + extension;
+        } else if (mediaType == MediaType.GROUPER) {
+            return userId + "/" + defaultGrouperPath + "/" + mediaId + "_" + UUID.randomUUID() + "_thumb" + extension;
+        }
+        return null;
     }
 }

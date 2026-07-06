@@ -232,7 +232,6 @@ async function fetchAlbumItemUrlsByResolution(albumId, resolution, page = 0) {
             return null;
         }
         setAlertStatus('Error', 'Failed to fetch album items: ' + err);
-        throw new Error(err);
     }
 }
 

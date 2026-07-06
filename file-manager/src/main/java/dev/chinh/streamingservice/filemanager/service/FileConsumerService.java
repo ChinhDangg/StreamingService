@@ -248,7 +248,7 @@ public class FileConsumerService {
                             .where(FileItemField.PATH).regex("^" + parentPath)
                             .and(FileItemField.FILE_TYPE).in(FileType.IMAGE, FileType.VIDEO))
                     .with(Sort.by(Sort.Direction.ASC, FileItemField.NAME))
-                    .skip(event.num() - 1)
+                    .skip(event.num()) // zero-based index
                     .limit(1);
             FileSystemItem numItem = mongoTemplate.findOne(query, FileSystemItem.class);
             if (numItem == null) {
