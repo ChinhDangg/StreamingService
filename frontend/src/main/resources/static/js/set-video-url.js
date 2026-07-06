@@ -141,6 +141,8 @@ export function pollPlaylistUrl(fetchUrl, disconnectAfterResult = null, maxWaitM
             }
         }
 
+        let jobStatusInfo = null;
+
         previewTimeout = setTimeout(() => {
             clearInterval(previewInterval);
             if (!cancelRequested) reject('Timeout');
@@ -152,10 +154,11 @@ export function pollPlaylistUrl(fetchUrl, disconnectAfterResult = null, maxWaitM
                 clearInterval(previewInterval);
                 clearTimeout(previewTimeout);
                 reject('cancelled');
+                disconnectStomp();
                 return;
             }
 
-            if (stompPayload && stompPayload.jobId === jobStatusInfo.jobId) {
+            if (stompPayload && jobStatusInfo && stompPayload.jobId === jobStatusInfo.jobId) {
                 clearInterval(previewInterval);
                 clearTimeout(previewTimeout);
                 resolve(stompPayload.result);
@@ -164,31 +167,35 @@ export function pollPlaylistUrl(fetchUrl, disconnectAfterResult = null, maxWaitM
             }
         }, intervalMs);
 
-        const response = await apiRequest(fetchUrl);
-        if (!response.ok) {
-            clearInterval(previewInterval);
-            clearTimeout(previewTimeout);
-            reject(await response.text());
-            return;
-        }
+        try {
+            await connectStompAsync();
 
-        const jobStatusInfo = await response.json();
-        if (jobStatusInfo.result !== 'PROCESSING') {
-            clearInterval(previewInterval);
-            clearTimeout(previewTimeout);
-            let result;
-            try {
-                result = JSON.parse(jobStatusInfo.result);
-            } catch (ignored) {
-                result = jobStatusInfo.result;
+            const response = await apiRequest(fetchUrl);
+            if (!response.ok) {
+                clearInterval(previewInterval);
+                clearTimeout(previewTimeout);
+                reject(await response.text());
+                return;
             }
-            disconnectSocket(result);
-            resolve(result);
-            return;
-        }
 
-        if (!stompClient || stompClient.connected === false)
-            connectStomp();
+            jobStatusInfo = await response.json();
+            if (jobStatusInfo.result !== 'PROCESSING') {
+                clearInterval(previewInterval);
+                clearTimeout(previewTimeout);
+                let result;
+                try {
+                    result = JSON.parse(jobStatusInfo.result);
+                } catch (ignored) {
+                    result = jobStatusInfo.result;
+                }
+                disconnectSocket(result);
+                resolve(result);
+            }
+        } catch (error) {
+            clearInterval(previewInterval);
+            clearTimeout(previewTimeout);
+            reject(error);
+        }
     });
 
     return {
@@ -201,40 +208,52 @@ export function pollPlaylistUrl(fetchUrl, disconnectAfterResult = null, maxWaitM
 
 let stompPayload = null;
 let stompClient = null;
-function connectStomp() {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const dynamicBrokerURL = `${protocol}//${host}/ws-stomp`;
+let stompConnectPromise = null;
 
-    stompClient = new Client({
-        brokerURL: dynamicBrokerURL,
-        // reconnectDelay: 5000
+function connectStompAsync() {
+    if (stompClient && stompClient.connected) {
+        return Promise.resolve();
+    }
+
+    // If a connection is already in progress, return the existing promise
+    if (stompConnectPromise) {
+        return stompConnectPromise;
+    }
+
+    stompConnectPromise = new Promise((resolve, reject) => {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.host;
+        const dynamicBrokerURL = `${protocol}//${host}/ws-stomp`;
+
+        stompClient = new Client({ brokerURL: dynamicBrokerURL });
+
+        stompClient.onConnect = (frame) => {
+            console.log('Connected successfully to STOMP broker: ' + frame);
+
+            stompClient.subscribe('/user/queue/job-reply', (message) => {
+                if (message.body) {
+                    const payload = JSON.parse(message.body);
+                    try { payload.result = JSON.parse(payload.result); } catch (ignored) {}
+                    stompPayload = payload;
+                    console.log('Received message: ', payload);
+                }
+            });
+
+            // RESOLVE THE PROMISE ONLY AFTER SUBSCRIBING
+            stompConnectPromise = null;
+            resolve();
+        };
+
+        stompClient.onStompError = (frame) => {
+            console.log('Broker error: ' + frame.headers['message']);
+            stompConnectPromise = null;
+            reject(frame.headers['message']);
+        };
+
+        stompClient.activate();
     });
 
-    stompClient.onConnect = (frame) => {
-        console.log('Connected successfully to STOMP broker: ' + frame);
-
-        stompClient.subscribe('/user/queue/job-reply', (message) => {
-            if (message.body) {
-                const payload = JSON.parse(message.body);
-                try {
-                    payload.result = JSON.parse(payload.result);
-                } catch (ignored) {}
-                stompPayload = payload;
-                console.log('Received message: ');
-                console.log(payload);
-            } else {
-                console.log('Received empty message');
-            }
-        });
-    }
-
-    stompClient.onStompError = (frame) => {
-        console.log('Broker reported error: ' + frame.headers['message']);
-        console.log('Additional details: ' + frame.body);
-    }
-
-    stompClient.activate();
+    return stompConnectPromise;
 }
 
 function disconnectStomp() {
