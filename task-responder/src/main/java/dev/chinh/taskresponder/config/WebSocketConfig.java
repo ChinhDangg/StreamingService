@@ -103,7 +103,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
             @Override
             public void afterConnectionClosed(@NonNull WebSocketSession session, @NonNull CloseStatus closeStatus) throws Exception {
-                try (var _ = activeSessions.remove(session.getId())) {}
+                var _ = activeSessions.remove(session.getId());
                 super.afterConnectionClosed(session, closeStatus);
             }
         });
