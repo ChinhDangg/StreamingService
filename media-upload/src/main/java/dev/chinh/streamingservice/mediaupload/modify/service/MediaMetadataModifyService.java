@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.mediaupload.modify.service;
 
+import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
@@ -18,6 +19,7 @@ import dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -37,6 +39,7 @@ public class MediaMetadataModifyService {
     private final MediaDisplayService mediaDisplayService;
     private final MinIOService minIOService;
 
+    private final RedisTemplate<String, String> redisStringTemplate;
     private final ApplicationEventPublisher eventPublisher;
 
     public List<NameEntityDTO> getMediaNameEntityInfo(String userIdStr, long mediaId, MediaNameEntityConstant nameEntity) {
@@ -259,6 +262,18 @@ public class MediaMetadataModifyService {
                         EventTopics.MEDIA_OBJECT_TOPIC,
                         new MediaUpdateEvent.MediaThumbnailUpdated(userId, mediaId, mediaType, null, mediaMetaData.getBucket(), newThumbnailName)
                 ));
+            } else {
+                String oldExtension = MediaUploadService.getFileExtension(mediaMetaData.getThumbnail());
+                String baseThumbnailCache = "/thumbnail-cache/";
+                String fileThumbnailCache = userId + "/" + mediaId + "_p144" + oldExtension;
+                String searchThumbnailCache = userId + "/" + mediaId + "_p360" + oldExtension;
+                String fileThumbnailWithBase = baseThumbnailCache.concat(fileThumbnailCache);
+                String searchThumbnailWithBase = baseThumbnailCache.concat(searchThumbnailCache);
+
+                OSUtil.deleteForceMemoryDirectory(fileThumbnailWithBase, null);
+                OSUtil.deleteForceMemoryDirectory(searchThumbnailWithBase, null);
+                redisStringTemplate.opsForZSet().remove("thumbnail-cache", fileThumbnailCache);
+                redisStringTemplate.opsForZSet().remove("thumbnail-cache", searchThumbnailCache);
             }
         } else if (mediaType == MediaType.VIDEO || mediaType == MediaType.ALBUM) {
             if (num < 0 || num >= mediaMetaData.getLength()) {
