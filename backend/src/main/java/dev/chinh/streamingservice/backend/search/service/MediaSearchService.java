@@ -154,7 +154,9 @@ public class MediaSearchService {
             Collection<MediaSearchItem> searchItems
     ) {}
 
-    private MapSearchResult mapResponseToMediaSearchResult(String userId, SearchResponse<Object> response, int page, int size) throws Exception {
+    private MapSearchResult mapResponseToMediaSearchResult(String userId, SearchResponse<Object> response, int page, int size) {
+        if (page > 50)
+            throw new IllegalArgumentException("Max page's'exceeded, please refine your search");
         List<MediaSearchItem> items = new ArrayList<>();
         List<MediaSearchItemResponse> itemResponses = new ArrayList<>();
         for (Hit<Object> hit : response.hits().hits()) {
