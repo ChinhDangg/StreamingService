@@ -250,10 +250,15 @@ public class MediaUploadService {
         MediaUploadService.MediaUploadRequest uploadRequest = new MediaUploadService.MediaUploadRequest(
                 event.bucket(), event.objectName(), event.fileName(), event.mediaType(), event.searchable()
         );
-        int lastDotIndex = event.fileName().lastIndexOf(".");
-        lastDotIndex = lastDotIndex == -1 ? event.fileName().length() : lastDotIndex;
+        String title;
+        if (event.mediaType() == MediaType.VIDEO) {
+            int lastDotIndex = event.fileName().lastIndexOf(".");
+            lastDotIndex = lastDotIndex == -1 ? event.fileName().length() : lastDotIndex;
+            title = event.fileName().substring(0, lastDotIndex).replaceAll("[-_]", " ");
+        } else
+            title = event.fileName().replaceAll("[-_]", " ");
         MediaBasicInfo mediaBasicInfo = new MediaBasicInfo(
-                event.fileName().substring(0, lastDotIndex).replaceAll("[-_]", " "),
+                title,
                 (short) event.uploadDate().atOffset(ZoneOffset.UTC).getYear()
         );
         long mediaId = saveMedia(event.userId(), uploadRequest, mediaBasicInfo, event.parentMediaId());
