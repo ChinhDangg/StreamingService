@@ -246,7 +246,7 @@ public class OpenSearchService {
         ));
 
         SortOptions standardTieBreaker = SortOptions.of(o -> o.field(f -> f
-                .field("_id")
+                .field("id")
                 .order(SortOrder.Asc)
         ));
 
