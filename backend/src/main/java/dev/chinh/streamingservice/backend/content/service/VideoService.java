@@ -27,9 +27,10 @@ public class VideoService extends MediaService {
         super(redisStringTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaSearchCacheService);
     }
 
-    public String getOriginalVideoUrl(String userId, long videoId) {
+    public JobStatus getOriginalVideoUrl(String userId, long videoId) {
         MediaDescription mediaDescription = getMediaDescription(userId, videoId);
-        return minIOService.getObjectUrl(mediaDescription.getBucket(), ContentMetaData.removeUserIdDirFromObjectKey(userId, mediaDescription.getKey()));
+        String url = minIOService.getObjectUrl(mediaDescription.getBucket(), ContentMetaData.removeUserIdDirFromObjectKey(userId, mediaDescription.getKey()));
+        return new JobStatus(getCacheMediaJobId(videoId, Resolution.original), url);
     }
 
     @Transactional
@@ -49,7 +50,7 @@ public class VideoService extends MediaService {
     public JobStatus getPartialVideoUrl(String userId, long videoId, Resolution res) throws Exception {
         String jobId = getCacheMediaJobId(videoId, res);
         if (res == Resolution.original)
-            return new JobStatus(jobId, getOriginalVideoUrl(userId, videoId));
+            return getOriginalVideoUrl(userId, videoId);
 
         MediaDescription mediaDescription = getMediaDescription(userId, videoId);
 
