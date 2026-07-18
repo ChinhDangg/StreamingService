@@ -706,6 +706,7 @@ public class FileService {
         return fileCacheService.getCachedFileElseFromDatabase(userId, id, getCachedFirst);
     }
 
+    // this does not check the items belong to a userId or not, use only after checking all ids belong to the userId
     public List<FileSystemItem> getItemInIds(Collection<String> ids, boolean getCachedFirst, Criteria criteria, Predicate<FileSystemItem> filter) {
         if (getCachedFirst)
             return fileCacheService.getCachedFilesElseFromDatabase(ids, criteria, filter);

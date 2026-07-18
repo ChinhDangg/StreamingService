@@ -31,7 +31,7 @@ public class DirectoryCacheService {
     private final FileLockService fileLockService;
 
     public String getCachedElseDbDirectoryId(String parentId, String dirName, String userId, boolean mustBeDirectory) {
-        String dirKey = getDirKey(dirName, parentId);
+        String dirKey = getDirKey(userId, dirName, parentId);
         var dirCached = (ApplicationConfig.DirectoryCached) directoryIdCache.get(dirKey, _ -> {
             Query query = Query.query(Criteria
                     .where(FileItemField.USER_ID).is(Long.parseLong(userId))
@@ -55,7 +55,7 @@ public class DirectoryCacheService {
     }
 
     public ApplicationConfig.DirectoryCached getCachedOrCreateDirectory(String dirName, String dirParentId, String dirPath, String userId) {
-        String dirKey = getDirKey(dirName, dirParentId);
+        String dirKey = getDirKey(userId, dirName, dirParentId);
         ApplicationConfig.EntryCached entry = directoryIdCache.get(dirKey, _ -> {
             // Only executes if the key is missing
             String fileId = getOrCreateFolder(userId, dirName, dirParentId, dirPath, FileType.DIR);
@@ -99,7 +99,7 @@ public class DirectoryCacheService {
     }
 
     public void addDirectoryToUserUsingList(String userId, String dirName, String dirParentId) {
-        String dirKey = getDirKey(dirName, dirParentId);
+        String dirKey = getDirKey(userId, dirName, dirParentId);
         // .get() is atomic for creation, and returns the existing item if present
         ApplicationConfig.EntryCached entry = directoryIdCache.get(userId, k ->
                 new ApplicationConfig.UserDirUsing(ConcurrentHashMap.newKeySet())
@@ -138,8 +138,8 @@ public class DirectoryCacheService {
         fileCacheService.invalidateFileCache(fileId);
     }
 
-    private String getDirKey(String dirName, String parentId) {
-        return "DIR_" + dirName + "|" + parentId;
+    private String getDirKey(String userId, String dirName, String parentId) {
+        return userId + "_DIR_" + dirName + "|" + parentId;
     }
 
 }

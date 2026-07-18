@@ -29,6 +29,7 @@ public class FileCacheService {
     private final Cache<String, FileSystemItem> fileCache;
     private final MongoTemplate mongoTemplate;
 
+    // this does not check the items belong to a userId or not, use only after checking all ids belong to the userId
     public List<FileSystemItem> getCachedFilesElseFromDatabase(Collection<String> ids, Criteria criteria, Predicate<FileSystemItem> filter) {
         Map<String, FileSystemItem> result = fileCache.getAll(ids, (keysToFetch) -> {
             Query query = new Query(Criteria.where("id").in(keysToFetch));
@@ -57,8 +58,12 @@ public class FileCacheService {
     public FileSystemItem getCachedFileElseFromDatabase(String userId, String id, boolean getCachedFirst) {
         // atomic: if multiple threads request the same ID, the compute function runs only once.
         // get, else compute, save, and return the result.
-        if (getCachedFirst)
-            return fileCache.get(id, k -> findById(userId, k));
+        if (getCachedFirst) {
+            var item = fileCache.get(id, k -> findById(userId, k));
+            if (item.getUserId() == null || item.getUserId().toString().equals(userId))
+                return item;
+            return null;
+        }
         var item = findById(userId, id);
         putFileCache(item);
         return item;
