@@ -97,6 +97,7 @@ public class NameEntityModifyService {
 
             eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     EventTopics.MEDIA_SEARCH_TOPIC,
+                    userId,
                     new MediaUpdateEvent.NameEntityCreated(userId, mediaNameEntityConstant, id, null)
             ));
         } catch (DataIntegrityViolationException e) {
@@ -137,6 +138,7 @@ public class NameEntityModifyService {
                     : EventTopics.MEDIA_SEARCH_TOPIC;
             eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     topic,
+                    userId,
                     new MediaUpdateEvent.NameEntityCreated(userId, mediaNameEntityConstant, id, thumbnailPath)
             ));
         } catch (Exception e) {
@@ -194,6 +196,7 @@ public class NameEntityModifyService {
 
         eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_SEARCH_TOPIC,
+                userId,
                 new MediaUpdateEvent.NameEntityUpdated(userId, mediaNameEntityConstant, id, null, null)
         ));
     }
@@ -247,11 +250,13 @@ public class NameEntityModifyService {
                         : EventTopics.MEDIA_SEARCH_TOPIC;
                 eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                         topic,
+                        userId,
                         new MediaUpdateEvent.NameEntityUpdated(userId, mediaNameEntityConstant, id, oldThumbnailPath, newThumbnailPath)
                 ));
                 if (thumbnailChanged)
                     eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                             EventTopics.MEDIA_OBJECT_TOPIC,
+                            userId,
                             new MediaUpdateEvent.ObjectDeleted(ContentMetaData.THUMBNAIL_BUCKET, List.of(oldThumbnailPath))
                     ));
             }
@@ -300,6 +305,7 @@ public class NameEntityModifyService {
 
         eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_SEARCH_TOPIC,
+                userId,
                 new MediaUpdateEvent.NameEntityDeleted(mediaNameEntityConstant, id, null)
         ));
     }
@@ -318,11 +324,13 @@ public class NameEntityModifyService {
                 : EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC;
         eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 topic,
+                userId,
                 new MediaUpdateEvent.NameEntityDeleted(mediaNameEntityConstant, id, thumbnailPath)
         ));
         if (thumbnailPath != null)
             eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     EventTopics.MEDIA_OBJECT_TOPIC,
+                    userId,
                     new MediaUpdateEvent.ObjectDeleted(ContentMetaData.THUMBNAIL_BUCKET, List.of(thumbnailPath))
             ));
     }

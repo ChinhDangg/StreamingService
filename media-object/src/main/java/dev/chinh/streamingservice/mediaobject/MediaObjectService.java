@@ -74,6 +74,7 @@ public class MediaObjectService {
                 : EventTopics.MEDIA_FILE_TOPIC; // not searchable - no thumbnail - no backup to save the thumbnail
         eventPublisher.publishEvent(new MediaObjectEventProducer.EventWrapper(
                 topic,
+                event.userId(),
                 new MediaUpdateEvent.MediaCreatedReady(
                         event.userId(),
                         event.fileId(),
@@ -136,6 +137,7 @@ public class MediaObjectService {
         String topic = sameName ? EventTopics.MEDIA_BACKUP_TOPIC : EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC;
         eventPublisher.publishEvent(new MediaObjectEventProducer.EventWrapper(
                 topic,
+                event.userId(),
                 new MediaUpdateEvent.MediaThumbnailUpdatedReady(event.mediaId(), mediaMetaData.getThumbnail(), newThumbnailName))
         );
 

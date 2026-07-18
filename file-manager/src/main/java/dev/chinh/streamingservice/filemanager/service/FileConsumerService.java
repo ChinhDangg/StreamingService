@@ -75,6 +75,7 @@ public class FileConsumerService {
         if (event.mediaId() != null && event.mediaType() != null) {
             publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_OBJECT_TOPIC,
+                    event.userId(),
                     new MediaUpdateEvent.MediaEnriched(
                             event.userId(),
                             fileItem.getId(),
@@ -131,6 +132,7 @@ public class FileConsumerService {
         if (hasMore) {
             publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_FILE_TOPIC,
+                    event.userId(),
                     new MediaUpdateEvent.DirectoryToMediaInitiated(
                             event.userId(), event.fileId(), event.mediaId(), event.mediaType(), event.searchable(), false, event.thumbnailObject(), size, skip)
             ));
@@ -155,6 +157,7 @@ public class FileConsumerService {
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_OBJECT_TOPIC,
+                event.userId(),
                 new MediaUpdateEvent.MediaEnriched(
                         event.userId(), item.getId(), event.mediaId(), event.mediaType(), event.thumbnailObject(), event.searchable(), size, skip)
         ));
@@ -187,6 +190,7 @@ public class FileConsumerService {
             if (child.getFileType() == FileType.DIR) {
                 publisher.publishEvent(new FileEventProducer.EventWrapper(
                         EventTopics.MEDIA_UPLOAD_TOPIC,
+                        event.userId(),
                         new MediaUpdateEvent.FileToMediaInitiated(
                                 event.userId(),
                                 child.getId(), event.childType(),
@@ -204,6 +208,7 @@ public class FileConsumerService {
         if (hasMore) {
             publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_FILE_TOPIC,
+                    event.userId(),
                     new MediaUpdateEvent.NestedDirectoryToMediaInitiated(
                             event.userId(), item.getId(), event.mediaId(), event.parentType(), event.childType(), event.childSearchable(), event.thumbnailObject(), skip)
             ));
@@ -212,6 +217,7 @@ public class FileConsumerService {
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_OBJECT_TOPIC,
+                event.userId(),
                 new MediaUpdateEvent.MediaEnriched(
                         event.userId(), item.getId(), event.mediaId(), event.parentType(), event.thumbnailObject(), true, -1, skip)
         ));
@@ -261,6 +267,7 @@ public class FileConsumerService {
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_OBJECT_TOPIC,
+                event.userId(),
                 new MediaUpdateEvent.MediaThumbnailUpdated(
                         event.userId(),
                         item.getMId(),
@@ -331,6 +338,7 @@ public class FileConsumerService {
             for (Map.Entry<String, List<String>> entry : toDelete.entrySet()) {
                 publisher.publishEvent(new FileEventProducer.EventWrapper(
                         EventTopics.MEDIA_OBJECT_TOPIC,
+                        userId,
                         new MediaUpdateEvent.ObjectDeleted(entry.getKey(), entry.getValue())
                 ));
             }
@@ -344,11 +352,13 @@ public class FileConsumerService {
         fileCacheService.invalidateFileCache(fileItem.getId());
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_OBJECT_TOPIC,
+                userId,
                 new MediaUpdateEvent.ObjectDeleted(fileItem.getBucket(), Collections.singletonList(fileItem.getObjectName()))
         ));
         if (fileItem.getThumbnail() != null)
             publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_OBJECT_AND_BACKUP_TOPIC,
+                    userId,
                     new MediaUpdateEvent.ThumbnailDeleted(fileItem.getThumbnail())
             ));
 
@@ -364,6 +374,7 @@ public class FileConsumerService {
             mongoTemplate.updateFirst(query, update, FileSystemItem.class);
             publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_UPLOAD_TOPIC,
+                    userId,
                     new MediaUpdateEvent.MediaFileLengthUpdate(userId, parent.getMId(), lengthDelta)
             ));
         }

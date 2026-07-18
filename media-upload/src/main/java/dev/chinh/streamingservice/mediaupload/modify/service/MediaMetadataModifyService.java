@@ -71,6 +71,7 @@ public class MediaMetadataModifyService {
 
         eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_SEARCH_TOPIC,
+                userId,
                 new MediaUpdateEvent.MediaTitleUpdated(userId, mediaId)
         ));
 
@@ -133,6 +134,7 @@ public class MediaMetadataModifyService {
         if (publishSearchUpdate)
             eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     EventTopics.MEDIA_SEARCH_TOPIC,
+                    userIdStr,
                     new MediaUpdateEvent.MediaNameEntityUpdated(userIdStr, mediaId, updateList.nameEntity)
             ));
 
@@ -187,6 +189,7 @@ public class MediaMetadataModifyService {
             Integer newLength = mediaMetaDataRepository.updateLengthWithDeltaReturning(userId, grouperMediaId, -1);
             eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     EventTopics.MEDIA_SEARCH_TOPIC,
+                    userIdStr,
                     new MediaUpdateEvent.LengthUpdated(grouperMediaId, newLength)
             ));
         }
@@ -215,6 +218,7 @@ public class MediaMetadataModifyService {
 
         eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_SEARCH_TOPIC,
+                String.valueOf(userId),
                 new MediaUpdateEvent.LengthUpdated(mediaId, newLength)
         ));
         mediaDisplayService.removeCacheGroupOfMedia(mediaId);
@@ -228,6 +232,7 @@ public class MediaMetadataModifyService {
 
         eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_SEARCH_TOPIC,
+                userId,
                 new MediaUpdateEvent.MediaPreviewUpdated(userId, mediaId, previewObject)
         ));
         mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
@@ -260,6 +265,7 @@ public class MediaMetadataModifyService {
             if (newThumbnailName != null && !newThumbnailName.equals(mediaMetaData.getThumbnail())) {
                 eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                         EventTopics.MEDIA_OBJECT_TOPIC,
+                        userId,
                         new MediaUpdateEvent.MediaThumbnailUpdated(userId, mediaId, mediaType, null, mediaMetaData.getBucket(), newThumbnailName)
                 ));
             } else {
@@ -282,6 +288,7 @@ public class MediaMetadataModifyService {
             if (mediaType == MediaType.VIDEO) {
                 eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                         EventTopics.MEDIA_OBJECT_TOPIC,
+                        userId,
                         new MediaUpdateEvent.MediaThumbnailUpdated(
                                 userId,
                                 mediaMetaData.getId(),
@@ -295,6 +302,7 @@ public class MediaMetadataModifyService {
             if (mediaType == MediaType.ALBUM) {
                 eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                         EventTopics.MEDIA_FILE_TOPIC,
+                        userId,
                         new MediaUpdateEvent.MediaThumbnailUpdateInitiated(
                                 userId,
                                 mediaMetaData.getId(),

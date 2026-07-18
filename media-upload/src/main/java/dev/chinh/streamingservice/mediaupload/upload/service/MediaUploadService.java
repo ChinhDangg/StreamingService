@@ -112,6 +112,7 @@ public class MediaUploadService {
         long size = minIOService.getObjectSize(bucket, objectName);
         publisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
+                userId,
                 new MediaUpdateEvent.FileCreated(userId, bucket, objectName, fileName, size, null, null, null, isLast)
         ));
 
@@ -151,6 +152,7 @@ public class MediaUploadService {
 
         publisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
+                userId,
                 new MediaUpdateEvent.FileCreated(
                         userId,
                         bucket, objectName,
@@ -271,6 +273,7 @@ public class MediaUploadService {
         if (event.mediaType() == MediaType.VIDEO) {
             publisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     EventTopics.MEDIA_OBJECT_TOPIC,
+                    event.userId(),
                     new MediaUpdateEvent.MediaEnriched(
                             event.userId(),
                             event.fileId(),
@@ -285,6 +288,7 @@ public class MediaUploadService {
         } else if (event.mediaType() == MediaType.ALBUM) {
             publisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     EventTopics.MEDIA_FILE_TOPIC,
+                    event.userId(),
                     new MediaUpdateEvent.DirectoryToMediaInitiated(
                             event.userId(),
                             event.fileId(),
@@ -300,6 +304,7 @@ public class MediaUploadService {
         } else if (event.mediaType() == MediaType.GROUPER) {
             publisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
                     EventTopics.MEDIA_FILE_TOPIC,
+                    event.userId(),
                     new MediaUpdateEvent.NestedDirectoryToMediaInitiated(
                             event.userId(),
                             event.fileId(),

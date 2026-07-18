@@ -13,16 +13,16 @@ public class MediaUploadEventProducer {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    public record EventWrapper(String topic, Object event) {}
-    public record ImmediateEventWrapper(String topic, Object event) {}
+    public record EventWrapper(String topic, String eventKey, Object event) {}
+    public record ImmediateEventWrapper(String topic, String eventKey, Object event) {}
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publishTransactionalEventListener(EventWrapper event) {
-        kafkaTemplate.send(event.topic, event.event);
+        kafkaTemplate.send(event.topic, event.eventKey, event.event);
     }
 
     @EventListener
     public void publishImmediateEvent(ImmediateEventWrapper event) {
-        kafkaTemplate.send(event.topic, event.event);
+        kafkaTemplate.send(event.topic, event.eventKey, event.event);
     }
 }

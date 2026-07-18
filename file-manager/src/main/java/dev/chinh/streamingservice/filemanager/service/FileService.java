@@ -235,6 +235,7 @@ public class FileService {
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
+                userId,
                 new MediaUpdateEvent.FileToMediaInitiated(
                         userId,
                         fileId, MediaType.VIDEO,
@@ -285,6 +286,7 @@ public class FileService {
             if (parent.getFileType() == FileType.GROUPER) {
                 publisher.publishEvent(new FileEventProducer.EventWrapper(
                         EventTopics.MEDIA_UPLOAD_TOPIC,
+                        userId,
                         new MediaUpdateEvent.FileToMediaInitiated(
                                 userId,
                                 fileId, MediaType.ALBUM,
@@ -299,6 +301,7 @@ public class FileService {
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
+                userId,
                 new MediaUpdateEvent.FileToMediaInitiated(
                         userId,
                         fileId, MediaType.ALBUM,
@@ -355,6 +358,7 @@ public class FileService {
         FileSystemItem first = findFirstImageOrVideo(userId, getPathForFileItem(item.getPath(), item.getId()));
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_UPLOAD_TOPIC,
+                userId,
                 new MediaUpdateEvent.FileToMediaInitiated(
                         userId,
                         fileId, MediaType.GROUPER,
@@ -401,6 +405,7 @@ public class FileService {
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_BACKUP_TOPIC,
+                userId,
                 new MediaUpdateEvent.DirectoryCreated(saved.getId(), addUserIdToPath(userId, getFullPathInName(saved, true)))
         ));
 
@@ -434,6 +439,7 @@ public class FileService {
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_BACKUP_TOPIC,
+                userId,
                 new MediaUpdateEvent.FileRenamed(item.getId(), addUserIdToPath(userId, getFullPathInName(item, true)), newName)
         ));
 
@@ -465,6 +471,7 @@ public class FileService {
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
+                userId,
                 new MediaUpdateEvent.FileDeleted(userId, item.getId(), addUserIdToPath(userId, getFullPathInName(item, true)), FileType.isNotDir(item.getFileType()), null)
         ));
     }
@@ -493,6 +500,7 @@ public class FileService {
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC,
+                userId,
                 new MediaUpdateEvent.FileDeleted(
                         userId, item.getId(), addUserIdToPath(userId, getFullPathInName(item, true)), FileType.isNotDir(item.getFileType()), item.getMId())
         ));
@@ -541,6 +549,7 @@ public class FileService {
 
             publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
+                    userId,
                     new MediaUpdateEvent.DirectoryMoved(
                             userId, fileId, newParentId, item.getPath(), addUserIdToPath(userId, getFullPathInName(item, true)), addUserIdToPath(userId, getFullPathInName(newParent, true))
                     )
@@ -552,6 +561,7 @@ public class FileService {
                     boolean newParentIsGrouper = newParent.getFileType() == FileType.GROUPER;
                     publisher.publishEvent(new FileEventProducer.EventWrapper(
                             EventTopics.MEDIA_UPLOAD_TOPIC,
+                            userId,
                             new MediaUpdateEvent.GrouperItemMoved(userId, item.getMId(), newParentIsGrouper ? newParent.getMId() : null, item.getName())
                     ));
                     if (!newParentIsGrouper) {
@@ -566,6 +576,7 @@ public class FileService {
         } else {
             publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_BACKUP_TOPIC,
+                    userId,
                     new MediaUpdateEvent.FileMoved(
                             fileId, addUserIdToPath(userId, getFullPathInName(item, true)), addUserIdToPath(userId, getFullPathInName(newParent, true))
                     )

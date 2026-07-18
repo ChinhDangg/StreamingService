@@ -12,10 +12,10 @@ public class MediaObjectEventProducer {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    public record EventWrapper(String topic, Object event) {}
+    public record EventWrapper(String topic, String eventKey, Object event) {}
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publishEventListener(EventWrapper event) {
-        kafkaTemplate.send(event.topic, event.event);
+        kafkaTemplate.send(event.topic, event.eventKey, event.event);
     }
 }

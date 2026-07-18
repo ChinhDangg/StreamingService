@@ -120,7 +120,7 @@ public class KafkaConfig {
                 new DeadLetterPublishingRecoverer(dlqKafkaTemplate,
                         (record, ex) -> new TopicPartition(
                                 MEDIA_FILE_DLQ_TOPIC,
-                                record.partition()
+                                -1
                         )
                 );
 
