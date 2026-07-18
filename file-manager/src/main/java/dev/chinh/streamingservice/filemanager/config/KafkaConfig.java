@@ -94,6 +94,12 @@ public class KafkaConfig {
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
         props.put(ProducerConfig.ACKS_CONFIG, "all");
         props.put(ProducerConfig.RETRIES_CONFIG, 3);
+        props.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100);
+        props.put(ProducerConfig.RETRY_BACKOFF_MAX_MS_CONFIG, 1000);
+        props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 30000);
+
+        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        props.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
 
         return new DefaultKafkaProducerFactory<>(props, new StringSerializer(), new JsonSerializer<>());
     }

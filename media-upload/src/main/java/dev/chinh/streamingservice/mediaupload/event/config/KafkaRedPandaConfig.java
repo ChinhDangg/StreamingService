@@ -39,6 +39,15 @@ public class KafkaRedPandaConfig {
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
         props.put(ProducerConfig.RETRIES_CONFIG, 3);
         props.put(ProducerConfig.ACKS_CONFIG, "all");
+        props.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100);
+        props.put(ProducerConfig.RETRY_BACKOFF_MAX_MS_CONFIG, 1000);
+        props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 30000);
+
+        // assigns a unique Producer ID (PID) to application.
+        // Every message batch sent by the producer gets a Sequence Number
+        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        // can have up to 5 batches traveling through the pipeline at the exact same time
+        props.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
 
         return new DefaultKafkaProducerFactory<>(
                 props,
