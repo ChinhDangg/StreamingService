@@ -21,23 +21,22 @@ public class MediaSearchCacheService {
     private final RedisTemplate<String, String> redisStringTemplate;
     private final ObjectMapper objectMapper;
 
-    public void cacheMediaSearchItem(MediaSearchItem item) {
-        String id = "media::" + item.getId();
+    public void cacheMediaSearchItem(String userId, MediaSearchItem item) {
         try {
             String json = objectMapper.writeValueAsString(item);
-            redisStringTemplate.opsForValue().set(id, json, Duration.ofHours(1));
+            redisStringTemplate.opsForValue().set(getCacheItemString(userId, item.getId()), json, Duration.ofHours(1));
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to parse json", e);
         }
     }
 
-    public void cacheMediaSearchItems(Collection<MediaSearchItem> items) {
+    public void cacheMediaSearchItems(String userId, Collection<MediaSearchItem> items) {
         List<String> keys = new ArrayList<>(items.size());
         List<String> args = new ArrayList<>(items.size());
         args.add(String.valueOf(Duration.ofMinutes(15).getSeconds()));
 
         items.forEach(item -> {
-            keys.add("media::" + item.getId());
+            keys.add(getCacheItemString(userId, item.getId()));
             try {
                 args.add(objectMapper.writeValueAsString(item));
             } catch (JsonProcessingException e) {
@@ -63,11 +62,10 @@ public class MediaSearchCacheService {
         return new DefaultRedisScript<>(luaScript, Long.class);
     }
 
-    public void cacheMediaSearchItem(MediaSearchItem item, Duration duration) {
-        String id = "media::" + item.getId();
+    public void cacheMediaSearchItem(String userId, MediaSearchItem item, Duration duration) {
         try {
             String json = objectMapper.writeValueAsString(item);
-            setOrRefreshTtl(id, json, duration.getSeconds());
+            setOrRefreshTtl(getCacheItemString(userId, item.getId()), json, duration.getSeconds());
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to parse json", e);
         }
@@ -90,8 +88,8 @@ public class MediaSearchCacheService {
         );
     }
 
-    public MediaSearchItem getCachedMediaSearchItem(long id) {
-        String json = redisStringTemplate.opsForValue().get("media::" + id);
+    public MediaSearchItem getCachedMediaSearchItem(String userId, long id) {
+        String json = redisStringTemplate.opsForValue().get(getCacheItemString(userId, id));
         if (json == null)
             return null;
         try {
@@ -101,7 +99,11 @@ public class MediaSearchCacheService {
         }
     }
 
-    public void removeCachedMediaSearchItem(long id) {
-        redisStringTemplate.delete("media::" + id);
+    private String getCacheItemString(String userId, long id) {
+        return "media::" + userId + ":" + id;
+    }
+
+    public void removeCachedMediaSearchItem(String userId, long id) {
+        redisStringTemplate.delete(getCacheItemString(userId, id));
     }
 }

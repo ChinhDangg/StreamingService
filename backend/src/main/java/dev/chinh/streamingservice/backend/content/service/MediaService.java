@@ -13,16 +13,20 @@ import dev.chinh.streamingservice.mediapersistence.entity.MediaDescription;
 import dev.chinh.streamingservice.mediapersistence.entity.MediaMetaData;
 import dev.chinh.streamingservice.mediapersistence.repository.MediaMetaDataRepository;
 import lombok.RequiredArgsConstructor;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.connection.stream.StreamRecords;
 import org.springframework.data.redis.core.RedisTemplate;
 
 import java.util.Collections;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 @RequiredArgsConstructor
 public abstract class MediaService {
 
     private final RedisTemplate<String, String> redisStringTemplate;
+    private final RedissonClient redissonClient;
     protected final ObjectMapper objectMapper;
     protected final MediaMapper mediaMapper;
     protected final MediaMetaDataRepository mediaRepository;
@@ -90,9 +94,35 @@ public abstract class MediaService {
     }
 
     protected MediaDescription getMediaDescription(String userId, long mediaId) {
-        MediaDescription mediaDescription = mediaSearchCacheService.getCachedMediaSearchItem(mediaId);
-        if (mediaDescription == null)
-            mediaDescription = findMediaMetaDataAllInfo(userId, mediaId);
+        MediaDescription mediaDescription = mediaSearchCacheService.getCachedMediaSearchItem(userId, mediaId);
+        if (mediaDescription != null)
+            return mediaDescription;
+
+        String lockKey = "media_lock:" + mediaId;
+        RLock lock = redissonClient.getLock(lockKey);
+
+        try {
+            if (lock.tryLock(5, 10, TimeUnit.SECONDS)) {
+                try {
+                    // double-check lock
+                    mediaDescription = mediaSearchCacheService.getCachedMediaSearchItem(userId, mediaId);
+                    if (mediaDescription != null)
+                        return mediaDescription;
+
+                    // query the database and then save the result to cache
+                    mediaDescription = findMediaMetaDataAllInfo(userId, mediaId);
+                } finally {
+                    lock.unlock();
+                }
+            } else {
+                // if can't get the lock, query the database and then save the result to cache
+                System.err.println("Failed to get lock for media id: " + mediaId);
+                mediaDescription = findMediaMetaDataAllInfo(userId, mediaId);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Thread interrupted while waiting for lock: " + lockKey + " for media id: " + mediaId);
+        }
         return mediaDescription;
     }
 
@@ -106,7 +136,7 @@ public abstract class MediaService {
             mediaSearchItem.setMediaGroupInfo(
                     new MediaGroupInfo(null, mediaMetaData.getGrouperId(), mediaMetaData.getGroupInfo().getNumInfo()));
         }
-        mediaSearchCacheService.cacheMediaSearchItem(mediaSearchItem);
+        mediaSearchCacheService.cacheMediaSearchItem(userId, mediaSearchItem);
         return mediaMetaData;
     }
 }

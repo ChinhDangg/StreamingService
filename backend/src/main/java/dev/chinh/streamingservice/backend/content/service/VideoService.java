@@ -9,6 +9,7 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import dev.chinh.streamingservice.mediapersistence.entity.MediaDescription;
 import dev.chinh.streamingservice.mediapersistence.repository.MediaMetaDataRepository;
+import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,12 +20,13 @@ public class VideoService extends MediaService {
     public final String ffmpegQueueKey = ContentMetaData.FFMPEG_VIDEO_QUEUE_KEY;
 
     public VideoService(RedisTemplate<String, String> redisStringTemplate,
+                        RedissonClient redissonClient,
                         ObjectMapper objectMapper,
                         MediaMapper mediaMapper,
                         MediaMetaDataRepository mediaRepository,
                         MinIOService minIOService,
                         MediaSearchCacheService mediaSearchCacheService) {
-        super(redisStringTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaSearchCacheService);
+        super(redisStringTemplate, redissonClient, objectMapper, mediaMapper, mediaRepository, minIOService, mediaSearchCacheService);
     }
 
     public JobStatus getOriginalVideoUrl(String userId, long videoId) {

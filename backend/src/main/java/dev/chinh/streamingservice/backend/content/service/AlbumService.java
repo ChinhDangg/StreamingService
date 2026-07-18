@@ -10,6 +10,7 @@ import dev.chinh.streamingservice.backend.search.service.MediaSearchCacheService
 import dev.chinh.streamingservice.mediapersistence.entity.MediaDescription;
 import dev.chinh.streamingservice.mediapersistence.repository.MediaMetaDataRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -19,13 +20,14 @@ public class AlbumService extends MediaService {
     private final VideoService videoService;
 
     public AlbumService(RedisTemplate<String, String> redisStringTemplate,
+                        RedissonClient redissonClient,
                         ObjectMapper objectMapper,
                         MediaMapper mediaMapper,
                         MediaMetaDataRepository mediaRepository,
                         MinIOService minIOService,
                         MediaSearchCacheService mediaSearchCacheService,
                         VideoService videoService) {
-        super(redisStringTemplate, objectMapper, mediaMapper, mediaRepository, minIOService, mediaSearchCacheService);
+        super(redisStringTemplate, redissonClient, objectMapper, mediaMapper, mediaRepository, minIOService, mediaSearchCacheService);
         this.videoService = videoService;
     }
 

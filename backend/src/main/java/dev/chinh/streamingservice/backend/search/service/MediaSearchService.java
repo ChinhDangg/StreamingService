@@ -86,7 +86,7 @@ public class MediaSearchService {
 
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
             thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
-        mediaSearchCacheService.cacheMediaSearchItems(mapSearchResult.searchItems);
+        mediaSearchCacheService.cacheMediaSearchItems(userId, mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 
@@ -120,7 +120,7 @@ public class MediaSearchService {
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
             thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
 
-        mediaSearchCacheService.cacheMediaSearchItems(mapSearchResult.searchItems);
+        mediaSearchCacheService.cacheMediaSearchItems(userId, mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 
@@ -134,7 +134,7 @@ public class MediaSearchService {
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
             thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
 
-        mediaSearchCacheService.cacheMediaSearchItems(mapSearchResult.searchItems);
+        mediaSearchCacheService.cacheMediaSearchItems(userId, mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 
@@ -145,7 +145,7 @@ public class MediaSearchService {
         if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
             thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
 
-        mediaSearchCacheService.cacheMediaSearchItems(mapSearchResult.searchItems);
+        mediaSearchCacheService.cacheMediaSearchItems(userId, mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 

@@ -13,6 +13,8 @@ import dev.chinh.streamingservice.backend.serve.data.MediaDisplayContent;
 import dev.chinh.streamingservice.mediapersistence.entity.MediaDescription;
 import dev.chinh.streamingservice.mediapersistence.repository.MediaGroupMetaDataRepository;
 import lombok.RequiredArgsConstructor;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.*;
 import org.springframework.data.redis.core.*;
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Service;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +38,7 @@ public class MediaDisplayService {
     private final ObjectMapper objectMapper;
     private final MediaMapper mediaMapper;
     private final RedisTemplate<String, String> redisStringTemplate;
+    private final RedissonClient redissonClient;
     private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
 
     @Value("${always-show-original-resolution}")
@@ -71,15 +75,14 @@ public class MediaDisplayService {
         return mediaDisplayContent;
     }
 
-    private void addCacheGroupOfMedia(long mediaId, int page, Sort.Direction sortOrder, GroupSlice mediaIds) throws JsonProcessingException {
-        String id = "grouper::" + mediaId;
+    private void addCacheGroupOfMedia(String userId, long mediaId, int page, Sort.Direction sortOrder, GroupSlice mediaIds) throws JsonProcessingException {
+        String id = getCacheGroupOfMediaString(userId, mediaId);
         redisStringTemplate.opsForHash().put(id, page + ":" + sortOrder, objectMapper.writeValueAsString(mediaIds));
         redisStringTemplate.expire(id, Duration.ofMinutes(15));
     }
 
-    public GroupSlice getCacheGroupOfMedia(long mediaId, int page, Sort.Direction sortOrder) {
-        String id = "grouper::" + mediaId;
-        Object json = redisStringTemplate.opsForHash().get(id, page + ":" + sortOrder);
+    public GroupSlice getCacheGroupOfMedia(String userId, long mediaId, int page, Sort.Direction sortOrder) {
+        Object json = redisStringTemplate.opsForHash().get(getCacheGroupOfMediaString(userId, mediaId), page + ":" + sortOrder);
 
         if (json == null)
             return null;
@@ -90,12 +93,43 @@ public class MediaDisplayService {
         }
     }
 
+    private String getCacheGroupOfMediaString(String userId, long mediaId) {
+        return "grouper::" + userId + ":" + mediaId;
+    }
+
     public GroupSlice getNextGroupOfMedia(String userId, long mediaId, int page, Sort.Direction sortOrder) throws JsonProcessingException {
-        GroupSlice cachedGroupOfMedia = getCacheGroupOfMedia(mediaId, page, sortOrder);
-        if (cachedGroupOfMedia != null) {
-            return cachedGroupOfMedia;
+        GroupSlice groupSlice = getCacheGroupOfMedia(userId, mediaId, page, sortOrder);
+        if (groupSlice != null) {
+            return groupSlice;
         }
 
+        String lockKey = "grouper_lock:" + mediaId;
+        RLock lock = redissonClient.getLock(lockKey);
+        try {
+            if (lock.tryLock(5, 10, TimeUnit.SECONDS)) {
+                try {
+                    groupSlice = getCacheGroupOfMedia(userId, mediaId, page, sortOrder);
+                    if (groupSlice != null) {
+                        return groupSlice;
+                    }
+
+                    groupSlice = findNextGroupOfMedia(userId, mediaId, page, sortOrder);
+                } finally {
+                    lock.unlock();
+                }
+            } else {
+                System.err.println("Failed to get lock for grouper media id: " + mediaId);
+                groupSlice = findNextGroupOfMedia(userId, mediaId, page, sortOrder);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Thread interrupted while waiting for lock: " + lockKey + " for media id: " + mediaId);
+        }
+
+        return groupSlice;
+    }
+
+    private GroupSlice findNextGroupOfMedia(String userId, long mediaId, int page, Sort.Direction sortOrder) throws JsonProcessingException {
         MediaDescription mediaItem = albumService.getMediaDescriptionGeneral(userId, mediaId);
         if (!mediaItem.isGrouper()) {
             throw new ResourceNotFoundException("No media grouper found with id: " + mediaId);
@@ -106,7 +140,7 @@ public class MediaDisplayService {
         Slice<Long> groupOfMedia = mediaGroupMetaDataRepository.findMediaMetadataIdsByGrouperMetaDataId(mediaItem.getGrouperId(), pageable);
         GroupSlice groupSlice = new GroupSlice(groupOfMedia.getContent(), page, maxBatchSize, groupOfMedia.hasNext());
 
-        addCacheGroupOfMedia(mediaId, page, sortOrder, groupSlice);
+        addCacheGroupOfMedia(userId, mediaId, page, sortOrder, groupSlice);
         return groupSlice;
     }
 
