@@ -127,6 +127,11 @@ export function displayFileItem(fileItems, fileItemManager = null, clearNode = t
         fileNode.dataset.name = item.name;
         showSelectedViews(fileNode, item, selectedViews);
         fileViewContainer.appendChild(fileNode);
+
+        if (selectedFiles.has(item.id)) {
+            fileNode.classList.add('border-[3px]', 'border-white');
+            selectedFiles.get(item.id).fileNode = fileNode;
+        }
     }
 
     if (useGlobalMapItems && fileItemManager !== null) {
@@ -569,7 +574,7 @@ function addSelectedFile(fileId, mediaId, fileType, fileName, fileNode) {
     if (selectedFiles.has(fileId))
         return false;
     selectedFiles.set(fileId, {mediaId: mediaId, fileType: fileType, fileName: fileName, fileNode: fileNode});
-    fileNode.classList.add('border-[3px]', 'border-white')
+    fileNode.classList.add('border-[3px]', 'border-white');
     selectFileBanner.querySelector('.selected-count-text').textContent = selectedFiles.size.toString();
     selectFileBanner.classList.remove('hidden');
     return true;
