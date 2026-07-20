@@ -1119,23 +1119,3 @@ async function requestVideoPreview(videoId, thumbnailContainer) {
 window.addEventListener('popstate', () => {
     closeOverlay();
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
