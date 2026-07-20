@@ -1,4 +1,5 @@
 import {apiRequest} from "/static/js/common.js";
+import SparkMD5 from '/static/js/file-manager/spark-md5.js';
 
 export async function endVideoUploadSession(uploadId, uploadedParts, basicInfo, nameUpdateList, isLast = false) {
     const endResponse = await apiRequest('/api/upload/media/end-session-video', {
@@ -133,15 +134,22 @@ export async function uploadFile(sessionId, file, fileName,
                 const urlRes = await urlResponse.text();
 
 
+                const calculatedMd5 = await calculateChunkMd5(c.blob);
                 const res = await apiRequest(urlRes, {
                     method: 'PUT',
                     body: c.blob
                 });
                 if (!res.ok) throw new Error('Upload: ' + await res.text());
 
+                const uploadedEtag = res.headers.get('ETag').replace(/"/g, '');
+                if (calculatedMd5 !== uploadedEtag) {
+                    throw new Error(`Integrity check failed for Part ${c.partNumber}! Expected ${calculatedMd5}, got ${uploadedEtag}`);
+                    // handle auto retry later, for now just view the error and manually retry in file manager by user
+                }
+
                 eTags.push({
                     partNumber: c.partNumber,
-                    etag: res.headers.get('ETag').replace(/"/g, '')
+                    etag: uploadedEtag,
                 });
 
                 if (uploadingFiles) uploadingFiles.get(fileName).partNumber++;
@@ -167,6 +175,11 @@ export async function uploadFile(sessionId, file, fileName,
     eTags.sort((a, b) => a.partNumber - b.partNumber);
 
     return true;
+}
+
+async function calculateChunkMd5(blob) {
+    const arrayBuffer = await blob.arrayBuffer();
+    return SparkMD5.ArrayBuffer.hash(arrayBuffer); // Returns hex string like '5ac2c830f5b4...'
 }
 
 function chunkFile(file) {
