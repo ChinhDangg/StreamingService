@@ -124,8 +124,8 @@ public class FileFindService {
             ));
         } else {
             // Atlas Search 'equals' operator for exact parent_id match
-            filterClauses.add(new Document("equals",
-                    new Document("value", parent.getId())
+            filterClauses.add(new Document("text",
+                    new Document("query", parent.getId())
                             .append("path", FileItemField.PARENT_ID)
             ));
         }
