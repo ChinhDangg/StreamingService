@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.filemanager.controller;
 
+import dev.chinh.streamingservice.filemanager.service.FileFindService;
 import dev.chinh.streamingservice.filemanager.service.FileService;
 import dev.chinh.streamingservice.filemanager.constant.SortBy;
 import jakarta.validation.Valid;
@@ -18,41 +19,40 @@ import org.springframework.web.bind.annotation.*;
 public class FileManagerController {
 
     private final FileService fileService;
+    private final FileFindService fileFindService;
 
     @GetMapping("/root")
-    public ResponseEntity<?> getRootDirectory(@RequestParam(required = false, name = "p") Integer page,
+    public ResponseEntity<?> getRootDirectory(@RequestParam(required = false, name = "p") String pageCursor,
                                               @RequestParam(required = false, name = "by") SortBy sortBy,
                                               @RequestParam(required = false, name = "order") Sort.Direction sortOrder,
                                               @AuthenticationPrincipal Jwt jwt) {
-        if (page == null) page = 0;
         if (sortBy == null) sortBy = SortBy.NAME;
         if (sortOrder == null) sortOrder = Sort.Direction.ASC;
-        return ResponseEntity.ok(fileService.findFilesAtRoot(jwt.getSubject(), page, sortBy, sortOrder));
+        return ResponseEntity.ok(fileFindService.findFilesAtRoot(jwt.getSubject(), pageCursor, sortBy, sortOrder));
     }
 
     @GetMapping("/dir")
     public ResponseEntity<?> getDirectoryContents(@RequestParam(required = false, name = "full") Boolean getParentInfo,
                                                   @RequestParam String id,
-                                                  @RequestParam(required = false, name = "p") Integer page,
+                                                  @RequestParam(required = false, name = "p") String pageCursor,
                                                   @RequestParam(required = false, name = "by") SortBy sortBy,
                                                   @RequestParam(required = false, name = "order") Sort.Direction sortOrder,
                                                   @AuthenticationPrincipal Jwt jwt) {
         if (getParentInfo == null) getParentInfo = false;
-        if (page == null) page = 0;
         if (sortBy == null) sortBy = SortBy.NAME;
         if (sortOrder == null) sortOrder = Sort.Direction.ASC;
-        return ResponseEntity.ok(fileService.findFilesInDirectory(jwt.getSubject(), getParentInfo, id, page, sortBy, sortOrder));
+        return ResponseEntity.ok(fileFindService.findFilesInDirectory(jwt.getSubject(), getParentInfo, id, pageCursor, sortBy, sortOrder));
     }
 
     public record SearchFilesRequest(
             @NotBlank @Size(max = 30) String parentId,
             @NotBlank @Size(max = 300) String searchString,
             boolean isRecursive,
-            int page
+            String pageCursor
     ) {}
     @PostMapping("/search")
     public ResponseEntity<?> searchFiles(@Valid @RequestBody SearchFilesRequest request, @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(fileService.searchFileByName(jwt.getSubject(), request.parentId, request.searchString, request.isRecursive, request.page));
+        return ResponseEntity.ok(fileFindService.searchFileByName(jwt.getSubject(), request.parentId, request.searchString, request.isRecursive, request.pageCursor));
     }
 
 

@@ -8,8 +8,6 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.bson.Document;
 import org.springframework.stereotype.Service;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -20,25 +18,43 @@ public class FileManageService {
 
     @PostConstruct
     public void createAtlasSearchIndex() {
+        // Tokenizer: Split on ANYTHING that is NOT a Unicode Letter or Number.
+        // (This automatically handles spaces, hyphens, and underscores.)
+        Document splitTokenizer = new Document("type", "regexSplit")
+                .append("pattern", "[^\\p{L}\\p{N}]+");
 
-        // Create a CUSTOM analyzer that NEVER splits words or drops punctuation
-        // It takes the exact string and just lowercases it.
-        Document customAnalyzer = new Document("name", "filename_analyzer")
-                .append("tokenizer", new Document("type", "keyword"))
-                .append("tokenFilters", List.of(new Document("type", "lowercase")));
+        // Define ONE Custom Analyzer (Tokenize & Lowercase)
+        Document filenameAnalyzer = new Document("name", "filename_analyzer")
+                .append("tokenizer", splitTokenizer)
+                .append("tokenFilters", List.of(
+                        new Document("type", "lowercase")
+                ));
 
-        // Assign our custom analyzer to the name field
-        Document nameFieldDefinition = new Document("type", "string")
-                .append("analyzer", "filename_analyzer");
+        // Let Atlas natively handle the edge-gramming via the autocomplete type
+        Document nameFieldDefinition = new Document("type", "autocomplete")
+                .append("analyzer", "filename_analyzer")
+                .append("tokenization", "edgeGram")
+                .append("minGrams", 1) // plural 'minGrams' for field definitions
+                .append("maxGrams", 15);
 
-        // dynamic: false ensures we only spend RAM/Disk indexing the specific field we want
+        // add path and parent_id for matching in search first before searching (filter unwanted first rather than search in all first)
+        Document pathFieldDefinition = new Document("type", "string")
+                .append("analyzer", "lucene.keyword"); // match on exact path
+        Document parentIdFieldDefinition = new Document("type", "string")
+                .append("analyzer", "lucene.keyword"); // match on exact parent_id
+
+        Document fields = new Document(FileItemField.NAME, nameFieldDefinition)
+                .append(FileItemField.PATH, pathFieldDefinition)
+                .append(FileItemField.PARENT_ID, parentIdFieldDefinition);
+
+        // Final Index Mappings & Definition
         Document mappings = new Document("dynamic", false)
-                .append("fields", new Document(FileItemField.NAME, nameFieldDefinition));
+                .append("fields", fields);
 
-        // Add the custom analyzer definition to the index alongside the mappings
         Document indexDefinition = new Document("mappings", mappings)
-                .append("analyzers", Collections.singletonList(customAnalyzer));
+                .append("analyzers", List.of(filenameAnalyzer));
 
+        // max objects in a search index are 2.1 billion
         String indexName = "fileNameSearchIndex";
 
         try {

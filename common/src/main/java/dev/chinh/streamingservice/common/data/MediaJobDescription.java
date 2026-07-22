@@ -18,6 +18,7 @@ public class MediaJobDescription {
     private Resolution resolution;
     private String acceptHeader;
     private int offset;
+    private String nextCursor;
     private int batch;
     private Resolution vidResolution;
 

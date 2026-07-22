@@ -12,11 +12,11 @@ public class FileDiscoveryService {
     @GrpcClient("file-provider")
     private FileServiceGrpc.FileServiceBlockingStub fileStub;
 
-    public FileResponse listFiles(String userId, String id, int page) {
+    public FileResponse listFiles(String userId, String id, String nextCursor) {
         FileRequest request = FileRequest.newBuilder()
                 .setUserId(userId)
                 .setId(id)
-                .setPage(page)
+                .setNextCursor(nextCursor)
                 .setSortBy("NAME")
                 .setSortOrder("ASC")
                 .build();

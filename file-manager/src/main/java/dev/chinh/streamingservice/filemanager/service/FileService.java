@@ -9,22 +9,17 @@ import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.validation.FileSystemValidator;
 import dev.chinh.streamingservice.filemanager.constant.FileStatus;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
-import dev.chinh.streamingservice.filemanager.constant.SortBy;
 import dev.chinh.streamingservice.filemanager.data.FileItemField;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import dev.chinh.streamingservice.filemanager.data.FolderLocks;
 import dev.chinh.streamingservice.filemanager.event.FileEventProducer;
-import dev.chinh.streamingservice.filemanager.repository.FileSystemRepository;
 import lombok.RequiredArgsConstructor;
-import org.bson.Document;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.domain.*;
 import org.springframework.data.mongodb.MongoTransactionException;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -50,123 +45,15 @@ public class FileService {
     private final RedisTemplate<String, String> redisStringTemplate;
     private final MongoTemplate mongoTemplate;
     private final ApplicationEventPublisher publisher;
-    private final FileSystemRepository fileSystemRepository;
 
-    private final ThumbnailService thumbnailService;
     private final DirectoryCacheService directoryCacheService;
     private final FileCacheService fileCacheService;
     private final FileLockService fileLockService;
 
 
-    private static final String mediaPath = ContentMetaData.MEDIA_BUCKET;
+    public static final String MEDIA_PATH = ContentMetaData.MEDIA_BUCKET;
     private static String ROOT_PATH = null;
     private static String ROOT_FOLDER_ID = null;
-
-    public record FileSearchResult(String parentId, String parentName, List<FileSystemItem> content, Pageable pageable, boolean hasNext) {}
-
-    public Slice<FileSystemItem> findFilesInDirectory(String userId, String parentId, int page, SortBy sortBy, Sort.Direction sortOrder) {
-        FileSystemItem parent = getFileSystemItem(userId, parentId, true);
-        String regexPath = "^" + Pattern.quote(parent.getPath() + parent.getId() + "/");
-
-        return fileSystemRepository.findByUserIdAndPathRegex(Long.parseLong(userId), regexPath, getPageable(page, sortBy, sortOrder));
-    }
-
-    public FileSearchResult findFilesAtRoot(String userId, int page, SortBy sortBy, Sort.Direction sortOrder) {
-        Slice<FileSystemItem> items = fileSystemRepository.findByUserIdAndParentId(Long.parseLong(userId), getROOT_FOLDER_ID(), getPageable(page, sortBy, sortOrder));
-        List<FileSystemItem> itemInRoot = getUpdatedThumbnailUrl(userId, items.getContent());
-
-        return new FileSearchResult(getROOT_FOLDER_ID(), mediaPath, itemInRoot, items.getPageable(), items.hasNext());
-    }
-
-    public FileSearchResult findFilesInDirectory(String userId, boolean getFullPathInfo, String parentId, int page, SortBy sortBy, Sort.Direction sortOrder) {
-        Slice<FileSystemItem> items = fileSystemRepository.findByUserIdAndParentId(Long.parseLong(userId), parentId, getPageable(page, sortBy, sortOrder));
-        List<FileSystemItem> itemInDir = getUpdatedThumbnailUrl(userId, items.getContent());
-
-        if (getFullPathInfo) {
-            FileSystemItem parentCraft = new FileSystemItem();
-            String pathInId;
-            if (itemInDir.isEmpty()) {
-                FileSystemItem parent = getFileSystemItem(userId, parentId, true);
-                pathInId = parent.getPath() + parent.getId() + "/";
-                parentCraft.setName(parent.getName());
-            } else {
-                pathInId = itemInDir.getFirst().getPath();
-                parentCraft.setName("unknown");
-            }
-            parentCraft.setPath(pathInId);
-            String pathInName = getFullPathInName(parentCraft, false);
-            return new FileSearchResult(pathInId, pathInName, itemInDir, items.getPageable(), items.hasNext());
-        }
-
-        return new FileSearchResult(itemInDir.isEmpty() ? null : itemInDir.getFirst().getParentId(), null, itemInDir, items.getPageable(), items.hasNext());
-    }
-
-    private List<FileSystemItem> getUpdatedThumbnailUrl(String userId, List<FileSystemItem> source) {
-        List<String> thumbnailName = thumbnailService.processThumbnail(userId, source);
-        for (int i = 0; i < thumbnailName.size(); i++) {
-            source.get(i).setThumbnail(thumbnailName.get(i));
-        }
-        return source;
-    }
-
-    private Pageable getPageable(int page, SortBy sortBy, Sort.Direction sortOrder) {
-        final int pageSize = 25;
-
-        Sort sort = Sort.by(sortOrder, sortBy.getField());
-        if (sortBy == SortBy.RESOLUTION) {
-            // Automatically add the width tie-breaker
-            sort = sort.and(Sort.by(sortOrder, ContentMetaData.RESOLUTION + "." + ContentMetaData.WIDTH));
-        }
-        return PageRequest.of(page, pageSize, sort);
-    }
-
-    public FileSearchResult searchFileByName(String userId, String parentId, String fileName, boolean isRecursive, int page) {
-        FileSystemItem parent = getFileSystemItem(userId, parentId, true);
-
-        List<AggregationOperation> stages = new ArrayList<>();
-        String indexName = "fileNameSearchIndex";
-
-        // Split words and enforce AND matching ---
-        List<Document> mustClauses = new ArrayList<>();
-
-        // Split the search string by one or more spaces
-        String[] searchWords = fileName.trim().split("\\s+");
-
-        for (String word : searchWords) {
-            // Create a wildcard clause for EACH word
-            mustClauses.add(new Document("wildcard",
-                    new Document("query", "*" + word + "*")
-                            .append("path", FileItemField.NAME)
-                            .append("allowAnalyzedField", true)
-            ));
-        }
-
-        // Wrap the clauses in a compound "must" (which acts as an AND operator)
-        Document searchDoc = new Document("$search", new Document("index", indexName)
-                .append("compound", new Document("must", mustClauses))
-        );
-
-        stages.add(context -> searchDoc);
-
-        if (isRecursive) {
-            String pathPrefix = "^" + Pattern.quote(parent.getPath() + parent.getId() + "/");
-            stages.add(Aggregation.match(Criteria.where(FileItemField.PATH).regex(pathPrefix)));
-        } else {
-            stages.add(Aggregation.match(Criteria.where(FileItemField.PARENT_ID).is(parent.getId())));
-        }
-
-        final int size = 25;
-        long skipCount = (long) page * size;
-
-        stages.add(Aggregation.skip(skipCount));
-
-        stages.add(Aggregation.limit(size));
-
-        Aggregation aggregation = Aggregation.newAggregation(stages);
-        List<FileSystemItem> results = mongoTemplate.aggregate(aggregation, "fs_metadata", FileSystemItem.class).getMappedResults();
-        getUpdatedThumbnailUrl(userId, results);
-        return new FileSearchResult(null, null, results, null, results.size() == size);
-    }
 
 
     public String getFileObjectUrl(String userId, String fileId) {
@@ -704,7 +591,7 @@ public class FileService {
         return mongoTemplate.findOne(query, FileSystemItem.class);
     }
 
-    private FileSystemItem getFileSystemItem(String userId, String id, boolean getCachedFirst) {
+    public FileSystemItem getFileSystemItem(String userId, String id, boolean getCachedFirst) {
         FileSystemItem item = findById(userId, id, getCachedFirst);
         if (item == null)
             throw new IllegalArgumentException("File not found with id: " + id);
@@ -738,7 +625,7 @@ public class FileService {
     public String getROOT_FOLDER_ID() {
         if (ROOT_FOLDER_ID != null) return ROOT_FOLDER_ID;
         Query query = new Query(Criteria
-                .where(FileItemField.NAME).is(mediaPath)
+                .where(FileItemField.NAME).is(MEDIA_PATH)
                 .and(FileItemField.PATH).is("/")
                 .and(FileItemField.FILE_TYPE).is(FileType.DIR)
         );
@@ -758,13 +645,13 @@ public class FileService {
 
     public void createRootFolder() {
         Query query = new Query(Criteria
-                .where(FileItemField.NAME).is(mediaPath)
+                .where(FileItemField.NAME).is(MEDIA_PATH)
                 .and(FileItemField.PATH).is("/")
                 .and(FileItemField.FILE_TYPE).is(FileType.DIR)
         );
 
         Update update = new Update()
-                .setOnInsert(FileItemField.NAME, mediaPath)
+                .setOnInsert(FileItemField.NAME, MEDIA_PATH)
                 .setOnInsert(FileItemField.PATH, "/")
                 .setOnInsert(FileItemField.FILE_TYPE, FileType.DIR);
 

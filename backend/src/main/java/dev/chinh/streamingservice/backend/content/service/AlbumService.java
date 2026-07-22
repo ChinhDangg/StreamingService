@@ -46,7 +46,7 @@ public class AlbumService extends MediaService {
         addCacheLastAccess(albumLastAccessKey, getCacheMediaJobId(albumId, albumRes), now);
     }
 
-    public JobStatus getAlbumContent(String userId, long albumId, Resolution resolution, int page, int batch,
+    public JobStatus getAlbumContent(String userId, long albumId, Resolution resolution, int page, int batch, String nextCursor,
                                   HttpServletRequest request) throws Exception {
         MediaDescription album = getMediaDescription(userId, albumId);
 
@@ -71,6 +71,7 @@ public class AlbumService extends MediaService {
         MediaJobDescription jobDescription = getMediaJobDescription(userId, album, albumJobId, resolution, "albumUrlList");
         jobDescription.setOffset(page);
         jobDescription.setBatch(batch);
+        jobDescription.setNextCursor(nextCursor);
         jobDescription.setWidth(album.getWidth());
         jobDescription.setHeight(album.getHeight());
         jobDescription.setAcceptHeader(request.getHeader("Accept"));

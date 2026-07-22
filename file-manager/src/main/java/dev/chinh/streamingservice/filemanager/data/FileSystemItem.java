@@ -5,6 +5,7 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
 import lombok.*;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.ReadOnlyProperty;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -103,6 +104,10 @@ public class FileSystemItem {
     @Field(FileItemField.UPLOAD_DATE)
     @JsonProperty(ContentMetaData.UPLOAD_DATE)
     private Instant uploadDate;
+
+    @ReadOnlyProperty // Prevents Spring from trying to save this to the database
+    @Field("pageToken")
+    private String pageToken;
 
     public void setResolution(int w, int h) {
         this.resolution = new ResolutionInfo(w, h);

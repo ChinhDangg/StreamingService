@@ -20,17 +20,18 @@ public class AlbumController {
     @Value("${always-show-original-resolution}")
     private String alwaysShowOriginalResolution;
 
-    @GetMapping("/{id}/{resolution}/{page}")
+    @GetMapping("/{id}/{resolution}")
     public ResponseEntity<?> checkResizedImage(@PathVariable Long id,
                                                @PathVariable Resolution resolution,
-                                               @PathVariable Integer page,
+                                               @RequestParam(name = "p", required = false) int page,
+                                               @RequestParam(name = "nc", required = false) String nextCursor,
                                                HttpServletRequest request,
                                                @AuthenticationPrincipal Jwt jwt) throws Exception {
         if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
             // if always show original - intercept the resolution parameter
             resolution = Resolution.original;
         }
-        return ResponseEntity.ok().body(albumService.getAlbumContent(jwt.getSubject(), id, resolution, page, 25, request));
+        return ResponseEntity.ok().body(albumService.getAlbumContent(jwt.getSubject(), id, resolution, page, 25, nextCursor, request));
     }
 
     @GetMapping("/{albumId}/{albumRes}/vid/{objectName}/{vidRes}")

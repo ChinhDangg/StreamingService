@@ -18,7 +18,6 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
@@ -46,6 +45,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         this.fileService = fileService;
     }
 
+    public record AlbumUrlResult(List<MediaUrl> result, String nextCursor) {}
     public record MediaUrl(MediaType type, String url) {}
     public record AlbumUrlInfo(List<MediaUrl> mediaUrlList, List<String> buckets, List<String> pathList) {}
 
@@ -60,11 +60,11 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             }
             switch (description.getJobType()) {
                 case "albumUrlList" -> {
-                    var mediaUrlList = processAlbumList(description);
-                    String mediaUrlListString = objectMapper.writeValueAsString(mediaUrlList);
-                    workerRedisService.addResultToStatus(description.getWorkId(), "page::"+description.getOffset(), mediaUrlListString);
+                    var albumUrlResult = processAlbumList(description);
+                    String albumUrlString = objectMapper.writeValueAsString(albumUrlResult);
+                    workerRedisService.addResultToStatus(description.getWorkId(), "page::"+description.getOffset(), albumUrlString);
                     workerRedisService.releaseToken(tokenKey);
-                    workerRedisService.sendJobNotification(description.getWorkId(), description.getUserId(), mediaUrlListString);
+                    workerRedisService.sendJobNotification(description.getWorkId(), description.getUserId(), albumUrlString);
                 }
                 case "albumVideoUrl" -> {
                     String videoPartialUrl = getAlbumPartialVideoUrl(tokenKey, description);
@@ -82,10 +82,10 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         }
     }
 
-    private List<MediaUrl> processAlbumList(MediaJobDescription mediaJobDescription) throws Exception {
-        long albumId = mediaJobDescription.getId();
-        Resolution resolution = mediaJobDescription.getResolution();
-        String userId = mediaJobDescription.getUserId();
+    private AlbumUrlResult processAlbumList(MediaJobDescription jobDescription) throws Exception {
+        long albumId = jobDescription.getId();
+        Resolution resolution = jobDescription.getResolution();
+        String userId = jobDescription.getUserId();
 
         boolean noFileId = false;
         Map<Object, Object> albumInfo = getCacheAlbumJobInfo(albumId);
@@ -107,7 +107,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             }
         }
 
-        var response = fileService.listFiles(userId, albumInfo.get("fileId").toString(), mediaJobDescription.getOffset());
+        var response = fileService.listFiles(userId, albumInfo.get("fileId").toString(), jobDescription.getNextCursor() == null ? "" : jobDescription.getNextCursor());
 
         String albumDir = "/stream/album/" + albumId + "/" + resolution.name();
         long size = 0;
@@ -129,7 +129,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
                 if (mediaType == MediaType.IMAGE) {
                     String originalExtension = objectName.contains(".") ? objectName.substring(objectName.lastIndexOf(".") + 1)
                             .toLowerCase() : "jpg";
-                    String format = (mediaJobDescription.getAcceptHeader() != null && mediaJobDescription.getAcceptHeader().contains("image/webp")) ? "webp" : originalExtension;
+                    String format = (jobDescription.getAcceptHeader() != null && jobDescription.getAcceptHeader().contains("image/webp")) ? "webp" : originalExtension;
                     String savedFileName = objectNameOmittedUserDir + "_" + resolution + "." + format;
                     String urlPath = OSUtil.normalizePath(albumDir, savedFileName);
                     mediaAllUrlList.add(new MediaUrl(mediaType, urlPath));
@@ -149,11 +149,13 @@ public class AlbumService extends MediaService implements ResourceCleanable {
 
         if (resolution != Resolution.original && hasImage) {
             if (!memoryManager.freeMemoryForSize(size)) {
-                return response.getContentList().stream()
-                        .map(i ->
-                                new MediaUrl(MediaType.detectMediaType(i.getObjectName()),
-                                        minIOService.getObjectUrl(i.getBucket(), ContentMetaData.removeUserIdDirFromObjectKey(userId, i.getObjectName()))))
-                        .toList();
+                return new AlbumUrlResult(
+                        response.getContentList().stream()
+                                .map(i ->
+                                        new MediaUrl(MediaType.detectMediaType(i.getObjectName()),
+                                                minIOService.getObjectUrl(i.getBucket(), ContentMetaData.removeUserIdDirFromObjectKey(userId, i.getObjectName()))))
+                                .toList(),
+                        response.getNextCursor());
             }
 
             AlbumUrlInfo urlInfo = new AlbumUrlInfo(mediaImageOutputList, bucketList, pathList);
@@ -169,12 +171,12 @@ public class AlbumService extends MediaService implements ResourceCleanable {
             long previousSize = albumInfo.get("size") == null ? 0 : Long.parseLong(albumInfo.get("size").toString());
             previousSize += size;
             albumInfo.put("size", String.valueOf(previousSize));
-            albumInfo.putIfAbsent("width", String.valueOf(mediaJobDescription.getWidth()));
-            albumInfo.putIfAbsent("height", String.valueOf(mediaJobDescription.getHeight()));
+            albumInfo.putIfAbsent("width", String.valueOf(jobDescription.getWidth()));
+            albumInfo.putIfAbsent("height", String.valueOf(jobDescription.getHeight()));
             addCacheAlbumJobInfo(albumId, albumInfo);
         }
 
-        return mediaAllUrlList;
+        return new AlbumUrlResult(mediaAllUrlList, response.getNextCursor());
     }
 
     private void processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String saveDir, boolean isAlbum, boolean addThumbnailCache) throws InterruptedException, IOException {

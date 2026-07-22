@@ -6,6 +6,7 @@ import dev.chinh.streamingservice.common.proto.FileResponse;
 import dev.chinh.streamingservice.common.proto.FileServiceGrpc;
 import dev.chinh.streamingservice.filemanager.constant.SortBy;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
+import dev.chinh.streamingservice.filemanager.service.FileFindService;
 import dev.chinh.streamingservice.filemanager.service.FileService;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
@@ -21,6 +22,7 @@ import java.util.List;
 public class FileGrpcService extends FileServiceGrpc.FileServiceImplBase {
 
     private final FileService fileService;
+    private final FileFindService fileFindService;
 
     @Override
     public void findFileByMId(FileRequest request, StreamObserver<FileResponse> responseObserver) {
@@ -44,22 +46,23 @@ public class FileGrpcService extends FileServiceGrpc.FileServiceImplBase {
     @Override
     public void findFilesInDirectory(FileRequest request, StreamObserver<FileResponse> responseObserver) {
 
-        Slice<FileSystemItem> slice = fileService.findFilesInDirectory(
+        var result = fileFindService.findFilesInDirectory(
                 request.getUserId(),
                 request.getId(),
-                request.getPage(),
+                request.getNextCursor(),
                 SortBy.valueOf(request.getSortBy()),
                 Sort.Direction.valueOf(request.getSortOrder())
         );
 
-        List<FileItem> fileItems = slice.getContent()
+        List<FileItem> fileItems = result.content()
                 .stream()
                 .map(this::toFileItem)
                 .toList();
 
         FileResponse response = FileResponse.newBuilder()
                 .addAllContent(fileItems)
-                .setHasNext(slice.hasNext())
+                .setNextCursor(result.nextCursor() == null ? "" : result.nextCursor())
+                .setHasNext(result.hasNext())
                 .build();
 
         responseObserver.onNext(response);
