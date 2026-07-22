@@ -38,9 +38,9 @@ async function getRootDir() {
     }
     const subFiles = await rootDir.json();
     if (subFiles.hasNext)
-        currentMainFileItems.setCurrentFilePage(subFiles.pageable.pageNumber + 1);
+        currentMainFileItems.setCurrentFilePage(subFiles.nextCursor);
     else
-        currentMainFileItems.setCurrentFilePage(-1);
+        currentMainFileItems.setCurrentFilePage(null);
     return subFiles;
     // return [
     //     {
@@ -145,7 +145,7 @@ export function displayFileItem(fileItems, fileItemManager = null, clearNode = t
         });
     }
 
-    if (fileItemManager && fileItemManager.getCurrentFilePage() === -1) {
+    if (fileItemManager && fileItemManager.getCurrentFilePage() === null) {
         const endOfFileText = fileViewWrapper.querySelector('.end-of-file-text');
         if (!fileItems || fileItems.length === 0)
             endOfFileText.innerText = 'No files found';
@@ -272,14 +272,15 @@ export function setObserver(newObserver) {
     observer = newObserver;
 }
 
-async function fetchMoreFiles(subId, page = 0, getParentInfo = false) {
+async function fetchMoreFiles(subId, page = null, getParentInfo = false) {
     if (isProcessing) return false;
     isProcessing = true;
     setIsSearching(false);
     const params = new URLSearchParams();
     if (subId) params.append('id', subId);
     const sortSelectValue = getSortSelectValue();
-    params.append('p', page.toString());
+    if (page)
+        params.append('p', page.toString());
     params.append('by', sortSelectValue.by);
     params.append('order', sortSelectValue.order);
     if (getParentInfo) params.append('full', 'true');
@@ -293,9 +294,9 @@ async function fetchMoreFiles(subId, page = 0, getParentInfo = false) {
     }
     const subFiles = await response.json();
     if (subFiles.hasNext)
-        currentMainFileItems.setCurrentFilePage(subFiles.pageable.pageNumber + 1);
+        currentMainFileItems.setCurrentFilePage(subFiles.nextCursor);
     else
-        currentMainFileItems.setCurrentFilePage(-1);
+        currentMainFileItems.setCurrentFilePage(null);
     isProcessing = false;
     if (getParentInfo)
         return subFiles;
@@ -315,7 +316,7 @@ sortSelect.addEventListener('change', async function () {
 
     setCurrentUri(subId);
 
-    if (currentMainFileItems.getCurrentFilePage() === -1) {
+    if (currentMainFileItems.getCurrentFilePage() === null) {
         // reached the end - should have all files with all info to sort locally
         const sortSelectValue = getSortSelectValue();
         let key = getItemKeyFromSortSelectValue(sortSelectValue.by);
@@ -383,16 +384,16 @@ export function setObserverToFetchMore() {
     observer = new IntersectionObserver(async (entries) => {
         if (entries[0].isIntersecting) {
             console.log('Intersecting');
-            const currentPathStack = getCurrentPath();
-            if (currentPathStack == null) {
+            if (currentMainFileItems.getCurrentFilePage() === null) {
                 observer.unobserve(sentinel);
                 return;
             }
-            const subId = currentPathStack.id;
-            if (currentMainFileItems.getCurrentFilePage() === -1) {
+            const currentPath = getCurrentPath();
+            if (currentPath == null) {
                 observer.unobserve(sentinel);
                 return;
             }
+            const subId = currentPathStack.length === 1 ? null : currentPath.id;
             const subFiles = await fetchMoreFiles(subId, currentMainFileItems.getCurrentFilePage());
             if (subFiles === false)
                 return;
@@ -484,7 +485,7 @@ async function initialize() {
             sortSelect.value = newValue;
         else
             sortSelect.value = 'NAME-ASC';
-        const fetchedAndMoved = await fetchMoreFilesAndMove(subId, 0);
+        const fetchedAndMoved = await fetchMoreFilesAndMove(subId, null);
         if (fetchedAndMoved) return;
     }
 
@@ -806,14 +807,14 @@ fileDropZone.addEventListener('click', async (event) => {
     if (getIsInDeepSearch()) {
         clearSearch();
         if (isDir)
-            await fetchMoreFilesAndMove(fileId, 0);
+            await fetchMoreFilesAndMove(fileId, null);
         else {
             const parentId = currentSearchFileItems.getFileItemById(fileId)?.parentId;
             if (!parentId) {
                 alert('Failed to get parent id.');
                 return;
             }
-            await fetchMoreFilesAndMove(parentId, 0);
+            await fetchMoreFilesAndMove(parentId, null);
         }
         setIsInDeepSearch(false);
         return;

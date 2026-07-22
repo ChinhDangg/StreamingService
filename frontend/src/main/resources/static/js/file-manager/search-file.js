@@ -48,7 +48,7 @@ async function searchFiles(searchTerm) {
     }
     isSearching = true;
     clearSearchButton.classList.remove('hidden');
-    if (currentMainFileItems.getCurrentFilePage() === -1 && !recursiveToggle.checked) {
+    if (currentMainFileItems.getCurrentFilePage() === null && !recursiveToggle.checked) {
         console.log('searching locally');
         let filteredFileIds = currentMainFileItems.findFileItemsWithNameAndReturnTheirIds(searchTerm);
         filteredFileIds = filteredFileIds.length === 0 ? null : filteredFileIds;
@@ -59,7 +59,7 @@ async function searchFiles(searchTerm) {
         displayFileItem([], currentSearchFileItems,true, true, false);
         unobserveSentinel();
         setObserverToSearch(searchTerm);
-        await fetchSearchFiles(searchTerm, 0);
+        await fetchSearchFiles(searchTerm, null);
         observeSentinel();
     }
 }
@@ -77,7 +77,7 @@ async function fetchSearchFiles(searchString, page) {
             parentId: currentPath.id,
             searchString: searchString,
             isRecursive: recursiveToggle.checked,
-            page: page
+            pageCursor: page
         })
     });
     if (!response.ok) {
@@ -86,9 +86,9 @@ async function fetchSearchFiles(searchString, page) {
     }
     const searchResult = await response.json();
     if (searchResult.hasNext)
-        currentSearchFileItems.setCurrentFilePage(page + 1);
+        currentSearchFileItems.setCurrentFilePage(searchResult.nextCursor);
     else
-        currentSearchFileItems.setCurrentFilePage(-1);
+        currentSearchFileItems.setCurrentFilePage(null);
     const subFiles = searchResult.content;
     displayFileItem(subFiles, currentSearchFileItems,false, false, true);
 }
@@ -110,7 +110,7 @@ function setObserverToSearch(searchString) {
     const searchObserver = new IntersectionObserver(async (entries) => {
         if (entries[0].isIntersecting) {
             console.log('Intersecting in search');
-            if (currentSearchFileItems.getCurrentFilePage() === -1) {
+            if (currentSearchFileItems.getCurrentFilePage() === null) {
                 unobserveSentinel();
                 return;
             }

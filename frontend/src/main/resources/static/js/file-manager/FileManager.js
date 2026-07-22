@@ -3,15 +3,15 @@ export class FileManager {
     constructor() {
         this.currentFileItemMap = new Map();
         this.currentFileItemIds = [];
-        this.currentFilePage = -1;
+        this.currentFilePageCursor = null;
     }
 
     setCurrentFilePage(page) {
-        this.currentFilePage = page;
+        this.currentFilePageCursor = page;
     }
 
     getCurrentFilePage() {
-        return this.currentFilePage;
+        return this.currentFilePageCursor;
     }
 
     addFileItem(fileItem) {

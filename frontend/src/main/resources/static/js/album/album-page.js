@@ -16,7 +16,7 @@ const RESOLUTION = Object.freeze({
 
 const albumResUrlMap = new Map();
 const albumUrlPageMap = new Map();
-let albumResolution = Object.keys(RESOLUTION)[3];
+let currentAlbumResolution = Object.keys(RESOLUTION)[3];
 
 const sentinel = document.createElement("div");
 let observer;
@@ -49,7 +49,7 @@ export async function initialize(id = null, albumInfo = null) {
 
     albumResUrlMap.clear();
     albumUrlPageMap.clear();
-    albumResolution = Object.keys(RESOLUTION)[3];
+    currentAlbumResolution = Object.keys(RESOLUTION)[3];
 
     currentFullScreen = null;
     isShowingNextFullScreen = false;
@@ -141,7 +141,7 @@ const addMediaItem = (start, end) => {
     const imageWrapperTem = imageContainer.querySelector('.image-container-wrapper');
     const videoWrapperTem = videoContainer.querySelector('.video-container-wrapper');
     for (let i = start; i < end; i++) {
-        const item = albumResUrlMap.get(albumResolution)[i];
+        const item = albumResUrlMap.get(currentAlbumResolution)[i];
         if (item.type === 'IMAGE') {
             addImageItem(item, imageContainer, imageWrapperTem);
         } else if (item.type === 'VIDEO') {
@@ -182,10 +182,10 @@ function initializeResolutionSelector() {
         option.textContent = RESOLUTION[key];
         resolutionSelector.appendChild(option);
     });
-    resolutionSelector.value = albumResolution;
+    resolutionSelector.value = currentAlbumResolution;
     resolutionSelector.addEventListener('change', async () => {
-        albumResolution = resolutionSelector.value;
-        const albumItems = await fetchAlbumItemUrlsByResolution(albumId, albumResolution);
+        currentAlbumResolution = resolutionSelector.value;
+        const albumItems = await fetchAlbumItemUrlsByResolution(albumId, currentAlbumResolution);
         if (!albumItems) return;
 
         const imageItems = imageContainer.querySelectorAll('.image-container-wrapper');
@@ -196,9 +196,9 @@ function initializeResolutionSelector() {
                 imageItems[i].remove();
                 continue;
             }
-            while (isImageCount < albumResUrlMap.get(albumResolution).length) {
-                if (albumResUrlMap.get(albumResolution)[isImageCount].type === 'IMAGE') {
-                    imageItems[i].querySelector('img').src = albumResUrlMap.get(albumResolution)[isImageCount].url;
+            while (isImageCount < albumResUrlMap.get(currentAlbumResolution).length) {
+                if (albumResUrlMap.get(currentAlbumResolution)[isImageCount].type === 'IMAGE') {
+                    imageItems[i].querySelector('img').src = albumResUrlMap.get(currentAlbumResolution)[isImageCount].url;
                     isImageCount++;
                     break;
                 }
@@ -209,34 +209,46 @@ function initializeResolutionSelector() {
     });
 }
 
-async function fetchAlbumItemUrlsByResolution(albumId, resolution, page = 0) {
-    if (albumUrlPageMap.get(albumResolution) === -1) return [];
-    const fetchAlbumUrls = `/api/album/${albumId}/${resolution}/${page}`;
+async function fetchAlbumItemUrlsByResolution(albumId, resolution) {
+    if (albumUrlPageMap.get(resolution) && albumUrlPageMap.get(resolution).page === -1) return [];
     try {
-        const urlPolling = pollPlaylistUrl(fetchAlbumUrls, (result) => {
-            return result.length !== 25;
-        });
-        const albumUrls = await urlPolling.promise;
+        const previousPage = (!albumUrlPageMap.get(resolution) || albumUrlPageMap.get(resolution).page === null) ? -1 : albumUrlPageMap.get(resolution).page;
+        const newPage = previousPage + 1;
 
-        const previousPage = albumUrlPageMap.get(albumResolution) == null ? -1 : albumUrlPageMap.get(albumResolution);
-        const newPage = previousPage < page ? page : albumUrlPageMap.get(albumResolution); // ensure page is fetched sequentially otherwise it will skip some items - only stored the highest page fetched
-        if (!albumResUrlMap.get(albumResolution)) {
-            albumResUrlMap.set(albumResolution, albumUrls);
+        let fetchAlbumUrls = `/api/album/${albumId}/${resolution}`;
+        const params = new URLSearchParams({
+            p: newPage
+        });
+        if (albumUrlPageMap.get(resolution))
+            params.append('nc', albumUrlPageMap.get(resolution).nextCursor);
+        fetchAlbumUrls += '?' + params.toString();
+
+        const urlPolling = pollPlaylistUrl(fetchAlbumUrls, (result) => {
+            const nextCursor = result.nextCursor;
+            return nextCursor === null || nextCursor === '';
+        });
+        const albumUrlResult = await urlPolling.promise;
+
+        if (!albumResUrlMap.get(resolution)) {
+            albumResUrlMap.set(resolution, albumUrlResult.result);
         } else if (newPage > previousPage)
-            albumResUrlMap.get(albumResolution).push(...albumUrls);
-        albumUrlPageMap.set(albumResolution, albumUrls.length === 25 ? newPage : -1); // -1 means no more items
-        return albumUrls;
+            albumResUrlMap.get(resolution).push(...albumUrlResult.result);
+            albumUrlPageMap.set(resolution, {
+                page: albumUrlResult.nextCursor ? newPage : -1, // -1 means no more items
+                nextCursor: albumUrlResult.nextCursor,
+            });
+        return albumUrlResult.result;
     } catch (err) {
         if (err === 'timeout') {
             setAlertStatus('Error', 'Time out');
-            return null;
         }
         setAlertStatus('Error', 'Failed to fetch album items: ' + err);
+        return null;
     }
 }
 
 async function displayAlbumItems(albumId) {
-    const albumItems = await fetchAlbumItemUrlsByResolution(albumId, albumResolution);
+    const albumItems = await fetchAlbumItemUrlsByResolution(albumId, currentAlbumResolution);
     if (!albumItems) return;
 
     setMediaLength(albumItems.length);
@@ -276,12 +288,12 @@ async function displayAlbumItems(albumId) {
     observer = new IntersectionObserver(async (entries) => {
         if (entries[0].isIntersecting) {
             console.log('intersecting');
-            if (albumUrlPageMap.get(albumResolution) === -1) {
+            if (albumUrlPageMap.get(currentAlbumResolution).page === -1) {
                 //console.log('no more items');
                 observer.unobserve(sentinel);
                 return;
             }
-            const nextUrls = await fetchAlbumItemUrlsByResolution(albumId, albumResolution, albumUrlPageMap.get(albumResolution) + 1);
+            const nextUrls = await fetchAlbumItemUrlsByResolution(albumId, currentAlbumResolution);
             if (!nextUrls) {
                 observer.unobserve(sentinel);
                 return;
@@ -376,7 +388,7 @@ async function showNextFullScreen() {
     const nextId = currentFullScreen.slice(0, dashIndex) + (id + 1);
     showFullScreen(nextId);
 
-    if (albumUrlPageMap.get(albumResolution) === -1) {
+    if (albumUrlPageMap.get(currentAlbumResolution).page === -1) {
         isShowingNextFullScreen = false;
         return;
     }
@@ -384,7 +396,7 @@ async function showNextFullScreen() {
         isShowingNextFullScreen = false;
         return;
     }
-    const nextUrls = await fetchAlbumItemUrlsByResolution(albumId, albumResolution, albumUrlPageMap.get(albumResolution) + 1);
+    const nextUrls = await fetchAlbumItemUrlsByResolution(albumId, currentAlbumResolution);
     if (!nextUrls) {
         isShowingNextFullScreen = false;
         return;
