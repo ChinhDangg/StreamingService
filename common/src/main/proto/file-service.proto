@@ -17,14 +17,15 @@ message FileItem {
 message FileRequest {
   string userId = 1;
   string id = 2;
-  int32 page = 3;
+  string nextCursor = 3;
   string sortBy = 4;
   string sortOrder = 5;
 }
 
 message FileResponse {
   repeated FileItem content = 1;
-  bool has_next = 2;
+  string nextCursor = 2;
+  bool has_next = 3;
 }
 
 service FileService {
