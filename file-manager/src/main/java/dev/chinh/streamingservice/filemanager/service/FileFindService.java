@@ -15,6 +15,7 @@ import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -206,9 +207,36 @@ public class FileFindService {
         try {
             byte[] decodedBytes = Base64.getUrlDecoder().decode(cursor);
             Map<String, Object> keys = objectMapper.readValue(decodedBytes, new TypeReference<>() {});
+
+            for (Map.Entry<String, Object> entry : keys.entrySet()) {
+                String key = entry.getKey();
+                Object value = entry.getValue();
+                if (value == null) continue;
+                switch (key) {
+                    case "uploadDate":
+                        if (value instanceof String strDate) {
+                            keys.put(key, Instant.parse(strDate));
+                        }
+                        break;
+                    case "size":
+                    case "resolution.area":
+                        if (value instanceof Number num) {
+                            keys.put(key, num.longValue());
+                        }
+                        break;
+
+                    case "length":
+                    case "resolution.width":
+                    case "resolution.height":
+                        if (value instanceof Number num) {
+                            keys.put(key, num.intValue());
+                        }
+                        break;
+                }
+            }
+
             return ScrollPosition.forward(keys);
         } catch (Exception e) {
-            // If the cursor is malformed, throw a 400 Bad Request
             throw new IllegalArgumentException("Invalid cursor format", e);
         }
     }
