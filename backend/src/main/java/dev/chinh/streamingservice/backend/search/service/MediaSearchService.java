@@ -63,7 +63,7 @@ public class MediaSearchService {
 
     public MediaSearchResult advanceSearch(String userId, MediaSearchRequest request, int page, int size,
                                            SortBy sortBy, SortOrder sortOrder) throws Exception {
-
+        checkMaxPage(page);
         boolean hasAnyField = request.hasAny();
         if (!hasAnyField) {
             throw new BadRequestException("Empty advanced search request");
@@ -109,7 +109,7 @@ public class MediaSearchService {
 
     public MediaSearchResult search(String userId, String searchString, int page, int size, SortBy sortBy,
                                     SortOrder sortOrder) throws Exception {
-
+        checkMaxPage(page);
         if (!MediaSearchField.validateSearchString(searchString)) {
             throw new IllegalArgumentException("Invalid search string");
         }
@@ -126,6 +126,7 @@ public class MediaSearchService {
 
     public MediaSearchResult searchByKeywords(String userId, String field, List<Object> keywords, boolean matchAll, int page, int size,
                                               SortBy sortBy, SortOrder sortOrder) throws Exception {
+        checkMaxPage(page);
         ContentMetaData.validateSearchFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 userId, openSearchService.searchTermByOneField(Long.parseLong(userId), MEDIA_INDEX_NAME, field + "." + ContentMetaData.ID, keywords, matchAll, page, size, sortBy, sortOrder),
@@ -139,6 +140,7 @@ public class MediaSearchService {
     }
 
     public MediaSearchResult searchMatchAll(String userId, int page, int size, SortBy sortBy, SortOrder sortOrder) throws Exception {
+        checkMaxPage(page);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 userId, openSearchService.searchMatchAll(MEDIA_INDEX_NAME, Long.parseLong(userId), page, size, sortBy, sortOrder), page, size);
 
@@ -149,14 +151,17 @@ public class MediaSearchService {
         return mapSearchResult.searchResult;
     }
 
+    private void checkMaxPage(int page) {
+        if (page > 50)
+            throw new IllegalArgumentException("Max page's'exceeded, please refine your search");
+    }
+
     public record MapSearchResult(
             MediaSearchResult searchResult,
             Collection<MediaSearchItem> searchItems
     ) {}
 
     private MapSearchResult mapResponseToMediaSearchResult(String userId, SearchResponse<Object> response, int page, int size) {
-        if (page > 50)
-            throw new IllegalArgumentException("Max page's'exceeded, please refine your search");
         List<MediaSearchItem> items = new ArrayList<>();
         List<MediaSearchItemResponse> itemResponses = new ArrayList<>();
         for (Hit<Object> hit : response.hits().hits()) {
