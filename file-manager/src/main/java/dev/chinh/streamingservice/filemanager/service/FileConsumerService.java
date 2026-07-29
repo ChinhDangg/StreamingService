@@ -10,7 +10,10 @@ import dev.chinh.streamingservice.filemanager.constant.FileType;
 import dev.chinh.streamingservice.filemanager.data.FileItemField;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import dev.chinh.streamingservice.filemanager.event.FileEventProducer;
+import io.micrometer.observation.annotation.Observed;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -30,6 +33,7 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class FileConsumerService {
 
+    private static final Logger log = LoggerFactory.getLogger(FileConsumerService.class);
     private final MongoTemplate mongoTemplate;
     private final FileService fileService;
     private final FileCacheService fileCacheService;
@@ -93,21 +97,22 @@ public class FileConsumerService {
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
         List<FileSystemItem> parents = fileService.getItemInIds(parentIds, true, criteria, f -> f.getFileType() == FileType.ALBUM);
         updateParentMediaLength(event.userId(), parents, 1);
+        log.info("Created file: {} with name: {}", fileItem.getId(), fileItem.getName());
     }
 
     @Transactional
     public void handleDirectoryToMedia(MediaUpdateEvent.DirectoryToMediaInitiated event) {
         FileSystemItem item = fileService.findById(event.userId(), event.fileId(), true);
         if (item == null) {
-            System.out.println("Item not found, skipping directory to media");
+            log.warn("Item not found, skipping directory to media {}", event.fileId());
             return;
         }
         if (item.getFileType() == FileType.ALBUM || item.getFileType() == FileType.GROUPER) {
-            System.out.println("Item is already Album or Grouper, skipping directory to media");
+            log.warn("Item is already Album or Grouper, skipping directory to media {}", event.fileId());
             return;
         }
         if (item.getFileType() != FileType.DIR) {
-            System.out.println("Item is not a directory, skipping directory to media");
+            log.warn("Item is not a directory, skipping directory to media {}", event.fileId());
             return;
         }
         long size = event.initialSize();
@@ -161,21 +166,22 @@ public class FileConsumerService {
                 new MediaUpdateEvent.MediaEnriched(
                         event.userId(), item.getId(), event.mediaId(), event.mediaType(), event.thumbnailObject(), event.searchable(), size, skip)
         ));
+        log.info("Created media for directory: {} with name: {}", item.getId(), item.getName());
     }
 
     @Transactional
     public void handleNestedDirectoryToMedia(MediaUpdateEvent.NestedDirectoryToMediaInitiated event) {
         FileSystemItem item = fileService.findById(event.userId(), event.fileId(), true);
         if (item == null) {
-            System.out.println("Item not found, skipping nested directory to media");
+            log.warn("Item not found, skipping nested directory to media {}", event.fileId());
             return;
         }
         if (item.getFileType() == FileType.ALBUM || item.getFileType() == FileType.GROUPER) {
-            System.out.println("Item is already Album or Grouper, skipping directory to media");
+            log.warn("Item is already Album or Grouper, skipping nested directory to media {}", event.fileId());
             return;
         }
         if (item.getFileType() != FileType.DIR) {
-            System.out.println("Item is not a directory, skipping directory to media");
+            log.warn("Item is not a directory, skipping nested directory to media {}", event.fileId());
             return;
         }
 
@@ -221,6 +227,7 @@ public class FileConsumerService {
                 new MediaUpdateEvent.MediaEnriched(
                         event.userId(), item.getId(), event.mediaId(), event.parentType(), event.thumbnailObject(), true, -1, skip)
         ));
+        log.info("Created media for nested directory: {} with name: {}", item.getId(), item.getName());
     }
 
     @Transactional
@@ -236,6 +243,7 @@ public class FileConsumerService {
                 event.height()
         );
         fileLockService.releaseLockedFileItem(Set.of(event.fileId()));
+        log.info("Completed file to media: {} with media id: {}", event.fileId(), event.mediaId());
         return result;
     }
 
@@ -243,7 +251,7 @@ public class FileConsumerService {
     public void handleInitiateUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdateInitiated event) {
         FileSystemItem item = fileService.findByMId(event.userId(), event.mediaId());
         if (item == null) {
-            System.err.println("Item not found, skipping update media thumbnail");
+            log.warn("Item not found, skipping update media thumbnail: {}", event.mediaId());
             return;
         }
         String objectName = item.getObjectName();
@@ -258,7 +266,7 @@ public class FileConsumerService {
                     .limit(1);
             FileSystemItem numItem = mongoTemplate.findOne(query, FileSystemItem.class);
             if (numItem == null) {
-                System.err.println("Item with id: " + item.getId() + " does not have child at num " + event.num() + ", skipping update media thumbnail");
+                log.warn("Item with id: {} does not have child at num {}, skipping update media thumbnail", item.getId(), event.num());
                 return;
             }
             objectName = numItem.getObjectName();
@@ -276,6 +284,7 @@ public class FileConsumerService {
                         bucket,
                         objectName)
         ));
+        log.info("Initiated update media thumbnail: {} with media id: {}", item.getId(), item.getMId());
     }
 
     @Transactional
@@ -284,13 +293,15 @@ public class FileConsumerService {
         Update update = new Update()
                 .set(FileItemField.THUMBNAIL, event.newThumbnail());
         mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+        log.info("Updated media thumbnail for media id: {}", event.mediaId());
     }
 
+    @Observed(name = "handle-file-delete")
     @Transactional
     public void handleDeleteFile(MediaUpdateEvent.FileDeleted event) {
         FileSystemItem fileItem = fileService.findById(event.userId(), event.fileId(), true);
         if (fileItem == null) {
-            System.out.println("File not found with id: " + event.fileId() + ", skipping delete");
+            log.warn("File not found with id: {}, skipping delete", event.fileId());
             return;
         }
 
@@ -305,6 +316,7 @@ public class FileConsumerService {
         }
 
         deleteFile(event.userId(), fileItem);
+        log.info("Deleted file: {} with name: {}", fileItem.getId(), fileItem.getName());
     }
 
     @Transactional
@@ -345,16 +357,17 @@ public class FileConsumerService {
             updateParentMediaLength(userId, parents, -fileCount);
             mongoTemplate.remove(new Query(Criteria.where("id").in(ids)), FileSystemItem.class);
             fileCacheService.invalidateFileCache(ids);
-            System.out.println("Deleted " + ids.size() + " items");
+            log.info("Deleted {} items for folder {} ", ids.size(), fileItem.getId());
         }
 
         mongoTemplate.remove(new Query(Criteria.where("id").is(fileItem.getId())), FileSystemItem.class);
         fileCacheService.invalidateFileCache(fileItem.getId());
-        publisher.publishEvent(new FileEventProducer.EventWrapper(
-                EventTopics.MEDIA_OBJECT_TOPIC,
-                userId,
-                new MediaUpdateEvent.ObjectDeleted(fileItem.getBucket(), Collections.singletonList(fileItem.getObjectName()))
-        ));
+        if (fileItem.getBucket() != null && fileItem.getObjectName() != null)
+            publisher.publishEvent(new FileEventProducer.EventWrapper(
+                    EventTopics.MEDIA_OBJECT_TOPIC,
+                    userId,
+                    new MediaUpdateEvent.ObjectDeleted(fileItem.getBucket(), Collections.singletonList(fileItem.getObjectName()))
+            ));
         if (fileItem.getThumbnail() != null)
             publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_OBJECT_AND_BACKUP_TOPIC,
@@ -385,20 +398,20 @@ public class FileConsumerService {
     public void handleMoveDirectory(String userId, String fileId, String newParentId, String oldPath) {
         FileSystemItem item = fileService.findById(userId, fileId, true);
         if (item == null) {
-            System.err.println("File not found. Skipping...");
+            log.warn("File not found with id: {}, skipping move directory", fileId);
             return;
         }
         if (FileType.isNotDir(item.getFileType())) {
-            System.err.println("File is not a directory. Moving single file is handled at initiation already. Skipping...");
+            log.warn("File is not a directory. Moving single file is handled at initiation already. Skipping... {}", fileId);
             return;
         }
         FileSystemItem newParent = fileService.findById(userId, newParentId, true);
         if (newParent == null) {
-            System.err.println("Parent not found. Skipping...");
+            log.warn("Parent not found with id: {}, skipping move directory", newParentId);
             return;
         }
         if (FileType.isNotDir(newParent.getFileType())) {
-            System.err.println("Parent is not a directory. Skipping...");
+            log.warn("Parent is not a directory. Skipping... {}", newParentId);
             return;
         }
 
@@ -418,5 +431,6 @@ public class FileConsumerService {
 
         Set<String> commonIds = fileService.getCommonIds(oldPath + item.getId() + newParent.getPath() + newParent.getId());
         fileLockService.releaseLockedFileItem(commonIds);
+        log.info("Moved directory: {} to parent: {}", item.getId(), newParent.getId());
     }
 }

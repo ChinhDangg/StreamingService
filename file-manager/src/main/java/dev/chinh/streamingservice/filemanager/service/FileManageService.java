@@ -4,6 +4,8 @@ import com.mongodb.MongoCommandException;
 import dev.chinh.streamingservice.filemanager.data.FileItemField;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.bson.Document;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FileManageService {
 
+    private static final Logger log = LoggerFactory.getLogger(FileManageService.class);
     private final MongoTemplate mongoTemplate;
 
     @PostConstruct
@@ -59,10 +62,10 @@ public class FileManageService {
 
         try {
             mongoTemplate.getCollection("fs_metadata").createSearchIndex(indexName, indexDefinition);
-            System.out.println("Successfully created Atlas Search index: " + indexName);
+            log.info("Successfully created Atlas Search index: {}", indexName);
         } catch (MongoCommandException e) {
             if (e.getErrorCode() == 68) {
-                System.out.println("Atlas Search index definition changed. Updating index: " + indexName);
+                log.info("Atlas Search index definition changed. Updating index: {}", indexName);
                 mongoTemplate.getCollection("fs_metadata").updateSearchIndex(indexName, indexDefinition);
             } else {
                 throw e;

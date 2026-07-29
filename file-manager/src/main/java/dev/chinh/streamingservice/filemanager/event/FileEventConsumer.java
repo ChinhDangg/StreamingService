@@ -7,6 +7,8 @@ import dev.chinh.streamingservice.filemanager.config.KafkaConfig;
 import dev.chinh.streamingservice.filemanager.service.FileConsumerService;
 import dev.chinh.streamingservice.filemanager.service.FileService;
 import lombok.AllArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.kafka.support.KafkaHeaders;
@@ -18,11 +20,12 @@ import org.springframework.stereotype.Service;
 @AllArgsConstructor
 public class FileEventConsumer {
 
+    private static final Logger log = LoggerFactory.getLogger(FileEventConsumer.class);
     private final FileConsumerService fileConsumerService;
     private final FileService fileService;
 
     private void onCreateFile(MediaUpdateEvent.FileCreated event) {
-        System.out.println("Received create file event");
+        log.info("Received create file event: {}", event.fileName());
         try {
             fileConsumerService.handleCreateFile(event);
         } catch (Exception e) {
@@ -31,49 +34,45 @@ public class FileEventConsumer {
     }
 
     private void onDirectoryToMedia(MediaUpdateEvent.DirectoryToMediaInitiated event) {
-        System.out.println("Received initiate directory to media initiated event");
+        log.info("Received initiate directory to media initiated event: {}", event.fileId());
         try {
             fileConsumerService.handleDirectoryToMedia(event);
         } catch (Exception e) {
-            System.err.println("Failed to initiate directory to media");
-            throw e;
+            throw new RuntimeException("Failed to initiate directory to media", e);
         }
     }
 
     private void onNestedDirectoryToMedia(MediaUpdateEvent.NestedDirectoryToMediaInitiated event) {
-        System.out.println("Received initiate nested directory to media initiated event");
+        log.info("Received initiate nested directory to media initiated event: {}", event.fileId());
         try {
             fileConsumerService.handleNestedDirectoryToMedia(event);
         } catch (Exception e) {
-            System.err.println("Failed to initiate nested directory to media");
-            throw e;
+            throw new RuntimeException("Failed to initiate nested directory to media", e);
         }
     }
 
     private void onCompleteFileToMedia(MediaUpdateEvent.MediaCreatedReady event) {
-        System.out.println("Received media create event from file: " + event.mediaId());
+        log.info("Received create media event: {} {}", event.fileId(), event.mediaId());
         try {
             UpdateResult result = fileConsumerService.handleCompleteFileToMedia(event);
             if (result.getModifiedCount() != 1)
                 throw new RuntimeException("Failed to update file to media");
         } catch (Exception e) {
-            System.err.println("Failed to update file to media");
-            throw e;
+            throw new RuntimeException("Failed to update file to media", e);
         }
     }
 
     private void onInitiateUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdateInitiated event) {
-        System.out.println("Received initiate update media thumbnail event");
+        log.info("Received initiate update media thumbnail event: {}", event.mediaId());
         try {
             fileConsumerService.handleInitiateUpdateMediaThumbnail(event);
         } catch (Exception e) {
-            System.err.println("Failed to initiate update media thumbnail");
-            throw e;
+            throw new RuntimeException("Failed to initiate update media thumbnail", e);
         }
     }
 
     private void onUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdatedReady event) {
-        System.out.println("Received update media thumbnail name: " + event.mediaId());
+        log.info("Received update media thumbnail name: {}", event.mediaId());
         try {
             fileConsumerService.handleUpdateMediaThumbnail(event);
         } catch (Exception e) {
@@ -81,8 +80,8 @@ public class FileEventConsumer {
         }
     }
 
-    private void onDeleteFile(MediaUpdateEvent.FileDeleted event) {
-        System.out.println("Received file delete event: " + event.fileId());
+    public void onDeleteFile(MediaUpdateEvent.FileDeleted event) {
+        log.info("Received file delete event: {}", event.fileId());
         try {
             fileConsumerService.handleDeleteFile(event);
         } catch (Exception e) {
@@ -91,7 +90,7 @@ public class FileEventConsumer {
     }
 
     private void onMoveFile(MediaUpdateEvent.DirectoryMoved event) {
-        System.out.println("Received file move event: from: " + event.fileId() + " to: " + event.parentId());
+        log.info("Received file move event: from: {} to: {}", event.fileId(), event.parentId());
         try {
             fileConsumerService.handleMoveDirectory(event.userId(), event.fileId(), event.parentId(), event.oldIdPath());
         } catch (Exception e) {
@@ -127,8 +126,7 @@ public class FileEventConsumer {
             }
             ack.acknowledge();
         } catch (Exception e) {
-            System.err.println(e.getMessage());
-            e.printStackTrace();
+            log.error("Failed to handle media event: {}", event, e);
             throw e;
         }
     }
@@ -141,29 +139,29 @@ public class FileEventConsumer {
     public void handleDlq(@Payload MediaUpdateEvent event,
                           Acknowledgment ack,
                           @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) byte[] errorMessage) {
-        System.out.println("======= DLQ EVENT DETECTED =======");
+        log.error("DLQ EVENT DETECTED: {}", event);
         String message = errorMessage != null ? new String(errorMessage) : "No error message found";
-        System.out.printf("Error Message: %s\n", message);
+        log.error("DLQ ERROR MESSAGE: {}", message);
 
         switch (event) {
             case MediaUpdateEvent.FileCreated e ->
-                    System.out.println("Received create file event: " + e.objectName());
+                    log.info("File DLQ: Received create file event: {}", e.objectName());
             case MediaUpdateEvent.FileDeleted e ->
-                    System.out.println("Received file delete event: " + e.fileId());
+                    log.info("File DLQ: Received file delete event: {}", e.fileId());
             case MediaUpdateEvent.DirectoryToMediaInitiated e ->
-                    System.out.println("Received initiate directory to media initiated event: " + e.fileId());
+                    log.info("File DLQ: Received initiate directory to media initiated event: {}", e.fileId());
             case MediaUpdateEvent.NestedDirectoryToMediaInitiated e ->
-                    System.out.println("Received initiate nested directory to media initiated event: " + e.fileId());
+                    log.info("File DLQ: Received initiate nested directory to media initiated event: {}", e.fileId());
             case MediaUpdateEvent.MediaCreatedReady e ->
-                    System.out.println("Received create media event: " + e.mediaId());
+                    log.info("File DLQ: Received create media event: {} {}", e.fileId(), e.mediaId());
             case MediaUpdateEvent.MediaThumbnailUpdateInitiated e ->
-                    System.out.println("Received initiate update media thumbnail event: " + e.mediaId());
+                    log.info("File DLQ: Received initiate update media thumbnail event: {}", e.mediaId());
             case MediaUpdateEvent.MediaThumbnailUpdatedReady e ->
-                    System.out.println("Received update media thumbnail name: " + e.mediaId());
+                    log.info("File DLQ: Received update media thumbnail name: {}", e.mediaId());
             case MediaUpdateEvent.DirectoryMoved e ->
-                    System.out.println("Received file move event: from: " + e.fileId() + " to: " + e.parentId());
+                    log.info("File DLQ: Received file move event: from: {} to: {}", e.fileId(), e.parentId());
             default -> {
-                System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+                log.error("File DLQ: Unknown MediaUpdateEvent type: {}", event.getClass());
                 ack.acknowledge();
             }
         }

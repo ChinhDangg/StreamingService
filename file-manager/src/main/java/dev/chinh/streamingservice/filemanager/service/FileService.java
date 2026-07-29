@@ -14,6 +14,8 @@ import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import dev.chinh.streamingservice.filemanager.data.FolderLocks;
 import dev.chinh.streamingservice.filemanager.event.FileEventProducer;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.domain.*;
@@ -42,6 +44,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FileService {
 
+    private static final Logger log = LoggerFactory.getLogger(FileService.class);
     private final RedisTemplate<String, String> redisStringTemplate;
     private final MongoTemplate mongoTemplate;
     private final ApplicationEventPublisher publisher;
@@ -295,6 +298,7 @@ public class FileService {
                 userId,
                 new MediaUpdateEvent.DirectoryCreated(saved.getId(), addUserIdToPath(userId, getFullPathInName(saved, true)))
         ));
+        log.info("Created new directory: {}", saved.getId());
 
         return saved;
     }
@@ -329,6 +333,7 @@ public class FileService {
                 userId,
                 new MediaUpdateEvent.FileRenamed(item.getId(), addUserIdToPath(userId, getFullPathInName(item, true)), newName)
         ));
+        log.info("Renamed file: {}", fileId);
 
         return newName;
     }

@@ -6,6 +6,8 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,7 @@ import java.util.function.Function;
 @RequiredArgsConstructor
 public class ThumbnailService {
 
+    private static final Logger log = LoggerFactory.getLogger(ThumbnailService.class);
     private final RedisTemplate<String, String> redisStringTemplate;
     private final MinIOService minIOService;
 
@@ -39,7 +42,7 @@ public class ThumbnailService {
         try {
             processResizedImagesInBatch(albumUrlInfo, thumbnailResolution, getThumbnailOutputParentPath(userId), false);
         } catch (Exception e) {
-            System.err.println(e.getMessage());
+            log.error("Failed to process thumbnail for albumId: {}", userId, e);
         } finally {
             counter.incrementAndGet();
         }
@@ -191,7 +194,7 @@ public class ThumbnailService {
 
                         int exitCode = process.waitFor();
                         if (exitCode != 0) {
-                            logs.forEach(System.out::println);
+                            logs.forEach(log::error);
                             System.out.println();
                         } else {
                             thumbnailServiceCache.add(name);
@@ -199,7 +202,7 @@ public class ThumbnailService {
                         }
 
                     } catch (Exception e) {
-                        System.err.println("Failed to execute ffmpeg command: " + e.getMessage());
+                        log.error("Failed to execute ffmpeg command: {}", e.getMessage(), e);
                     } finally {
                         semaphore.release();
                     }
