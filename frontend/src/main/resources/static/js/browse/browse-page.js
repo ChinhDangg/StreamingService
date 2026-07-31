@@ -15,8 +15,8 @@ const SortBy = Object.freeze({
 });
 
 const SortOrder = Object.freeze({
-    Ascending: 'ASC',
-    Descending: 'DESC',
+    Ascending: 'Asc',
+    Descending: 'Desc',
 });
 
 let currentNameEntry = getCurrentNameEntry();
