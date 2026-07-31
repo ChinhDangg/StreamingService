@@ -29,7 +29,7 @@ public class MediaNameEntityService {
 
     @Value("${always-show-original-resolution}")
     private String alwaysShowOriginalResolution;
-    private final int pageSize = 2;
+    private final int pageSize = 20;
 
     public Page<NameEntityDTO> findAllAuthors(String userId, int page, SortBy sortBy, SortOrder sortOrder) {
         return mapInfo(userId, page, searchMatchAll(ContentMetaData.AUTHORS, userId, page, sortBy, sortOrder), false);
