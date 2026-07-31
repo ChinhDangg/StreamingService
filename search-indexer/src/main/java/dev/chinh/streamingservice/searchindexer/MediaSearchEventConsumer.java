@@ -44,7 +44,7 @@ public class MediaSearchEventConsumer {
             return;
         }
         MediaSearchItem mediaSearchItem = mediaMapper.map(mediaMetaData.get());
-        if (event.mediaType() == MediaType.GROUPER) {
+        if (mediaMetaData.get().getMediaType() == MediaType.GROUPER) {
             mediaSearchItem.setMediaGroupInfo(new MediaGroupInfo(mediaMetaData.get().getGrouperId(), -1L));
         }
         try {
