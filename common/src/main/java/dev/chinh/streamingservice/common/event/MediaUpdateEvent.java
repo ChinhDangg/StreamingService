@@ -48,6 +48,13 @@ public interface MediaUpdateEvent {
             String newThumbnail
     ) implements MediaUpdateEvent{}
 
+    record NameEntityLengthUpdated(
+            String userId,
+            MediaNameEntityConstant nameEntityConstant,
+            Long[] nameEntityIds,
+            int deltaLength
+    ) implements MediaUpdateEvent{}
+
     record MediaPreviewUpdated(
             String userId,
             long mediaId,

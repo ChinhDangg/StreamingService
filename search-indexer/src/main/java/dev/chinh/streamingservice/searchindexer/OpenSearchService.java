@@ -7,13 +7,13 @@ import lombok.RequiredArgsConstructor;
 import org.opensearch.client.json.JsonData;
 import org.opensearch.client.json.JsonpMapper;
 import org.opensearch.client.opensearch.OpenSearchClient;
-import org.opensearch.client.opensearch._types.BuiltinScriptLanguage;
-import org.opensearch.client.opensearch._types.OpType;
-import org.opensearch.client.opensearch._types.Refresh;
-import org.opensearch.client.opensearch._types.Script;
+import org.opensearch.client.opensearch._types.*;
 import org.opensearch.client.opensearch._types.analysis.*;
 import org.opensearch.client.opensearch._types.mapping.Property;
 import org.opensearch.client.opensearch._types.mapping.TypeMapping;
+import org.opensearch.client.opensearch._types.query_dsl.Query;
+import org.opensearch.client.opensearch._types.query_dsl.TermsQuery;
+import org.opensearch.client.opensearch._types.query_dsl.TermsQueryField;
 import org.opensearch.client.opensearch.core.*;
 import org.opensearch.client.opensearch.indices.*;
 import org.opensearch.client.opensearch.indices.ExistsRequest;
@@ -392,6 +392,72 @@ public class OpenSearchService {
 
         UpdateByQueryResponse response = client.updateByQuery(request);
         System.out.println("Updated " + response.updated() + " documents with new name");
+    }
+
+    /**
+     * Updates the length field for documents matching the given IDs.
+     *
+     * @param indexName      Target index name
+     * @param docIds         List of custom document IDs
+     * @param delta          Amount to adjust length by (e.g., +1 to increase, -1 to decrease)
+     * @param idempotencyKey Key used to prevent duplicate executions
+     */
+    public void updateLengthByIds(
+            String indexName,
+            List<Long> docIds,
+            int delta,
+            String idempotencyKey) throws IOException {
+
+        // Define script source checking idempotency key before modifying length
+        String scriptSource =
+                "if (ctx._source.last_idempotency_key != params.key) { " +
+                "    if (ctx._source.length != null) { " +
+                "        ctx._source.length += params.delta; " +
+                "    } " +
+                "    ctx._source.last_idempotency_key = params.key; " +
+                "} else { " +
+                "    ctx.op = 'noop'; " + // Skip operation and avoid incrementing version
+                "}";
+
+        // Build Painless script with parameters
+        Script updateScript = Script.of(s -> s
+                .inline(InlineScript.of(i -> i
+                        .lang(l -> l.builtin(BuiltinScriptLanguage.Painless))
+                        .source(scriptSource)
+                        .params(Map.of(
+                                "delta", JsonData.of(delta),
+                                "key", JsonData.of(idempotencyKey)
+                        ))
+                ))
+        );
+
+        // 3. Query custom field 'id'
+        List<FieldValue> fieldValues = docIds.stream()
+                .map(FieldValue::of)
+                .toList();
+
+        Query customIdQuery = TermsQuery.of(t -> t
+                .field("id") // Use "id.keyword" if mapped as text + keyword
+                .terms(TermsQueryField.of(tf -> tf.value(fieldValues)))
+        ).toQuery();
+
+        UpdateByQueryRequest request = UpdateByQueryRequest.of(u -> u
+                .index(indexName)
+                .query(customIdQuery)
+                .script(updateScript)
+                .conflicts(Conflicts.Proceed)
+        );
+
+        UpdateByQueryResponse response = client.updateByQuery(request);
+
+        if (response.versionConflicts() != null && response.versionConflicts() > 0) {
+            // Log or metric trigger: Some documents were skipped due to concurrent writes.
+            // Re-issuing the method call with the same idempotencyKey will safely complete them!
+            System.err.println("Encountered " + response.versionConflicts() + " version conflicts.");
+        }
+
+        System.out.println("Updated documents: " + response.updated());
+        System.out.println("No-op (skipped) documents: " + response.noops());
     }
 
     /**

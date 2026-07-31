@@ -1,53 +1,62 @@
 package dev.chinh.streamingservice.backend.serve.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.backend.content.service.MinIOService;
 import dev.chinh.streamingservice.backend.content.service.ThumbnailService;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO;
-import dev.chinh.streamingservice.mediapersistence.repository.MediaAuthorRepository;
-import dev.chinh.streamingservice.mediapersistence.repository.MediaCharacterRepository;
-import dev.chinh.streamingservice.mediapersistence.repository.MediaTagRepository;
-import dev.chinh.streamingservice.mediapersistence.repository.MediaUniverseRepository;
+import dev.chinh.streamingservice.searchclient.OpenSearchService;
 import dev.chinh.streamingservice.searchclient.constant.SortBy;
 import lombok.RequiredArgsConstructor;
+import org.opensearch.client.opensearch._types.SortOrder;
+import org.opensearch.client.opensearch.core.SearchResponse;
+import org.opensearch.client.opensearch.core.search.Hit;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class MediaNameEntityService {
 
-    private final MediaAuthorRepository mediaAuthorRepository;
-    private final MediaCharacterRepository mediaCharacterRepository;
-    private final MediaUniverseRepository mediaUniverseRepository;
-    private final MediaTagRepository mediaTagRepository;
     private final ThumbnailService thumbnailService;
     private final MinIOService minIOService;
+    private final OpenSearchService openSearchService;
+    private final ObjectMapper objectMapper;
 
     @Value("${always-show-original-resolution}")
     private String alwaysShowOriginalResolution;
+    private final int pageSize = 2;
 
-    public Page<NameEntityDTO> findAllAuthors(String userId, int offset, SortBy sortBy, Sort.Direction sortOrder) {
-        return mapInfo(userId, mediaAuthorRepository.findAllNames(Long.parseLong(userId), getPageable(offset, sortBy, sortOrder)), false);
+    public Page<NameEntityDTO> findAllAuthors(String userId, int page, SortBy sortBy, SortOrder sortOrder) {
+        return mapInfo(userId, page, searchMatchAll(ContentMetaData.AUTHORS, userId, page, sortBy, sortOrder), false);
     }
 
-    public Page<NameEntityDTO> findAllCharacters(String userId, int offset, SortBy sortBy, Sort.Direction sortOrder) {
-        return mapInfo(userId, mediaCharacterRepository.findAllNames(Long.parseLong(userId), getPageable(offset, sortBy, sortOrder)), true);
+    public Page<NameEntityDTO> findAllCharacters(String userId, int page, SortBy sortBy, SortOrder sortOrder) {
+        return mapInfo(userId, page, searchMatchAll(ContentMetaData.CHARACTERS, userId, page, sortBy, sortOrder), true);
     }
 
-    public Page<NameEntityDTO> findAllUniverses(String userId, int offset, SortBy sortBy, Sort.Direction sortOrder) {
-        return mapInfo(userId, mediaUniverseRepository.findAllNames(Long.parseLong(userId), getPageable(offset, sortBy, sortOrder)), true);
+    public Page<NameEntityDTO> findAllUniverses(String userId, int page, SortBy sortBy, SortOrder sortOrder) {
+        return mapInfo(userId, page, searchMatchAll(ContentMetaData.UNIVERSES, userId, page, sortBy, sortOrder), true);
     }
 
-    public Page<NameEntityDTO> findAllTags(String userId, int offset, SortBy sortBy, Sort.Direction sortOrder) {
-        return mapInfo(userId, mediaTagRepository.findAllNames(Long.parseLong(userId), getPageable(offset, sortBy, sortOrder)), false);
+    public Page<NameEntityDTO> findAllTags(String userId, int page, SortBy sortBy, SortOrder sortOrder) {
+        return mapInfo(userId, page, searchMatchAll(ContentMetaData.TAGS, userId, page, sortBy, sortOrder), false);
     }
 
-    private Page<NameEntityDTO> mapInfo(String userId, Page<NameEntityDTO> entry, boolean hasThumbnail) {
-        List<NameEntityDTO> nameEntries = entry.getContent();
+    private Page<NameEntityDTO> mapInfo(String userId, int page, SearchResponse<Object> searchResponse, boolean hasThumbnail) {
+        int size = searchResponse.hits().hits().size();
+        if (size == 0)
+            return new PageImpl<>(new ArrayList<>(), PageRequest.of(page, pageSize), 0);
+
+        List<NameEntityDTO> nameEntries = new ArrayList<>(size);
+        for (Hit<Object> hit : searchResponse.hits().hits()) {
+            NameEntityDTO nameEntry = objectMapper.convertValue(hit.source(), NameEntityDTO.class);
+            nameEntries.add(nameEntry);
+        }
         if (hasThumbnail) {
             if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
                 nameEntries.forEach(nameEntry -> {
@@ -69,11 +78,17 @@ public class MediaNameEntityService {
                 });
             }
         }
-        return new PageImpl<>(nameEntries, PageRequest.of(entry.getNumber(), entry.getSize()), entry.getTotalElements());
+        int total = searchResponse.hits().total() == null ? 0 : (int) searchResponse.hits().total().value();
+        return new PageImpl<>(nameEntries, PageRequest.of(page, pageSize), total);
     }
 
-    private Pageable getPageable(int offset, SortBy sortBy, Sort.Direction sortOrder) {
-        final int pageSize = 20;
-        return PageRequest.of(offset, pageSize, Sort.by(sortOrder, sortBy.getField()));
+    public SearchResponse<Object> searchMatchAll(String indexName, String userId, int page, SortBy sortBy, SortOrder sortOrder) {
+        if (page > 50)
+            throw new IllegalArgumentException("Max page's'exceeded, please refine your search");
+        try {
+            return openSearchService.searchMatchAll(indexName, Long.parseLong(userId), page, pageSize, sortBy, sortOrder);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

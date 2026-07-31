@@ -4,6 +4,7 @@ import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
+import dev.chinh.streamingservice.mediapersistence.entity.MediaNameEntity;
 import dev.chinh.streamingservice.mediapersistence.projection.MediaGroupInfo;
 import dev.chinh.streamingservice.mediapersistence.projection.MediaNameSearchItem;
 import dev.chinh.streamingservice.mediapersistence.projection.MediaSearchItem;
@@ -21,10 +22,7 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -123,16 +121,10 @@ public class MediaSearchEventConsumer {
 
     private void onCreateNameEntitySearch(MediaUpdateEvent.NameEntityCreated event) {
         System.out.println("Received create name entity: " + event.nameEntityConstant() + " nameEntityId: " + event.nameEntityId());
-        String name = getNameEntityName(Long.parseLong(event.userId()), event.nameEntityConstant(), event.nameEntityId());
-        if (name != null) {
+        MediaNameEntity nameEntity = getMediaNameEntity(Long.parseLong(event.userId()), event.nameEntityConstant(), event.nameEntityId());
+        if (nameEntity != null) {
             try {
-                Map<String, Object> fields = new HashMap<>();
-                fields.put(ContentMetaData.NAME, name);
-                fields.put(ContentMetaData.USER_ID, Long.parseLong(event.userId()));
-                if (event.thumbnailPath() != null) {
-                    fields.put(ContentMetaData.THUMBNAIL, event.thumbnailPath());
-                }
-                openSearchService.indexDocument(event.nameEntityConstant().getName(), event.nameEntityId(), fields);
+                openSearchService.indexDocument(event.nameEntityConstant().getName(), event.nameEntityId(), nameEntity);
             } catch (IOException e) {
                 throw new RuntimeException("Failed to update Search index field for name entity " + event.nameEntityId(), e);
             }
@@ -160,6 +152,20 @@ public class MediaSearchEventConsumer {
             } catch (IOException e) {
                 throw new RuntimeException("Failed to update Search index field for name entity " + event.nameEntityId(), e);
             }
+        }
+    }
+
+    private void onUpdateNameEntityLength(MediaUpdateEvent.NameEntityLengthUpdated event) {
+        System.out.println("Received update name entity length");
+        try {
+            openSearchService.updateLengthByIds(
+                    event.nameEntityConstant().getName(),
+                    List.of(event.nameEntityIds()),
+                    event.deltaLength(),
+                    UUID.randomUUID().toString()
+            );
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to update Search name entity length in batch: " + event.nameEntityConstant().getName() + " for user: " + event.userId());
         }
     }
 
@@ -191,6 +197,16 @@ public class MediaSearchEventConsumer {
         };
     }
 
+    private MediaNameEntity getMediaNameEntity(long userId, MediaNameEntityConstant nameEntity, long nameEntityId) {
+        var result =  switch (nameEntity) {
+            case AUTHORS -> mediaAuthorRepository.findByIdAndUserId(nameEntityId, userId);
+            case CHARACTERS -> mediaCharacterRepository.findByIdAndUserId(nameEntityId, userId);
+            case UNIVERSES -> mediaUniverseRepository.findByIdAndUserId(nameEntityId, userId);
+            case TAGS -> mediaTagRepository.findByIdAndUserId(nameEntityId, userId);
+        };
+        return result.orElse(null);
+    }
+
 
     @KafkaListener(topics = {
             EventTopics.MEDIA_SEARCH_TOPIC,
@@ -211,6 +227,7 @@ public class MediaSearchEventConsumer {
 
                 case MediaUpdateEvent.NameEntityCreated e -> onCreateNameEntitySearch(e);
                 case MediaUpdateEvent.NameEntityUpdated e -> onUpdateNameEntitySearch(e);
+                case MediaUpdateEvent.NameEntityLengthUpdated e -> onUpdateNameEntityLength(e);
                 case MediaUpdateEvent.NameEntityDeleted e -> onDeleteNameEntitySearch(e);
 
                 default ->

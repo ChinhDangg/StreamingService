@@ -75,7 +75,7 @@ public class MediaMetadataModifyService {
                 new MediaUpdateEvent.MediaTitleUpdated(userId, mediaId)
         ));
 
-        mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
+        mediaSearchCacheService.removeCachedMediaSearchItem(userId, mediaId);
         return newTitle;
     }
 
@@ -117,6 +117,11 @@ public class MediaMetadataModifyService {
                 int added = addNameEntitiesToMedia(mediaId, addingIds, updateList.nameEntity);
                 System.out.println("Adding: " + addingIds.length + " Added: " + added);
                 nameEntityModifyService.incrementEntityLengthCount(userId, addingIds, updateList.nameEntity);
+                eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                        EventTopics.MEDIA_SEARCH_TOPIC,
+                        userIdStr,
+                        new MediaUpdateEvent.NameEntityLengthUpdated(userIdStr, updateList.nameEntity, addingIds, 1)
+                ));
             }
         }
 
@@ -126,6 +131,11 @@ public class MediaMetadataModifyService {
                 int removed = removeNameEntitiesFromMedia(mediaId, removingIds, updateList.nameEntity);
                 System.out.println("Removing: " + removingIds.length + " Removed: " + removed);
                 nameEntityModifyService.decrementNameEntityLengthCount(userId, removingIds, updateList.nameEntity);
+                eventPublisher.publishEvent(new MediaUploadEventProducer.EventWrapper(
+                        EventTopics.MEDIA_SEARCH_TOPIC,
+                        userIdStr,
+                        new MediaUpdateEvent.NameEntityLengthUpdated(userIdStr, updateList.nameEntity, removingIds, -1)
+                ));
             }
         }
 
@@ -138,7 +148,7 @@ public class MediaMetadataModifyService {
                     new MediaUpdateEvent.MediaNameEntityUpdated(userIdStr, mediaId, updateList.nameEntity)
             ));
 
-        mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
+        mediaSearchCacheService.removeCachedMediaSearchItem(userIdStr, mediaId);
         return updatedMediaNameEntityList;
     }
 
@@ -205,9 +215,9 @@ public class MediaMetadataModifyService {
             mediaDisplayService.removeCacheGroupOfMedia(mediaMetaData.getId());
         } else if (mediaMetaData.getGrouperId() != null && grouperMediaId != null) {
             mediaDisplayService.removeCacheGroupOfMedia(grouperMediaId);
-            mediaSearchCacheService.removeCachedMediaSearchItem(grouperMediaId);
+            mediaSearchCacheService.removeCachedMediaSearchItem(userIdStr, grouperMediaId);
         }
-        mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
+        mediaSearchCacheService.removeCachedMediaSearchItem(userIdStr, mediaId);
     }
 
     @Transactional
@@ -222,7 +232,7 @@ public class MediaMetadataModifyService {
                 new MediaUpdateEvent.LengthUpdated(mediaId, newLength)
         ));
         mediaDisplayService.removeCacheGroupOfMedia(mediaId);
-        mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
+        mediaSearchCacheService.removeCachedMediaSearchItem(String.valueOf(userId), mediaId);
     }
 
     @Transactional
@@ -235,7 +245,7 @@ public class MediaMetadataModifyService {
                 userId,
                 new MediaUpdateEvent.MediaPreviewUpdated(userId, mediaId, previewObject)
         ));
-        mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
+        mediaSearchCacheService.removeCachedMediaSearchItem(userId, mediaId);
     }
 
     private MediaMetaData getMediaMetaData(long mediaId) {
@@ -313,6 +323,6 @@ public class MediaMetadataModifyService {
             }
         } else
             return;
-        mediaSearchCacheService.removeCachedMediaSearchItem(mediaId);
+        mediaSearchCacheService.removeCachedMediaSearchItem(userId, mediaId);
     }
 }

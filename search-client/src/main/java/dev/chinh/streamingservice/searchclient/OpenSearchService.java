@@ -237,6 +237,7 @@ public class OpenSearchService {
             case SortBy.LENGTH -> ContentMetaData.LENGTH;
             case SortBy.SIZE -> ContentMetaData.SIZE;
             case SortBy.YEAR -> ContentMetaData.YEAR;
+            case SortBy.NAME -> ContentMetaData.NAME + ".keyword";
             default -> null;
         };
 
