@@ -10,7 +10,7 @@ public class MediaSearchCacheService {
 
     private final RedisTemplate<String, String> redisStringTemplate;
 
-    public void removeCachedMediaSearchItem(long id) {
-        redisStringTemplate.delete("media::" + id);
+    public void removeCachedMediaSearchItem(String userId, long id) {
+        redisStringTemplate.delete("media::" + userId + ":" + id);
     }
 }
