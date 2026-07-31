@@ -1,0 +1,55 @@
+# RECEIVERS: How data enters the collector
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+# PROCESSORS: Modifications made before sending
+processors:
+  batch: # Groups spans/metrics into batches to optimize network calls
+    timeout: 1s
+    send_batch_size: 8192
+  memory_limiter: # Prevents collector from running out of memory
+    check_interval: 1s
+    limit_percentage: 75
+    spike_limit_percentage: 20
+
+# EXPORTERS: Where the data goes
+exporters:
+  # Print telemetry to collector container logs (for testing/debugging)
+  debug:
+    verbosity: detailed
+
+  otlp_grpc/tempo:
+    endpoint: "tempo:4317"
+    tls:
+      insecure: true
+
+  otlp_http/loki:
+    endpoint: "http://loki:3100/otlp"
+    tls:
+      insecure: true
+
+  prometheusremotewrite:
+    endpoint: "http://prometheus:9090/api/v1/write"
+
+# PIPELINES: Connect Receivers -> Processors -> Exporters
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_grpc/tempo]
+
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_http/loki]
+
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheusremotewrite]

@@ -1,0 +1,42 @@
+apiVersion: 1
+
+datasources:
+  # Prometheus for Metrics
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+
+  # Loki for Logs (with trace ID correlation)
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      derivedFields:
+        - name: trace_id
+          matcherType: label
+          matcherRegex: 'trace[_]?id'
+          url: '$${__value.raw}'
+          datasourceUid: tempo
+
+  # Tempo for Traces
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      # Link Tempo to Loki to fetch logs related to spans automatically
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: '-1m'       # Expands time window slightly to catch pre-span logs
+        spanEndTimeShift: '1m'
+        tags:
+          - key: 'service.name'
+            value: 'service_name'     # Maps Tempo service name to Loki query
+        filterByTraceID: true          # Automatically appends trace_id filter to Loki query
+        filterBySpanID: false

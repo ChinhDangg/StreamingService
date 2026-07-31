@@ -41,6 +41,22 @@
                 <artifactId>lombok</artifactId>
                 <version>${lombok.version}</version>
             </dependency>
+            <!-- Forces all core OpenTelemetry libs to a unified version -->
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-bom</artifactId>
+                <version>1.64.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Forces all OpenTelemetry instrumentation (like Logback) to match -->
+            <dependency>
+                <groupId>io.opentelemetry.instrumentation</groupId>
+                <artifactId>opentelemetry-instrumentation-bom-alpha</artifactId>
+                <version>2.29.0-alpha</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

@@ -1,0 +1,6 @@
+global:
+  scrape_interval: 10s # How often to pull data
+
+storage:
+  tsdb:
+    out_of_order_time_window: 30m
