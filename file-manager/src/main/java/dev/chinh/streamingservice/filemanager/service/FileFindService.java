@@ -61,7 +61,7 @@ public class FileFindService {
         );
         List<FileSystemItem> itemInDir = getUpdatedThumbnailUrl(userId, window.getContent());
 
-        if (getFullPathInfo) {
+        if (!itemInDir.isEmpty() && getFullPathInfo) {
             FileSystemItem parentCraft = new FileSystemItem();
             String pathInId;
             if (itemInDir.isEmpty()) {
