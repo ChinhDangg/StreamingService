@@ -1,4 +1,4 @@
-package dev.chinh.taskresponder.config;
+package dev.chinh.streamingservice.workers.config;
 
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Autowired;

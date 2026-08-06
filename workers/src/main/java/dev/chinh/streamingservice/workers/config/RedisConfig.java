@@ -5,11 +5,15 @@ import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import dev.chinh.streamingservice.workers.respond.RedisJobStatusListener;
 import io.lettuce.core.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import org.springframework.data.redis.listener.adapter.MessageListenerAdapter;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Configuration
@@ -37,5 +41,30 @@ public class RedisConfig {
 
         template.afterPropertiesSet();
         return template;
+    }
+
+
+    @Bean
+    public ChannelTopic jobTopic() {
+        return new ChannelTopic("job-status-channel");
+    }
+
+    @Bean
+    public MessageListenerAdapter listenerAdapter(RedisJobStatusListener receiver) {
+        return new MessageListenerAdapter(receiver, "handleJob");
+    }
+
+    @Bean
+    public RedisMessageListenerContainer redisContainer(
+            RedisConnectionFactory connectionFactory,
+            MessageListenerAdapter listenerAdapter,
+            ChannelTopic jobTopic
+    ) {
+        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+        container.setConnectionFactory(connectionFactory);
+
+        // Map the adapter and its targeted method to listen strictly on our topic channel
+        container.addMessageListener(listenerAdapter, jobTopic);
+        return container;
     }
 }

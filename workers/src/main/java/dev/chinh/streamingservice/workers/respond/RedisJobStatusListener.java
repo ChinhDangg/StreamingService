@@ -1,4 +1,4 @@
-package dev.chinh.taskresponder;
+package dev.chinh.streamingservice.workers.respond;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;

@@ -73,7 +73,6 @@
         <module>media-upload</module>
         <module>search-indexer</module>
         <module>workers</module>
-        <module>task-responder</module>
     </modules>
 
     <dependencies>

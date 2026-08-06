@@ -1,4 +1,4 @@
-package dev.chinh.taskresponder.config;
+package dev.chinh.streamingservice.workers.config;
 
 import dev.chinh.streamingservice.common.security.EnforceCsrfFilter;
 import org.springframework.beans.factory.annotation.Value;
