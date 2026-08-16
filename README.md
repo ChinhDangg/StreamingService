@@ -6,9 +6,7 @@ It supports authenticated media upload, on-demand and cached HLS streaming, back
 The platform is designed to serve **media assets (videos and images) at multiple resolutions at runtime rather than pre-generating them and storing them on disk to save space**.  
 When a requested resolution does not already exist, the system performs **live transcoding** from the original stored media, generating **HLS chunks in real time**, storing them **in memory (RAM)**, and **streaming them immediately to the user** without writing intermediate data to disk.
 
-The system is built around **clear service responsibilities**, **event-driven workflows**, and **high-performance media delivery** using RAM-backed storage and an **nginx/OpenResty edge** for secure, low-latency streaming.
-
-Support a filesystem structure similar to a traditional file server like Google Drive over the web to organize your media files. Pick videos to put them in the streaming service to browse and add tags for searching. Pick group of images or videos to create an album and view them 
+Support a filesystem structure similar to a traditional file storage server like Google Drive over the web to organize your media files. Pick videos to put them in the streaming service to browse and add tags for searching. Pick group of images or videos to create an album and view them 
 in a single scrollable page like a photo gallery or comic webcomic. Group of albums can be put together to become a grouper - to share common tags and get searched together like a multiple chapters comic.
 
 ---
