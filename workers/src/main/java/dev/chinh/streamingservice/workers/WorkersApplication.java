@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Bean;
 @SpringBootApplication
 public class WorkersApplication {
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         SpringApplication.run(WorkersApplication.class, args);
     }
 

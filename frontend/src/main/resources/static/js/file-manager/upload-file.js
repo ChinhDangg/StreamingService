@@ -2,7 +2,8 @@ import {apiRequest} from "/static/js/common.js";
 import SparkMD5 from '/static/js/file-manager/spark-md5.js';
 
 export async function endVideoUploadSession(uploadId, uploadedParts, basicInfo, nameUpdateList, isLast = false) {
-    const endResponse = await apiRequest('/api/upload/media/end-session-video', {
+    const nameUpdateListJson = nameUpdateList ? JSON.stringify(nameUpdateList) : null;
+    const response = await apiRequest('/api/upload/end-session-file', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -10,19 +11,19 @@ export async function endVideoUploadSession(uploadId, uploadedParts, basicInfo, 
         body: JSON.stringify({
             uploadId: uploadId,
             uploadedParts: uploadedParts,
-            basicInfo: basicInfo,
             isLast: isLast,
-            nameUpdateList: nameUpdateList
+            addAsVideo: true,
+            nameUpdateListAsJson: nameUpdateListJson,
         })
     });
-    if (!endResponse.ok) {
-        return 'Error: Failed to finalize video upload: ' + await endResponse.text();
+    if (!response.ok) {
+        return 'Error: Failed to finalize video upload: ' + await response.text();
     }
-    return endResponse.text();
+    return response.text();
 }
 
 export async function endFileSession(uploadId, uploadedParts, isLast = false){
-    const response = await apiRequest('/api/upload/media/end-session-file', {
+    const response = await apiRequest('/api/upload/end-session-file', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -36,10 +37,10 @@ export async function endFileSession(uploadId, uploadedParts, isLast = false){
     if (!response.ok) {
         return 'Error: Failed to finalize file upload: ' + await response.text();
     }
-    return "Success";
+    return response.text();
 }
 
-export async function uploadFile(sessionId, file, fileName,
+export async function uploadFile(file, fileName,
                                  uploadingFiles = null, currentFailTexts = null,
                                  chunks = null, eTags = null, uploadId = null,
                                  showProgressFn = null) {
@@ -53,43 +54,16 @@ export async function uploadFile(sessionId, file, fileName,
     console.log(chunks);
 
     if (uploadingFiles)
-        uploadingFiles.set(fileName, { file: file, sessionId: sessionId, uploadId: uploadId, fileName: fileName, chunks: chunks, eTags: eTags, partNumber: chunks.partNumber ? chunks.partNumber : 0 });
+        uploadingFiles.set(fileName, { file: file, uploadId: uploadId, fileName: fileName, chunks: chunks, eTags: eTags, partNumber: chunks.partNumber ? chunks.partNumber : 0 });
 
-    const startUploadSession = async(filePath) => {
-        const sessionResponse = await apiRequest('/api/file/upload/create-session', {
+    const initiateUpload = async(filePath) => {
+        const response = await apiRequest('/api/upload/initiate', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 filePath: filePath
-            })
-        });
-        if (!sessionResponse.ok) {
-            return 'Error: Failed to start upload: ' + await sessionResponse.text();
-        }
-        return await sessionResponse.text();
-    }
-
-    sessionId = sessionId == null ? await startUploadSession(fileName) : sessionId;
-    if (!sessionId || sessionId.startsWith('Error:')) {
-        if (currentFailTexts)
-            currentFailTexts.push(sessionId);
-        return false;
-    }
-    console.log('sessionId: ' + sessionId);
-
-    if (uploadingFiles)
-        uploadingFiles.get(fileName).sessionId = sessionId;
-
-    const initiateUpload = async () => {
-        const response = await apiRequest('/api/upload/media/initiate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                sessionId: sessionId
             })
         });
         if (!response.ok) {
@@ -100,7 +74,7 @@ export async function uploadFile(sessionId, file, fileName,
         return await response.text();
     }
 
-    uploadId = uploadId == null ? await initiateUpload() : uploadId;
+    uploadId = uploadId == null ? await initiateUpload(fileName) : uploadId;
     if (!uploadId)
         return false;
     console.log('uploadId: ' + uploadId);
@@ -120,7 +94,7 @@ export async function uploadFile(sessionId, file, fileName,
             const c = tasks.shift();
 
             try {
-                const urlResponse = await apiRequest('/api/upload/media/presign-part-url', {
+                const urlResponse = await apiRequest('/api/upload/presign-part-url', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

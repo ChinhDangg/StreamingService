@@ -1,0 +1,326 @@
+package dev.chinh.streamingservice.mediahandler.modify.service;
+
+import dev.chinh.streamingservice.common.OSUtil;
+import dev.chinh.streamingservice.common.constant.MediaType;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
+import dev.chinh.streamingservice.common.event.EventTopics;
+import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
+import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
+import dev.chinh.streamingservice.common.exception.DuplicateEntryException;
+import dev.chinh.streamingservice.mediapersistence.repository.*;
+import dev.chinh.streamingservice.mediahandler.event.MediaHandlerEventProducer;
+import dev.chinh.streamingservice.mediahandler.event.MediaHandlerService;
+import dev.chinh.streamingservice.mediahandler.MinIOService;
+import dev.chinh.streamingservice.mediapersistence.entity.MediaGroupMetaData;
+import dev.chinh.streamingservice.mediapersistence.entity.MediaMetaData;
+import dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class MediaMetadataModifyService {
+
+    private final MediaMetaDataRepository mediaMetaDataRepository;
+    private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
+    private final MediaSearchCacheService mediaSearchCacheService;
+    private final NameEntityModifyService nameEntityModifyService;
+    private final MinIOService minIOService;
+
+    private final StringRedisTemplate redisTemplate;
+    private final ApplicationEventPublisher eventPublisher;
+
+    public List<NameEntityDTO> getMediaNameEntityInfo(String userIdStr, long mediaId, MediaNameEntityConstant nameEntity) {
+        long userId = Long.parseLong(userIdStr);
+        return switch (nameEntity.getName()) {
+            case ContentMetaData.AUTHORS -> mediaMetaDataRepository.findAuthorsByMediaId(userId, mediaId);
+            case ContentMetaData.CHARACTERS -> mediaMetaDataRepository.findCharactersByMediaId(userId, mediaId);
+            case ContentMetaData.UNIVERSES -> mediaMetaDataRepository.findUniversesByMediaId(userId, mediaId);
+            case ContentMetaData.TAGS -> mediaMetaDataRepository.findTagsByMediaId(userId, mediaId);
+            default -> throw new IllegalArgumentException("Invalid name entity type: " + nameEntity);
+        };
+    }
+
+    @Transactional
+    public String updateMediaTitle(String userId, long mediaId, String newTitle) {
+        if (newTitle == null) {
+            throw new IllegalArgumentException("Title must not be null");
+        }
+        newTitle = newTitle.trim();
+        if (newTitle.isEmpty())
+            throw new IllegalArgumentException("Name must not be empty");
+        if (newTitle.length() < 5)
+            throw new IllegalArgumentException("Name must be at least 5 chars: " + newTitle);
+        if (newTitle.length() > 300)
+            throw new IllegalArgumentException("Name must be at most 300 chars");
+
+        int updated = mediaMetaDataRepository.updateMediaTitle(Long.parseLong(userId), mediaId, newTitle);
+        if (updated == 0) throw new IllegalArgumentException("Media not found: " + mediaId);
+
+        eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                EventTopics.MEDIA_SEARCH_TOPIC,
+                userId,
+                new MediaUpdateEvent.MediaTitleUpdated(userId, mediaId, newTitle)
+        ));
+
+        mediaSearchCacheService.removeCachedMediaSearchItem(userId, mediaId);
+        return newTitle;
+    }
+
+    public record UpdateList(
+            List<NameEntityDTO> adding, List<NameEntityDTO> removing, MediaNameEntityConstant nameEntity
+    ) {}
+
+    @Transactional
+    public void updateNameEntityInMediaInBatch(String userId, List<UpdateList> updateLists, long mediaId, boolean publishSearchUpdate) {
+        MediaMetaData mediaMetaData = getMediaMetaData(mediaId);
+        for (UpdateList updateList : updateLists) {
+            updateNameEntityInMedia(userId, updateList, mediaId, publishSearchUpdate, mediaMetaData);
+        }
+    }
+
+    @Transactional
+    public List<NameEntityDTO> updateNameEntityInMedia(String userIdStr, UpdateList updateList, long mediaId, boolean publishSearchUpdate, MediaMetaData mediaMetaData) {
+        if ((updateList.adding == null || updateList.adding.isEmpty()) && (updateList.removing == null || updateList.removing.isEmpty())) return new ArrayList<>();
+
+        long userId = Long.parseLong(userIdStr);
+
+        mediaMetaData = mediaMetaData == null ? getMediaMetaData(mediaId) : mediaMetaData;
+        if (mediaMetaData.getUserId() != userId)
+            throw new IllegalArgumentException("No media found for user: " + userId);
+
+        List<Long> uniqueAdding = updateList.adding == null
+                ? new ArrayList<>()
+                : new ArrayList<>(updateList.adding.stream().map(NameEntityDTO::getId).distinct().toList());
+        List<Long> uniqueRemoving = updateList.removing == null
+                ? new ArrayList<>()
+                : updateList.removing.stream().map(NameEntityDTO::getId).distinct().toList();
+        uniqueAdding.removeAll(uniqueRemoving);
+
+        if (uniqueAdding.isEmpty() && uniqueRemoving.isEmpty()) return new ArrayList<>();
+
+        if (!uniqueAdding.isEmpty()) {
+            Long[] addingIds = nameEntityModifyService.getMediaNameEntityIdByUserIdAndIdIn(userId, uniqueAdding, updateList.nameEntity);
+            if (addingIds.length > 0) {
+                int added = addNameEntitiesToMedia(mediaId, addingIds, updateList.nameEntity);
+                System.out.println("Adding: " + addingIds.length + " Added: " + added);
+                nameEntityModifyService.incrementEntityLengthCount(userId, addingIds, updateList.nameEntity);
+                eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                        EventTopics.MEDIA_SEARCH_TOPIC,
+                        userIdStr,
+                        new MediaUpdateEvent.NameEntityLengthUpdated(userIdStr, updateList.nameEntity, addingIds, 1)
+                ));
+            }
+        }
+
+        if (!uniqueRemoving.isEmpty()) {
+            Long[] removingIds = nameEntityModifyService.getMediaNameEntityIdByUserIdAndIdIn(userId, uniqueRemoving, updateList.nameEntity);
+            if (removingIds.length > 0) {
+                int removed = removeNameEntitiesFromMedia(mediaId, removingIds, updateList.nameEntity);
+                System.out.println("Removing: " + removingIds.length + " Removed: " + removed);
+                nameEntityModifyService.decrementNameEntityLengthCount(userId, removingIds, updateList.nameEntity);
+                eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                        EventTopics.MEDIA_SEARCH_TOPIC,
+                        userIdStr,
+                        new MediaUpdateEvent.NameEntityLengthUpdated(userIdStr, updateList.nameEntity, removingIds, -1)
+                ));
+            }
+        }
+
+        List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(userIdStr, mediaId, updateList.nameEntity);
+
+        if (publishSearchUpdate)
+            eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                    EventTopics.MEDIA_SEARCH_TOPIC,
+                    userIdStr,
+                    new MediaUpdateEvent.MediaNameEntityUpdated(userIdStr, mediaId, updateList.nameEntity)
+            ));
+
+        mediaSearchCacheService.removeCachedMediaSearchItem(userIdStr, mediaId);
+        return updatedMediaNameEntityList;
+    }
+
+    private int addNameEntitiesToMedia(long mediaId, Long[] nameEntityIds, MediaNameEntityConstant nameEntity) {
+        try {
+            return switch (nameEntity) {
+                case MediaNameEntityConstant.AUTHORS -> mediaMetaDataRepository.addAuthorsToMedia(mediaId, nameEntityIds);
+                case MediaNameEntityConstant.CHARACTERS -> mediaMetaDataRepository.addCharactersToMedia(mediaId, nameEntityIds);
+                case MediaNameEntityConstant.UNIVERSES -> mediaMetaDataRepository.addUniversesToMedia(mediaId, nameEntityIds);
+                case MediaNameEntityConstant.TAGS -> mediaMetaDataRepository.addTagsToMedia(mediaId, nameEntityIds);
+            };
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateEntryException("Duplicate name entity in media: " + e.getMessage());
+        }
+    }
+
+    private int removeNameEntitiesFromMedia(long mediaId, Long[] nameEntityIds, MediaNameEntityConstant nameEntity) {
+        return switch (nameEntity) {
+            case MediaNameEntityConstant.AUTHORS -> mediaMetaDataRepository.deleteAuthorsFromMedia(mediaId, nameEntityIds);
+            case MediaNameEntityConstant.CHARACTERS -> mediaMetaDataRepository.deleteCharactersFromMedia(mediaId, nameEntityIds);
+            case MediaNameEntityConstant.UNIVERSES -> mediaMetaDataRepository.deleteUniversesFromMedia(mediaId, nameEntityIds);
+            case MediaNameEntityConstant.TAGS -> mediaMetaDataRepository.deleteTagsFromMedia(mediaId, nameEntityIds);
+        };
+    }
+
+    @Transactional
+    public void deleteMedia(String userIdStr, long mediaId) {
+        MediaMetaData mediaMetaData = mediaMetaDataRepository.findById(mediaId).orElseThrow(
+                () -> new IllegalArgumentException("Media not found: " + mediaId)
+        );
+
+        long userId = Long.parseLong(userIdStr);
+        if (mediaMetaData.getUserId() != userId)
+            throw new IllegalArgumentException("No media found for user: " + userId);
+
+        Long grouperMediaId = null;
+        if (mediaMetaData.getMediaType() == MediaType.GROUPER) {
+            // for grouper of album - delete each album first - only delete grouper if it is empty
+            Optional<MediaGroupMetaData> grouperItems = mediaGroupMetaDataRepository.findFirstByGrouperMetaDataId(mediaMetaData.getGrouperId());
+            if (grouperItems.isPresent())
+                throw new IllegalArgumentException("Non-empty Grouper media cannot be deleted: " + mediaMetaData.getId());
+        } else if (mediaMetaData.getGrouperId() != null) { // else if not a grouper
+            // media is part of a grouper - decrement grouper length
+            MediaGroupMetaData grouperMetaData = mediaGroupMetaDataRepository.findById(mediaMetaData.getGrouperId()).orElseThrow(
+                    () -> new IllegalArgumentException("Grouper media not found: " + mediaMetaData.getGrouperId())
+            );
+            grouperMediaId = grouperMetaData.getMediaMetaDataId();
+            mediaMetaDataRepository.updateLengthWithDelta(userId, new Long[]{grouperMediaId}, -1);
+            eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                    EventTopics.MEDIA_SEARCH_TOPIC,
+                    userIdStr,
+                    new MediaUpdateEvent.LengthUpdated(Collections.singletonList(grouperMediaId), -1)
+            ));
+        }
+
+        mediaMetaDataRepository.decrementAuthorLengths(userId, mediaMetaData.getId());
+        mediaMetaDataRepository.decrementCharacterLengths(userId, mediaMetaData.getId());
+        mediaMetaDataRepository.decrementUniverseLengths(userId, mediaMetaData.getId());
+        mediaMetaDataRepository.decrementTagLengths(userId, mediaMetaData.getId());
+
+        mediaMetaDataRepository.deleteById(mediaMetaData.getId());
+
+        if (mediaMetaData.getMediaType() == MediaType.GROUPER) {
+            mediaSearchCacheService.removeCacheGroupOfMedia(userIdStr, mediaMetaData.getId());
+        } else if (mediaMetaData.getGrouperId() != null && grouperMediaId != null) {
+            mediaSearchCacheService.removeCacheGroupOfMedia(userIdStr, grouperMediaId);
+            mediaSearchCacheService.removeCachedMediaSearchItem(userIdStr, grouperMediaId);
+        }
+        mediaSearchCacheService.removeCachedMediaSearchItem(userIdStr, mediaId);
+    }
+
+    @Transactional
+    public void updateMediaLengthWithDelta(long userId, List<Long> mediaIds, int delta) {
+        int updated = mediaMetaDataRepository.updateLengthWithDelta(userId, mediaIds.toArray(Long[]::new), delta);
+        if (updated == 0)
+            System.err.println("Media not found: " + mediaIds);
+
+        eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                EventTopics.MEDIA_SEARCH_TOPIC,
+                String.valueOf(userId),
+                new MediaUpdateEvent.LengthUpdated(mediaIds, delta)
+        ));
+        mediaSearchCacheService.removeCacheGroupOfMedia(String.valueOf(userId), mediaIds);
+        mediaSearchCacheService.removeCachedMediaSearchItem(String.valueOf(userId), mediaIds);
+    }
+
+    @Transactional
+    public void updateMediaPreview(String userId, long mediaId, String previewObject) {
+        int updated = mediaMetaDataRepository.updateMediaPreview(Long.parseLong(userId), mediaId, previewObject);
+        if (updated == 0) throw new IllegalArgumentException("Media not found: " + mediaId + " for user: " + userId);
+
+        eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                EventTopics.MEDIA_SEARCH_TOPIC,
+                userId,
+                new MediaUpdateEvent.MediaPreviewUpdated(userId, mediaId, previewObject)
+        ));
+        mediaSearchCacheService.removeCachedMediaSearchItem(userId, mediaId);
+    }
+
+    private MediaMetaData getMediaMetaData(long mediaId) {
+        return mediaMetaDataRepository.findById(mediaId).orElseThrow(
+                () -> new IllegalArgumentException("Media not found: " + mediaId)
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public void updateMediaThumbnail(String userId, long mediaId, Double num, MultipartFile multipartFile) throws Exception {
+        boolean hasFile = multipartFile != null && multipartFile.getSize() > 0;
+        if (!hasFile && num == null) {
+            throw new IllegalArgumentException("Thumbnail file is empty and no thumbnail number provided");
+        }
+        MediaMetaData mediaMetaData = getMediaMetaData(mediaId);
+        if (mediaMetaData.getUserId() != Long.parseLong(userId))
+            throw new IllegalArgumentException("No media found for user: " + userId);
+
+        MediaType mediaType = mediaMetaData.getMediaType();
+
+        if (hasFile) {
+            String extension = MediaHandlerService.getFileExtension(multipartFile.getOriginalFilename());
+            String newThumbnailName = mediaMetaData.getThumbnail().endsWith(extension)
+                    ? mediaMetaData.getThumbnail()
+                    : MediaHandlerService.createMediaThumbnailString(userId, mediaType, multipartFile.getOriginalFilename());
+            minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnailName, multipartFile);
+            if (newThumbnailName != null && !newThumbnailName.equals(mediaMetaData.getThumbnail())) {
+                eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                        EventTopics.MEDIA_OBJECT_TOPIC,
+                        userId,
+                        new MediaUpdateEvent.MediaThumbnailUpdated(userId, mediaId, mediaType, null, mediaMetaData.getBucket(), newThumbnailName)
+                ));
+            } else {
+                String oldExtension = MediaHandlerService.getFileExtension(mediaMetaData.getThumbnail());
+                String baseThumbnailCache = "/thumbnail-cache/";
+                String fileThumbnailCache = userId + "/" + mediaId + "_p144" + oldExtension;
+                String searchThumbnailCache = userId + "/" + mediaId + "_p360" + oldExtension;
+                String fileThumbnailWithBase = baseThumbnailCache.concat(fileThumbnailCache);
+                String searchThumbnailWithBase = baseThumbnailCache.concat(searchThumbnailCache);
+
+                OSUtil.deleteForceMemoryDirectory(fileThumbnailWithBase, null);
+                OSUtil.deleteForceMemoryDirectory(searchThumbnailWithBase, null);
+                redisTemplate.opsForZSet().remove("thumbnail-cache", fileThumbnailCache);
+                redisTemplate.opsForZSet().remove("thumbnail-cache", searchThumbnailCache);
+            }
+        } else if (mediaType == MediaType.VIDEO || mediaType == MediaType.ALBUM) {
+            if (num < 0 || num >= mediaMetaData.getLength()) {
+                throw new IllegalArgumentException("Invalid thumbnail number: " + num);
+            }
+            if (mediaType == MediaType.VIDEO) {
+                eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                        EventTopics.MEDIA_OBJECT_TOPIC,
+                        userId,
+                        new MediaUpdateEvent.MediaThumbnailUpdated(
+                                userId,
+                                mediaMetaData.getId(),
+                                mediaType,
+                                num,
+                                mediaMetaData.getBucket(),
+                                mediaMetaData.getThumbnail()
+                        )
+                ));
+            }
+            if (mediaType == MediaType.ALBUM) {
+                eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                        EventTopics.MEDIA_FILE_TOPIC,
+                        userId,
+                        new MediaUpdateEvent.MediaThumbnailUpdateInitiated(
+                                userId,
+                                mediaMetaData.getId(),
+                                mediaType,
+                                (int) num.doubleValue()
+                        )
+                ));
+            }
+        } else
+            return;
+        mediaSearchCacheService.removeCachedMediaSearchItem(userId, mediaId);
+    }
+}

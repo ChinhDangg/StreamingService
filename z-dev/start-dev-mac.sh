@@ -23,4 +23,4 @@ if [ ! -d "/Volumes/$RAM_DISK_NAME" ]; then
     fi
 fi
 
-docker compose -f compose.mac.dev.yml --env-file .env.dev -p ss-dev up -d && echo "System is live!" || echo "❌ Failed to launch fleet."
+docker compose -f compose.mac.dev.yml --env-file .env -p ss-dev up -d && echo "System is live!" || echo "❌ Failed to launch fleet."

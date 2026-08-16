@@ -356,7 +356,7 @@ async function manageUploadFile(fileList) {
             const uploadingFile = uploadingFiles.get(f);
             uploadingFile.chunks.partNumber = uploadingFile.partNumber;
             const passed = await uploadFile(
-                uploadingFile.sessionId, uploadingFile.file, uploadingFile.fileName, uploadingFiles, currentFailTexts,
+                uploadingFile.file, uploadingFile.fileName, uploadingFiles, currentFailTexts,
                 uploadingFile.chunks, uploadingFile.eTags, uploadingFile.uploadId,
                 showProgress
             );
@@ -379,7 +379,7 @@ async function manageUploadFile(fileList) {
             const file = fileList[i];
             const fileName = getDirPath(currentFullPath, file.name);
             const passed = await uploadFile(
-                null, file.file, fileName, uploadingFiles, currentFailTexts,
+                file.file, fileName, uploadingFiles, currentFailTexts,
                 null, null, null,
                 showProgress
             );

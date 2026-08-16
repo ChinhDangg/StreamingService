@@ -1,8 +1,7 @@
 package dev.chinh.streamingservice.workers.service;
 
-import dev.chinh.streamingservice.common.constant.Resolution;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
@@ -12,15 +11,15 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ThumbnailService {
 
-    private final RedisTemplate<String, String> queueRedisTemplate;
+    private final StringRedisTemplate redisTemplate;
 
     public Set<ZSetOperations.TypedTuple<String>> getAllThumbnailCacheLastAccess(long max) {
-        return queueRedisTemplate.opsForZSet()
+        return redisTemplate.opsForZSet()
                 .rangeByScoreWithScores("thumbnail-cache", 0, max, 0, 50);
     }
 
     public void removeThumbnailLastAccess(String thumbnailFileName) {
-        queueRedisTemplate.opsForZSet().remove("thumbnail-cache", thumbnailFileName);
+        redisTemplate.opsForZSet().remove("thumbnail-cache", thumbnailFileName);
     }
 
     public static String getThumbnailParentPath() {

@@ -58,7 +58,7 @@ public class FileManagerController {
 
     @PostMapping("/vid/{fileId}")
     public ResponseEntity<?> addFileAsVideo(@PathVariable String fileId, @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(fileService.addFileAsVideoMedia(jwt.getSubject(), fileId));
+        return ResponseEntity.ok(fileService.addFileAsVideoMedia(jwt.getSubject(), fileId, null));
     }
 
     @PostMapping("/album/{fileId}")
@@ -106,11 +106,5 @@ public class FileManagerController {
     @GetMapping("/download/{fileId}")
     public ResponseEntity<?> getFileObjectUrl(@PathVariable String fileId, @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok().body(fileService.getFileObjectUrl(jwt.getSubject(), fileId));
-    }
-
-    public record InitiateMultipartUploadRequest(@NotBlank @Size(max = 1000) String filePath) {}
-    @PostMapping("/upload/create-session")
-    public String initiateSession(@RequestBody @Valid InitiateMultipartUploadRequest request, @AuthenticationPrincipal Jwt jwt) {
-        return fileService.initiateUploadRequest(jwt.getSubject(), request.filePath);
     }
 }

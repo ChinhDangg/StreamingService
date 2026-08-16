@@ -81,9 +81,8 @@ public class MediaMetaData extends MediaDescription {
 
     // Technical
     private short frameRate;
-
-    @Column(nullable = false)
     private String format;
+
 
     @Override
     public List<MediaNameSearchItem> getTags() {

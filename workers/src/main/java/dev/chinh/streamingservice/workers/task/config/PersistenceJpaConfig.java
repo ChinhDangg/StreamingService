@@ -1,0 +1,15 @@
+package dev.chinh.streamingservice.workers.task.config;
+
+import org.springframework.boot.autoconfigure.domain.EntityScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+
+@Configuration
+@EnableJpaRepositories(
+        basePackages = "dev.chinh.streamingservice.mediapersistence.repository"
+)
+@EntityScan(
+        basePackages = "dev.chinh.streamingservice.mediapersistence.entity"
+)
+public class PersistenceJpaConfig {
+}

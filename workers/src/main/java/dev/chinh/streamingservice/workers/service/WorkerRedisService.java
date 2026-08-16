@@ -2,10 +2,9 @@ package dev.chinh.streamingservice.workers.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.stream.*;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
@@ -16,11 +15,11 @@ import java.util.List;
 @Service
 public class WorkerRedisService {
 
-    private final RedisTemplate<String, String> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
     public WorkerRedisService(
-            @Qualifier("queueRedisTemplate") RedisTemplate<String, String> redisTemplate,
+            StringRedisTemplate redisTemplate,
             ObjectMapper objectMapper
     ) {
         this.redisTemplate = redisTemplate;

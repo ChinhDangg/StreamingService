@@ -5,7 +5,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.GrantedAuthority;
@@ -23,7 +23,7 @@ public class TokenService {
     private final JwtEncoder jwtEncoder;
     private final JwtDecoder jwtDecoder;
     private final JpaUserDetailService userDetailsService;
-    private final RedisTemplate<String, String> redisStringTemplate;
+    private final StringRedisTemplate redisTemplate;
 
     private String generateToken(SecurityUser securityUser, long tokenExpirySeconds) {
         Instant now = Instant.now();
@@ -72,7 +72,7 @@ public class TokenService {
         System.out.println(refreshCookie);
         System.out.println(accessCookie);
 
-        redisStringTemplate.opsForValue().set("refresh:" + securityUser.getUserId(), refreshCookie.getValue());
+        redisTemplate.opsForValue().set("refresh:" + securityUser.getUserId(), refreshCookie.getValue());
 
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
@@ -105,7 +105,7 @@ public class TokenService {
             return null;
         }
 
-        String storedRefreshToken = redisStringTemplate.opsForValue().get("refresh:" + userId);
+        String storedRefreshToken = redisTemplate.opsForValue().get("refresh:" + userId);
 
         if (storedRefreshToken != null && storedRefreshToken.equals(refreshTokenCookie)) {
             String csrfTokenHeader = request.getHeader("X-XSRF-TOKEN");

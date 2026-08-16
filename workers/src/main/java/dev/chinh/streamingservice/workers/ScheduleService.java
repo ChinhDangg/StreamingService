@@ -7,7 +7,7 @@ import dev.chinh.streamingservice.workers.service.VideoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisCallback;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -27,7 +27,7 @@ public class ScheduleService {
     @Value("${ffmpeg-name}")
     private String ffmpegName;
 
-    private final RedisTemplate<String, String> queueRedisTemplate;
+    private final StringRedisTemplate redisTemplate;
 
     @Scheduled(fixedRate = 60_000, initialDelay = 60_000)
     public void scheduled() {
@@ -48,7 +48,7 @@ public class ScheduleService {
 
 
     private void trimJobStreams() {
-        queueRedisTemplate.execute((RedisCallback<Void>) conn -> {
+        redisTemplate.execute((RedisCallback<Void>) conn -> {
             var streams = new String[] {
                     VideoWorker.STREAM,
                     AlbumWorker.STREAM

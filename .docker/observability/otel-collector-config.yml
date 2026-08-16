@@ -16,6 +16,13 @@ processors:
     check_interval: 1s
     limit_percentage: 75
     spike_limit_percentage: 20
+  transform:
+    metric_statements:
+      - context: metric
+        statements:
+          - set(name, "http_server_requests_seconds_count") where name == "http_server_requests_milliseconds_count"
+          - set(name, "http_server_requests_seconds_sum") where name == "http_server_requests_milliseconds_sum"
+          - set(name, "http_server_requests_seconds_bucket") where name == "http_server_requests_milliseconds_bucket"
 
 # EXPORTERS: Where the data goes
 exporters:
@@ -46,10 +53,10 @@ service:
 
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
-      exporters: [otlp_http/loki]
+      processors: [memory_limiter, batch, transform]
+      exporters: [debug, otlp_http/loki]
 
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
+      processors: [memory_limiter, batch, transform]
       exporters: [prometheusremotewrite]

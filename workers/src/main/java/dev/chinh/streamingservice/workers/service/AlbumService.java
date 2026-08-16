@@ -11,9 +11,8 @@ import dev.chinh.streamingservice.common.proto.FileItem;
 import dev.chinh.streamingservice.workers.internal.FileDiscoveryService;
 import io.grpc.StatusRuntimeException;
 import org.apache.coyote.BadRequestException;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
@@ -32,7 +31,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
     @Value("${ffmpeg-name}")
     private String ffmpegName;
 
-    public AlbumService(@Qualifier("queueRedisTemplate") RedisTemplate<String, String> redisTemplate,
+    public AlbumService(StringRedisTemplate redisTemplate,
                         ObjectMapper objectMapper,
                         MinIOService minIOService,
                         WorkerRedisService workerRedisService,
@@ -179,7 +178,7 @@ public class AlbumService extends MediaService implements ResourceCleanable {
         return new AlbumUrlResult(mediaAllUrlList, response.getNextCursor());
     }
 
-    private void processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String saveDir, boolean isAlbum, boolean addThumbnailCache) throws InterruptedException, IOException {
+    private void processResizedImagesInBatch(AlbumUrlInfo albumUrlInfo, Resolution resolution, String saveDir, boolean isAlbum, boolean addThumbnailCache) {
         try (ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor()) {
             Semaphore semaphore = new Semaphore(4);
             List<CompletableFuture<Void>> futures = new ArrayList<>();

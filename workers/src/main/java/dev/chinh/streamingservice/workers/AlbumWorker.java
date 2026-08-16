@@ -5,7 +5,7 @@ import dev.chinh.streamingservice.workers.service.WorkerRedisService;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import dev.chinh.streamingservice.workers.service.AlbumService;
 import org.springframework.context.annotation.Scope;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,10 +20,10 @@ public class AlbumWorker extends Worker {
     public static final String DLQ_STREAM = "ffmpeg_album_dlq";
 
     public AlbumWorker(WorkerRedisService workerRedisService,
-                       RedisTemplate<String, String> queueRedisTemplate,
+                       StringRedisTemplate redisTemplate,
                        ObjectMapper objectMapper,
                        AlbumService albumService) {
-        super(workerRedisService, queueRedisTemplate, objectMapper);
+        super(workerRedisService, redisTemplate, objectMapper);
         this.albumService = albumService;
     }
 

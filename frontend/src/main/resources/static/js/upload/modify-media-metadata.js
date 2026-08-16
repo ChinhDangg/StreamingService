@@ -281,7 +281,8 @@ async function initializeEditAddingArea() {
     }
 
     const searchName = async (nameString) => {
-        const response = await apiRequest(`/api/search/name/${currentNameEntity}?s=${nameString}`);
+        const nameEntity = currentNameEntity.toUpperCase();
+        const response = await apiRequest(`/api/search/name/${nameEntity}?s=${nameString}`);
         if (!response.ok) {
             alert('Failed to fetch name info: ' + await response.text());
             return;

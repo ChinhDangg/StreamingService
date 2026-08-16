@@ -11,9 +11,14 @@ public interface MediaUpdateEvent {
 
     // for search only
     record LengthUpdated(
-            long mediaId,
-            Integer newLength
-    ) implements MediaUpdateEvent {}
+            List<Long> mediaIds,
+            int deltaLength,
+            long version
+    ) implements MediaUpdateEvent {
+        public LengthUpdated(List<Long> mediaIds, Integer deltaLength) {
+            this(mediaIds, deltaLength, Instant.now().toEpochMilli());
+        }
+    }
 
     record MediaNameEntityUpdated(
             String userId,
@@ -23,7 +28,8 @@ public interface MediaUpdateEvent {
 
     record MediaTitleUpdated(
             String userId,
-            long mediaId
+            long mediaId,
+            String title
     ) implements MediaUpdateEvent{}
 
 
@@ -44,6 +50,7 @@ public interface MediaUpdateEvent {
             String userId,
             MediaNameEntityConstant nameEntityConstant,
             long nameEntityId,
+            String newName,
             String oldThumbnail,
             String newThumbnail
     ) implements MediaUpdateEvent{}
@@ -105,10 +112,9 @@ public interface MediaUpdateEvent {
             String objectName,
             String fileName,
             long size,
-            Long mediaId,
-            MediaType mediaType,
-            String thumbnailObject,
-            boolean isLast
+            boolean isLast,
+            boolean addAsVideo,
+            String nameUpdateListAsJson
     ) implements MediaUpdateEvent {}
 
     record FileDeleted(
@@ -119,41 +125,88 @@ public interface MediaUpdateEvent {
             Long mediaId
     ) implements MediaUpdateEvent {}
 
-    record FileToMediaInitiated(
+//    record FileToMediaInitiated(
+//            String userId,
+//            String fileId,
+//            MediaType mediaType,
+//            String bucket,
+//            String objectName,
+//            String fileName,
+//            Instant uploadDate,
+//            Long parentMediaId,
+//            Long childMediaId,
+//            boolean searchable,
+//            boolean updateParentLength
+//    ) implements MediaUpdateEvent {}
+
+//    record DirectoryToMediaInitiated(
+//            String userId,
+//            String fileId,
+//            long mediaId,
+//            MediaType mediaType,
+//            boolean searchable,
+//            boolean updateParentLength,
+//            String thumbnailObject,
+//            long initialSize,
+//            int offset
+//    ) implements MediaUpdateEvent {}
+
+//    record NestedDirectoryToMediaInitiated(
+//            String userId,
+//            String fileId,
+//            long mediaId,
+//            MediaType parentType,
+//            MediaType childType,
+//            boolean childSearchable,
+//            String thumbnailObject,
+//            int offset
+//    ) implements MediaUpdateEvent {}
+
+    record NestedDirectoryToGrouperMediaInitiated(
             String userId,
             String fileId,
-            MediaType mediaType,
+            Long mediaId,
             String bucket,
             String objectName,
             String fileName,
             Instant uploadDate,
-            Long parentMediaId,
-            Long childMediaId,
-            boolean searchable,
-            boolean updateParentLength
-    ) implements MediaUpdateEvent {}
-
-    record DirectoryToMediaInitiated(
-            String userId,
-            String fileId,
-            long mediaId,
-            MediaType mediaType,
-            boolean searchable,
-            boolean updateParentLength,
-            String thumbnailObject,
-            long initialSize,
-            int offset
-    ) implements MediaUpdateEvent {}
-
-    record NestedDirectoryToMediaInitiated(
-            String userId,
-            String fileId,
-            long mediaId,
-            MediaType parentType,
-            MediaType childType,
             boolean childSearchable,
-            String thumbnailObject,
-            int offset
+            MediaType childMediaType,
+            int length
+    ) implements MediaUpdateEvent {}
+
+    record GrouperMediaCreatedReady(
+            String userId,
+            String fileid,
+            long mediaId,
+            int length,
+            String bucket,
+            String objectName
+    ) implements MediaUpdateEvent{}
+
+
+
+    record DirectoryToAlbumMediaInitiated(
+            String userId,
+            String fileId,
+            String bucket,
+            String objectName,
+            String fileName,
+            Instant uploadDate,
+            boolean searchable,
+            long size,
+            int length,
+            Long parentMediaId
+    ) implements MediaUpdateEvent {}
+
+    record FileToVideoMediaInitiated(
+            String userId,
+            String fileId,
+            String bucket,
+            String objectName,
+            String fileName,
+            Instant uploadDate,
+            String nameUpdateListAsJson
     ) implements MediaUpdateEvent {}
 
     record MediaCreatedReady(
@@ -181,7 +234,8 @@ public interface MediaUpdateEvent {
     record DirectoryMoved(
             String userId,
             String fileId,
-            String parentId,
+            String newParentId,
+            String oldParentId,
             String oldIdPath,
             String oldPath,
             String newPath
@@ -208,7 +262,7 @@ public interface MediaUpdateEvent {
 
     record MediaFileLengthUpdate(
             String userId,
-            long mediaId,
+            List<Long> mediaIds,
             int length
     ) implements MediaUpdateEvent {}
 

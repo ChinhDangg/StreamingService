@@ -7,7 +7,7 @@ import dev.chinh.streamingservice.common.constant.MediaJobStatus;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.connection.stream.*;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -19,7 +19,7 @@ import java.util.UUID;
 public abstract class Worker implements Runnable {
 
     protected final WorkerRedisService workerRedisService;
-    protected final RedisTemplate<String, String> queueRedisTemplate;
+    protected final StringRedisTemplate redisTemplate;
     protected final ObjectMapper objectMapper;
 
     protected abstract String streamKey();
@@ -104,22 +104,22 @@ public abstract class Worker implements Runnable {
     }
 
     public int getRetryCount(String workId) {
-        Object value = queueRedisTemplate.opsForHash().get("retry:"+workId, "count");
+        Object value = redisTemplate.opsForHash().get("retry:"+workId, "count");
         return value == null ? 0 : Integer.parseInt((String) value);
     }
 
     public void incrementRetry(String workId) {
-        Object value = queueRedisTemplate.opsForHash().get("retry:" + workId, "count");
+        Object value = redisTemplate.opsForHash().get("retry:" + workId, "count");
 
         int currentCount = (value == null) ? 0 : Integer.parseInt((String) value);
         currentCount++;
 
-        queueRedisTemplate.opsForHash().put("retry:" + workId, "count", String.valueOf(currentCount));
+        redisTemplate.opsForHash().put("retry:" + workId, "count", String.valueOf(currentCount));
     }
 
 
     public void clearRetry(String workId) {
-        queueRedisTemplate.delete("retry:"+workId);
+        redisTemplate.delete("retry:"+workId);
     }
 
 
@@ -133,7 +133,7 @@ public abstract class Worker implements Runnable {
     // Avoid infinite retries
     // Preserve bad inputs
     private void sendToDLQ(MapRecord<String, Object, Object> record, String reason) {
-        queueRedisTemplate.opsForStream().add(
+        redisTemplate.opsForStream().add(
                 StreamRecords.mapBacked(
                         Map.of(
                                 jobDescriptionKey, record.getValue().get(jobDescriptionKey),
@@ -169,7 +169,7 @@ public abstract class Worker implements Runnable {
         if (stale.isEmpty()) return;
 
         List<MapRecord<String,Object,Object>> claimed =
-                queueRedisTemplate.opsForStream().claim(
+                redisTemplate.opsForStream().claim(
                         streamKey(),
                         groupName(),
                         consumerName,

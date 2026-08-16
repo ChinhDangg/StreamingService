@@ -1,0 +1,62 @@
+logging:
+  level:
+    # Mutes ProducerConfig, ConsumerConfig, AppInfoParser, and internal Kafka client chatter
+    org.apache.kafka: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, loggers, caches, scheduledtasks, threaddump
+    access:
+      default: ${MONITORING_ACCESS:none}
+  metrics:
+    distribution:
+      percentiles-histogram:
+        all: ${MONITORING_ENABLED:false}
+    # Adds the application name tag so Grafana drop-down filters work
+    enable:
+      all: ${MONITORING_ENABLED:false}
+    tags:
+      application: ${spring.application.name}
+      service.name: ${spring.application.name}
+
+  # PUSH METRICS CONFIGURATION (Micrometer -> OTLP)
+  otlp:
+    metrics:
+      export:
+        url: http://localhost:4318/v1/metrics # OpenTelemetry Collector metrics endpoint
+        step: 10s                             # How often service pushes metrics
+        enabled: ${MONITORING_ENABLED:false}
+        base-time-unit: seconds
+    # PUSH TRACES CONFIGURATION (Micrometer Tracing -> OTLP)
+    tracing:
+      endpoint: http://localhost:4318/v1/traces # OpenTelemetry Collector traces endpoint
+    logging:
+      endpoint: http://localhost:4318/v1/logs
+
+  tracing:
+    enabled: ${MONITORING_ENABLED:false}
+    sampling:
+      probability: 1.0 # Sample 100% of requests for testing/local development
+    propagation:
+      type: "w3c" # Uses W3C traceparent headers across microservices
+
+
+
+---
+# Active only when SPRING_PROFILES_ACTIVE=prod
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+management:
+  otlp:
+    metrics:
+      export:
+        url: http://otel-collector:4318/v1/metrics
+    tracing:
+      endpoint: http://otel-collector:4318/v1/traces
+    logging:
+      endpoint: http://otel-collector:4318/v1/logs

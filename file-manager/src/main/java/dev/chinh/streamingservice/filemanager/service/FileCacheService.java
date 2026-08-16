@@ -23,7 +23,7 @@ public class FileCacheService {
 
     /*
         This service is used to cache file metadata in memory for general read not maintaining locked dir item - that is directory cache service
-        If multiple service of file-manager- remove this class as it will create inconsistency!
+        If multiple service of file-manager- move to distributed cache like redis!
      */
 
     private final Cache<String, FileSystemItem> fileCache;

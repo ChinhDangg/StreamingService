@@ -1,10 +1,8 @@
 package dev.chinh.streamingservice.workers.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.chinh.streamingservice.common.constant.Resolution;
 import dev.chinh.streamingservice.common.data.MediaJobDescription;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 
 import java.io.BufferedReader;
@@ -12,18 +10,17 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 public abstract class MediaService {
 
-    protected final RedisTemplate<String, String> redisTemplate;
+    protected final StringRedisTemplate redisTemplate;
     protected final ObjectMapper objectMapper;
     protected final MinIOService minIOService;
     protected final WorkerRedisService workerRedisService;
 
-    public MediaService(@Qualifier("queueRedisTemplate") RedisTemplate<String, String> redisTemplate,
+    public MediaService(StringRedisTemplate redisTemplate,
                         ObjectMapper objectMapper,
                         MinIOService minIOService,
                         WorkerRedisService workerRedisService) {

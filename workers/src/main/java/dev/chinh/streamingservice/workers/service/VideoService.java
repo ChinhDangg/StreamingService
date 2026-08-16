@@ -16,7 +16,7 @@ import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
@@ -46,7 +46,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
 
     private final MemoryManager memoryManager;
 
-    public VideoService(@Qualifier("queueRedisTemplate") RedisTemplate<String, String> redisTemplate,
+    public VideoService(StringRedisTemplate redisTemplate,
                         ObjectMapper objectMapper,
                         MinIOService minIOService,
                         WorkerRedisService workerRedisService,

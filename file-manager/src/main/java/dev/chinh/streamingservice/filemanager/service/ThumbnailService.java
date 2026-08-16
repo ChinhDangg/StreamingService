@@ -9,7 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisCallback;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
@@ -23,7 +23,7 @@ import java.util.function.Function;
 public class ThumbnailService {
 
     private static final Logger log = LoggerFactory.getLogger(ThumbnailService.class);
-    private final RedisTemplate<String, String> redisStringTemplate;
+    private final StringRedisTemplate redisTemplate;
     private final MinIOService minIOService;
 
     private static final Resolution thumbnailResolution = Resolution.p144;
@@ -110,7 +110,7 @@ public class ThumbnailService {
     }
 
     private List<Object> checkHasCacheThumbnails(List<ShortFileInfo> shortFileInfoList) {
-        return redisStringTemplate.executePipelined((RedisCallback<Object>) connection -> {
+        return redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
             for (var info : shortFileInfoList) {
                 connection.zSetCommands().zScore("thumbnail-cache".getBytes(), info.thumbnailName.getBytes());
             }
@@ -119,7 +119,7 @@ public class ThumbnailService {
     }
 
     private void addCacheThumbnails(List<String> thumbnailFileNames, long expiry, Function<String, String> processThumbnailName) {
-        redisStringTemplate.executePipelined((RedisCallback<Object>) connection -> {
+        redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
             for (String thumbnailFileName : thumbnailFileNames) {
                 String name = processThumbnailName == null ? thumbnailFileName : processThumbnailName.apply(thumbnailFileName);
                 connection.zSetCommands().zAdd(

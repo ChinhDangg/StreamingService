@@ -660,7 +660,7 @@ async function requestAdvanceSearch(advanceRequestBody, page, sortBy, sortOrder)
         [SEARCH_INFO.SORT_BY]: sortBy,
         [SEARCH_INFO.SORT_ORDER]: sortOrder
     });
-    const advanceSearchUrl = `/api/search/advance?${queryParams}`;
+    const advanceSearchUrl = `/api/search/media/advance?${queryParams}`;
     const response = await apiRequest(advanceSearchUrl, {
         method: 'POST',
         headers: {
@@ -714,7 +714,7 @@ function getMatchAllSearchUrl(page, sortBy, sortOrder) {
         [SEARCH_INFO.SORT_BY]: sortBy,
         [SEARCH_INFO.SORT_ORDER]: sortOrder
     });
-    return `/api/search/match-all?${queryParams}`;
+    return `/api/search/media/match-all?${queryParams}`;
 }
 
 function getBasicSearchUrl(searchString, page, sortBy, sortOrder) {
@@ -724,7 +724,7 @@ function getBasicSearchUrl(searchString, page, sortBy, sortOrder) {
         [SEARCH_INFO.SORT_BY]: sortBy,
         [SEARCH_INFO.SORT_ORDER]: sortOrder
     });
-    return `/api/search?${queryParams}`;
+    return `/api/search/media?${queryParams}`;
 }
 
 function getKeywordSearchUrl(keywordField, keywordValueList, keywordMatchAll, page, sortBy, sortOrder) {
@@ -736,7 +736,7 @@ function getKeywordSearchUrl(keywordField, keywordValueList, keywordMatchAll, pa
         [SEARCH_INFO.SORT_BY]: sortBy,
         [SEARCH_INFO.SORT_ORDER]: sortOrder
     });
-    return `/api/search/keyword?${queryParams}`;
+    return `/api/search/media/keyword?${queryParams}`;
 }
 
 function getAdvanceSearchUrl(page, sortBy, sortOrder) {
@@ -745,7 +745,7 @@ function getAdvanceSearchUrl(page, sortBy, sortOrder) {
         [SEARCH_INFO.SORT_BY]: sortBy,
         [SEARCH_INFO.SORT_ORDER]: sortOrder
     });
-    return `/api/search/advance?${queryParams}`;
+    return `/api/search/media/advance?${queryParams}`;
 }
 
 let currentPageInfo = null;

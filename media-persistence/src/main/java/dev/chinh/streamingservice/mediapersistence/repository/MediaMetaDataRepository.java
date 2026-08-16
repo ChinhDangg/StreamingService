@@ -2,7 +2,6 @@ package dev.chinh.streamingservice.mediapersistence.repository;
 
 import dev.chinh.streamingservice.mediapersistence.entity.MediaMetaData;
 import dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -30,20 +29,16 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
 
     Optional<MediaMetaData> findByUserIdAndId(long userId, long id);
 
-    // returning query doesn't work with modifying - remove annotation or create a custom RepositoryImpl
-    // and then use an entity manager to create the query.
-    // Removing the modifying annotation works for spring >= 3.2
-    //@Modifying
-    //@Transactional
+    @Modifying
+    @Transactional
     @Query(value = """
-        UPDATE media.media_metadata
-        SET length = length + :length
-        WHERE id = :id
-            AND length > 0
-            AND user_id = :userId
-        RETURNING length
-    """, nativeQuery = true)
-    Integer updateLengthWithDeltaReturning(@Param("userId") long userId, @Param("id") long id, @Param("length") int length);
+        UPDATE MediaMetaData m
+        SET m.length = m.length + :length
+        WHERE m.id IN :ids
+            AND m.userId = :userId
+            AND (:length >= 0 OR m.length > 0)
+    """)
+    int updateLengthWithDelta(@Param("userId") long userId, @Param("ids") Long[] ids, @Param("length") int length);
 
 
     @Query("""

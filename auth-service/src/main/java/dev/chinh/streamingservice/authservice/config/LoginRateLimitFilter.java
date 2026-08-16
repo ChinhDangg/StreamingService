@@ -7,7 +7,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
@@ -22,7 +22,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class LoginRateLimitFilter extends OncePerRequestFilter {
 
-    private final RedisTemplate<String, String> redisStringTemplate;
+    private final StringRedisTemplate redisTemplate;
     private final JpaUserDetailService jpaUserDetailService;
 
     // Rate limit config
@@ -86,17 +86,17 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     }
 
     public void clearLoginAttempts(String ip, String username) {
-        redisStringTemplate.delete("login_attempts:ip:" + ip);
-        redisStringTemplate.delete("login_attempts:user:" + username);
+        redisTemplate.delete("login_attempts:ip:" + ip);
+        redisTemplate.delete("login_attempts:user:" + username);
     }
 
 
     private void cacheUserId(String username, long userId) {
-        redisStringTemplate.opsForValue().set("username:" + username, String.valueOf(userId), Duration.ofSeconds(WINDOW_SECONDS));
+        redisTemplate.opsForValue().set("username:" + username, String.valueOf(userId), Duration.ofSeconds(WINDOW_SECONDS));
     }
 
     private long getUserIdFromCache(String username) {
-        String userId = redisStringTemplate.opsForValue().get("username:" + username);
+        String userId = redisTemplate.opsForValue().get("username:" + username);
         if (userId == null) return -1;
         return Long.parseLong(userId);
     }
@@ -108,21 +108,21 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     }
 
     private boolean checkTooManyAttempts(String attemptsKey, String blockKey, HttpServletResponse response) throws IOException {
-        if (redisStringTemplate.hasKey(blockKey)) {
+        if (redisTemplate.hasKey(blockKey)) {
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.getWriter().println("Too many login attempts. Try again later.");
             return true;
         }
 
         long attempts = Objects.requireNonNullElse(
-                redisStringTemplate.opsForValue().increment(attemptsKey),
+                redisTemplate.opsForValue().increment(attemptsKey),
                 0L
         );
 
         if (attempts == 1) {
-            redisStringTemplate.expire(attemptsKey, Duration.ofSeconds(WINDOW_SECONDS));
+            redisTemplate.expire(attemptsKey, Duration.ofSeconds(WINDOW_SECONDS));
         } else if (attempts > MAX_ATTEMPTS) {
-            redisStringTemplate.opsForValue().set(blockKey, "true", Duration.ofSeconds(LOCKOUT_SECONDS));
+            redisTemplate.opsForValue().set(blockKey, "true", Duration.ofSeconds(LOCKOUT_SECONDS));
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.getWriter().println("Too many login attempts. Try again later.");
             return true;

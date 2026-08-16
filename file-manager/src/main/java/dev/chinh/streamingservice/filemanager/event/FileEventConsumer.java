@@ -4,8 +4,9 @@ import com.mongodb.client.result.UpdateResult;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.filemanager.config.KafkaConfig;
-import dev.chinh.streamingservice.filemanager.service.FileConsumerService;
 import dev.chinh.streamingservice.filemanager.service.FileService;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import lombok.AllArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,40 +22,42 @@ import org.springframework.stereotype.Service;
 public class FileEventConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(FileEventConsumer.class);
-    private final FileConsumerService fileConsumerService;
+    private final ObservationRegistry observationRegistry;
+
+    private final FileEventConsumerService fileEventConsumerService;
     private final FileService fileService;
 
     private void onCreateFile(MediaUpdateEvent.FileCreated event) {
         log.info("Received create file event: {}", event.fileName());
         try {
-            fileConsumerService.handleCreateFile(event);
+            fileEventConsumerService.handleCreateFile(event);
         } catch (Exception e) {
             throw new RuntimeException("Failed to create file", e);
         }
     }
 
-    private void onDirectoryToMedia(MediaUpdateEvent.DirectoryToMediaInitiated event) {
-        log.info("Received initiate directory to media initiated event: {}", event.fileId());
+    private void onDirectoryToAlbumMedia(MediaUpdateEvent.DirectoryToAlbumMediaInitiated event) {
+        log.info("Received initiate directory to album media initiated event: {}", event.fileId());
         try {
-            fileConsumerService.handleDirectoryToMedia(event);
+            fileEventConsumerService.handleDirectoryToAlbumMedia(event);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to initiate directory to media", e);
+            throw new RuntimeException("Failed to initiate directory to album media", e);
         }
     }
 
-    private void onNestedDirectoryToMedia(MediaUpdateEvent.NestedDirectoryToMediaInitiated event) {
-        log.info("Received initiate nested directory to media initiated event: {}", event.fileId());
+    private void onNestedDirectoryToGrouperMedia(MediaUpdateEvent.NestedDirectoryToGrouperMediaInitiated event) {
+        log.info("Received initiate nested directory to grouper media initiated event: {}", event.fileId());
         try {
-            fileConsumerService.handleNestedDirectoryToMedia(event);
+            fileEventConsumerService.handleNestedDirectoryToGrouperMedia(event);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to initiate nested directory to media", e);
+            throw new RuntimeException("Failed to initiate nested directory to grouper media", e);
         }
     }
 
     private void onCompleteFileToMedia(MediaUpdateEvent.MediaCreatedReady event) {
         log.info("Received create media event: {} {}", event.fileId(), event.mediaId());
         try {
-            UpdateResult result = fileConsumerService.handleCompleteFileToMedia(event);
+            UpdateResult result = fileEventConsumerService.handleCompleteFileToMedia(event);
             if (result.getModifiedCount() != 1)
                 throw new RuntimeException("Failed to update file to media");
         } catch (Exception e) {
@@ -65,7 +68,7 @@ public class FileEventConsumer {
     private void onInitiateUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdateInitiated event) {
         log.info("Received initiate update media thumbnail event: {}", event.mediaId());
         try {
-            fileConsumerService.handleInitiateUpdateMediaThumbnail(event);
+            fileEventConsumerService.handleInitiateUpdateMediaThumbnail(event);
         } catch (Exception e) {
             throw new RuntimeException("Failed to initiate update media thumbnail", e);
         }
@@ -74,30 +77,56 @@ public class FileEventConsumer {
     private void onUpdateMediaThumbnail(MediaUpdateEvent.MediaThumbnailUpdatedReady event) {
         log.info("Received update media thumbnail name: {}", event.mediaId());
         try {
-            fileConsumerService.handleUpdateMediaThumbnail(event);
+            fileEventConsumerService.handleUpdateMediaThumbnail(event);
         } catch (Exception e) {
             throw new RuntimeException("Failed to update thumbnail name for media " + event.mediaId(), e);
         }
     }
 
-    public void onDeleteFile(MediaUpdateEvent.FileDeleted event) {
+    private void onDeleteFile(MediaUpdateEvent.FileDeleted event) {
         log.info("Received file delete event: {}", event.fileId());
         try {
-            fileConsumerService.handleDeleteFile(event);
+            fileEventConsumerService.handleDeleteFile(event);
         } catch (Exception e) {
             throw new RuntimeException("Failed to delete file", e);
         }
     }
 
     private void onMoveFile(MediaUpdateEvent.DirectoryMoved event) {
-        log.info("Received file move event: from: {} to: {}", event.fileId(), event.parentId());
+        log.info("Received file move event: from: {} to: {}", event.fileId(), event.newParentId());
         try {
-            fileConsumerService.handleMoveDirectory(event.userId(), event.fileId(), event.parentId(), event.oldIdPath());
+            fileEventConsumerService.handleMoveDirectory(event);
         } catch (Exception e) {
             throw new RuntimeException("Failed to move file", e);
         }
     }
 
+
+    private void handleFileEvents(MediaUpdateEvent event, Acknowledgment ack) {
+        try {
+            switch (event) {
+                case MediaUpdateEvent.FileCreated e -> onCreateFile(e);
+                case MediaUpdateEvent.FileDeleted e -> onDeleteFile(e);
+                case MediaUpdateEvent.DirectoryToAlbumMediaInitiated e -> onDirectoryToAlbumMedia(e);
+                case MediaUpdateEvent.NestedDirectoryToGrouperMediaInitiated e -> onNestedDirectoryToGrouperMedia(e);
+                case MediaUpdateEvent.MediaCreatedReady e -> onCompleteFileToMedia(e);
+
+                case MediaUpdateEvent.MediaThumbnailUpdateInitiated e -> onInitiateUpdateMediaThumbnail(e);
+                case MediaUpdateEvent.MediaThumbnailUpdatedReady e -> onUpdateMediaThumbnail(e);
+                case MediaUpdateEvent.DirectoryMoved e -> onMoveFile(e);
+
+                case MediaUpdateEvent.ControlAddAsVideo e -> controlAddAsVideo(e.userId(), e.fileId());
+                case MediaUpdateEvent.ControlAddAsAlbum e -> controlAddAsAlbum(e.userId(), e.fileId());
+                case MediaUpdateEvent.ControlAddAsGrouper e -> controlAddAsGrouper(e.userId(), e.fileId());
+                default ->
+                        System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+            }
+            ack.acknowledge();
+        } catch (Exception e) {
+            log.warn("Failed to handle media event: {}", event, e);
+            throw e;
+        }
+    }
 
     @KafkaListener(topics = {
             EventTopics.MEDIA_FILE_TOPIC,
@@ -106,29 +135,11 @@ public class FileEventConsumer {
             EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC
     }, groupId = KafkaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) {
-        try {
-            switch (event) {
-                case MediaUpdateEvent.FileCreated e -> onCreateFile(e);
-                case MediaUpdateEvent.FileDeleted e -> onDeleteFile(e);
-                case MediaUpdateEvent.DirectoryToMediaInitiated e -> onDirectoryToMedia(e);
-                case MediaUpdateEvent.NestedDirectoryToMediaInitiated e -> onNestedDirectoryToMedia(e);
-                case MediaUpdateEvent.MediaCreatedReady e -> onCompleteFileToMedia(e);
-                case MediaUpdateEvent.MediaThumbnailUpdateInitiated e -> onInitiateUpdateMediaThumbnail(e);
-                case MediaUpdateEvent.MediaThumbnailUpdatedReady e -> onUpdateMediaThumbnail(e);
-                case MediaUpdateEvent.DirectoryMoved e -> onMoveFile(e);
-
-
-                case MediaUpdateEvent.ControlAddAsVideo e -> controlAddAsVideo(e.userId(), e.fileId());
-                case MediaUpdateEvent.ControlAddAsAlbum e -> controlAddAsAlbum(e.userId(), e.fileId());
-                case MediaUpdateEvent.ControlAddAsGrouper e -> controlAddAsGrouper(e.userId(), e.fileId());
-                default ->
-                    System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
-            }
-            ack.acknowledge();
-        } catch (Exception e) {
-            log.error("Failed to handle media event: {}", event, e);
-            throw e;
-        }
+        String eventType = event.getClass().getSimpleName();
+        Observation.createNotStarted("event.processing.time", observationRegistry)
+                .contextualName("process-" + eventType)       // Names the span in Tempo
+                .lowCardinalityKeyValue("event_type", eventType) // Adds a tag for Prometheus & Loki
+                .observe(() -> handleFileEvents(event, ack));
     }
 
     @KafkaListener(
@@ -148,18 +159,19 @@ public class FileEventConsumer {
                     log.info("File DLQ: Received create file event: {}", e.objectName());
             case MediaUpdateEvent.FileDeleted e ->
                     log.info("File DLQ: Received file delete event: {}", e.fileId());
-            case MediaUpdateEvent.DirectoryToMediaInitiated e ->
-                    log.info("File DLQ: Received initiate directory to media initiated event: {}", e.fileId());
-            case MediaUpdateEvent.NestedDirectoryToMediaInitiated e ->
-                    log.info("File DLQ: Received initiate nested directory to media initiated event: {}", e.fileId());
+            case MediaUpdateEvent.NestedDirectoryToGrouperMediaInitiated e ->
+                    log.info("File DLQ: Received initiate nested directory to grouper media initiated event: {}", e.fileId());
+            case MediaUpdateEvent.DirectoryToAlbumMediaInitiated e ->
+                    log.info("File DLQ: Received initiate directory to album media initiated event: {}", e.fileId());
             case MediaUpdateEvent.MediaCreatedReady e ->
                     log.info("File DLQ: Received create media event: {} {}", e.fileId(), e.mediaId());
+
             case MediaUpdateEvent.MediaThumbnailUpdateInitiated e ->
                     log.info("File DLQ: Received initiate update media thumbnail event: {}", e.mediaId());
             case MediaUpdateEvent.MediaThumbnailUpdatedReady e ->
                     log.info("File DLQ: Received update media thumbnail name: {}", e.mediaId());
             case MediaUpdateEvent.DirectoryMoved e ->
-                    log.info("File DLQ: Received file move event: from: {} to: {}", e.fileId(), e.parentId());
+                    log.info("File DLQ: Received file move event: from: {} to: {}", e.fileId(), e.newParentId());
             default -> {
                 log.error("File DLQ: Unknown MediaUpdateEvent type: {}", event.getClass());
                 ack.acknowledge();
@@ -172,7 +184,7 @@ public class FileEventConsumer {
 
 
     private void controlAddAsVideo(String userId, String fileId) {
-        String result = fileService.addFileAsVideoMedia(userId, fileId);
+        String result = fileService.addFileAsVideoMedia(userId, fileId, null);
         System.out.println(result);
     }
 

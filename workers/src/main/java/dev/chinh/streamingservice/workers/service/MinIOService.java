@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.workers.service;
 
 import io.minio.*;
+import io.minio.http.Method;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +18,17 @@ public class MinIOService {
 
     @Value("${minio.container.url}")
     private String minioContainerUrl;
+
+    private String getSignedUrl(String bucket, String object, int expirySeconds) throws Exception {
+        return minioClient.getPresignedObjectUrl(
+                GetPresignedObjectUrlArgs.builder()
+                        .method(Method.GET)
+                        .bucket(bucket)
+                        .object(object)
+                        .expiry(expirySeconds)
+                        .build()
+        );
+    }
 
     private String encodeUriPathSegment(String str) {
         return UriUtils.encodePathSegment(str, StandardCharsets.UTF_8);

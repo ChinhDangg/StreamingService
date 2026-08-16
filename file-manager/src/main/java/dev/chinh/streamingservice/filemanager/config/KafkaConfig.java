@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.filemanager.config;
 
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
+import io.micrometer.observation.ObservationRegistry;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -62,7 +63,8 @@ public class KafkaConfig {
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, MediaUpdateEvent> kafkaListenerContainerFactory(
             ConsumerFactory<String, MediaUpdateEvent> consumerFactory,
-            DefaultErrorHandler errorHandler
+            DefaultErrorHandler errorHandler,
+            ObservationRegistry observationRegistry
     ) {
         ConcurrentKafkaListenerContainerFactory<String, MediaUpdateEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
@@ -70,12 +72,16 @@ public class KafkaConfig {
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
         factory.setCommonErrorHandler(errorHandler);
 
+        factory.getContainerProperties().setObservationEnabled(true);
+        factory.getContainerProperties().setObservationRegistry(observationRegistry);
+
         return factory;
     }
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, MediaUpdateEvent> dlqListenerContainerFactory(
-            ConsumerFactory<String, MediaUpdateEvent> consumerFactory
+            ConsumerFactory<String, MediaUpdateEvent> consumerFactory,
+            ObservationRegistry observationRegistry
     ) {
         ConcurrentKafkaListenerContainerFactory<String, MediaUpdateEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
@@ -85,6 +91,9 @@ public class KafkaConfig {
         errorHandler.setAckAfterHandle(false);
 
         factory.setCommonErrorHandler(errorHandler);
+        factory.getContainerProperties().setObservationEnabled(true);
+        factory.getContainerProperties().setObservationRegistry(observationRegistry);
+
         return factory;
     }
 
@@ -106,8 +115,14 @@ public class KafkaConfig {
     }
 
     @Bean
-    public KafkaTemplate<String, Object> dlqKafkaTemplate() {
-        return new KafkaTemplate<>(dlqProducerFactory());
+    public KafkaTemplate<String, Object> dlqKafkaTemplate(
+            ObservationRegistry observationRegistry
+    ) {
+        KafkaTemplate<String, Object> kafkaTemplate = new KafkaTemplate<>(dlqProducerFactory());
+        kafkaTemplate.setObservationEnabled(true);
+        kafkaTemplate.setObservationRegistry(observationRegistry);
+
+        return kafkaTemplate;
     }
 
     public static final String MEDIA_FILE_DLQ_TOPIC = "media-file-dlq";

@@ -63,15 +63,12 @@
     <modules>
         <module>common</module>
         <module>media-persistence</module>
-        <module>search-client</module>
         <module>auth-service</module>
-        <module>backend</module>
         <module>file-manager</module>
         <module>frontend</module>
         <module>media-backup</module>
-        <module>media-object</module>
-        <module>media-upload</module>
-        <module>search-indexer</module>
+        <module>media-handler</module>
+        <module>search-service</module>
         <module>workers</module>
     </modules>
 

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp/>
+                <logLevel/>
+                <loggerName/>
+                <threadName/>
+                <message/>
+                <mdc>
+                    <!-- Map MDC key traceId -> trace_id and spanId -> span_id -->
+                    <mdcKeyFieldName>traceId=trace_id</mdcKeyFieldName>
+                    <mdcKeyFieldName>spanId=span_id</mdcKeyFieldName>
+                </mdc>
+                <stackTrace/>
+            </providers>
+        </encoder>
+    </appender>
+
+    <!-- Pushes logs directly over OTLP to OpenTelemetry Collector -->
+    <appender name="OpenTelemetry" class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="OpenTelemetry" />
+    </root>
+</configuration>

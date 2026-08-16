@@ -8,6 +8,11 @@ datasources:
     access: proxy
     url: http://prometheus:9090
     isDefault: true
+    jsonData:
+      exemplarTraceIdDestinations:
+        # The label name that holds the trace ID
+        - name: trace_id
+          datasourceUid: tempo
 
   # Loki for Logs (with trace ID correlation)
   - name: Loki

@@ -4,11 +4,12 @@ services:
       context: ../auth-service
       dockerfile: Dockerfile
       args:
-        SERVICE_PORT: ${AUTH_PORT}
+        SERVICE_PORT: ${AUTH_SERVICE_PORT}
     ports:
-      - "${AUTH_PORT}:${AUTH_PORT}"
+      - "${AUTH_SERVICE_PORT}:${AUTH_SERVICE_PORT}"
     environment:
-      - AUTH_PORT=${AUTH_PORT}
+      - SPRING_PROFILES_ACTIVE=prod
+      - AUTH_SERVICE_PORT=${AUTH_SERVICE_PORT}
 
       - TEST_USER_USERNAME=${TEST_USER_USERNAME}
       - TEST_USER_PASSWORD=${TEST_USER_PASSWORD}
@@ -30,55 +31,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-      backend:
-        condition: service_started
-
-  backend:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile
-      args:
-        SERVICE_PORT: ${BACKEND_PORT}
-    ports:
-      - "${BACKEND_PORT}:${BACKEND_PORT}"
-    environment:
-      - BACKEND_PORT=${BACKEND_PORT}
-
-      - AUTH_SERVER=${AUTH_SERVER}
-
-      - OPENSEARCH_HOST=${OPENSEARCH_HOST}
-      - OPENSEARCH_PORT=${OPENSEARCH_PORT}
-
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-
-      - DB_USERNAME=${DB_USERNAME}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_URL=${DB_URL}
-      - DB_POOL_SIZE=${DB_POOL_SIZE}
-      - DB_MIN_IDLE=${DB_MIN_IDLE}
-      - DB_POOL_NAME=${DB_POOL_NAME}
-      - JPA_SHOW_SQL=${JPA_SHOW_SQL}
-
-      - MINIO_CONTAINER_URL=${MINIO_CONTAINER_URL}
-      - MINIO_URL=${MINIO_URL} # Used for browser-side redirects if needed
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
-
-      # Features
-      - ALWAYS_SHOW_ORIGINAL_RESOLUTION=${ALWAYS_SHOW_ORIGINAL_RESOLUTION}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      opensearch:
-        condition: service_healthy
-      redis:
-        condition: service_started
-      minio:
-        condition: service_started
-    volumes:
-      - chunks:/chunks
 
   frontend:
     build:
@@ -89,6 +41,7 @@ services:
     ports:
       - "${FRONTEND_PORT}:${FRONTEND_PORT}"
     environment:
+      - SPRING_PROFILES_ACTIVE=prod
       - FRONTEND_PORT=${FRONTEND_PORT}
       - AUTH_SERVER=${AUTH_SERVER}
 
@@ -101,12 +54,14 @@ services:
     ports:
       - "${FILE_MANAGER_PORT}:${FILE_MANAGER_PORT}"
     environment:
+      - SPRING_PROFILES_ACTIVE=prod
       - FILE_MANAGER_PORT=${FILE_MANAGER_PORT}
 
       - AUTH_SERVER=${AUTH_SERVER}
 
       - MINIO_CONTAINER_URL=${MINIO_CONTAINER_URL}
       - MINIO_URL=${MINIO_URL}
+      - MINIO_EXTERNAL_URL=${MINIO_EXTERNAL_URL}
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
 
@@ -123,6 +78,9 @@ services:
       - MONGODB_AUTO_INDEX=${MONGODB_AUTO_INDEX}
 
       - KAFKA_BOOTSTRAP_SERVER=${KAFKA_BOOTSTRAP_SERVER}
+
+      - MONITORING_ENABLED=${MONITORING_ENABLED}
+      - MONITORING_ACCESS=${MONITORING_ACCESS}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -135,48 +93,16 @@ services:
     volumes:
       - chunks:/chunks
 
-  media-object:
+  media-handler:
     build:
-      context: ../media-object
-      dockerfile: Dockerfile
-    environment:
-      - MINIO_CONTAINER_URL=${MINIO_CONTAINER_URL}
-      - MINIO_URL=${MINIO_URL}
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
-
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-
-      - DB_MEDIA_UPLOAD_PASSWORD=${DB_MEDIA_UPLOAD_PASSWORD}
-      - DB_URL=${DB_URL}
-      - DB_POOL_SIZE=${DB_POOL_SIZE}
-      - DB_MIN_IDLE=${DB_MIN_IDLE}
-      - DB_POOL_NAME=${DB_POOL_NAME}
-      - JPA_SHOW_SQL=${JPA_SHOW_SQL}
-
-      - KAFKA_BOOTSTRAP_SERVER=${KAFKA_BOOTSTRAP_SERVER}
-      - THUMBNAIL_DISK=${THUMBNAIL_DISK}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redpanda:
-        condition: service_started
-      minio:
-        condition: service_started
-    volumes:
-      - chunks:/chunks
-
-  media-upload:
-    build:
-      context: ../media-upload
+      context: ../media-handler
       dockerfile: Dockerfile
       args:
-        SERVICE_PORT: ${MEDIA_UPLOAD_PORT}
+        SERVICE_PORT: ${MEDIA_HANDLER_PORT}
     ports:
-      - "${MEDIA_UPLOAD_PORT}:${MEDIA_UPLOAD_PORT}"
+      - "${MEDIA_HANDLER_PORT}:${MEDIA_HANDLER_PORT}"
     environment:
+      - SPRING_PROFILES_ACTIVE=prod
       - MEDIA_UPLOAD_PORT=${MEDIA_UPLOAD_PORT}
 
       - AUTH_SERVER=${AUTH_SERVER}
@@ -191,7 +117,7 @@ services:
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
 
-      - DB_MEDIA_UPLOAD_PASSWORD=${DB_MEDIA_UPLOAD_PASSWORD}
+      - DB_MEDIA_HANDLER_PASSWORD=${DB_MEDIA_HANDLER_PASSWORD}
       - DB_URL=${DB_URL}
       - DB_POOL_SIZE=${DB_POOL_SIZE}
       - DB_MIN_IDLE=${DB_MIN_IDLE}
@@ -199,6 +125,8 @@ services:
       - JPA_SHOW_SQL=${JPA_SHOW_SQL}
 
       - KAFKA_BOOTSTRAP_SERVER=${KAFKA_BOOTSTRAP_SERVER}
+
+      - THUMBNAIL_DISK=${THUMBNAIL_DISK}
     depends_on:
       postgres:
         condition: service_healthy
@@ -208,16 +136,34 @@ services:
         condition: service_started
       minio:
         condition: service_started
+    volumes:
+      - chunks:/chunks
 
-  search-indexer:
+  search-service:
     build:
-      context: ../search-indexer
+      context: ../search-service
       dockerfile: Dockerfile
+      args:
+        SERVICE_PORT: ${SEARCH_SERVICE_PORT}
+    ports:
+      - "${SEARCH_SERVICE_PORT}:${SEARCH_SERVICE_PORT}"
     environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SEARCH_SERVICE_PORT=${SEARCH_SERVICE_PORT}
+
       - OPENSEARCH_HOST=${OPENSEARCH_HOST}
       - OPENSEARCH_PORT=${OPENSEARCH_PORT}
 
-      - DB_SEARCH_INDEXER_PASSWORD=${DB_SEARCH_INDEXER_PASSWORD}
+      - MINIO_CONTAINER_URL=${MINIO_CONTAINER_URL}
+      - MINIO_URL=${MINIO_URL}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+
+      - DB_MEDIA_HANDLER_PASSWORD=${DB_MEDIA_HANDLER_PASSWORD}
       - DB_URL=${DB_URL}
       - DB_POOL_SIZE=${DB_POOL_SIZE}
       - DB_MIN_IDLE=${DB_MIN_IDLE}
@@ -225,12 +171,18 @@ services:
       - JPA_SHOW_SQL=${JPA_SHOW_SQL}
 
       - KAFKA_BOOTSTRAP_SERVER=${KAFKA_BOOTSTRAP_SERVER}
+
+      - ALWAYS_SHOW_ORIGINAL_RESOLUTION=${ALWAYS_SHOW_ORIGINAL_RESOLUTION}
     depends_on:
       opensearch:
         condition: service_healthy
       postgres:
         condition: service_healthy
       redpanda:
+        condition: service_started
+      redis:
+        condition: service_started
+      minio:
         condition: service_started
 
   workers:
@@ -242,7 +194,10 @@ services:
     ports:
       - "${WORKERS_PORT}:${WORKERS_PORT}"
     environment:
+      - SPRING_PROFILES_ACTIVE=prod
       - WORKERS_PORT=${WORKERS_PORT}
+
+      - AUTH_SERVER=${AUTH_SERVER}
 
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
@@ -253,10 +208,22 @@ services:
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
 
+      - DB_MEDIA_HANDLER_PASSWORD=${DB_MEDIA_HANDLER_PASSWORD}
+      - DB_URL=${DB_URL}
+      - DB_POOL_SIZE=${DB_POOL_SIZE}
+      - DB_MIN_IDLE=${DB_MIN_IDLE}
+      - DB_POOL_NAME=${DB_POOL_NAME}
+      - JPA_SHOW_SQL=${JPA_SHOW_SQL}
+
       - KAFKA_BOOTSTRAP_SERVER=${KAFKA_BOOTSTRAP_SERVER}
+
       - GRPC_FILE_PROVIDER_ADDRESS=static://file-manager:9090
+
       - NUMBER_OF_THREADS=${NUMBER_OF_THREADS}
+      - WEBSOCKET_ALLOWED_ORIGINS=${WEBSOCKET_ALLOWED_ORIGINS}
     depends_on:
+      postgres:
+        condition: service_healthy
       redpanda:
         condition: service_started
       minio:
@@ -273,12 +240,14 @@ services:
       context: ../media-backup
       dockerfile: Dockerfile
     environment:
+      - SPRING_PROFILES_ACTIVE=prod
       - MINIO_CONTAINER_URL=${MINIO_CONTAINER_URL}
       - MINIO_URL=${MINIO_URL}
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
 
       - KAFKA_BOOTSTRAP_SERVER=${KAFKA_BOOTSTRAP_SERVER}
+
       - BACKUP_LOCATION=${BACKUP_LOCATION}
       - BACKUP_ENABLED=${BACKUP_ENABLED}
     depends_on:
@@ -291,22 +260,7 @@ services:
     volumes:
       - ${BACKUP_PATH}:${BACKUP_LOCATION}
 
-  task-responder:
-    build:
-      context: ../task-responder
-      dockerfile: Dockerfile
-      args:
-        SERVICE_PORT: ${TASK_RESPONDER_PORT}
-    ports:
-      - "127.0.0.1:${TASK_RESPONDER_PORT}:${TASK_RESPONDER_PORT}"
-    environment:
-      - AUTH_SERVER=${AUTH_SERVER}
 
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-
-      - WEBSOCKET_ALLOWED_ORIGINS=${WEBSOCKET_ALLOWED_ORIGINS}
 
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
@@ -398,11 +352,10 @@ services:
     environment:
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: media_db
     ports:
       - "5432:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}" ]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d postgres" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -419,7 +372,6 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: ${DB_PORT}
-      DB_NAME: ${DB_NAME}
       DB_SUPERUSER: ${DB_USERNAME}
       DB_SUPERUSER_PASSWORD: ${DB_PASSWORD}
     volumes:
@@ -466,6 +418,74 @@ services:
     volumes:
       - ${MONGODB_VOLUME}:/data/db
       - atlas_config:/data/configdb
+    user: "0:0"
+
+
+  # Metrics Storage (Prometheus)
+  prometheus:
+    image: prom/prometheus:v3.13.0
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-remote-write-receiver'
+    volumes:
+      - ../.docker/observability/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9091:9090" # grpc already used 9090 port, use 9091 for prometheus instead
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Logs Storage (Loki)
+  loki:
+    image: grafana/loki:3.6.13
+    container_name: loki
+    command: -config.file=/etc/loki/local-config.yml
+    volumes:
+      - ../.docker/observability/loki.yml:/etc/loki/local-config.yml
+    ports:
+      - "3100:3100"
+
+  # Traces Storage (Tempo)
+  tempo:
+    image: grafana/tempo:2.9.4
+    container_name: tempo
+    command: [ "-config.file=/etc/tempo.yml" ]
+    volumes:
+      - ../.docker/observability/tempo.yml:/etc/tempo.yml
+    ports:
+      - "3200:3200" # Tempo HTTP
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.157.0
+    container_name: otel-collector
+    command: [ "--config=/etc/otelcol-contrib/config.yml" ]
+    volumes:
+      - ../.docker/observability/otel-collector-config.yml:/etc/otelcol-contrib/config.yml
+    ports:
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+
+  grafana:
+    image: grafana/grafana:11.6.16
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../.docker/observability/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ../.docker/observability/grafana.ini:/etc/grafana/grafana.ini
+      - ../.docker/observability/provisioning/alerting:/etc/grafana/provisioning/alerting
+      - ../.docker/observability/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ../.docker/observability/dashboards:/etc/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      # SMTP Settings
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_HOST=smtp.gmail.com:587
+      - GF_SMTP_USER=${GF_SMTP_USER}
+      - GF_SMTP_PASSWORD=${GF_SMTP_PASSWORD}
+      - GF_SMTP_FROM_ADDRESS=${GF_SMTP_USER}
+      - GF_SMTP_FROM_NAME=Grafana Alerts
 
 
 volumes:

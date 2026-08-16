@@ -1,0 +1,20 @@
+package dev.chinh.streamingservice.mediahandler.modify.dto;
+
+import dev.chinh.streamingservice.common.validation.ValidImage;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.springframework.web.multipart.MultipartFile;
+
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+public class MediaUpdateThumbnailRequest {
+
+    private Double num;
+
+    @ValidImage
+    private MultipartFile thumbnail;
+}

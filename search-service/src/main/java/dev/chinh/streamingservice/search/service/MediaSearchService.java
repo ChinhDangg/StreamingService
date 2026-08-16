@@ -1,0 +1,163 @@
+package dev.chinh.streamingservice.search.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
+import dev.chinh.streamingservice.mediapersistence.projection.MediaSearchItem;
+import dev.chinh.streamingservice.search.MediaMapper;
+import dev.chinh.streamingservice.search.constant.SortBy;
+import dev.chinh.streamingservice.search.data.*;
+import lombok.RequiredArgsConstructor;
+import org.apache.coyote.BadRequestException;
+import org.opensearch.client.opensearch._types.SortOrder;
+import org.opensearch.client.opensearch.core.SearchResponse;
+import org.opensearch.client.opensearch.core.search.Hit;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.util.*;
+
+@Service
+@RequiredArgsConstructor
+public class MediaSearchService {
+
+    private final ObjectMapper mapper;
+    private final MediaMapper mediaMapper;
+    private final OpenSearchSearchService searchService;
+    private final MediaSearchCacheService mediaSearchCacheService;
+    private final ThumbnailService thumbnailService;
+
+    public static final String MEDIA_INDEX_NAME = "media";
+    private final MinIOService minIOService;
+
+    @Value("${always-show-original-resolution}")
+    private String alwaysShowOriginalResolution;
+
+    public MediaSearchResult advanceSearch(String userId, MediaSearchRequest request, int page, int size,
+                                           SortBy sortBy, SortOrder sortOrder) throws Exception {
+        checkMaxPage(page);
+        boolean hasAnyField = request.hasAny();
+        if (!hasAnyField) {
+            throw new BadRequestException("Empty advanced search request");
+        }
+
+        List<SearchFieldGroup> includes = request.getIncludeFields() == null ? null :
+                mapMediaSearchFieldsToSearchFieldGroups(request.getIncludeFields());
+        List<SearchFieldGroup> excludes = request.getExcludeFields() == null ? null :
+                mapMediaSearchFieldsToSearchFieldGroups(request.getExcludeFields());
+
+        if (request.getRangeFields() != null) {
+            for (MediaSearchRangeField rangeField : request.getRangeFields()) {
+                ContentMetaData.validateSearchRangeFieldName(rangeField.getField());
+            }
+        }
+
+        MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
+                userId, searchService.advanceSearch(Long.parseLong(userId), MEDIA_INDEX_NAME, includes, excludes, request.getRangeFields(), page, size, sortBy, sortOrder),
+                page, size);
+
+        if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
+            thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
+        mediaSearchCacheService.cacheMediaSearchItems(userId, mapSearchResult.searchItems);
+        return mapSearchResult.searchResult;
+    }
+
+    private List<SearchFieldGroup> mapMediaSearchFieldsToSearchFieldGroups(List<MediaSearchField> searchFields) {
+        List<SearchFieldGroup> searchFieldGroups = new ArrayList<>();
+        for (MediaSearchField includeField : searchFields) {
+            ContentMetaData.validateSearchFieldName(includeField.getField());
+            if (includeField.getField().equals(ContentMetaData.TITLE)) {
+                searchFieldGroups.add(new SearchFieldGroup(
+                        includeField.getField(), includeField.getValues(), includeField.isMatchAll(), false
+                ));
+            } else {
+                searchFieldGroups.add(new SearchFieldGroup(
+                        includeField.getField() + "." + ContentMetaData.ID, includeField.getValues(), includeField.isMatchAll(), true
+                ));
+            }
+        }
+        return searchFieldGroups;
+    }
+
+    public MediaSearchResult search(String userId, String searchString, int page, int size, SortBy sortBy,
+                                    SortOrder sortOrder) throws Exception {
+        checkMaxPage(page);
+        if (!MediaSearchField.validateSearchString(searchString)) {
+            throw new IllegalArgumentException("Invalid search string");
+        }
+        MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
+                userId, searchService.search(Long.parseLong(userId), MEDIA_INDEX_NAME, searchString, page, size, sortBy, sortOrder),
+                page, size);
+
+        if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
+            thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
+
+        mediaSearchCacheService.cacheMediaSearchItems(userId, mapSearchResult.searchItems);
+        return mapSearchResult.searchResult;
+    }
+
+    public MediaSearchResult searchByKeywords(String userId, String field, List<Object> keywords, boolean matchAll, int page, int size,
+                                              SortBy sortBy, SortOrder sortOrder) throws Exception {
+        checkMaxPage(page);
+        ContentMetaData.validateSearchFieldName(field);
+        MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
+                userId, searchService.searchTermByOneField(Long.parseLong(userId), MEDIA_INDEX_NAME, field + "." + ContentMetaData.ID, keywords, matchAll, page, size, sortBy, sortOrder),
+                page, size);
+
+        if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
+            thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
+
+        mediaSearchCacheService.cacheMediaSearchItems(userId, mapSearchResult.searchItems);
+        return mapSearchResult.searchResult;
+    }
+
+    public MediaSearchResult searchMatchAll(String userId, int page, int size, SortBy sortBy, SortOrder sortOrder) throws Exception {
+        checkMaxPage(page);
+        MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
+                userId, searchService.searchMatchAll(MEDIA_INDEX_NAME, Long.parseLong(userId), page, size, sortBy, sortOrder), page, size);
+
+        if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
+            thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
+
+        mediaSearchCacheService.cacheMediaSearchItems(userId, mapSearchResult.searchItems);
+        return mapSearchResult.searchResult;
+    }
+
+    private void checkMaxPage(int page) {
+        if (page > 50)
+            throw new IllegalArgumentException("Max page's'exceeded, please refine your search");
+    }
+
+    public record MapSearchResult(
+            MediaSearchResult searchResult,
+            Collection<MediaSearchItem> searchItems
+    ) {}
+
+    private MapSearchResult mapResponseToMediaSearchResult(String userId, SearchResponse<Object> response, int page, int size) {
+        List<MediaSearchItem> items = new ArrayList<>();
+        List<MediaSearchItemResponse> itemResponses = new ArrayList<>();
+        for (Hit<Object> hit : response.hits().hits()) {
+            MediaSearchItem searchItem = mapper.convertValue(hit.source(), MediaSearchItem.class);
+            items.add(searchItem);
+            MediaSearchItemResponse itemResponse = mediaMapper.map(searchItem);
+            if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
+                itemResponse.setThumbnail(searchItem.hasThumbnail()
+                        ? minIOService.getObjectUrl(ContentMetaData.THUMBNAIL_BUCKET, ContentMetaData.removeUserIdDirFromObjectKey(userId, searchItem.getThumbnail()))
+                        : null);
+            } else {
+                itemResponse.setThumbnail(searchItem.hasThumbnail()
+                        ? ThumbnailService.getThumbnailPath(ThumbnailService.getThumbnailUrlParentPath(), searchItem.getId(), searchItem.getThumbnail())
+                        : null);
+            }
+            itemResponse.setMediaType(searchItem.getMediaType());
+            itemResponses.add(itemResponse);
+        }
+
+        MediaSearchResult result = new MediaSearchResult(itemResponses);
+        result.setPage(page);
+        result.setPageSize(size);
+        result.setTotal(response.hits().total() == null ? 0 : response.hits().total().value());
+        result.setTotalPages((result.getTotal() + size -1) / size);
+
+        return new MapSearchResult(result, items);
+    }
+}

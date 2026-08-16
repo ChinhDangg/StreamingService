@@ -45,19 +45,19 @@ public abstract class MediaDescription implements MetaDataProvider {
 
     @JsonProperty(ContentMetaData.LENGTH)
     @Column(nullable = false)
-    protected Integer length;
+    protected int length;
 
     @JsonProperty(ContentMetaData.SIZE)
     @Column(nullable = false)
-    protected Long size;
+    protected long size;
 
     @JsonProperty(ContentMetaData.WIDTH)
     @Column(nullable = false)
-    protected Integer width;
+    protected int width;
 
     @JsonProperty(ContentMetaData.HEIGHT)
     @Column(nullable = false)
-    protected Integer height;
+    protected int height;
 
     @JsonProperty(ContentMetaData.UPLOAD_DATE)
     @Column(nullable = false)
