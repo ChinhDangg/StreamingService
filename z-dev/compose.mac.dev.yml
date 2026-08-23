@@ -161,71 +161,71 @@ services: # docker compose -f compose.mac.dev.yml --env-file .env.dev -p ss-dev 
       - atlas_config:/data/configdb
 
 
-  # Metrics Storage (Prometheus)
-  prometheus:
-    image: prom/prometheus:v3.13.0
-    container_name: prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--web.enable-remote-write-receiver'
-    volumes:
-      - ../.docker/observability/prometheus.yml:/etc/prometheus/prometheus.yml
-    ports:
-      - "9091:9090" # grpc already used 9090 port, use 9091 for prometheus instead
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  # Logs Storage (Loki)
-  loki:
-    image: grafana/loki:3.6.13
-    container_name: loki
-    command: -config.file=/etc/loki/local-config.yml
-    volumes:
-      - ../.docker/observability/loki.yml:/etc/loki/local-config.yml
-    ports:
-      - "3100:3100"
-
-  # Traces Storage (Tempo)
-  tempo:
-    image: grafana/tempo:2.9.4
-    container_name: tempo
-    command: [ "-config.file=/etc/tempo.yml" ]
-    volumes:
-      - ../.docker/observability/tempo.yml:/etc/tempo.yml
-    ports:
-      - "3200:3200" # Tempo HTTP
-
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.157.0
-    container_name: otel-collector
-    command: [ "--config=/etc/otelcol-contrib/config.yml" ]
-    volumes:
-      - ../.docker/observability/otel-collector-config.yml:/etc/otelcol-contrib/config.yml
-    ports:
-      - "4317:4317" # OTLP gRPC receiver
-      - "4318:4318" # OTLP HTTP receiver
-
-  grafana:
-    image: grafana/grafana:11.6.16
-    container_name: grafana
-    ports:
-      - "3000:3000"
-    volumes:
-      - ../.docker/observability/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
-      - ../.docker/observability/grafana.ini:/etc/grafana/grafana.ini
-      - ../.docker/observability/provisioning/alerting:/etc/grafana/provisioning/alerting
-      - ../.docker/observability/provisioning/dashboards:/etc/grafana/provisioning/dashboards
-      - ../.docker/observability/dashboards:/etc/grafana/dashboards
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-      # SMTP Settings
-      - GF_SMTP_ENABLED=true
-      - GF_SMTP_HOST=smtp.gmail.com:587
-      - GF_SMTP_USER=${GF_SMTP_USER}
-      - GF_SMTP_PASSWORD=${GF_SMTP_PASSWORD}
-      - GF_SMTP_FROM_ADDRESS=${GF_SMTP_USER}
-      - GF_SMTP_FROM_NAME=Grafana Alerts
+#  # Metrics Storage (Prometheus)
+#  prometheus:
+#    image: prom/prometheus:v3.13.0
+#    container_name: prometheus
+#    command:
+#      - '--config.file=/etc/prometheus/prometheus.yml'
+#      - '--web.enable-remote-write-receiver'
+#    volumes:
+#      - ../.docker/observability/prometheus.yml:/etc/prometheus/prometheus.yml
+#    ports:
+#      - "9091:9090" # grpc already used 9090 port, use 9091 for prometheus instead
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+#
+#  # Logs Storage (Loki)
+#  loki:
+#    image: grafana/loki:3.6.13
+#    container_name: loki
+#    command: -config.file=/etc/loki/local-config.yml
+#    volumes:
+#      - ../.docker/observability/loki.yml:/etc/loki/local-config.yml
+#    ports:
+#      - "3100:3100"
+#
+#  # Traces Storage (Tempo)
+#  tempo:
+#    image: grafana/tempo:2.9.4
+#    container_name: tempo
+#    command: [ "-config.file=/etc/tempo.yml" ]
+#    volumes:
+#      - ../.docker/observability/tempo.yml:/etc/tempo.yml
+#    ports:
+#      - "3200:3200" # Tempo HTTP
+#
+#  otel-collector:
+#    image: otel/opentelemetry-collector-contrib:0.157.0
+#    container_name: otel-collector
+#    command: [ "--config=/etc/otelcol-contrib/config.yml" ]
+#    volumes:
+#      - ../.docker/observability/otel-collector-config.yml:/etc/otelcol-contrib/config.yml
+#    ports:
+#      - "4317:4317" # OTLP gRPC receiver
+#      - "4318:4318" # OTLP HTTP receiver
+#
+#  grafana:
+#    image: grafana/grafana:11.6.16
+#    container_name: grafana
+#    ports:
+#      - "3000:3000"
+#    volumes:
+#      - ../.docker/observability/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+#      - ../.docker/observability/grafana.ini:/etc/grafana/grafana.ini
+#      - ../.docker/observability/provisioning/alerting:/etc/grafana/provisioning/alerting
+#      - ../.docker/observability/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+#      - ../.docker/observability/dashboards:/etc/grafana/dashboards
+#    environment:
+#      - GF_SECURITY_ADMIN_PASSWORD=admin
+#      - GF_USERS_ALLOW_SIGN_UP=false
+#      # SMTP Settings
+#      - GF_SMTP_ENABLED=true
+#      - GF_SMTP_HOST=smtp.gmail.com:587
+#      - GF_SMTP_USER=${GF_SMTP_USER}
+#      - GF_SMTP_PASSWORD=${GF_SMTP_PASSWORD}
+#      - GF_SMTP_FROM_ADDRESS=${GF_SMTP_USER}
+#      - GF_SMTP_FROM_NAME=Grafana Alerts
 
 
 volumes:

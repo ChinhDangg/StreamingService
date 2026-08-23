@@ -373,7 +373,7 @@ export function addNewAlbumItem(newId) {
 }
 
 async function fetchMediaContent(mediaId) {
-    const response = await apiRequest(`/api/media/content/${mediaId}`);
+    const response = await apiRequest(`/api/media/grouper/content/${mediaId}`);
     if (!response.ok) {
         alert("Failed to fetch media info");
         return false;

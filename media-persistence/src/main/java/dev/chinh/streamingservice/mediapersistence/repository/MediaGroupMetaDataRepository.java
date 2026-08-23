@@ -14,12 +14,12 @@ import java.util.Optional;
 public interface MediaGroupMetaDataRepository extends JpaRepository<MediaGroupMetaData, Long> {
 
     @Query("""
-        SELECT m.mediaMetaDataId
+        SELECT m.mediaMetaData.id
         FROM MediaGroupMetaData m
-        WHERE m.grouperMetaDataId = :grouperId
+        WHERE m.grouperMetaData.id = :grouperId
     """)
     Slice<Long> findMediaMetadataIdsByGrouperMetaDataId(@Param("grouperId") Long grouperId, Pageable pageable);
 
     // Spring generates: SELECT * FROM media_group_meta_data WHERE grouper_id = ? LIMIT 1
-    Optional<MediaGroupMetaData> findFirstByGrouperMetaDataId(Long grouperId);
+    Optional<MediaGroupMetaData> findFirstByGrouperMetaData_Id(Long grouperId);
 }

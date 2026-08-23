@@ -18,7 +18,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.QueryTimeoutException;
-import org.springframework.data.domain.*;
 import org.springframework.data.mongodb.MongoTransactionException;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -90,7 +89,7 @@ public class FileService {
         fileCacheService.invalidateFileCache(item.getId());
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
-                EventTopics.MEDIA_UPLOAD_TOPIC,
+                EventTopics.MEDIA_HANDLER_TOPIC,
                 userId,
                 new MediaUpdateEvent.FileToVideoMediaInitiated(
                         userId,
@@ -201,7 +200,7 @@ public class FileService {
 
 //        FileSystemItem first = findFirstImageOrVideo(userId, getPathForFileItem(item.getPath(), item.getId()));
         publisher.publishEvent(new FileEventProducer.EventWrapper(
-                EventTopics.MEDIA_UPLOAD_TOPIC, // send to media_handler first to get grouper/parent media id
+                EventTopics.MEDIA_HANDLER_TOPIC, // send to media_handler first to get grouper/parent media id
                 userId,
                 new MediaUpdateEvent.NestedDirectoryToGrouperMediaInitiated(
                         userId,
@@ -321,7 +320,13 @@ public class FileService {
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
                 userId,
-                new MediaUpdateEvent.FileDeleted(userId, item.getId(), addUserIdToPath(userId, getFullPathInName(item, true)), FileType.isNotDir(item.getFileType()), null)
+                new MediaUpdateEvent.FileDeleted(userId,
+                        item.getId(),
+                        addUserIdToPath(userId, getFullPathInName(item, true)),
+                        FileType.isNotDir(item.getFileType()),
+                        FileType.convertFileTypeToMediaType(item.getFileType()),
+                        null
+                )
         ));
     }
 
@@ -348,10 +353,16 @@ public class FileService {
         fileCacheService.invalidateFileCache(item.getId());
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
-                EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC,
+                EventTopics.MEDIA_FILE_HANDLER_SEARCH_AND_BACKUP_TOPIC,
                 userId,
                 new MediaUpdateEvent.FileDeleted(
-                        userId, item.getId(), addUserIdToPath(userId, getFullPathInName(item, true)), FileType.isNotDir(item.getFileType()), item.getMId())
+                        userId,
+                        item.getId(),
+                        addUserIdToPath(userId, getFullPathInName(item, true)),
+                        FileType.isNotDir(item.getFileType()),
+                        FileType.convertFileTypeToMediaType(item.getFileType()),
+                        item.getMId()
+                )
         ));
     }
 
@@ -403,7 +414,8 @@ public class FileService {
                             userId, fileId, newParentId,
                             item.getParentId(), item.getPath(), // old parent id, and old path
                             addUserIdToPath(userId, getFullPathInName(item, true)),
-                            addUserIdToPath(userId, getFullPathInName(newParent, true))
+                            addUserIdToPath(userId, getFullPathInName(newParent, true)),
+                            item.getFileType().name()
                     )
             ));
 
@@ -413,9 +425,9 @@ public class FileService {
                 boolean oldParentIsGrouper = oldParent.getFileType() == FileType.GROUPER;
                 if (oldParentIsGrouper || newParentIsGrouper) {
                     publisher.publishEvent(new FileEventProducer.EventWrapper(
-                            EventTopics.MEDIA_UPLOAD_TOPIC,
+                            EventTopics.MEDIA_HANDLER_TOPIC,
                             userId,
-                            new MediaUpdateEvent.GrouperItemMoved(userId, item.getMId(), newParent.getMId(), item.getName())
+                            new MediaUpdateEvent.GrouperItemMoved(userId, item.getMId(), newParent.getMId(), item.getName(), oldParentIsGrouper, null)
                     ));
                 }
                 if (oldParentIsGrouper && !newParentIsGrouper) {

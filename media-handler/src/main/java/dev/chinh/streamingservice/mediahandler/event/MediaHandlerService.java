@@ -7,6 +7,7 @@ import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
+import dev.chinh.streamingservice.mediahandler.MediaMapper;
 import dev.chinh.streamingservice.mediapersistence.entity.MediaGroupMetaData;
 import dev.chinh.streamingservice.mediapersistence.entity.MediaMetaData;
 import dev.chinh.streamingservice.mediapersistence.repository.MediaMetaDataRepository;
@@ -43,6 +44,7 @@ public class MediaHandlerService {
     private final MediaMetaDataRepository mediaMetaDataRepository;
     private final MediaMetaDataRepository mediaRepository;
     private final ObjectMapper objectMapper;
+    private final MediaMapper mediaMapper;
 
 
     /**
@@ -59,7 +61,7 @@ public class MediaHandlerService {
                 title,
                 (short) event.uploadDate().atOffset(ZoneOffset.UTC).getYear()
         );
-        long mediaId = saveMedia(null, event.userId(), saveRequest, mediaBasicInfo, null);
+        var saved = saveMedia(null, event.userId(), saveRequest, mediaBasicInfo, null);
 
         eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
                 EventTopics.MEDIA_FILE_TOPIC,
@@ -67,7 +69,7 @@ public class MediaHandlerService {
                 new MediaUpdateEvent.NestedDirectoryToGrouperMediaInitiated(
                         event.userId(),
                         event.fileId(),
-                        mediaId,
+                        saved.getId(),
                         event.bucket(), event.objectName(),
                         event.fileName(), event.uploadDate(),
                         event.childSearchable(),
@@ -85,7 +87,7 @@ public class MediaHandlerService {
         mediaMetaData.setLength(event.length());
 
         eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
-                EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC,
+                EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
                 event.userId(),
                 new MediaUpdateEvent.MediaCreatedReady(
                         event.userId(),
@@ -97,6 +99,14 @@ public class MediaHandlerService {
                         mediaMetaData.getWidth(),
                         mediaMetaData.getHeight()
                 )
+        ));
+
+        MediaUpdateEvent.MediaCreatedReadyForSearch eventForSearch = mediaMapper.map(mediaMetaData);
+        System.out.println(eventForSearch);
+        eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                EventTopics.MEDIA_SEARCH_TOPIC,
+                event.userId(),
+                eventForSearch
         ));
     }
 
@@ -116,10 +126,10 @@ public class MediaHandlerService {
         mediaMetaData.setLength(event.length());
         if (event.searchable())
             probeAndFillMediaMetadata(mediaMetaData, event.bucket(), event.objectName(), MediaType.detectMediaType(event.objectName()), createMediaThumbnailString(event.userId(), MediaType.ALBUM, event.objectName()));
-        long mediaId = saveMedia(mediaMetaData, event.userId(), saveRequest, mediaBasicInfo, event.parentMediaId());
+        var saved = saveMedia(mediaMetaData, event.userId(), saveRequest, mediaBasicInfo, event.parentMediaId());
 
         String topic = event.searchable()
-                ? EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC
+                ? EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC
                 : EventTopics.MEDIA_FILE_TOPIC; // not searchable - no thumbnail - no backup to save the thumbnail
         eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
                 topic,
@@ -127,13 +137,20 @@ public class MediaHandlerService {
                 new MediaUpdateEvent.MediaCreatedReady(
                         event.userId(),
                         event.fileId(),
-                        mediaId,
+                        saved.getId(),
                         MediaType.ALBUM,
                         mediaMetaData.getThumbnail(),
                         mediaMetaData.getLength(),
                         mediaMetaData.getWidth(),
                         mediaMetaData.getHeight()
                 )
+        ));
+
+        MediaUpdateEvent.MediaCreatedReadyForSearch eventForSearch = mediaMapper.map(saved);
+        eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                EventTopics.MEDIA_SEARCH_TOPIC,
+                event.userId(),
+                eventForSearch
         ));
     }
 
@@ -154,26 +171,33 @@ public class MediaHandlerService {
         MediaMetaData mediaMetaData = new MediaMetaData();
         probeAndFillMediaMetadata(mediaMetaData, event.bucket(), event.objectName(), MediaType.VIDEO, createMediaThumbnailString(event.userId(), MediaType.VIDEO, event.objectName()));
 
-        long mediaId = saveMedia(mediaMetaData, event.userId(), saveRequest, mediaBasicInfo, null);
+        var saved = saveMedia(mediaMetaData, event.userId(), saveRequest, mediaBasicInfo, null);
 
         if (event.nameUpdateListAsJson() != null) {
             List<MediaMetadataModifyService.UpdateList> updateLists = objectMapper.readValue(event.nameUpdateListAsJson(), new TypeReference<>() {});
-            mediaMetadataModifyService.updateNameEntityInMediaInBatch(event.userId(), updateLists, mediaId, false);
+            mediaMetadataModifyService.updateNameEntityInMediaInBatch(event.userId(), updateLists, saved.getId(), false);
         }
 
         eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
-                EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC,
+                EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
                 event.userId(),
                 new MediaUpdateEvent.MediaCreatedReady(
                         event.userId(),
                         event.fileId(),
-                        mediaId,
+                        saved.getId(),
                         MediaType.VIDEO,
                         mediaMetaData.getThumbnail(),
                         mediaMetaData.getLength(),
                         mediaMetaData.getWidth(),
                         mediaMetaData.getHeight()
                 )
+        ));
+
+        MediaUpdateEvent.MediaCreatedReadyForSearch eventForSearch = mediaMapper.map(saved);
+        eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                EventTopics.MEDIA_SEARCH_TOPIC,
+                event.userId(),
+                eventForSearch
         ));
     }
 
@@ -201,14 +225,26 @@ public class MediaHandlerService {
 
     @Transactional
     public void handleMoveGrouperItem(MediaUpdateEvent.GrouperItemMoved event) {
+        Long newGroupInfoId = null;
         if (event.parentMediaId() != null) {
-            String error = addMediaToGrouper(event.parentMediaId(), event.childMediaId(), event.fileName());
-            if (error != null)
-                System.err.println(error);
+            newGroupInfoId = addMediaToGrouper(event.parentMediaId(), event.childMediaId(), event.fileName());
+            System.out.println(newGroupInfoId);
         } else {
             // a grouper item is moved out of a grouper and not into another grouper - delete media info
             mediaMetadataModifyService.deleteMedia(event.userId(), event.childMediaId());
         }
+        eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                EventTopics.MEDIA_SEARCH_TOPIC,
+                event.userId(),
+                new MediaUpdateEvent.GrouperItemMoved(
+                        event.userId(),
+                        event.childMediaId(),
+                        event.parentMediaId(),
+                        event.fileName(),
+                        event.oldParentIsGrouper(),
+                        newGroupInfoId
+                )
+        ));
     }
 
     public void handleDeleteObject(MediaUpdateEvent.ObjectDeleted event) {
@@ -316,7 +352,7 @@ public class MediaHandlerService {
     public record MediaSavedRequest(String bucket, String objectName, String fileName, MediaType mediaType) {}
 
     @Transactional
-    public long saveMedia(MediaMetaData base, String userId, MediaSavedRequest upload, MediaBasicInfo basicInfo, Long parentMediaId) {
+    public MediaMetaData saveMedia(MediaMetaData base, String userId, MediaSavedRequest upload, MediaBasicInfo basicInfo, Long parentMediaId) {
         if (upload.mediaType == MediaType.OTHER || upload.mediaType == MediaType.IMAGE) {
             throw new IllegalArgumentException("Unsupported type to be a media: " + upload.mediaType);
         }
@@ -329,14 +365,11 @@ public class MediaHandlerService {
         mediaMetaData.setUserId(Long.parseLong(userId));
         mediaMetaData.setKey(upload.objectName);
 
-        var saved = mediaRepository.save(mediaMetaData);
-
         if (upload.mediaType == MediaType.GROUPER) {
             MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
             mediaGroupInfo.setGrouperMetaData(null);
-            mediaGroupInfo.setMediaMetaData(saved);
-            saved.setGroupInfo(mediaGroupInfo);
-//            mediaRepository.save(saved);
+            mediaGroupInfo.setMediaMetaData(mediaMetaData);
+            mediaMetaData.setGroupInfo(mediaGroupInfo);
         }
 
         if (parentMediaId != null) {
@@ -350,18 +383,23 @@ public class MediaHandlerService {
             }
         }
 
-        return saved.getId();
+        return mediaRepository.save(mediaMetaData);
     }
 
+    /**
+     * @return new media group info id if successful, null if failed.
+     */
     @Transactional
-    public String addMediaToGrouper(long grouperMediaId, long mediaId, String fileName) {
+    public Long addMediaToGrouper(long grouperMediaId, long mediaId, String fileName) {
         MediaMetaData mediaMetaData = mediaRepository.findById(mediaId).orElse(null);
         if (mediaMetaData == null) {
-            return "Media not found";
+            System.err.println("Media not found: " + mediaId);
+            return null;
         }
         MediaMetaData grouperMedia = mediaRepository.findById(grouperMediaId).orElse(null);
         if (grouperMedia == null) {
-            return "Grouper media not found";
+            System.err.println("Grouper media not found: " + grouperMediaId);
+            return null;
         }
         mediaMetadataModifyService.updateMediaLengthWithDelta(grouperMedia.getUserId(), List.of(grouperMediaId), 1);
         MediaGroupMetaData mediaGroupInfo = new MediaGroupMetaData();
@@ -369,7 +407,7 @@ public class MediaHandlerService {
         mediaGroupInfo.setMediaMetaData(mediaMetaData);
         mediaGroupInfo.setNumInfo(fileName);
         mediaMetaData.setGroupInfo(mediaGroupInfo);
-        mediaRepository.save(mediaMetaData);
-        return null;
+        var saved = mediaRepository.save(mediaMetaData);
+        return saved.getGroupInfo().getId();
     }
 }

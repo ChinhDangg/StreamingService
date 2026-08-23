@@ -3,10 +3,7 @@ package dev.chinh.streamingservice.mediapersistence.entity;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 @Getter
 @Setter
@@ -21,6 +18,7 @@ import lombok.Setter;
 public class MediaGroupMetaData {
 
     @Setter(AccessLevel.NONE)
+    @JsonProperty(ContentMetaData.ID)
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
@@ -28,10 +26,10 @@ public class MediaGroupMetaData {
     @JoinColumn(name = "media_id", nullable = false)
     private MediaMetaData mediaMetaData;
 
-    @Setter(AccessLevel.NONE)
-    // Read-only access to foreign key column
-    @Column(name = "media_id", insertable = false, updatable = false)
-    private Long mediaMetaDataId;
+//    @Setter(AccessLevel.NONE)
+//    // Read-only access to foreign key column
+//    @Column(name = "media_id", insertable = false, updatable = false)
+//    private Long mediaMetaDataId;
 
     // If has media group id then the media is an individual item that hold the grouper id.
     // Media Grouper holds shared info and group other Media MetaData
@@ -41,11 +39,24 @@ public class MediaGroupMetaData {
     @JoinColumn(name = "grouper_id")
     private MediaGroupMetaData grouperMetaData;
 
-    @Setter(AccessLevel.NONE)
-    @JsonProperty(ContentMetaData.GROUPER_ID)
-    @Column(name = "grouper_id", insertable = false, updatable = false)
-    private Long grouperMetaDataId;
+//    @Setter(AccessLevel.NONE)
+//    @JsonProperty(ContentMetaData.GROUPER_ID)
+//    @Column(name = "grouper_id", insertable = false, updatable = false)
+//    private Long grouperMetaDataId;
 
     @JsonProperty(ContentMetaData.NUM_INFO)
     private String numInfo; // using string as numInfo to have an easy sorting capability without needing to reorder all
+
+    public Long getMediaMetaDataId() {
+        return mediaMetaData == null ? null : mediaMetaData.getId();
+    }
+
+    public Long getGrouperMetaDataId() {
+        return grouperMetaData == null ? null : grouperMetaData.getId();
+    }
+
+    public String toString() {
+        return String.format("MediaGroupMetaData(id=%d, mediaMetaDataId=%d, grouperMetaDataId=%d, numInfo=%s)",
+                id, getMediaMetaDataId(), getGrouperMetaDataId(), numInfo);
+    }
 }

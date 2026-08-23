@@ -1,11 +1,14 @@
 package dev.chinh.streamingservice.common.event;
 
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.common.constant.MediaType;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 public interface MediaUpdateEvent {
 
@@ -23,7 +26,8 @@ public interface MediaUpdateEvent {
     record MediaNameEntityUpdated(
             String userId,
             long mediaId,
-            MediaNameEntityConstant nameEntityConstant
+            MediaNameEntityConstant nameEntityConstant,
+            Map<Long, String> nameEntityIdsToNames
     ) implements MediaUpdateEvent{}
 
     record MediaTitleUpdated(
@@ -37,6 +41,8 @@ public interface MediaUpdateEvent {
             String userId,
             MediaNameEntityConstant nameEntityConstant,
             long nameEntityId,
+            String name,
+            int length,
             String thumbnailPath
     ) implements MediaUpdateEvent{}
 
@@ -122,45 +128,9 @@ public interface MediaUpdateEvent {
             String fileId,
             String fileName,
             boolean isNotDirectory,
+            MediaType mediaType,
             Long mediaId
     ) implements MediaUpdateEvent {}
-
-//    record FileToMediaInitiated(
-//            String userId,
-//            String fileId,
-//            MediaType mediaType,
-//            String bucket,
-//            String objectName,
-//            String fileName,
-//            Instant uploadDate,
-//            Long parentMediaId,
-//            Long childMediaId,
-//            boolean searchable,
-//            boolean updateParentLength
-//    ) implements MediaUpdateEvent {}
-
-//    record DirectoryToMediaInitiated(
-//            String userId,
-//            String fileId,
-//            long mediaId,
-//            MediaType mediaType,
-//            boolean searchable,
-//            boolean updateParentLength,
-//            String thumbnailObject,
-//            long initialSize,
-//            int offset
-//    ) implements MediaUpdateEvent {}
-
-//    record NestedDirectoryToMediaInitiated(
-//            String userId,
-//            String fileId,
-//            long mediaId,
-//            MediaType parentType,
-//            MediaType childType,
-//            boolean childSearchable,
-//            String thumbnailObject,
-//            int offset
-//    ) implements MediaUpdateEvent {}
 
     record NestedDirectoryToGrouperMediaInitiated(
             String userId,
@@ -220,6 +190,50 @@ public interface MediaUpdateEvent {
             Integer height
     ) implements MediaUpdateEvent{}
 
+    record MediaCreatedReadyForSearch(
+            @JsonProperty(ContentMetaData.ID)
+            long id,
+            @JsonProperty(ContentMetaData.USER_ID)
+            long userId,
+            @JsonProperty(ContentMetaData.TITLE)
+            String title,
+            @JsonProperty(ContentMetaData.BUCKET)
+            String bucket,
+            @JsonProperty(ContentMetaData.KEY)
+            String key,
+            @JsonProperty(ContentMetaData.THUMBNAIL)
+            String thumbnail,
+            @JsonProperty(ContentMetaData.PREVIEW)
+            String preview,
+            @JsonProperty(ContentMetaData.LENGTH)
+            int length,
+            @JsonProperty(ContentMetaData.SIZE)
+            long size,
+            @JsonProperty(ContentMetaData.WIDTH)
+            int width,
+            @JsonProperty(ContentMetaData.HEIGHT)
+            int height,
+            @JsonProperty(ContentMetaData.UPLOAD_DATE)
+            Instant uploadDate,
+            @JsonProperty(ContentMetaData.YEAR)
+            short year,
+            @JsonProperty(ContentMetaData.MEDIA_TYPE)
+            MediaType mediaType,
+            @JsonProperty(ContentMetaData.TAGS)
+            Map<Long, String> tags,
+            @JsonProperty(ContentMetaData.CHARACTERS)
+            Map<Long, String> characters,
+            @JsonProperty(ContentMetaData.UNIVERSES)
+            Map<Long, String> universes,
+            @JsonProperty(ContentMetaData.AUTHORS)
+            Map<Long, String> authors,
+            Long groupInfoId,
+            @JsonProperty(ContentMetaData.GROUPER_ID)
+            Long groupInfoGrouperId,
+            @JsonProperty(ContentMetaData.NUM_INFO)
+            String groupInfoNumInfo
+    ) implements MediaUpdateEvent {}
+
     record MediaThumbnailUpdatedReady(
             long mediaId,
             String oldThumbnail,
@@ -238,7 +252,8 @@ public interface MediaUpdateEvent {
             String oldParentId,
             String oldIdPath,
             String oldPath,
-            String newPath
+            String newPath,
+            String fileType
     ) implements MediaUpdateEvent {}
 
     record FileMoved(
@@ -251,7 +266,9 @@ public interface MediaUpdateEvent {
             String userId,
             long childMediaId,
             Long parentMediaId,
-            String fileName
+            String fileName,
+            boolean oldParentIsGrouper,
+            Long newGroupInfoId
     ) implements MediaUpdateEvent {}
 
     record FileRenamed(

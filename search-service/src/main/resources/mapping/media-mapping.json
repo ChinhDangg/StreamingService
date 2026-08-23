@@ -116,9 +116,6 @@
       "bucket": {
         "type": "text"
       },
-      "parentPath": {
-        "type": "text"
-      },
       "key": {
         "type": "text"
       },

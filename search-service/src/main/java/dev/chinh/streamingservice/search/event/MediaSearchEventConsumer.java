@@ -3,6 +3,7 @@ package dev.chinh.streamingservice.search.event;
 import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.search.config.KafkaRedPandaConfig;
+import dev.chinh.streamingservice.search.data.NameEntityField;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
@@ -19,19 +20,19 @@ public class MediaSearchEventConsumer {
 
     private final MediaSearchEventService mediaSearchEventService;
 
-    private void onCreateMediaIndexSearch(MediaUpdateEvent.MediaCreatedReady event) {
-        System.out.println("Received new index event: " + event.mediaId());
+    private void onCreateMediaIndexSearch(MediaUpdateEvent.MediaCreatedReadyForSearch event) {
+        System.out.println("Received new index event: " + event.id());
         try {
-            mediaSearchEventService.handleCreateMediaIndexSearch(event.userId(), event.mediaId());
+            mediaSearchEventService.handleCreateMediaIndexSearch(event);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to index media " + event.mediaId() + " to Search", e);
+            throw new RuntimeException("Failed to index media " + event.id() + " to Search", e);
         }
     }
 
     private void onDeleteMediaIndexSearch(MediaUpdateEvent.FileDeleted event) {
         System.out.println("Received delete index event: " + event.mediaId());
         try {
-            mediaSearchEventService.handleDeleteMediaIndexSearch(event.mediaId());
+            mediaSearchEventService.handleDeleteMediaIndexSearch(event.mediaId(), event.mediaType());
         } catch (IOException e) {
             throw new RuntimeException("Failed to delete media index " + event.mediaId() + " from Search", e);
         }
@@ -40,7 +41,7 @@ public class MediaSearchEventConsumer {
     private void onUpdateMediaNameEntitySearch(MediaUpdateEvent.MediaNameEntityUpdated event) {
         System.out.println("Received update media name entity event: " + event.mediaId());
         try {
-            mediaSearchEventService.handleUpdateMediaNameEntitySearch(event.userId(), event.mediaId(), event.nameEntityConstant());
+            mediaSearchEventService.handleUpdateMediaNameEntitySearch(event.mediaId(), event.nameEntityConstant(), event.nameEntityIdsToNames());
         } catch (IOException e) {
             throw new RuntimeException("Failed to update Search index field for media " + event.mediaId(), e);
         }
@@ -83,10 +84,29 @@ public class MediaSearchEventConsumer {
         }
     }
 
+    private void onMoveGrouperItem(MediaUpdateEvent.GrouperItemMoved event) throws IOException {
+        System.out.println("Received moving grouper item: " + event.childMediaId());
+        try {
+            mediaSearchEventService.handleMoveGrouperItem(event);
+        } catch (Exception e) {
+            System.err.println("Failed to move grouper item outside grouper: " + event.childMediaId());
+            throw e;
+        }
+    }
+
+
     private void onCreateNameEntitySearch(MediaUpdateEvent.NameEntityCreated event) {
         System.out.println("Received create name entity: " + event.nameEntityConstant() + " nameEntityId: " + event.nameEntityId());
         try {
-            mediaSearchEventService.handleCreateNameEntitySearch(event.userId(), event.nameEntityConstant(), event.nameEntityId());
+            mediaSearchEventService.handleCreateNameEntitySearch(event.nameEntityConstant(), event.nameEntityId(),
+                    new NameEntityField(
+                            event.nameEntityId(),
+                            Long.parseLong(event.userId()),
+                            event.name(),
+                            event.length(),
+                            event.thumbnailPath()
+                    )
+            );
         } catch (IOException e) {
             throw new RuntimeException("Failed to update Search index field for name entity " + event.nameEntityId(), e);
         }
@@ -104,7 +124,7 @@ public class MediaSearchEventConsumer {
     private void onUpdateNameEntitySearch(MediaUpdateEvent.NameEntityUpdated event) {
         System.out.println("Received update name entity");
         try {
-            mediaSearchEventService.handleUpdateNameEntitySearch(event.userId(), event.nameEntityConstant(), event.nameEntityId(),
+            mediaSearchEventService.handleUpdateNameEntitySearch(event.nameEntityConstant(), event.nameEntityId(),
                     event.newName(),
                     event.oldThumbnail(), event.newThumbnail());
         } catch (IOException e) {
@@ -126,18 +146,19 @@ public class MediaSearchEventConsumer {
             EventTopics.MEDIA_SEARCH_TOPIC,
             EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC,
             EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC,
-            EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC,
+            EventTopics.MEDIA_FILE_HANDLER_SEARCH_AND_BACKUP_TOPIC,
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
-    public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) {
+    public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws IOException {
         try {
             switch (event) {
-                case MediaUpdateEvent.MediaCreatedReady e -> onCreateMediaIndexSearch(e);
+                case MediaUpdateEvent.MediaCreatedReadyForSearch e -> onCreateMediaIndexSearch(e);
                 case MediaUpdateEvent.FileDeleted e -> onDeleteMediaIndexSearch(e);
                 case MediaUpdateEvent.MediaThumbnailUpdatedReady e -> onUpdateMediaThumbnailSearch(e);
                 case MediaUpdateEvent.MediaNameEntityUpdated e -> onUpdateMediaNameEntitySearch(e);
                 case MediaUpdateEvent.LengthUpdated e -> onUpdateMediaLengthSearch(e);
                 case MediaUpdateEvent.MediaTitleUpdated e -> onUpdateMediaTitleSearch(e);
                 case MediaUpdateEvent.MediaPreviewUpdated e -> onUpdateMediaPreview(e);
+                case MediaUpdateEvent.GrouperItemMoved e -> onMoveGrouperItem(e);
 
                 case MediaUpdateEvent.NameEntityCreated e -> onCreateNameEntitySearch(e);
                 case MediaUpdateEvent.NameEntityDeleted e -> onDeleteNameEntitySearch(e);
@@ -171,8 +192,8 @@ public class MediaSearchEventConsumer {
 
         // Accessing the POJO data directly
         switch (event) {
-            case MediaUpdateEvent.MediaCreatedReady e ->
-                    System.out.println("Received new index event: " + e.mediaId() + " type: " + e.mediaType());
+            case MediaUpdateEvent.MediaCreatedReadyForSearch e ->
+                    System.out.println("Received new index event: " + e.id() + " type: " + e.mediaType());
             case MediaUpdateEvent.FileDeleted e ->
                     System.out.println("Received delete index event: " + e.mediaId());
             case MediaUpdateEvent.MediaThumbnailUpdatedReady e ->
@@ -185,6 +206,8 @@ public class MediaSearchEventConsumer {
                     System.out.println("Received update media title event: " + e.mediaId());
             case MediaUpdateEvent.MediaPreviewUpdated e ->
                     System.out.println("Received create media preview event: " + e.mediaId());
+            case MediaUpdateEvent.GrouperItemMoved e ->
+                    System.out.println("Received move grouper item: " + e.childMediaId() + " parentMediaId: " + e.parentMediaId());
 
             case MediaUpdateEvent.NameEntityCreated e ->
                     System.out.println("Received create name entity: " + e.nameEntityConstant() + " nameEntityId: " + e.nameEntityId());

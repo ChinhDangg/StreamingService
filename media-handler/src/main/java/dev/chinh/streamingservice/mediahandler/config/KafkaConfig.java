@@ -79,65 +79,58 @@ public class KafkaConfig {
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000") // delete after 7 days // if use for replay then use longer day
-                        .config("segment.bytes", "100048576")
+                        .config("segment.bytes", "500048576")
                         .build(),
                 TopicBuilder.name(EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC)
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000")
-                        .config("segment.bytes", "100048576")
+                        .config("segment.bytes", "500048576")
                         .build(),
                 TopicBuilder.name(EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC)
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000")
-                        .config("segment.bytes", "100048576")
+                        .config("segment.bytes", "500048576")
                         .build(),
-                TopicBuilder.name(EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC)
+                TopicBuilder.name(EventTopics.MEDIA_FILE_HANDLER_SEARCH_AND_BACKUP_TOPIC)
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000")
-                        .config("segment.bytes", "100048576")
+                        .config("segment.bytes", "500048576")
+                        .build(),
+
+                TopicBuilder.name(EventTopics.MEDIA_HANDLER_TOPIC)
+                        .partitions(1)
+                        .replicas(1)
+                        .config("retention.ms", "604800000")
+                        .config("segment.bytes", "500048576")
+                        .build(),
+                TopicBuilder.name(EventTopics.MEDIA_HANDLER_AND_BACKUP_TOPIC)
+                        .partitions(1)
+                        .replicas(1)
+                        .config("retention.ms", "604800000")
+                        .config("segment.bytes", "500048576")
                         .build(),
 
                 TopicBuilder.name(EventTopics.MEDIA_SEARCH_TOPIC)
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000")
-                        .config("segment.bytes", "100048576")
+                        .config("segment.bytes", "500048576")
                         .build(),
                 TopicBuilder.name(EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC)
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000")
-                        .config("segment.bytes", "100048576")
-                        .build(),
-
-                TopicBuilder.name(EventTopics.MEDIA_OBJECT_TOPIC)
-                        .partitions(1)
-                        .replicas(1)
-                        .config("retention.ms", "604800000")
-                        .config("segment.bytes", "100048576")
-                        .build(),
-                TopicBuilder.name(EventTopics.MEDIA_OBJECT_AND_BACKUP_TOPIC)
-                        .partitions(1)
-                        .replicas(1)
-                        .config("retention.ms", "604800000")
-                        .config("segment.bytes", "100048576")
-                        .build(),
-
-                TopicBuilder.name(EventTopics.MEDIA_UPLOAD_TOPIC)
-                        .partitions(1)
-                        .replicas(1)
-                        .config("retention.ms", "604800000")
-                        .config("segment.bytes", "100048576")
+                        .config("segment.bytes", "500048576")
                         .build(),
 
                 TopicBuilder.name(EventTopics.MEDIA_BACKUP_TOPIC)
                         .partitions(1)
                         .replicas(1)
                         .config("retention.ms", "604800000")
-                        .config("segment.bytes", "100048576")
+                        .config("segment.bytes", "500048576")
                         .build()
         );
     }
@@ -202,11 +195,11 @@ public class KafkaConfig {
         return factory;
     }
 
-    public static final String MEDIA_UPLOAD_DLQ_TOPIC = "media-upload-dlq";
+    public static final String MEDIA_HANDLER_DLQ_TOPIC = "media-handler-dlq";
 
     @Bean
     public NewTopic mediaUpdateDlqTopic() {
-        return TopicBuilder.name(MEDIA_UPLOAD_DLQ_TOPIC)
+        return TopicBuilder.name(MEDIA_HANDLER_DLQ_TOPIC)
                 .partitions(1)
                 .replicas(1)
                 .config("retention.ms", "604800000") // keep dlq messages for 7 days
@@ -218,7 +211,7 @@ public class KafkaConfig {
         DeadLetterPublishingRecoverer recoverer =
                 new DeadLetterPublishingRecoverer(dlqKafkaTemplate,
                         (record, ex) -> new org.apache.kafka.common.TopicPartition(
-                                MEDIA_UPLOAD_DLQ_TOPIC,
+                                MEDIA_HANDLER_DLQ_TOPIC,
                                 -1
                         ));
 

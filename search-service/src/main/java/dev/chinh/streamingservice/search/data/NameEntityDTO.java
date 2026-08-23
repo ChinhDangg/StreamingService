@@ -1,0 +1,63 @@
+package dev.chinh.streamingservice.search.data;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import dev.chinh.streamingservice.common.data.ContentMetaData;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.util.Objects;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class NameEntityDTO {
+
+    @JsonProperty(ContentMetaData.ID)
+    private long id;
+
+    @JsonProperty(ContentMetaData.USER_ID)
+    private long userId;
+
+    @JsonProperty(ContentMetaData.NAME)
+    private String name;
+
+    @JsonProperty(ContentMetaData.LENGTH)
+    private int length;
+
+    @JsonProperty(ContentMetaData.THUMBNAIL)
+    private String thumbnail;
+
+    public NameEntityDTO(long id, String name, int length, String thumbnail) {
+        this.id = id;
+        this.name = name;
+        this.length = length;
+        this.thumbnail = thumbnail;
+    }
+
+    public NameEntityDTO(long id, String name, int length) {
+        this.id = id;
+        this.name = name;
+        this.length = length;
+    }
+
+    public NameEntityDTO(long id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        NameEntityDTO that = (NameEntityDTO) o;
+        return id == that.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+}

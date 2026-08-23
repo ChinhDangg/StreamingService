@@ -145,13 +145,15 @@ public class FileEventConsumerService {
                 ));
             } else if (child.getFileType() == FileType.ALBUM || child.getFileType() == FileType.GROUPER) {
                 publisher.publishEvent(new FileEventProducer.EventWrapper(
-                        EventTopics.MEDIA_UPLOAD_TOPIC,
+                        EventTopics.MEDIA_HANDLER_TOPIC,
                         event.userId(),
                         new MediaUpdateEvent.GrouperItemMoved(
                                 event.userId(),
                                 child.getMId(),
                                 event.mediaId(),
-                                child.getName()
+                                child.getName(),
+                                true,
+                                null
                         )
                 ));
             }
@@ -178,7 +180,7 @@ public class FileEventConsumerService {
         }
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
-                EventTopics.MEDIA_UPLOAD_TOPIC,
+                EventTopics.MEDIA_HANDLER_TOPIC,
                 event.userId(),
                 new MediaUpdateEvent.GrouperMediaCreatedReady(
                         event.userId(),
@@ -235,7 +237,7 @@ public class FileEventConsumerService {
 
         boolean hasMore = batch.size() == batchSize;
 
-        String eventTopic = hasMore ? EventTopics.MEDIA_FILE_TOPIC : EventTopics.MEDIA_UPLOAD_TOPIC;
+        String eventTopic = hasMore ? EventTopics.MEDIA_FILE_TOPIC : EventTopics.MEDIA_HANDLER_TOPIC;
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 eventTopic,
                 event.userId(),
@@ -311,7 +313,7 @@ public class FileEventConsumerService {
         }
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
-                EventTopics.MEDIA_OBJECT_TOPIC,
+                EventTopics.MEDIA_HANDLER_TOPIC,
                 event.userId(),
                 new MediaUpdateEvent.MediaThumbnailUpdated(
                         event.userId(),
@@ -343,11 +345,8 @@ public class FileEventConsumerService {
 
         boolean isMedia = fileItem.getMId() != null && fileItem.getMId() > 0;
         if (isMedia && fileItem.getFileType() == FileType.ALBUM) {
-            System.out.println("Is media and is album, deleting media");
             FileSystemItem parent = fileService.findById(event.userId(), fileItem.getParentId(), true);
-            System.out.println(parent);
             if (parent != null && parent.getFileType() == FileType.GROUPER) {
-                System.out.println("Parent is grouper, updating parent length");
                 updateParentMediaLength(event.userId(), Collections.singletonList(parent), -1, false);
             }
         }
@@ -386,7 +385,7 @@ public class FileEventConsumerService {
             }
             for (Map.Entry<String, List<String>> entry : toDelete.entrySet()) {
                 publisher.publishEvent(new FileEventProducer.EventWrapper(
-                        EventTopics.MEDIA_OBJECT_TOPIC,
+                        EventTopics.MEDIA_HANDLER_TOPIC,
                         userId,
                         new MediaUpdateEvent.ObjectDeleted(entry.getKey(), entry.getValue())
                 ));
@@ -401,13 +400,13 @@ public class FileEventConsumerService {
         fileCacheService.invalidateFileCache(fileItem.getId());
         if (fileItem.getBucket() != null && fileItem.getObjectName() != null)
             publisher.publishEvent(new FileEventProducer.EventWrapper(
-                    EventTopics.MEDIA_OBJECT_TOPIC,
+                    EventTopics.MEDIA_HANDLER_TOPIC,
                     userId,
                     new MediaUpdateEvent.ObjectDeleted(fileItem.getBucket(), Collections.singletonList(fileItem.getObjectName()))
             ));
         if (fileItem.getThumbnail() != null)
             publisher.publishEvent(new FileEventProducer.EventWrapper(
-                    EventTopics.MEDIA_OBJECT_AND_BACKUP_TOPIC,
+                    EventTopics.MEDIA_HANDLER_AND_BACKUP_TOPIC,
                     userId,
                     new MediaUpdateEvent.ThumbnailDeleted(fileItem.getThumbnail())
             ));
@@ -434,7 +433,7 @@ public class FileEventConsumerService {
 
         if (!parentMediaIds.isEmpty() && sendEvent)
             publisher.publishEvent(new FileEventProducer.EventWrapper(
-                    EventTopics.MEDIA_UPLOAD_TOPIC,
+                    EventTopics.MEDIA_HANDLER_TOPIC,
                     userId,
                     new MediaUpdateEvent.MediaFileLengthUpdate(userId, parentMediaIds, lengthDelta)
             ));
@@ -462,7 +461,8 @@ public class FileEventConsumerService {
             return;
         }
 
-        if (item.getFileType() == FileType.ALBUM || item.getFileType() == FileType.GROUPER) {
+        FileType oldFileType = FileType.valueOf(event.fileType());
+        if (oldFileType == FileType.ALBUM || oldFileType == FileType.GROUPER) {
             if (newParent.getFileType() == FileType.GROUPER) {
                 updateParentMediaLength(event.userId(), Collections.singletonList(newParent), 1, false);
             }

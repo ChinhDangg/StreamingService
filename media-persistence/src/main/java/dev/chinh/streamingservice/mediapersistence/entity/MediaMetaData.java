@@ -1,6 +1,7 @@
 package dev.chinh.streamingservice.mediapersistence.entity;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.mediapersistence.projection.MediaNameSearchItem;
 import jakarta.persistence.*;
@@ -71,7 +72,7 @@ public class MediaMetaData extends MediaDescription {
 
     @Override
     public boolean isGrouper() {
-        return groupInfo != null && (groupInfo.getGrouperMetaDataId() == null || groupInfo.getGrouperMetaDataId() == -1);
+        return mediaType == MediaType.GROUPER;
     }
 
     @Override

@@ -2,7 +2,7 @@ package dev.chinh.streamingservice.search.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.chinh.streamingservice.mediapersistence.projection.MediaSearchItem;
+import dev.chinh.streamingservice.search.persistence.MediaSearchItem;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.redis.core.StringRedisTemplate;

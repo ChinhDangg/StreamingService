@@ -143,10 +143,9 @@ public class MediaHandlerEventConsumer {
 
 
     @KafkaListener(topics = {
-            EventTopics.MEDIA_UPLOAD_TOPIC,
-            EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC,
-            EventTopics.MEDIA_OBJECT_TOPIC,
-            EventTopics.MEDIA_OBJECT_AND_BACKUP_TOPIC
+            EventTopics.MEDIA_HANDLER_TOPIC,
+            EventTopics.MEDIA_HANDLER_AND_BACKUP_TOPIC,
+            EventTopics.MEDIA_FILE_HANDLER_SEARCH_AND_BACKUP_TOPIC,
     }, groupId = KafkaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws Exception {
         try {
@@ -181,7 +180,7 @@ public class MediaHandlerEventConsumer {
     }
 
     @KafkaListener(
-            topics = KafkaConfig.MEDIA_UPLOAD_DLQ_TOPIC,
+            topics = KafkaConfig.MEDIA_HANDLER_DLQ_TOPIC,
             groupId = "media-handler-dlq-group",
             containerFactory = "dlqListenerContainerFactory"
     )

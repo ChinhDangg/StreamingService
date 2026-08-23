@@ -64,4 +64,24 @@ PGPASSWORD="$DB_SUPERUSER_PASSWORD" psql \
   -d media_db \
   -f /scripts/sql/media_schema.sql
 
+
+PGPASSWORD="$DB_SUPERUSER_PASSWORD" psql \
+  -v ON_ERROR_STOP=1 \
+  -h "$DB_HOST" \
+  -p "$DB_PORT" \
+  -U "$DB_SUPERUSER" \
+  -d postgres \
+  <<-EOSQL
+    SELECT 'CREATE DATABASE search_db'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'search_db')\gexec
+EOSQL
+
+PGPASSWORD="$DB_SUPERUSER_PASSWORD" psql \
+  -v ON_ERROR_STOP=1 \
+  -h "$DB_HOST" \
+  -p "$DB_PORT" \
+  -U "$DB_SUPERUSER" \
+  -d media_db \
+  -f /scripts/sql/search_schema.sql
+
 echo "Bootstrap SQL complete."

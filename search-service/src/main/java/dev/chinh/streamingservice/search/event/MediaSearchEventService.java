@@ -3,16 +3,16 @@ package dev.chinh.streamingservice.search.event;
 import dev.chinh.streamingservice.common.constant.MediaNameEntityConstant;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
-import dev.chinh.streamingservice.mediapersistence.entity.MediaMetaData;
-import dev.chinh.streamingservice.mediapersistence.entity.MediaNameEntity;
-import dev.chinh.streamingservice.mediapersistence.projection.MediaGroupInfo;
-import dev.chinh.streamingservice.mediapersistence.projection.MediaNameSearchItem;
-import dev.chinh.streamingservice.mediapersistence.projection.MediaSearchItem;
-import dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO;
-import dev.chinh.streamingservice.mediapersistence.repository.*;
+import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.search.MediaMapper;
+import dev.chinh.streamingservice.search.data.NameEntityField;
+import dev.chinh.streamingservice.search.persistence.*;
+import dev.chinh.streamingservice.search.service.OpenSearchSearchService;
 import dev.chinh.streamingservice.search.service.OpenSearchService;
+import jakarta.persistence.EntityManager;
+import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
+import org.opensearch.client.opensearch.core.SearchResponse;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -22,38 +22,49 @@ import java.util.*;
 @AllArgsConstructor
 public class MediaSearchEventService {
 
-    private final MediaMetaDataRepository mediaMetaDataRepository;
-    private final MediaAuthorRepository mediaAuthorRepository;
-    private final MediaCharacterRepository mediaCharacterRepository;
-    private final MediaUniverseRepository mediaUniverseRepository;
-    private final MediaTagRepository mediaTagRepository;
+    private final GrouperMetadataRepository grouperMetadataRepository;
+
     private final OpenSearchService openSearchService;
+    private final OpenSearchSearchService searchService;
     private final MediaMapper mediaMapper;
 
-    public void handleCreateMediaIndexSearch(String userId, long mediaId) throws IOException {
-        Optional<MediaMetaData> mediaMetaData = mediaMetaDataRepository.findByIdWithAllInfo(Long.parseLong(userId), mediaId);
-        if (mediaMetaData.isEmpty()) {
-            System.err.println("MediaMetaData not found for mediaId: " + mediaId);
+    private final EntityManager entityManager;
+
+    @Transactional
+    public void handleCreateMediaIndexSearch(MediaUpdateEvent.MediaCreatedReadyForSearch event) throws IOException {
+        if (event.groupInfoId() != null && (event.groupInfoGrouperId() == null || event.groupInfoGrouperId().equals(event.groupInfoId()))) { // is grouper
+            GrouperMediaMetadata grouperMediaMetadata = mediaMapper.mapToGrouperMediaMetadata(event);
+            grouperMediaMetadata.setNew(true);
+            MediaGroupInfo grouperGroupInfo = new MediaGroupInfo(
+                    event.groupInfoId(), grouperMediaMetadata, null, null
+            );
+            grouperMediaMetadata.setGroupInfo(grouperGroupInfo);
+            grouperMetadataRepository.save(grouperMediaMetadata);
+        } else if (event.groupInfoId() != null) {
+            GrouperMediaMetadata childInGrouperItem = mediaMapper.mapToGrouperMediaMetadata(event);
+            childInGrouperItem.setNew(true);
+            MediaGroupInfo childGroupInfo = new MediaGroupInfo(
+                    event.groupInfoId(), childInGrouperItem, null, event.groupInfoNumInfo()
+            );
+            childGroupInfo.setGrouperInfo(entityManager.getReference(MediaGroupInfo.class, event.groupInfoGrouperId()));
+            childInGrouperItem.setGroupInfo(childGroupInfo);
+            grouperMetadataRepository.save(childInGrouperItem);
             return;
         }
-        MediaSearchItem mediaSearchItem = mediaMapper.map(mediaMetaData.get());
-        if (mediaMetaData.get().getMediaType() == MediaType.GROUPER) {
-            mediaSearchItem.setMediaGroupInfo(new MediaGroupInfo(mediaMetaData.get().getGrouperId(), -1L));
-        }
-        openSearchService.indexDocument(OpenSearchService.MEDIA_INDEX_NAME, mediaMetaData.get().getId(), mediaSearchItem);
+
+        MediaSearchItem item = mediaMapper.map(event);
+        openSearchService.indexDocument(OpenSearchService.MEDIA_INDEX_NAME, item.getId(), item);
     }
 
-    public void handleDeleteMediaIndexSearch(long mediaId) throws IOException {
+    public void handleDeleteMediaIndexSearch(long mediaId, MediaType mediaType) throws IOException {
+        if (mediaType == MediaType.GROUPER || mediaType == MediaType.ALBUM) {
+            grouperMetadataRepository.deleteById(mediaId);
+        }
         openSearchService.deleteDocument(OpenSearchService.MEDIA_INDEX_NAME, mediaId);
     }
 
-    public void handleUpdateMediaNameEntitySearch(String userId, long mediaId, MediaNameEntityConstant nameEntityConstant) throws IOException {
-        List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(
-                Long.parseLong(userId), mediaId, nameEntityConstant);
-        List<MediaNameSearchItem> nameEntityList = updatedMediaNameEntityList.stream()
-                .map(n -> new MediaNameSearchItem(n.getId(), n.getName()))
-                .toList();
-        openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, mediaId, Map.of(nameEntityConstant.getName(), nameEntityList));
+    public void handleUpdateMediaNameEntitySearch(long mediaId, MediaNameEntityConstant nameEntityConstant, Map<Long, String> nameEntityIdsToNames) throws IOException {
+        openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, mediaId, Map.of(nameEntityConstant.getName(), nameEntityIdsToNames));
     }
 
     public void handleUpdateMediaTitleSearch(String userId, long mediaId, String title) throws IOException {
@@ -74,8 +85,6 @@ public class MediaSearchEventService {
                 delta,
                 String.valueOf(version)
         );
-//        openSearchService.partialUpdateDocument(
-//                OpenSearchService.MEDIA_INDEX_NAME, mediaIds, Map.of(ContentMetaData.LENGTH, newLength));
     }
 
     public void handleUpdateMediaPreview(String userId, long mediaId, String previewObject) throws IOException {
@@ -86,20 +95,50 @@ public class MediaSearchEventService {
         openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, mediaId, Map.of(ContentMetaData.PREVIEW, previewObject));
     }
 
-    public void handleCreateNameEntitySearch(String userId, MediaNameEntityConstant nameEntityConstant, long nameEntityId) throws IOException {
-        MediaNameEntity nameEntity = getMediaNameEntity(Long.parseLong(userId), nameEntityConstant, nameEntityId);
-        if (nameEntity == null) {
-            System.err.println("Name Entity not found with id: " + nameEntityId + " for nameEntityConstant: " + nameEntityConstant.getName());
-            return;
+    @Transactional
+    public void handleMoveGrouperItem(MediaUpdateEvent.GrouperItemMoved event) throws IOException {
+        if (event.parentMediaId() != null) {
+            GrouperMediaMetadata grouperMediaMetadata = null;
+
+            if (event.oldParentIsGrouper()) {
+                grouperMediaMetadata = entityManager.getReference(GrouperMediaMetadata.class, event.childMediaId());
+            } else {
+                SearchResponse<MediaSearchItem> searchItemResponse = searchService.findById(OpenSearchService.MEDIA_INDEX_NAME, Long.parseLong(event.userId()), event.childMediaId(), MediaSearchItem.class);
+                MediaSearchItem searchItem = searchItemResponse.hits().hits().getFirst().source();
+                if (searchItem != null) {
+                    grouperMediaMetadata = mediaMapper.mapToGrouperMediaMetadata(searchItem);
+                    grouperMediaMetadata.setNew(true);
+                }
+            }
+
+            if (grouperMediaMetadata == null)
+                throw new NullPointerException("Grouper media metadata not found for mediaId: " + event.childMediaId());
+
+            MediaGroupInfo mediaGroupInfo = new MediaGroupInfo(
+                    event.newGroupInfoId(),
+                    grouperMediaMetadata,
+                    entityManager.getReference(MediaGroupInfo.class, event.parentMediaId()),
+                    event.fileName()
+            );
+            grouperMediaMetadata.setGroupInfo(mediaGroupInfo);
+            grouperMetadataRepository.save(grouperMediaMetadata);
+            System.out.println("Saved grouper media metadata: " + grouperMediaMetadata.getId());
+        } else {
+            grouperMetadataRepository.deleteById(event.childMediaId());
         }
-        openSearchService.indexDocument(nameEntityConstant.getName(), nameEntityId, nameEntity);
+        openSearchService.deleteDocument(OpenSearchService.MEDIA_INDEX_NAME, event.childMediaId());
+    }
+
+
+    public void handleCreateNameEntitySearch(MediaNameEntityConstant nameEntityConstant, long nameEntityId, NameEntityField nameEntityField) throws IOException {
+        openSearchService.indexDocument(nameEntityConstant.getName(), nameEntityId, nameEntityField);
     }
 
     public void handleDeleteNameEntitySearch(long nameEntityId, MediaNameEntityConstant nameEntityConstant) throws IOException {
         openSearchService.deleteDocument(nameEntityConstant.getName(), nameEntityId);
     }
 
-    public void handleUpdateNameEntitySearch(String userId, MediaNameEntityConstant nameEntityConstant, long nameEntityId,
+    public void handleUpdateNameEntitySearch(MediaNameEntityConstant nameEntityConstant, long nameEntityId,
                                              String newName,
                                              String oldThumbnail, String newThumbnail) throws IOException {
         Map<String, Object> fields = new HashMap<>();
@@ -127,34 +166,5 @@ public class MediaSearchEventService {
                 deltaLength,
                 UUID.randomUUID().toString()
         );
-    }
-
-
-    private List<NameEntityDTO> getMediaNameEntityInfo(long userId, long mediaId, MediaNameEntityConstant nameEntity) {
-        return switch (nameEntity) {
-            case AUTHORS -> mediaMetaDataRepository.findAuthorsByMediaId(userId, mediaId);
-            case CHARACTERS -> mediaMetaDataRepository.findCharactersByMediaId(userId, mediaId);
-            case UNIVERSES -> mediaMetaDataRepository.findUniversesByMediaId(userId, mediaId);
-            case TAGS -> mediaMetaDataRepository.findTagsByMediaId(userId, mediaId);
-        };
-    }
-
-    private String getNameEntityName(long userId, MediaNameEntityConstant nameEntity, long nameEntityId) {
-        return switch (nameEntity) {
-            case AUTHORS -> mediaAuthorRepository.getNameEntityNameById(userId, nameEntityId);
-            case CHARACTERS -> mediaCharacterRepository.getNameEntityNameById(userId, nameEntityId);
-            case UNIVERSES -> mediaUniverseRepository.getNameEntityNameById(userId, nameEntityId);
-            case TAGS -> mediaTagRepository.getNameEntityNameById(userId, nameEntityId);
-        };
-    }
-
-    private MediaNameEntity getMediaNameEntity(long userId, MediaNameEntityConstant nameEntity, long nameEntityId) {
-        var result =  switch (nameEntity) {
-            case AUTHORS -> mediaAuthorRepository.findByIdAndUserId(nameEntityId, userId);
-            case CHARACTERS -> mediaCharacterRepository.findByIdAndUserId(nameEntityId, userId);
-            case UNIVERSES -> mediaUniverseRepository.findByIdAndUserId(nameEntityId, userId);
-            case TAGS -> mediaTagRepository.findByIdAndUserId(nameEntityId, userId);
-        };
-        return result.orElse(null);
     }
 }

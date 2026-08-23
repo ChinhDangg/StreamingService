@@ -22,10 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -139,12 +137,16 @@ public class MediaMetadataModifyService {
 
         List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(userIdStr, mediaId, updateList.nameEntity);
 
-        if (publishSearchUpdate)
+        if (publishSearchUpdate) {
+            Map<Long, String> nameEntityIdsToNames = updatedMediaNameEntityList.stream().collect(Collectors.toMap(
+                    NameEntityDTO::getId, NameEntityDTO::getName
+            ));
             eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
                     EventTopics.MEDIA_SEARCH_TOPIC,
                     userIdStr,
-                    new MediaUpdateEvent.MediaNameEntityUpdated(userIdStr, mediaId, updateList.nameEntity)
+                    new MediaUpdateEvent.MediaNameEntityUpdated(userIdStr, mediaId, updateList.nameEntity, nameEntityIdsToNames)
             ));
+        }
 
         mediaSearchCacheService.removeCachedMediaSearchItem(userIdStr, mediaId);
         return updatedMediaNameEntityList;
@@ -185,7 +187,7 @@ public class MediaMetadataModifyService {
         Long grouperMediaId = null;
         if (mediaMetaData.getMediaType() == MediaType.GROUPER) {
             // for grouper of album - delete each album first - only delete grouper if it is empty
-            Optional<MediaGroupMetaData> grouperItems = mediaGroupMetaDataRepository.findFirstByGrouperMetaDataId(mediaMetaData.getGrouperId());
+            Optional<MediaGroupMetaData> grouperItems = mediaGroupMetaDataRepository.findFirstByGrouperMetaData_Id(mediaMetaData.getGrouperId());
             if (grouperItems.isPresent())
                 throw new IllegalArgumentException("Non-empty Grouper media cannot be deleted: " + mediaMetaData.getId());
         } else if (mediaMetaData.getGrouperId() != null) { // else if not a grouper
@@ -272,7 +274,7 @@ public class MediaMetadataModifyService {
             minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnailName, multipartFile);
             if (newThumbnailName != null && !newThumbnailName.equals(mediaMetaData.getThumbnail())) {
                 eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
-                        EventTopics.MEDIA_OBJECT_TOPIC,
+                        EventTopics.MEDIA_HANDLER_TOPIC,
                         userId,
                         new MediaUpdateEvent.MediaThumbnailUpdated(userId, mediaId, mediaType, null, mediaMetaData.getBucket(), newThumbnailName)
                 ));
@@ -295,7 +297,7 @@ public class MediaMetadataModifyService {
             }
             if (mediaType == MediaType.VIDEO) {
                 eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
-                        EventTopics.MEDIA_OBJECT_TOPIC,
+                        EventTopics.MEDIA_HANDLER_TOPIC,
                         userId,
                         new MediaUpdateEvent.MediaThumbnailUpdated(
                                 userId,

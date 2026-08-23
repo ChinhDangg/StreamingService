@@ -21,6 +21,11 @@ public class MediaDisplayController {
         return ResponseEntity.ok().body(mediaDisplayService.getMediaContentInfo(jwt.getSubject(), id));
     }
 
+    @GetMapping("/grouper/content/{id}")
+    public ResponseEntity<?> getGrouperContent(@PathVariable long id, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().body(mediaDisplayService.getMediaGrouperContentInfo(jwt.getSubject(), id));
+    }
+
     @GetMapping("/grouper-next/{id}")
     public ResponseEntity<MediaDisplayService.GroupSlice> getNextGrouper(@PathVariable long id,
                                                                          @RequestParam(name = "p") int page,

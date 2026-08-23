@@ -1,10 +1,10 @@
-package dev.chinh.streamingservice.mediapersistence.projection;
+package dev.chinh.streamingservice.search.persistence;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
-import dev.chinh.streamingservice.mediapersistence.entity.MediaDescription;
+import dev.chinh.streamingservice.search.data.MediaSearchGroupInfo;
 import lombok.*;
 
 import java.util.List;
@@ -27,16 +27,13 @@ public class MediaSearchItem extends MediaDescription {
     private List<MediaNameSearchItem> authors;
 
     @JsonProperty(ContentMetaData.GROUP_INFO)
-    private MediaGroupInfo mediaGroupInfo;
+    private MediaSearchGroupInfo groupInfo;
 
-    @Override
     public boolean isGrouper() {
         return mediaType == MediaType.GROUPER;
     }
 
-    @Override
     public Long getGrouperId() {
-        return mediaGroupInfo == null ? null : isGrouper() ? mediaGroupInfo.getId() : mediaGroupInfo.getGrouperId();
+        return groupInfo == null ? null : isGrouper() ? groupInfo.getId() : groupInfo.getGrouperId();
     }
-
 }

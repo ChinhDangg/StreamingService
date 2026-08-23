@@ -1,4 +1,4 @@
-package dev.chinh.streamingservice.mediapersistence.entity;
+package dev.chinh.streamingservice.search.persistence;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.chinh.streamingservice.common.constant.MediaType;
@@ -14,11 +14,11 @@ import java.time.Instant;
 @Setter
 @ToString
 @MappedSuperclass
-public abstract class MediaDescription implements MetaDataProvider {
+public abstract class MediaDescription {
 
     @JsonProperty(ContentMetaData.ID)
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    protected long id;
+    @Id
+    protected Long id;
 
     @JsonProperty(ContentMetaData.USER_ID)
     @Column(nullable = false)
@@ -38,10 +38,6 @@ public abstract class MediaDescription implements MetaDataProvider {
     @JsonProperty(ContentMetaData.THUMBNAIL)
     @Column(columnDefinition = "TEXT")
     protected String thumbnail;
-
-    @JsonProperty(ContentMetaData.PREVIEW)
-    @Column(columnDefinition = "TEXT")
-    protected String preview;
 
     @JsonProperty(ContentMetaData.LENGTH)
     @Column(nullable = false)
@@ -71,6 +67,9 @@ public abstract class MediaDescription implements MetaDataProvider {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     protected MediaType mediaType;
+
+    private short frameRate;
+    private String format;
 
     public boolean hasThumbnail() {
         return thumbnail != null && !thumbnail.isEmpty();

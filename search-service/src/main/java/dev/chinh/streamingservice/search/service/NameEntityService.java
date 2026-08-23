@@ -2,8 +2,8 @@ package dev.chinh.streamingservice.search.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
-import dev.chinh.streamingservice.mediapersistence.projection.NameEntityDTO;
 import dev.chinh.streamingservice.search.constant.SortBy;
+import dev.chinh.streamingservice.search.data.NameEntityDTO;
 import lombok.RequiredArgsConstructor;
 import org.opensearch.client.opensearch._types.SortOrder;
 import org.opensearch.client.opensearch.core.SearchResponse;

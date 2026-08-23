@@ -224,8 +224,8 @@ public class MediaBackupEventConsumer {
             EventTopics.MEDIA_BACKUP_TOPIC,
             EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
             EventTopics.MEDIA_FILE_SEARCH_AND_BACKUP_TOPIC,
-            EventTopics.MEDIA_FILE_UPLOAD_SEARCH_AND_BACKUP_TOPIC,
-            EventTopics.MEDIA_OBJECT_AND_BACKUP_TOPIC,
+            EventTopics.MEDIA_FILE_HANDLER_SEARCH_AND_BACKUP_TOPIC,
+            EventTopics.MEDIA_HANDLER_AND_BACKUP_TOPIC,
             EventTopics.MEDIA_SEARCH_AND_BACKUP_TOPIC,
     }, groupId = KafkaRedPandaConfig.MEDIA_GROUP_ID)
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws Exception {

@@ -5,9 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.exception.ResourceNotFoundException;
-import dev.chinh.streamingservice.mediapersistence.projection.MediaSearchItem;
-import dev.chinh.streamingservice.mediapersistence.repository.MediaGroupMetaDataRepository;
 import dev.chinh.streamingservice.search.MediaMapper;
+import dev.chinh.streamingservice.search.persistence.GrouperMetadataRepository;
+import dev.chinh.streamingservice.search.persistence.MediaGroupInfoRepository;
+import dev.chinh.streamingservice.search.persistence.MediaSearchItem;
 import dev.chinh.streamingservice.search.serve.data.MediaDisplayContent;
 import dev.chinh.streamingservice.search.service.*;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -40,7 +42,9 @@ public class MediaDisplayService {
     private final RedissonClient redissonClient;
     private final OpenSearchSearchService searchService;
     private final MediaSearchCacheService mediaSearchCacheService;
-    private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
+
+    private final GrouperMetadataRepository grouperMetadataRepository;
+    private final MediaGroupInfoRepository mediaGroupInfoRepository;
 
     @Value("${always-show-original-resolution}")
     private String alwaysShowOriginalResolution;
@@ -69,11 +73,18 @@ public class MediaDisplayService {
         if (mediaItem.isGrouper()) {
             GroupSlice mediaIds = getNextGroupOfMedia(userId, mediaId, 0, Sort.Direction.DESC);
             mediaDisplayContent.setChildMediaIds(mediaIds);
-            mediaDisplayContent.setMediaType(MediaType.GROUPER);
-        } else {
-            mediaDisplayContent.setMediaType(mediaItem.getMediaType());
+//            mediaDisplayContent.setMediaType(MediaType.GROUPER);
         }
+//        else {
+//            mediaDisplayContent.setMediaType(mediaItem.getMediaType());
+//        }
         return mediaDisplayContent;
+    }
+
+    public MediaDisplayContent getMediaGrouperContentInfo(String userId, long mediaId) {
+        MediaSearchItem mediaItem = getGrouperMediaSearchItem(userId, mediaId);
+
+        return mediaMapper.mapDescription(mediaItem);
     }
 
     private void addCacheGroupOfMedia(String userId, long mediaId, int page, Sort.Direction sortOrder, GroupSlice mediaIds) throws JsonProcessingException {
@@ -138,7 +149,7 @@ public class MediaDisplayService {
 
         final int maxBatchSize = 20;
         Pageable pageable = PageRequest.of(page, maxBatchSize, Sort.by(sortOrder, ContentMetaData.NUM_INFO));
-        Slice<Long> groupOfMedia = mediaGroupMetaDataRepository.findMediaMetadataIdsByGrouperMetaDataId(mediaItem.getGrouperId(), pageable);
+        Slice<Long> groupOfMedia = mediaGroupInfoRepository.findMediaMetadataIdsByGrouperId(mediaItem.getGrouperId(), pageable);
         GroupSlice groupSlice = new GroupSlice(groupOfMedia.getContent(), page, maxBatchSize, groupOfMedia.hasNext());
 
         addCacheGroupOfMedia(userId, mediaId, page, sortOrder, groupSlice);
@@ -169,10 +180,22 @@ public class MediaDisplayService {
             mediaSearchItem = response.hits().hits().getFirst().source();
         } catch (IOException e) {
             throw new RuntimeException("Failed to get media search item", e);
+        } catch (NoSuchElementException e) {
+            throw new ResourceNotFoundException("No media found with id: " + mediaId);
         }
         if (mediaSearchItem == null)
             throw new ResourceNotFoundException("No media found with id: " + mediaId);
         return mediaSearchItem;
+    }
+
+    private MediaSearchItem getGrouperMediaSearchItem(String userId, long mediaId) {
+        MediaSearchItem mediaSearchItem = mediaSearchCacheService.getCachedMediaSearchItem(userId, mediaId);
+        if (mediaSearchItem != null)
+            return mediaSearchItem;
+        var childGrouper = grouperMetadataRepository.findByIdAndUserId(mediaId, Long.parseLong(userId));
+        if (childGrouper != null)
+            return mediaMapper.map(childGrouper);
+        throw new ResourceNotFoundException("No media grouper child found with id: " + mediaId);
     }
 
 }

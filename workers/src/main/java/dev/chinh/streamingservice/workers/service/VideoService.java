@@ -321,7 +321,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
             minIOService.moveFileToObject(ContentMetaData.PREVIEW_BUCKET, previewObject, output);
             Files.deleteIfExists(Path.of(output));
             publisher.publishEvent(new WorkerEventProducer.ImmediateEventWrapper(
-                    EventTopics.MEDIA_UPLOAD_TOPIC,
+                    EventTopics.MEDIA_HANDLER_TOPIC,
                     new MediaUpdateEvent.MediaPreviewUpdated(userId, videoId, previewObject)
             ));
         } catch (Exception e) {

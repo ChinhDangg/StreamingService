@@ -93,12 +93,11 @@ public class NameEntityModifyService {
 
         try {
             T added = repository.save(mediaNameEntity);
-            long id = added.getId();
 
             eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
                     EventTopics.MEDIA_SEARCH_TOPIC,
                     userId,
-                    new MediaUpdateEvent.NameEntityCreated(userId, mediaNameEntityConstant, id, null)
+                    new MediaUpdateEvent.NameEntityCreated(userId, mediaNameEntityConstant, added.getId(), added.getName(), added.getLength(), null)
             ));
         } catch (DataIntegrityViolationException e) {
             throw new IllegalArgumentException("Name already exists: " + name);
@@ -117,17 +116,16 @@ public class NameEntityModifyService {
 
             mediaNameEntity.setName(name);
 
-            T added = repository.save(mediaNameEntity);
-            long id = added.getId();
-
             if (request.getThumbnail() != null) {
                 String extension = request.getThumbnail().getOriginalFilename() == null ? ".jpg"
                         : request.getThumbnail().getOriginalFilename().substring(request.getThumbnail().getOriginalFilename().lastIndexOf("."));
 
-                thumbnailPath = createNameEntityThumbnail(userId, mediaNameEntityConstant, id, extension);
+                thumbnailPath = createNameEntityThumbnail(userId, mediaNameEntityConstant, extension);
 
                 minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, thumbnailPath, request.getThumbnail());
             }
+
+            T added = repository.save(mediaNameEntity);
 
             if (request.getThumbnail() != null)
                 mediaNameEntity.setThumbnail(thumbnailPath);
@@ -139,18 +137,18 @@ public class NameEntityModifyService {
             eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
                     topic,
                     userId,
-                    new MediaUpdateEvent.NameEntityCreated(userId, mediaNameEntityConstant, id, thumbnailPath)
+                    new MediaUpdateEvent.NameEntityCreated(userId, mediaNameEntityConstant, added.getId(), added.getName(), added.getLength(), thumbnailPath)
             ));
         } catch (Exception e) {
-            try {
-                if (thumbnailPath != null) {
-                    minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, thumbnailPath);
-                    System.out.println("Compensation successful: Deleted file " + thumbnailPath + " from Object Storage.");
-                }
-            } catch (Exception deleteEx) {
-                System.err.println("CRITICAL: Failed to clean up orphan file: " + thumbnailPath);
-            }
             if (e instanceof DataIntegrityViolationException) {
+                try {
+                    if (thumbnailPath != null) {
+                        minIOService.removeFile(ContentMetaData.THUMBNAIL_BUCKET, thumbnailPath);
+                        System.out.println("Compensation successful: Deleted file " + thumbnailPath + " from Object Storage.");
+                    }
+                } catch (Exception deleteEx) {
+                    System.err.println("CRITICAL: Failed to clean up orphan file: " + thumbnailPath);
+                }
                 throw new IllegalArgumentException("Name already exists: " + request.getName());
             }
             throw new RuntimeException("Entity creation failed after file upload.", e);
@@ -224,7 +222,7 @@ public class NameEntityModifyService {
 
                 newThumbnailPath = oldThumbnailPath.endsWith(extension)
                         ? oldThumbnailPath
-                        : createNameEntityThumbnail(userId, mediaNameEntityConstant, id, extension);
+                        : createNameEntityThumbnail(userId, mediaNameEntityConstant, extension);
                 minIOService.uploadFile(ContentMetaData.THUMBNAIL_BUCKET, newThumbnailPath, request.getThumbnail());
             }
         } catch (Exception e) {
@@ -255,7 +253,7 @@ public class NameEntityModifyService {
                 ));
                 if (thumbnailChanged)
                     eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
-                            EventTopics.MEDIA_OBJECT_TOPIC,
+                            EventTopics.MEDIA_HANDLER_TOPIC,
                             userId,
                             new MediaUpdateEvent.ObjectDeleted(ContentMetaData.THUMBNAIL_BUCKET, List.of(oldThumbnailPath))
                     ));
@@ -273,8 +271,8 @@ public class NameEntityModifyService {
         }
     }
 
-    private String createNameEntityThumbnail(String userId, MediaNameEntityConstant name, long id, String extension) {
-        return userId + "/" + name + "/" + id + "_" + UUID.randomUUID() + extension;
+    private String createNameEntityThumbnail(String userId, MediaNameEntityConstant name, String extension) {
+        return userId + "/" + name + "/" + UUID.randomUUID() + extension;
     }
 
 
@@ -329,7 +327,7 @@ public class NameEntityModifyService {
         ));
         if (thumbnailPath != null)
             eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
-                    EventTopics.MEDIA_OBJECT_TOPIC,
+                    EventTopics.MEDIA_HANDLER_TOPIC,
                     userId,
                     new MediaUpdateEvent.ObjectDeleted(ContentMetaData.THUMBNAIL_BUCKET, List.of(thumbnailPath))
             ));

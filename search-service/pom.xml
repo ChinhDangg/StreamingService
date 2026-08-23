@@ -126,14 +126,14 @@
         </dependency>
 
         <dependency>
-            <groupId>dev.chinh.streamingservice</groupId>
-            <artifactId>common</artifactId>
-            <version>1.0.0</version>
-            <scope>compile</scope>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
+
         <dependency>
             <groupId>dev.chinh.streamingservice</groupId>
-            <artifactId>media-persistence</artifactId>
+            <artifactId>common</artifactId>
             <version>1.0.0</version>
             <scope>compile</scope>
         </dependency>
