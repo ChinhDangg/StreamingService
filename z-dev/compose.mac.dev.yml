@@ -120,6 +120,9 @@ services: # docker compose -f compose.mac.dev.yml --env-file .env.dev -p ss-dev 
       DB_PORT: ${DB_PORT}
       DB_SUPERUSER: ${DB_USERNAME}
       DB_SUPERUSER_PASSWORD: ${DB_PASSWORD}
+      DB_AUTH_SERVICE_PASSWORD: ${DB_AUTH_SERVICE_PASSWORD}
+      DB_MEDIA_HANDLER_PASSWORD: ${DB_MEDIA_HANDLER_PASSWORD}
+      DB_SEARCH_SERVICE_PASSWORD: ${DB_SEARCH_SERVICE_PASSWORD}
     volumes:
       - ../.docker/postgres/initdb.d:/scripts
 

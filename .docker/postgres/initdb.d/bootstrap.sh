@@ -38,6 +38,7 @@ EOSQL
 # STEP 2: Connect directly to new database and run the SQL file
 PGPASSWORD="$DB_SUPERUSER_PASSWORD" psql \
   -v ON_ERROR_STOP=1 \
+  -v auth_pass="$DB_AUTH_SERVICE_PASSWORD" \
   -h "$DB_HOST" \
   -p "$DB_PORT" \
   -U "$DB_SUPERUSER" \
@@ -58,6 +59,7 @@ EOSQL
 
 PGPASSWORD="$DB_SUPERUSER_PASSWORD" psql \
   -v ON_ERROR_STOP=1 \
+  -v media_pass="$DB_MEDIA_HANDLER_PASSWORD" \
   -h "$DB_HOST" \
   -p "$DB_PORT" \
   -U "$DB_SUPERUSER" \
@@ -78,6 +80,7 @@ EOSQL
 
 PGPASSWORD="$DB_SUPERUSER_PASSWORD" psql \
   -v ON_ERROR_STOP=1 \
+  -v search_pass="$DB_SEARCH_SERVICE_PASSWORD" \
   -h "$DB_HOST" \
   -p "$DB_PORT" \
   -U "$DB_SUPERUSER" \
