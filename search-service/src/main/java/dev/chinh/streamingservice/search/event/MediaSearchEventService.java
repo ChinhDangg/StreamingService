@@ -87,11 +87,7 @@ public class MediaSearchEventService {
         );
     }
 
-    public void handleUpdateMediaPreview(String userId, long mediaId, String previewObject) throws IOException {
-        if (previewObject == null) {
-            System.err.println("Preview not found for mediaId: " + mediaId + " userId: " + userId);
-            return;
-        }
+    public void handleUpdateMediaPreview(long mediaId, String previewObject) throws IOException {
         openSearchService.partialUpdateDocument(OpenSearchService.MEDIA_INDEX_NAME, mediaId, Map.of(ContentMetaData.PREVIEW, previewObject));
     }
 

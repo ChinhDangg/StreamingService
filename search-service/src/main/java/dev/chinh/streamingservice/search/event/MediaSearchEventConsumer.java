@@ -78,7 +78,7 @@ public class MediaSearchEventConsumer {
     private void onUpdateMediaPreview(MediaUpdateEvent.MediaPreviewUpdated event) {
         System.out.println("Received create media preview: " + event.mediaId());
         try {
-            mediaSearchEventService.handleUpdateMediaPreview(event.userId(), event.mediaId(), event.previewObject());
+            mediaSearchEventService.handleUpdateMediaPreview(event.mediaId(), event.previewObject());
         } catch (IOException e) {
             throw new RuntimeException("Failed to create media preview: " + event.mediaId(), e);
         }
