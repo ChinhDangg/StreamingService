@@ -322,6 +322,7 @@ public class VideoService extends MediaService implements ResourceCleanable {
             Files.deleteIfExists(Path.of(output));
             publisher.publishEvent(new WorkerEventProducer.ImmediateEventWrapper(
                     EventTopics.MEDIA_HANDLER_TOPIC,
+                    userId,
                     new MediaUpdateEvent.MediaPreviewUpdated(userId, videoId, previewObject)
             ));
         } catch (Exception e) {

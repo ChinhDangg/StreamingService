@@ -53,51 +53,6 @@ public class OSUtil {
         return RAMDISK;
     }
 
-//    public static void _createRamDisk(long ramBytes) throws Exception {
-//        if (currentOS != OS.LINUX && Files.exists(Paths.get(RAMDISK))) {
-//            System.out.println("Ramdisk already exists");
-//            return;
-//        }
-//
-//        if (currentOS == OS.WINDOWS) {
-//            // skipping windows ramdisk as can't be mounted as volume
-//            return;
-//        }
-//
-//        String[] command = switch (currentOS) {
-//            case OS.MAC -> new String[]{"/bin/bash", "-c",
-////                    "diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://1048576`"};
-//                    "diskutil erasevolume HFS+ 'RAMDISK' `hdiutil attach -nomount ram://" + (ramBytes / 512) + "`"};
-//            case OS.LINUX -> new String[]{
-//                    // chinh ALL=(root) NOPASSWD: /bin/mkdir, /bin/mount, /bin/umount
-//                    // "mkdir -p /mnt/ramdisk && mount -t tmpfs -o size=512m tmpfs /mnt/ramdisk"};
-//                    "/bin/bash", "-c",
-//                    """
-//                    if ! findmnt -n -o FSTYPE /mnt/ramdisk | grep -q 'tmpfs'; then
-//                        sudo mkdir -p /mnt/ramdisk && \
-//                        sudo mount -t tmpfs -o size=%d tmpfs /mnt/ramdisk;
-//                    fi
-//                    """.formatted(ramBytes)
-//            };
-//            case OS.WINDOWS -> new String[]{
-//                    "OSFMount.com",
-//                    "-a",          // add new disk
-//                    "-t", "vm",    // type: virtual memory (RAM)
-//                    "-s", "512M",  // size
-//                    "-m", "R:",    // mount point
-//                    "-o", "format:ntfs" // auto-format NTFS
-//            }; // to remove: OSFMount.com -d -m R:
-//            default -> throw new UnsupportedOperationException("Unsupported OS: " + currentOS);
-//        };
-//
-//        try {
-//            runCommandAndLog(command, null);
-//        } catch (Exception e) {
-//            throw new Exception("Fail to create RAM DISK");
-//        }
-//
-//        System.out.println("RAMDisk creation finished");
-//    }
 
     public static void _initializeRAMInfo(String containerName) throws IOException, InterruptedException {
         if (containerName == null || containerName.isEmpty())
@@ -105,26 +60,6 @@ public class OSUtil {
         MEMORY_TOTAL = getMemoryTotalSpace(containerName);
         MEMORY_USABLE = new AtomicLong(getActualMemoryUsableSpace(containerName));
     }
-
-//    public static void startDockerCompose() throws IOException, InterruptedException {
-//        String composeFile = switch (currentOS) {
-//            case OS.MAC -> "compose.mac.yaml";
-//            case OS.LINUX -> "compose.linux.yaml";
-//            case OS.WINDOWS -> "compose.windows.yaml";
-//            default -> "compose.yaml";
-//        };
-//        ProcessBuilder pb = new ProcessBuilder(
-//                "docker", "compose", "-f", composeFile, "up", "-d"
-//        );
-//        pb.inheritIO();
-//        Process process = pb.start();
-//        int exit = process.waitFor();
-//
-//        if (exit != 0) {
-//            throw new RuntimeException("docker compose failed with code " + exit);
-//        }
-//        System.out.println("docker compose finished with exit code: " + exit);
-//    }
 
     private static long getMemoryTotalSpace(String containerName) throws IOException, InterruptedException {
         OS os = _getDetectedOS();
