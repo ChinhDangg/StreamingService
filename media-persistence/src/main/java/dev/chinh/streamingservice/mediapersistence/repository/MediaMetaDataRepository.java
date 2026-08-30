@@ -137,6 +137,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Query(value = """
         INSERT INTO media.authors_media (media_id, authors_id)
         SELECT :mediaId, unnest(CAST(:authorIds AS bigint[]))
+        ON CONFLICT (media_id, authors_id) DO NOTHING
     """, nativeQuery = true)
     int addAuthorsToMedia(@Param("mediaId") long mediaId, @Param("authorIds") Long[] authorIds);
 
@@ -153,6 +154,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Query(value = """
         INSERT INTO media.characters_media (media_id, characters_id)
         SELECT :mediaId, unnest(CAST(:characterIds AS bigint[]))
+        ON CONFLICT (media_id, characters_id) DO NOTHING
     """, nativeQuery = true)
     int addCharactersToMedia(@Param("mediaId") long mediaId, @Param("characterIds") Long[] characterIds);
 
@@ -169,6 +171,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Query(value = """
         INSERT INTO media.universes_media (media_id, universes_id)
         SELECT :mediaId, unnest(CAST(:universeIds AS bigint[]))
+        ON CONFLICT (media_id, universes_id) DO NOTHING
     """, nativeQuery = true)
     int addUniversesToMedia(@Param("mediaId") long mediaId, @Param("universeIds") Long[] universeIds);
 
@@ -185,6 +188,7 @@ public interface MediaMetaDataRepository extends JpaRepository<MediaMetaData, Lo
     @Query(value = """
         INSERT INTO media.tags_media (media_id, tags_id)
         SELECT :mediaId, unnest(CAST(:tagIds AS bigint[]))
+        ON CONFLICT (media_id, tags_id) DO NOTHING
     """, nativeQuery = true)
     int addTagsToMedia(@Param("mediaId") long mediaId, @Param("tagIds") Long[] tagIds);
 

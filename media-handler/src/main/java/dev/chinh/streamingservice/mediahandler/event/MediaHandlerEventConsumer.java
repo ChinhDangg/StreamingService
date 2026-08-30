@@ -241,14 +241,13 @@ public class MediaHandlerEventConsumer {
         List<NameEntityDTO> addingIds = Arrays.stream(nameEntityIds)
                 .map(id -> new NameEntityDTO(id, null))
                 .toList();
-        mediaMetadataModifyService.updateNameEntityInMedia(
+        mediaMetadataModifyService.updateMediaNameEntity(
                 userId,
                 new MediaMetadataModifyService.UpdateList(
                         addingIds, null, nameEntity
                 ),
                 mediaId,
-                true,
-                null
+                true
         );
     }
 }

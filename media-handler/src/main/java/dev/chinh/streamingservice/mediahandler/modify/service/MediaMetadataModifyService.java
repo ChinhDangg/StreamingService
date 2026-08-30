@@ -31,6 +31,7 @@ public class MediaMetadataModifyService {
 
     private final MediaMetaDataRepository mediaMetaDataRepository;
     private final MediaGroupMetaDataRepository mediaGroupMetaDataRepository;
+
     private final MediaSearchCacheService mediaSearchCacheService;
     private final NameEntityModifyService nameEntityModifyService;
     private final MinIOService minIOService;
@@ -80,23 +81,14 @@ public class MediaMetadataModifyService {
     ) {}
 
     @Transactional
-    public void updateNameEntityInMediaInBatch(String userId, List<UpdateList> updateLists, long mediaId, boolean publishSearchUpdate) {
-        MediaMetaData mediaMetaData = getMediaMetaData(mediaId);
+    public void updateMediaNameEntityInBatch(String userId, List<UpdateList> updateLists, long mediaId, boolean publishSearchUpdate) {
         for (UpdateList updateList : updateLists) {
-            updateNameEntityInMedia(userId, updateList, mediaId, publishSearchUpdate, mediaMetaData);
+            updateMediaNameEntity(userId, updateList, mediaId, publishSearchUpdate);
         }
     }
 
     @Transactional
-    public List<NameEntityDTO> updateNameEntityInMedia(String userIdStr, UpdateList updateList, long mediaId, boolean publishSearchUpdate, MediaMetaData mediaMetaData) {
-        if ((updateList.adding == null || updateList.adding.isEmpty()) && (updateList.removing == null || updateList.removing.isEmpty())) return new ArrayList<>();
-
-        long userId = Long.parseLong(userIdStr);
-
-        mediaMetaData = mediaMetaData == null ? getMediaMetaData(mediaId) : mediaMetaData;
-        if (mediaMetaData.getUserId() != userId)
-            throw new IllegalArgumentException("No media found for user: " + userId);
-
+    public List<NameEntityDTO> updateMediaNameEntity(String userIdStr, UpdateList updateList, long mediaId, boolean publishSearchUpdate) {
         List<Long> uniqueAdding = updateList.adding == null
                 ? new ArrayList<>()
                 : new ArrayList<>(updateList.adding.stream().map(NameEntityDTO::getId).distinct().toList());
@@ -107,37 +99,40 @@ public class MediaMetadataModifyService {
 
         if (uniqueAdding.isEmpty() && uniqueRemoving.isEmpty()) return new ArrayList<>();
 
-        if (!uniqueAdding.isEmpty()) {
-            Long[] addingIds = nameEntityModifyService.getMediaNameEntityIdByUserIdAndIdIn(userId, uniqueAdding, updateList.nameEntity);
-            if (addingIds.length > 0) {
-                int added = addNameEntitiesToMedia(mediaId, addingIds, updateList.nameEntity);
-                System.out.println("Adding: " + addingIds.length + " Added: " + added);
-                nameEntityModifyService.incrementEntityLengthCount(userId, addingIds, updateList.nameEntity);
-                eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
-                        EventTopics.MEDIA_SEARCH_TOPIC,
-                        userIdStr,
-                        new MediaUpdateEvent.NameEntityLengthUpdated(userIdStr, updateList.nameEntity, addingIds, 1)
-                ));
-            }
+        long userId = Long.parseLong(userIdStr);
+
+        MediaMetaData mediaMetaData = getMediaMetaData(mediaId);
+        if (mediaMetaData.getUserId() != userId) {
+            throw new IllegalArgumentException("No media found for user: " + userId);
         }
 
         if (!uniqueRemoving.isEmpty()) {
-            Long[] removingIds = nameEntityModifyService.getMediaNameEntityIdByUserIdAndIdIn(userId, uniqueRemoving, updateList.nameEntity);
-            if (removingIds.length > 0) {
-                int removed = removeNameEntitiesFromMedia(mediaId, removingIds, updateList.nameEntity);
-                System.out.println("Removing: " + removingIds.length + " Removed: " + removed);
-                nameEntityModifyService.decrementNameEntityLengthCount(userId, removingIds, updateList.nameEntity);
-                eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
-                        EventTopics.MEDIA_SEARCH_TOPIC,
-                        userIdStr,
-                        new MediaUpdateEvent.NameEntityLengthUpdated(userIdStr, updateList.nameEntity, removingIds, -1)
-                ));
-            }
+            Long[] removingIds = uniqueRemoving.toArray(Long[]::new);
+            int removed = removeNameEntitiesFromMedia(mediaId, removingIds, updateList.nameEntity);
+            System.out.println("Removing: " + removingIds.length + " Removed: " + removed);
+            nameEntityModifyService.decrementNameEntityLengthCount(userId, removingIds, updateList.nameEntity);
+            eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                    EventTopics.MEDIA_SEARCH_TOPIC,
+                    userIdStr,
+                    new MediaUpdateEvent.NameEntityLengthUpdated(userIdStr, updateList.nameEntity, removingIds, -1)
+            ));
         }
 
-        List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(userIdStr, mediaId, updateList.nameEntity);
+        if (!uniqueAdding.isEmpty()) {
+            Long[] addingIds = uniqueAdding.toArray(Long[]::new);
+            int added = addNameEntitiesToMedia(mediaId, addingIds, updateList.nameEntity);
+            System.out.println("Adding: " + addingIds.length + " Added: " + added);
+            nameEntityModifyService.incrementEntityLengthCount(userId, addingIds, updateList.nameEntity);
+            eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
+                    EventTopics.MEDIA_SEARCH_TOPIC,
+                    userIdStr,
+                    new MediaUpdateEvent.NameEntityLengthUpdated(userIdStr, updateList.nameEntity, addingIds, 1)
+            ));
+        }
 
+        mediaSearchCacheService.removeCachedMediaSearchItem(userIdStr, mediaId);
         if (publishSearchUpdate) {
+            List<NameEntityDTO> updatedMediaNameEntityList = getMediaNameEntityInfo(userIdStr, mediaId, updateList.nameEntity);
             Map<Long, String> nameEntityIdsToNames = updatedMediaNameEntityList.stream().collect(Collectors.toMap(
                     NameEntityDTO::getId, NameEntityDTO::getName
             ));
@@ -146,10 +141,9 @@ public class MediaMetadataModifyService {
                     userIdStr,
                     new MediaUpdateEvent.MediaNameEntityUpdated(userIdStr, mediaId, updateList.nameEntity, nameEntityIdsToNames)
             ));
+            return updatedMediaNameEntityList;
         }
-
-        mediaSearchCacheService.removeCachedMediaSearchItem(userIdStr, mediaId);
-        return updatedMediaNameEntityList;
+        return null;
     }
 
     private int addNameEntitiesToMedia(long mediaId, Long[] nameEntityIds, MediaNameEntityConstant nameEntity) {

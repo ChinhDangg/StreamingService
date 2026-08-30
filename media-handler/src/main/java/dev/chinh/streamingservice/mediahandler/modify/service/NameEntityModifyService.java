@@ -31,16 +31,6 @@ public class NameEntityModifyService {
     private final MinIOService minIOService;
     private final ApplicationEventPublisher eventPublisher;
 
-    public Long[] getMediaNameEntityIdByUserIdAndIdIn(long userId, List<Long> ids, MediaNameEntityConstant nameEntity) {
-        List<Long> result = switch (nameEntity) {
-            case MediaNameEntityConstant.AUTHORS -> mediaAuthorRepository.findIdByUserIdAndIdIn(userId, ids);
-            case MediaNameEntityConstant.CHARACTERS -> mediaCharacterRepository.findIdByUserIdAndIdIn(userId, ids);
-            case MediaNameEntityConstant.UNIVERSES -> mediaUniverseRepository.findIdByUserIdAndIdIn(userId, ids);
-            case MediaNameEntityConstant.TAGS -> mediaTagRepository.findIdByUserIdAndIdIn(userId, ids);
-        };
-        return result.toArray(new Long[0]);
-    }
-
     public void incrementEntityLengthCount(long userId, Long[] nameEntityIds, MediaNameEntityConstant nameEntityConstant) {
         int updated = switch (nameEntityConstant) {
             case MediaNameEntityConstant.AUTHORS -> mediaAuthorRepository.incrementLength(userId, nameEntityIds);

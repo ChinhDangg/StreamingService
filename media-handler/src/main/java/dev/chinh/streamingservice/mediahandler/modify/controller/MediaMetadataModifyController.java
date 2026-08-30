@@ -37,14 +37,14 @@ public class MediaMetadataModifyController {
     public ResponseEntity<List<NameEntityDTO>> updateMediaNameEntityInfo(@PathVariable long id,
                                                                          @RequestBody MediaMetadataModifyService.UpdateList updateList,
                                                                          @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok().body(mediaMetadataModifyService.updateNameEntityInMedia(jwt.getSubject(), updateList, id, true, null));
+        return ResponseEntity.ok().body(mediaMetadataModifyService.updateMediaNameEntity(jwt.getSubject(), updateList, id, true));
     }
 
     @PutMapping("/update-batch/{id}")
     public ResponseEntity<Void> updateMediaNameEntityInfoInBatch(@PathVariable long id,
                                                                  @RequestBody List<MediaMetadataModifyService.UpdateList> updateLists,
                                                                  @AuthenticationPrincipal Jwt jwt) {
-        mediaMetadataModifyService.updateNameEntityInMediaInBatch(jwt.getSubject(), updateLists, id, true);
+        mediaMetadataModifyService.updateMediaNameEntityInBatch(jwt.getSubject(), updateLists, id, true);
         return ResponseEntity.ok().build();
     }
 

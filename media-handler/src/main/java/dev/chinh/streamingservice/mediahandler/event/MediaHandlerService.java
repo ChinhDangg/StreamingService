@@ -18,6 +18,7 @@ import dev.chinh.streamingservice.mediahandler.event.probe.VideoMetadata;
 import dev.chinh.streamingservice.mediahandler.modify.service.MediaMetadataModifyService;
 import dev.chinh.streamingservice.mediahandler.MinIOService;
 import io.minio.messages.DeleteObject;
+import jakarta.persistence.EntityManager;
 import lombok.AllArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -36,6 +37,7 @@ public class MediaHandlerService {
     private final ApplicationEventPublisher eventPublisher;
     private final StringRedisTemplate redisTemplate;
 
+    private final EntityManager entityManager;
     private final MediaMetadataModifyService mediaMetadataModifyService;
     private final MinIOService minIOService;
     private final MediaProbe mediaProbe;
@@ -175,7 +177,7 @@ public class MediaHandlerService {
 
         if (event.nameUpdateListAsJson() != null) {
             List<MediaMetadataModifyService.UpdateList> updateLists = objectMapper.readValue(event.nameUpdateListAsJson(), new TypeReference<>() {});
-            mediaMetadataModifyService.updateNameEntityInMediaInBatch(event.userId(), updateLists, saved.getId(), false);
+            mediaMetadataModifyService.updateMediaNameEntityInBatch(event.userId(), updateLists, saved.getId(), false);
         }
 
         eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
@@ -193,7 +195,10 @@ public class MediaHandlerService {
                 )
         ));
 
-        MediaUpdateEvent.MediaCreatedReadyForSearch eventForSearch = mediaMapper.map(saved);
+        entityManager.detach(saved);
+        var allInfo = mediaMetaDataRepository.findByIdWithAllInfo(saved.getUserId(), saved.getId());
+        MediaUpdateEvent.MediaCreatedReadyForSearch eventForSearch = mediaMapper.map(allInfo.orElseThrow());
+
         eventPublisher.publishEvent(new MediaHandlerEventProducer.EventWrapper(
                 EventTopics.MEDIA_SEARCH_TOPIC,
                 event.userId(),
