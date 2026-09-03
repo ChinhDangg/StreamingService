@@ -6,11 +6,9 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.filemanager.constant.SortBy;
 import dev.chinh.streamingservice.filemanager.data.FileItemField;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
-import dev.chinh.streamingservice.filemanager.repository.FileSystemRepository;
 import lombok.RequiredArgsConstructor;
 import org.bson.Document;
 import org.springframework.data.domain.*;
-import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.stereotype.Service;
@@ -23,18 +21,17 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class FileFindService {
 
-    private final FileSystemRepository fileSystemRepository;
+    private final FileRepository fileRepository;
     private final FileService fileService;
     private final ThumbnailService thumbnailService;
     private final ObjectMapper objectMapper;
-    private final MongoTemplate mongoTemplate;
 
     private final Limit searchResultLimit = Limit.of(25);
     public record FileSearchResult(String parentId, String parentName, List<FileSystemItem> content, String nextCursor, boolean hasNext) {}
 
     public FileSearchResult findFilesAtRoot(String userId, String cursorStr, SortBy sortBy, Sort.Direction sortOrder) {
-        Window<FileSystemItem> window = fileSystemRepository.findByUserIdAndParentId(
-                Long.parseLong(userId),
+        Window<FileSystemItem> window = fileRepository.findByUserIdAndParentId(
+                userId,
                 fileService.getROOT_FOLDER_ID(),
                 getSort(sortBy, sortOrder),
                 searchResultLimit,
@@ -52,8 +49,8 @@ public class FileFindService {
     }
 
     public FileSearchResult findFilesInDirectory(String userId, boolean getFullPathInfo, String parentId, String cursorStr, SortBy sortBy, Sort.Direction sortOrder) {
-        Window<FileSystemItem> window = fileSystemRepository.findByUserIdAndParentId(
-                Long.parseLong(userId),
+        Window<FileSystemItem> window = fileRepository.findByUserIdAndParentId(
+                userId,
                 parentId,
                 getSort(sortBy, sortOrder),
                 searchResultLimit,
@@ -84,8 +81,8 @@ public class FileFindService {
         FileSystemItem parent = fileService.getFileSystemItem(userId, parentId, true);
         String regexPath = "^" + Pattern.quote(parent.getPath() + parent.getId() + "/");
 
-        Window<FileSystemItem> window = fileSystemRepository.findByUserIdAndPathRegex(
-                Long.parseLong(userId),
+        Window<FileSystemItem> window = fileRepository.findByUserIdAndPathRecursive(
+                userId,
                 regexPath,
                 getSort(sortBy, sortOrder),
                 searchResultLimit,
@@ -160,7 +157,7 @@ public class FileFindService {
         ));
 
         Aggregation aggregation = Aggregation.newAggregation(stages);
-        List<FileSystemItem> results = mongoTemplate.aggregate(aggregation, "fs_metadata", FileSystemItem.class).getMappedResults();
+        List<FileSystemItem> results = fileRepository.aggregate(aggregation, "fs_metadata").getMappedResults();
         getUpdatedThumbnailUrl(userId, results);
 
         String nextToken = (results.size() == size) ? results.getLast().getPageToken() : null;

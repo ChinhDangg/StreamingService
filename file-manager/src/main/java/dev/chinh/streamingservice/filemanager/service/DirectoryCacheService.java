@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class DirectoryCacheService {
 
-    private final MongoTemplate mongoTemplate;
+    private final FileRepository fileRepository;
     private final MongoTemplate safeWriteMongoTemplate;
 
     private final Cache<String, ApplicationConfig.EntryCached> directoryIdCache;
@@ -90,7 +90,7 @@ public class DirectoryCacheService {
         // upsert to create and return in one operation - atomic
         FindAndModifyOptions options = new FindAndModifyOptions().upsert(true).returnNew(true);
 
-        FileSystemItem dir = mongoTemplate.findAndModify(query, update, options, FileSystemItem.class);
+        FileSystemItem dir = fileRepository.findAndModify(query, options, update);
 
         if (dir == null) throw new RuntimeException("Failed to create folder");
         fileLockService.lockFileItem(userId, Set.of(dir.getId()), Map.of(dir.getId(), FileStatus.IN_USE));

@@ -6,7 +6,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 
 
-public interface FileSystemRepository extends MongoRepository<FileSystemItem, String> {
+public interface FileSystemItemRepository extends MongoRepository<FileSystemItem, String> {
 
     @Query("{ 'userId': ?0, 'path': { $regex: ?1 } }")
     Slice<FileSystemItem> findByUserIdAndPathRegex(Long userId, String pathRegex, Pageable pageable);

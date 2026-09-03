@@ -1,18 +1,11 @@
 package dev.chinh.streamingservice.filemanager.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
-import dev.chinh.streamingservice.filemanager.data.FileItemField;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -27,14 +20,11 @@ public class FileCacheService {
      */
 
     private final Cache<String, FileSystemItem> fileCache;
-    private final MongoTemplate mongoTemplate;
 
     // this does not check the items belong to a userId or not, use only after checking all ids belong to the userId
-    public List<FileSystemItem> getCachedFilesElseFromDatabase(Collection<String> ids, Criteria criteria, Predicate<FileSystemItem> filter) {
+    public List<FileSystemItem> getCachedFilesElse(Collection<String> ids, Predicate<FileSystemItem> filter, Function<Set<? extends String>, List<FileSystemItem>> fetcher) {
         Map<String, FileSystemItem> result = fileCache.getAll(ids, (keysToFetch) -> {
-            Query query = new Query(Criteria.where("id").in(keysToFetch));
-            if (criteria != null) query.addCriteria(criteria);
-            List<FileSystemItem> fetched = mongoTemplate.find(query, FileSystemItem.class);
+            List<FileSystemItem> fetched = fetcher.apply(keysToFetch);
             return fetched.stream().collect(Collectors.toMap(FileSystemItem::getId, item -> item));
         });
         var listResult = new ArrayList<>(result.values());
@@ -55,16 +45,16 @@ public class FileCacheService {
      * If getCachedFirst is true, the file cache is checked first. Then from the database. The result is cached.
      * Else from database only, the result is still cached.
      */
-    public FileSystemItem getCachedFileElseFromDatabase(String userId, String id, boolean getCachedFirst) {
+    public FileSystemItem getCachedFileElse(String userId, String id, boolean getCachedFirst, Function<String, FileSystemItem> fetcher) {
         // atomic: if multiple threads request the same ID, the compute function runs only once.
         // get, else compute, save, and return the result.
         if (getCachedFirst) {
-            var item = fileCache.get(id, k -> findById(userId, k));
+            var item = fileCache.get(id, fetcher);
             if (item.getUserId() == null || item.getUserId().toString().equals(userId))
                 return item;
             return null;
         }
-        var item = findById(userId, id);
+        var item = fetcher.apply(id);
         putFileCache(item);
         return item;
     }
@@ -81,11 +71,7 @@ public class FileCacheService {
         fileCache.invalidateAll(ids);
     }
 
-    private FileSystemItem findById(String userId, String id) {
-        Query query = new Query(Criteria
-                .where(FileItemField.USER_ID).is(Long.parseLong(userId))
-                .and("id").is(id)
-        );
-        return mongoTemplate.findOne(query, FileSystemItem.class);
+    public void invalidateAllFileCache() {
+        fileCache.invalidateAll();
     }
 }

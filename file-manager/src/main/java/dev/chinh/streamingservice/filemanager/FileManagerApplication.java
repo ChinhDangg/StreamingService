@@ -1,6 +1,6 @@
 package dev.chinh.streamingservice.filemanager;
 
-import dev.chinh.streamingservice.filemanager.repository.FileSystemRepository;
+import dev.chinh.streamingservice.filemanager.repository.FileSystemItemRepository;
 import dev.chinh.streamingservice.filemanager.service.FileService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -14,7 +14,7 @@ public class FileManagerApplication {
     }
 
     //@Bean
-    CommandLineRunner commandLineRunner(FileSystemRepository repository, FileService fileService) {
+    CommandLineRunner commandLineRunner(FileSystemItemRepository repository, FileService fileService) {
         return args -> {
 //            repository.save(new FileSystemItem(
 //                    1,

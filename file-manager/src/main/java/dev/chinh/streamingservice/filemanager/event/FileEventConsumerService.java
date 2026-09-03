@@ -9,16 +9,12 @@ import dev.chinh.streamingservice.filemanager.config.ApplicationConfig;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
 import dev.chinh.streamingservice.filemanager.data.FileItemField;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
-import dev.chinh.streamingservice.filemanager.service.DirectoryCacheService;
-import dev.chinh.streamingservice.filemanager.service.FileCacheService;
-import dev.chinh.streamingservice.filemanager.service.FileLockService;
-import dev.chinh.streamingservice.filemanager.service.FileService;
+import dev.chinh.streamingservice.filemanager.service.*;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.aggregation.AggregationUpdate;
 import org.springframework.data.mongodb.core.aggregation.StringOperators;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -31,16 +27,17 @@ import java.time.Instant;
 import java.util.*;
 import java.util.regex.Pattern;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FileEventConsumerService {
 
-    private static final Logger log = LoggerFactory.getLogger(FileEventConsumerService.class);
-    private final MongoTemplate mongoTemplate;
+    private final FileRepository fileRepository;
+
     private final FileService fileService;
-    private final FileCacheService fileCacheService;
     private final DirectoryCacheService directoryCacheService;
     private final FileLockService fileLockService;
+
     private final ApplicationEventPublisher publisher;
 
     @Transactional
@@ -72,7 +69,7 @@ public class FileEventConsumerService {
                 .fileType(FileType.detectFileTypeFromMediaType(MediaType.detectMediaType(fileName)))
                 .uploadDate(Instant.now())
                 .build();
-        var savedFileItem = mongoTemplate.insert(fileItem);
+        var savedFileItem = fileRepository.insert(fileItem);
 
         if (event.isLast()) {
             directoryCacheService.removeAllDirectoriesUserUsing(event.userId());
@@ -127,7 +124,7 @@ public class FileEventConsumerService {
                 .with(Sort.by(Sort.Direction.ASC, FileItemField.NAME))
                 .limit(batchSize)
                 .skip(skip);
-        List<FileSystemItem> directChildren = mongoTemplate.find(query, FileSystemItem.class);
+        List<FileSystemItem> directChildren = fileRepository.find(query);
         for (FileSystemItem child : directChildren) {
             if (child.getFileType() == FileType.DIR) {
                 publisher.publishEvent(new FileEventProducer.EventWrapper(
@@ -228,7 +225,7 @@ public class FileEventConsumerService {
                 .limit(batchSize)
                 .skip(skip);
         query.fields().include("id", FileItemField.SIZE, FileItemField.FILE_TYPE);
-        List<FileSystemItem> batch = mongoTemplate.find(query, FileSystemItem.class);
+        List<FileSystemItem> batch = fileRepository.find(query);
 
         size += batch.stream()
                 .filter(f -> FileType.isNotDir(f.getFileType()))
@@ -262,10 +259,11 @@ public class FileEventConsumerService {
 
     private FileSystemItem findFirstImageOrVideo(String userId, String parentPath) {
         String quotedParentPath = Pattern.quote(parentPath);
-        return mongoTemplate.findOne(new Query(Criteria
+        return fileRepository.findOne(new Query(Criteria
                 .where(FileItemField.USER_ID).is(Long.parseLong(userId))
                 .and(FileItemField.PATH).regex("^" + quotedParentPath)
-                .and(FileItemField.FILE_TYPE).in(FileType.IMAGE, FileType.VIDEO)), FileSystemItem.class);
+                .and(FileItemField.FILE_TYPE).in(FileType.IMAGE, FileType.VIDEO)
+        ));
     }
 
     @Transactional
@@ -281,7 +279,6 @@ public class FileEventConsumerService {
                 event.height()
         );
         fileLockService.releaseLockedFileItem(Set.of(event.fileId()));
-        fileCacheService.invalidateFileCache(event.fileId());
         log.info("Completed file to media: {} with media id: {}", event.fileId(), event.mediaId());
         return result;
     }
@@ -303,7 +300,7 @@ public class FileEventConsumerService {
                     .with(Sort.by(Sort.Direction.ASC, FileItemField.NAME))
                     .skip(event.num()) // zero-based index
                     .limit(1);
-            FileSystemItem numItem = mongoTemplate.findOne(query, FileSystemItem.class);
+            FileSystemItem numItem = fileRepository.findOne(query);
             if (numItem == null) {
                 log.warn("Item with id: {} does not have child at num {}, skipping update media thumbnail", item.getId(), event.num());
                 return;
@@ -331,7 +328,7 @@ public class FileEventConsumerService {
         Query query = Query.query(Criteria.where(FileItemField.MEDIA_ID).is(event.mediaId()));
         Update update = new Update()
                 .set(FileItemField.THUMBNAIL, event.newThumbnail());
-        mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+        fileRepository.findAndModify(query, FindAndModifyOptions.options(), update);
         log.info("Updated media thumbnail for media id: {}", event.mediaId());
     }
 
@@ -366,8 +363,8 @@ public class FileEventConsumerService {
         final int batchSize = 500;
         while (hasMore) { // delete items in the target fileItem if the fileItem is a directory
             String parentPath = Pattern.quote(fileService.getPathForFileItem(fileItem.getPath(), fileItem.getId()));
-            List<FileSystemItem> batch = mongoTemplate.find(Query.query(Criteria
-                    .where(FileItemField.PATH).regex("^" + parentPath)).limit(batchSize), FileSystemItem.class);
+            List<FileSystemItem> batch = fileRepository.find(Query.query(Criteria
+                    .where(FileItemField.PATH).regex("^" + parentPath)).limit(batchSize));
 
             hasMore = batch.size() == batchSize;
 
@@ -391,13 +388,11 @@ public class FileEventConsumerService {
                 ));
             }
             updateParentMediaLength(userId, parents, -fileCount, true);
-            mongoTemplate.remove(new Query(Criteria.where("id").in(ids)), FileSystemItem.class);
-            fileCacheService.invalidateFileCache(ids);
+            fileRepository.remove(ids);
             log.info("Deleted {} items for folder {} ", ids.size(), fileItem.getId());
         }
 
-        mongoTemplate.remove(new Query(Criteria.where("id").is(fileItem.getId())), FileSystemItem.class);
-        fileCacheService.invalidateFileCache(fileItem.getId());
+        fileRepository.remove(fileItem.getId());
         if (fileItem.getBucket() != null && fileItem.getObjectName() != null)
             publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_HANDLER_TOPIC,
@@ -429,7 +424,7 @@ public class FileEventConsumerService {
         Update update = new Update().inc(FileItemField.LENGTH, lengthDelta);
         if (lengthDelta < 0)
             query.addCriteria(Criteria.where(FileItemField.LENGTH).gt(0));
-        mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+        fileRepository.updateMulti(parentIds, query, update);
 
         if (!parentMediaIds.isEmpty() && sendEvent)
             publisher.publishEvent(new FileEventProducer.EventWrapper(
@@ -484,7 +479,7 @@ public class FileEventConsumerService {
                 .toValue(StringOperators.ReplaceOne.valueOf(FileItemField.PATH)
                         .find(event.oldIdPath()) // find old path prefix and replace with new path prefix
                         .replacement(newIdPrefix));
-        mongoTemplate.updateMulti(query, update, FileSystemItem.class);
+        fileRepository.updateMulti(query, update);
 
         Set<String> commonIds = fileService.getCommonIds(event.oldIdPath() + item.getId() + newParent.getPath() + newParent.getId());
         fileLockService.releaseLockedFileItem(commonIds);

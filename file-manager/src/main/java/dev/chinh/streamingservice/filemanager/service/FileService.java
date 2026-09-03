@@ -14,13 +14,10 @@ import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import dev.chinh.streamingservice.filemanager.data.FolderLocks;
 import dev.chinh.streamingservice.filemanager.event.FileEventProducer;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.mongodb.MongoTransactionException;
-import org.springframework.data.mongodb.core.FindAndModifyOptions;
-import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -37,12 +34,12 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FileService {
 
-    private static final Logger log = LoggerFactory.getLogger(FileService.class);
-    private final MongoTemplate mongoTemplate;
+    private final FileRepository fileRepository;
     private final ApplicationEventPublisher publisher;
 
     private final FileCacheService fileCacheService;
@@ -186,11 +183,9 @@ public class FileService {
             throw new IllegalArgumentException("Has parent as album - cannot have grouper in an album");
         }
 
-        boolean anyDirectFile = mongoTemplate.exists(Query.query(Criteria
-                        .where(FileItemField.USER_ID).is(Long.parseLong(userId))
-                        .and(FileItemField.PARENT_ID).is(fileId)
-                        .and(FileItemField.FILE_TYPE).nin(FileType.DIR, FileType.ALBUM, FileType.GROUPER)),
-                FileSystemItem.class);
+        boolean anyDirectFile = fileRepository.checkExistWithUserId(userId, Criteria
+                        .where(FileItemField.PARENT_ID).is(fileId)
+                        .and(FileItemField.FILE_TYPE).nin(FileType.DIR, FileType.ALBUM, FileType.GROUPER));
         if (anyDirectFile) {
             throw new IllegalArgumentException("Contains direct files - can't be grouped - must include only direct directories");
         }
@@ -247,7 +242,7 @@ public class FileService {
                 .uploadDate(Instant.now())
                 .build();
 
-        var saved = mongoTemplate.insert(item);
+        var saved = fileRepository.insert(item);
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_BACKUP_TOPIC,
@@ -279,10 +274,8 @@ public class FileService {
             throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
         }
 
-        Query query = new Query(Criteria.where("id").is(fileId));
         Update update = new Update().set(FileItemField.NAME, newName);
-        mongoTemplate.updateFirst(query, update, FileSystemItem.class);
-        fileCacheService.invalidateFileCache(fileId);
+        fileRepository.updateFirstByIdAndUserId(userId, fileId, update);
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_BACKUP_TOPIC,
@@ -398,7 +391,6 @@ public class FileService {
             throw new IllegalArgumentException("File already exists with name: " + item.getName());
         }
 
-        Query query = new Query(Criteria.where("id").is(fileId));
         Update update = new Update()
                 .set(FileItemField.PARENT_ID, newParentId)
                 .set(FileItemField.PATH, newParent.getPath() + newParent.getId() + "/");
@@ -448,7 +440,7 @@ public class FileService {
             ));
         }
 
-        FileSystemItem moved = mongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), FileSystemItem.class);
+        FileSystemItem moved = fileRepository.findAndModifyById(fileId, update);
 
         if (moved != null && (item.getFileType() == FileType.IMAGE || item.getThumbnail() != null)) {
             String thumbnailPath = ThumbnailService.getThumbnailPath(
@@ -471,26 +463,21 @@ public class FileService {
     }
 
     private String getLockedInfoString(String userId, String fileId, FileStatus status) {
-        return "File " + fileCacheService.getCachedFileElseFromDatabase(userId, fileId, true).getName() + " is " + status;
+        return "File " + findById(userId, fileId, true).getName() + " is " + status;
     }
 
 
     public boolean itemWithNameExists(String userId, String parentId, String name) {
-        Query query = new Query(Criteria
-                .where(FileItemField.USER_ID).is(Long.parseLong(userId))
-                .and(FileItemField.PARENT_ID).is(parentId)
+        return fileRepository.checkExistWithUserId(userId, Criteria
+                .where(FileItemField.PARENT_ID).is(parentId)
                 .and(FileItemField.NAME).is(name));
-        return mongoTemplate.exists(query, FileSystemItem.class);
     }
 
     private boolean anyChildMedia(String userId, String parentPath) {
         String quotedParentPath = Pattern.quote(parentPath);
-        return mongoTemplate.exists(
-                new Query(Criteria
-                        .where(FileItemField.USER_ID).is(Long.parseLong(userId))
-                        .and(FileItemField.PATH).regex("^" + quotedParentPath)
-                        .and(FileItemField.MEDIA_ID).nin(null, 0)),
-                FileSystemItem.class);
+        return fileRepository.checkExistWithUserId(userId, Criteria
+                .where(FileItemField.PATH).regex("^" + quotedParentPath)
+                .and(FileItemField.MEDIA_ID).nin(null, 0));
     }
 
 
@@ -508,10 +495,6 @@ public class FileService {
     @Transactional
     public UpdateResult updateFileMetadataAsMedia(String userId, String fileId, long mediaId, FileType fileType, String thumbnailObject,
                                                   int length, Integer width, Integer height) {
-        Query query = new Query(Criteria
-                .where(FileItemField.USER_ID).is(Long.parseLong(userId))
-                .and("id").is(fileId)
-        );
         Update update = new Update()
                 .set(FileItemField.MEDIA_ID, mediaId)
                 .set(FileItemField.FILE_TYPE, fileType)
@@ -520,7 +503,7 @@ public class FileService {
             update.set(FileItemField.THUMBNAIL, thumbnailObject);
         if (width != null && height != null)
             update.set(FileItemField.RESOLUTION_INFO, new FileSystemItem.ResolutionInfo(width, height));
-        return mongoTemplate.updateFirst(query, update, FileSystemItem.class);
+        return fileRepository.updateFirstByIdAndUserId(userId, fileId, update);
     }
 
     public String getFullPathInName(FileSystemItem item, boolean omitRoot) {
@@ -560,7 +543,7 @@ public class FileService {
                 .where(FileItemField.USER_ID).is(Long.parseLong(userId))
                 .and(FileItemField.MEDIA_ID).is(mId)
         );
-        return mongoTemplate.findOne(query, FileSystemItem.class);
+        return fileRepository.findOne(query);
     }
 
     public FileSystemItem getFileSystemItem(String userId, String id, boolean getCachedFirst) {
@@ -573,16 +556,26 @@ public class FileService {
     public FileSystemItem findById(String userId, String id, boolean getCachedFirst) {
         if (id.equals(getROOT_FOLDER_ID()))
             return getRootDirectoryItem();
-        return fileCacheService.getCachedFileElseFromDatabase(userId, id, getCachedFirst);
+        return fileCacheService.getCachedFileElse(userId, id, getCachedFirst, fileId -> {
+            Query query = new Query(Criteria
+                    .where(FileItemField.USER_ID).is(Long.parseLong(userId))
+                    .and("id").is(fileId)
+            );
+            return fileRepository.findOne(query);
+        });
     }
 
     // this does not check the items belong to a userId or not, use only after checking all ids belong to the userId
     public List<FileSystemItem> getItemInIds(Collection<String> ids, boolean getCachedFirst, Criteria criteria, Predicate<FileSystemItem> filter) {
         if (getCachedFirst)
-            return fileCacheService.getCachedFilesElseFromDatabase(ids, criteria, filter);
+            return fileCacheService.getCachedFilesElse(ids, filter, keysToFetch -> {
+                Query query = new Query(Criteria.where("id").in(keysToFetch));
+                if (criteria != null) query.addCriteria(criteria);
+                return fileRepository.find(query);
+            });
         Query query = new Query(Criteria.where("id").in(ids));
         if (criteria != null) query.addCriteria(criteria);
-        return mongoTemplate.find(query, FileSystemItem.class);
+        return fileRepository.find(query);
     }
 
     public FileSystemItem getRootDirectoryItem() {
@@ -590,7 +583,7 @@ public class FileService {
             Query query = new Query(Criteria
                     .where("id").is(rootId)
             );
-            return mongoTemplate.findOne(query, FileSystemItem.class);
+            return fileRepository.findOne(query);
         });
     }
 
@@ -601,7 +594,7 @@ public class FileService {
                 .and(FileItemField.PATH).is("/")
                 .and(FileItemField.FILE_TYPE).is(FileType.DIR)
         );
-        FileSystemItem item = mongoTemplate.findOne(query, FileSystemItem.class);
+        FileSystemItem item = fileRepository.findOne(query);
 
         if (item == null) throw new RuntimeException("Failed to find root folder");
 
@@ -627,7 +620,7 @@ public class FileService {
                 .setOnInsert(FileItemField.PATH, "/")
                 .setOnInsert(FileItemField.FILE_TYPE, FileType.DIR);
 
-        UpdateResult result = mongoTemplate.upsert(query, update, FileSystemItem.class);
+        UpdateResult result = fileRepository.upsert(query, update);
         if (!result.wasAcknowledged()) throw new RuntimeException("Failed to create root folder");
     }
 }
