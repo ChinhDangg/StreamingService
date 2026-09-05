@@ -9,6 +9,7 @@ import dev.chinh.streamingservice.filemanager.config.ApplicationConfig;
 import dev.chinh.streamingservice.filemanager.constant.FileType;
 import dev.chinh.streamingservice.filemanager.data.FileItemField;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
+import dev.chinh.streamingservice.filemanager.repository.FileRepository;
 import dev.chinh.streamingservice.filemanager.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -467,19 +468,38 @@ public class FileEventConsumerService {
             }
         }
 
+        final int batchSize = 500;
+
         // needing oldPath since item or source dir path is already updated to reflect changes
         // item is the source directory, we need to get all children and update their paths
         String childrenIdPrefix = event.oldIdPath() + item.getId() + "/"; // all children in the directory
         String newIdPrefix = newParent.getPath() + newParent.getId() + "/";
 
         String anchoredRegex = "^" + Pattern.quote(childrenIdPrefix);
-        Query query = new Query(Criteria.where(FileItemField.PATH).regex(anchoredRegex)); // find children
-        AggregationUpdate update = AggregationUpdate.update()
-                .set(FileItemField.PATH)
-                .toValue(StringOperators.ReplaceOne.valueOf(FileItemField.PATH)
-                        .find(event.oldIdPath()) // find old path prefix and replace with new path prefix
-                        .replacement(newIdPrefix));
-        fileRepository.updateMulti(query, update);
+        Query idQuery = new Query(Criteria.where(FileItemField.PATH).regex(anchoredRegex)).limit(batchSize); // find children
+        idQuery.fields().include(FileItemField.ID);
+        List<FileSystemItem> children = fileRepository.find(idQuery);
+
+        if (!children.isEmpty()) {
+            List<String> targetIds = children.stream().map(FileSystemItem::getId).toList();
+
+            Query updateQuery = new Query(Criteria.where("id").in(targetIds));
+            AggregationUpdate update = AggregationUpdate.update()
+                    .set(FileItemField.PATH)
+                    .toValue(StringOperators.ReplaceOne.valueOf(FileItemField.PATH)
+                            .find(event.oldIdPath()) // find old path prefix and replace with new path prefix
+                            .replacement(newIdPrefix));
+            fileRepository.updateMulti(targetIds, updateQuery, update);
+        }
+
+        if (children.size() == batchSize) {
+            publisher.publishEvent(new FileEventProducer.EventWrapper(
+                    EventTopics.MEDIA_FILE_TOPIC,
+                    event.userId(),
+                    event
+            ));
+            return;
+        }
 
         Set<String> commonIds = fileService.getCommonIds(event.oldIdPath() + item.getId() + newParent.getPath() + newParent.getId());
         fileLockService.releaseLockedFileItem(commonIds);
