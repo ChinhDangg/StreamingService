@@ -13,6 +13,7 @@ import dev.chinh.streamingservice.filemanager.data.FileItemField;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import dev.chinh.streamingservice.filemanager.data.FolderLocks;
 import dev.chinh.streamingservice.filemanager.event.FileEventProducer;
+import dev.chinh.streamingservice.filemanager.repository.FileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;

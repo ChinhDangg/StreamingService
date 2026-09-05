@@ -1,9 +1,9 @@
-package dev.chinh.streamingservice.filemanager.service;
+package dev.chinh.streamingservice.filemanager.repository;
 
 import com.mongodb.client.result.UpdateResult;
 import dev.chinh.streamingservice.filemanager.data.FileItemField;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
-import dev.chinh.streamingservice.filemanager.repository.FileSystemItemRepository;
+import dev.chinh.streamingservice.filemanager.service.FileCacheService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.ScrollPosition;
@@ -96,9 +96,9 @@ public class FileRepository {
         return item;
     }
 
-    public void updateMulti(Query query, AggregationUpdate update) {
+    public void updateMulti(Collection<String> affectedIds, Query query, AggregationUpdate update) {
         mongoTemplate.updateMulti(query, update, FileSystemItem.class);
-        fileCacheService.invalidateAllFileCache();
+        fileCacheService.invalidateFileCache(affectedIds);
     }
 
     public void updateMulti(Collection<String> affectedIds, Query query, Update update) {
