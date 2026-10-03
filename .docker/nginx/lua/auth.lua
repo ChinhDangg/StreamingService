@@ -1,12 +1,10 @@
 local pkey   = require "resty.openssl.pkey"
 local digest = require "resty.openssl.digest"
-local cjson  = require "cjson"
+local cjson  = require "cjson.safe"
 local http   = require "resty.http"
 
-
 local CACHE_DICT_NAME = "jwks_cache"
-local CACHE_KEY       = "JWKS_PEM"
-local CACHE_TTL       = 86400 -- 24 hours in seconds
+local CACHE_TTL       = 86400 -- 24 hours
 
 -----------------------------------------------------
 -- Base64URL decoder
@@ -15,225 +13,179 @@ local function b64url_decode(input)
     if not input then return nil end
     input = input:gsub("-", "+"):gsub("_", "/")
     local pad = #input % 4
-    if pad > 0 then input = input .. string.rep("=", 4 - pad) end
+    if pad > 0 then
+        input = input .. string.rep("=", 4 - pad)
+    end
     return ngx.decode_base64(input)
 end
 
 -----------------------------------------------------
--- JWK to PEM Converter (Pure Lua)
--- Converts raw modulus (n) and exponent (e) to PEM
+-- Fetch and Cache JWKS Keys by `kid`
 -----------------------------------------------------
-local function asn1_encode_len(n)
-    if n < 128 then
-        return string.char(n)
-    end
-    local s = ""
-    while n > 0 do
-        s = string.char(n % 256) .. s
-        n = math.floor(n / 256)
-    end
-    return string.char(128 + #s) .. s
-end
-
-local function jwk_to_pem(n_b64, e_b64)
-    local n = b64url_decode(n_b64)
-    local e = b64url_decode(e_b64)
-
-    if not n or not e then return nil, "Failed to decode n/e" end
-
-    -- ASN.1 Integers must be positive. If the first bit is 1, prepend 0x00
-    if string.byte(n, 1) >= 128 then n = "\0" .. n end
-    if string.byte(e, 1) >= 128 then e = "\0" .. e end
-
-    local function encode_int(data)
-        return "\2" .. asn1_encode_len(#data) .. data
-    end
-
-    local function encode_seq(data)
-        return "\48" .. asn1_encode_len(#data) .. data
-    end
-
-    -- RSAPublicKey = SEQUENCE { n INTEGER, e INTEGER }
-    local rsa_key_seq = encode_seq(encode_int(n) .. encode_int(e))
-
-    -- AlgorithmIdentifier = SEQUENCE { algorithm OID, parameters NULL }
-    -- OID rsaEncryption: 1.2.840.113549.1.1.1
-    local alg_id = "\48\13\6\9\42\134\72\134\247\13\1\1\1\5\0"
-
-    -- PublicKeyInfo = SEQUENCE { algorithm, subjectPublicKey BIT STRING }
-    local bit_string = "\3" .. asn1_encode_len(#rsa_key_seq + 1) .. "\0" .. rsa_key_seq
-    local full_der = encode_seq(alg_id .. bit_string)
-
-    local body = ngx.encode_base64(full_der)
-
-    -- Wrap lines at 64 chars (standard PEM)
-    local pem_body = body:gsub("(.{64})", "%1\n")
-    if pem_body:sub(-1) ~= "\n" then pem_body = pem_body .. "\n" end
-
-    return "-----BEGIN PUBLIC KEY-----\n" .. pem_body .. "-----END PUBLIC KEY-----\n"
-end
-
------------------------------------------------------
--- Fetch JWKS and Generate Public Key (PEM)
------------------------------------------------------
-local function get_jwks_pem()
+local function fetch_and_cache_jwks(dict)
     local httpc = http.new()
-    httpc:set_timeout(2000)
+    httpc:set_timeout(3000)
 
-    -- Note: Ensure host.docker.internal is resolvable by your Nginx resolver
     local res, err = httpc:request_uri("http://host.docker.internal:8084/.well-known/jwks.json", {
         method = "GET",
         ssl_verify = false,
-        headers = { ["Content-Type"] = "application/json" }
+        headers = { ["Accept"] = "application/json" }
     })
 
-    if not res then
-        ngx.log(ngx.ERR, "Failed to fetch JWKS: ", err)
+    if not res or res.status ~= 200 then
+        ngx.log(ngx.ERR, "Failed to fetch JWKS: ", err or ("HTTP " .. (res and res.status or "nil")))
         return nil
     end
 
-    if res.status ~= 200 then
-        ngx.log(ngx.ERR, "JWKS endpoint returned status: ", res.status)
+    local data = cjson.decode(res.body)
+    if not data or not data.keys then
+        ngx.log(ngx.ERR, "Invalid JWKS format")
         return nil
     end
 
-    local status, data = pcall(cjson.decode, res.body)
-    if not status then
-        ngx.log(ngx.ERR, "Failed to parse JWKS JSON")
-        return nil
+    -- Store each key by "jwk_kid:<kid>"
+    for _, key in ipairs(data.keys) do
+        if key.kid then
+            dict:safe_set("jwk_kid:" .. key.kid, cjson.encode(key), CACHE_TTL)
+        end
     end
 
-    -- Use the first key (simplify logic)
-    local key = data.keys and data.keys[1]
-    if not key or not key.n or not key.e then
-        ngx.log(ngx.ERR, "Invalid JWKS format: missing keys/n/e")
-        return nil
-    end
-
-    -- Convert JWK to PEM string manually
-    return jwk_to_pem(key.n, key.e)
+    return data.keys
 end
 
------------------------------------------------------
--- LOAD KEY (Module Level)
------------------------------------------------------
-local function get_pem_from_cache()
+local function get_jwk_by_kid(kid)
     local dict = ngx.shared[CACHE_DICT_NAME]
     if not dict then
-        ngx.log(ngx.ERR, "Shared dictionary '" .. CACHE_DICT_NAME .. "' not defined in nginx.conf")
+        ngx.log(ngx.ERR, "Shared dict '" .. CACHE_DICT_NAME .. "' not defined in nginx.conf")
         return nil
     end
 
-    -- Try get from cache first
-    local pem, _ = dict:get(CACHE_KEY)
-    if pem then
-        return pem
+    -- 1. Try Cache
+    local cached_json = dict:get("jwk_kid:" .. kid)
+    if cached_json then
+        return cjson.decode(cached_json)
     end
 
-    pem = get_jwks_pem()
+    -- 2. Cache miss / Key rotation: fetch latest JWKS
+    local keys = fetch_and_cache_jwks(dict)
+    if not keys then return nil end
 
-    -- Store in Cache (safe_set handles out-of-memory errors gracefully)
-    if pem then
-        local ok, err, forcible = dict:safe_set(CACHE_KEY, pem, CACHE_TTL)
-        if not ok then
-            ngx.log(ngx.ERR, "Failed to update cache: ", err)
+    for _, key in ipairs(keys) do
+        if key.kid == kid then
+            return key
         end
-        return pem
     end
 
     return nil
 end
 
-
-local PUBLIC_KEY_PEM = get_pem_from_cache()
-
 -----------------------------------------------------
--- Extract Auth cookie
+-- Map JWT alg claim to OpenSSL Digest
 -----------------------------------------------------
-local function get_jwt()
-    local jwt = ngx.var.cookie_Auth
-    if not jwt then
-        ngx.log(ngx.ERR, "Auth cookie missing")
-        return nil
-    end
-    return jwt:gsub("%s+", "")
+local function get_digest_name(alg)
+    local map = {
+        RS256 = "SHA256",
+        RS384 = "SHA384",
+        RS512 = "SHA512"
+    }
+    return map[alg]
 end
 
 -----------------------------------------------------
--- Verify RS256 JWT
+-- Verify JWT
 -----------------------------------------------------
-local function verify_jwt(jwt)
-    if not PUBLIC_KEY_PEM then
-        -- For now, just fail.
-        ngx.log(ngx.ERR, "Public Key is missing (Fetch failed)")
-        return false, nil
-    end
-
-    local header_b64, payload_b64, sig_b64 =
-        jwt:match("^([^.]+)%.([^.]+)%.([^.]+)$")
-
+local function verify_jwt(jwt_str)
+    local header_b64, payload_b64, sig_b64 = jwt_str:match("^([^.]+)%.([^.]+)%.([^.]+)$")
     if not header_b64 or not payload_b64 or not sig_b64 then
-        ngx.log(ngx.ERR, "JWT split failed")
-        return false, nil
+        return false, "Malformed JWT structure"
     end
 
-    local signature = b64url_decode(sig_b64)
-    if not signature then return false end
+    -- 1. Decode Header (to get 'kid' and 'alg')
+    local header_json = b64url_decode(header_b64)
+    local header = header_json and cjson.decode(header_json)
+    if not header or not header.kid or not header.alg then
+        return false, "Missing 'kid' or 'alg' in token header"
+    end
 
-    local signing_input = header_b64 .. "." .. payload_b64
+    local hash_algo = get_digest_name(header.alg)
+    if not hash_algo then
+        return false, "Unsupported algorithm: " .. tostring(header.alg)
+    end
 
-    local pub, err = pkey.new(PUBLIC_KEY_PEM)
+    -- 2. Retrieve Matching JWK
+    local jwk = get_jwk_by_kid(header.kid)
+    if not jwk then
+        return false, "No matching public key found for kid: " .. header.kid
+    end
+
+    -- 3. Construct Public Key directly using lua-resty-openssl
+    local pub, err = pkey.new(jwk)
     if not pub then
-        ngx.log(ngx.ERR, "Cannot load public key: ", err)
-        return false, nil
+        return false, "Failed to parse JWK into pkey: " .. tostring(err)
     end
 
-    local d = digest.new("SHA256")
-    d:update(signing_input)
+    -- 4. Verify Signature
+    local signature = b64url_decode(sig_b64)
+    if not signature then
+        return false, "Failed to decode signature"
+    end
 
-    local ok, err = pub:verify(signature, d)
+    local d = digest.new(hash_algo)
+    d:update(header_b64 .. "." .. payload_b64)
+
+    local ok, verify_err = pub:verify(signature, d)
     if not ok then
-        ngx.log(ngx.ERR, "Signature verification FAILED: ", err)
-        return false, nil
+        return false, "Signature verification failed: " .. tostring(verify_err)
     end
 
-    -- Decode the payload to extract claims
-    local payload_raw = b64url_decode(payload_b64)
-    if not payload_raw then
-        ngx.log(ngx.ERR, "Failed to decode payload")
-        return false, nil
+    -- 5. Decode & Validate Payload Claims
+    local payload_json = b64url_decode(payload_b64)
+    local payload = payload_json and cjson.decode(payload_json)
+    if not payload then
+        return false, "Failed to decode payload JSON"
     end
 
-    local status, payload = pcall(cjson.decode, payload_raw)
-    if not status then
-        ngx.log(ngx.ERR, "Failed to parse payload JSON")
-        return false, nil
+    -- Check Expiration ('exp')
+    local now = ngx.time()
+    if payload.exp and payload.exp < now then
+        return false, "Token has expired"
+    end
+
+    -- Check Not Before ('nbf')
+    if payload.nbf and payload.nbf > now then
+        return false, "Token is not active yet"
     end
 
     return true, payload
 end
 
 -----------------------------------------------------
--- ENTRY POINT
+-- Entry Point
 -----------------------------------------------------
-local jwt_str = get_jwt()
-if not jwt_str then
+local raw_jwt = ngx.var.cookie_Auth
+if not raw_jwt then
+    ngx.status = 401
+    ngx.say('{"error": "unauthorized", "message": "Missing Auth cookie"}')
     return ngx.exit(401)
 end
 
-local ok, payload = verify_jwt(jwt_str)
-if not ok then
+local jwt_str = raw_jwt:gsub("%s+", "")
+local valid, result = verify_jwt(jwt_str)
+
+if not valid then
+    ngx.log(ngx.WARN, "JWT validation failed: ", result)
+    ngx.status = 401
+    ngx.say('{"error": "unauthorized", "message": "' .. result .. '"}')
     return ngx.exit(401)
 end
 
-ngx.log(ngx.INFO, "Signature verification PASSED")
-
--- Extract the subject (userId)
-local user_id = payload.sub
+-- Validate user ID
+local user_id = result.sub
 if not user_id then
-    ngx.log(ngx.ERR, "JWT missing 'sub' claim")
+    ngx.status = 403
+    ngx.say('{"error": "forbidden", "message": "Missing sub claim"}')
     return ngx.exit(403)
 end
 
--- Export to NGINX variable so the location block can use it
+-- Export variable for downstream proxy_pass
 ngx.var.jwt_user_id = user_id
