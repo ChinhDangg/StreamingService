@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.authservice.entity;
 
+import dev.chinh.streamingservice.authservice.constant.Role;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

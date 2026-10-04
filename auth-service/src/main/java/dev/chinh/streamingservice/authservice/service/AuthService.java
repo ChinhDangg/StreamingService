@@ -1,6 +1,6 @@
 package dev.chinh.streamingservice.authservice.service;
 
-import dev.chinh.streamingservice.authservice.entity.Role;
+import dev.chinh.streamingservice.authservice.constant.Role;
 import dev.chinh.streamingservice.authservice.entity.User;
 import dev.chinh.streamingservice.authservice.repository.UserRepository;
 import dev.chinh.streamingservice.authservice.user.SecurityUser;

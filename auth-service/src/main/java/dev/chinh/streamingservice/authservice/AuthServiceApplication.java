@@ -1,6 +1,6 @@
 package dev.chinh.streamingservice.authservice;
 
-import dev.chinh.streamingservice.authservice.entity.Role;
+import dev.chinh.streamingservice.authservice.constant.Role;
 import dev.chinh.streamingservice.authservice.service.AuthService;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemWriter;
