@@ -1,7 +1,9 @@
 package dev.chinh.streamingservice.search.serve.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import dev.chinh.streamingservice.search.serve.data.MediaDisplayContent;import dev.chinh.streamingservice.search.serve.service.MediaDisplayService;import lombok.RequiredArgsConstructor;
+import dev.chinh.streamingservice.search.serve.data.MediaDisplayContent;import dev.chinh.streamingservice.search.serve.service.MediaDisplayService;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,8 +19,10 @@ public class MediaDisplayController {
 
     @GetMapping("/content/{id}")
     public ResponseEntity<MediaDisplayContent> getMediaDisplayContent(@PathVariable long id,
+                                                                      HttpServletRequest request,
                                                                       @AuthenticationPrincipal Jwt jwt) throws Exception {
-        return ResponseEntity.ok().body(mediaDisplayService.getMediaContentInfo(jwt.getSubject(), id));
+        boolean originalResolution = request.getHeader("X-Original-Resolution") != null;
+        return ResponseEntity.ok().body(mediaDisplayService.getMediaContentInfo(jwt.getSubject(), id, originalResolution));
     }
 
     @GetMapping("/grouper/content/{id}")

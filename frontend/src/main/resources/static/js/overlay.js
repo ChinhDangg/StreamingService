@@ -60,7 +60,7 @@ async function displayContentPageForOverlay(mediaType, mediaId, mediaInfo = null
         overlayWrapper.innerHTML = '';
         overlayWrapper.appendChild(node);
         if (previousQuickViewMediaId !== null && previousQuickViewMediaId !== mediaId) {
-            mod.initialize(mediaId, mediaInfo);
+            mod.initialize(mediaId, mediaInfo, true);
             previousQuickViewMediaId = mediaId;
             openOverlay(true);
         } else {

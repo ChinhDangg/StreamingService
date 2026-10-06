@@ -1,7 +1,8 @@
 import {initializeHeader, setAlertStatus} from "/static/js/header.js";
 import {setVideoResolution, pollPlaylistUrl, requestVideoPartial, setVideoUrl} from "/static/js/set-video-url.js";
-import { displayContentInfo, helperCloneAndUnHideNode } from "/static/js/metadata-display.js";
+import {displayContentInfo, helperCloneAndUnHideNode} from "/static/js/metadata-display.js";
 import {apiRequest, setMediaId, setMediaLength} from "/static/js/common.js";
+import {getResolutionSetting, getResolutionSettingAsHeader} from "/static/js/setting/get-setting.js";
 
 let albumId = null;
 const BATCH_SIZE = 25;
@@ -26,7 +27,7 @@ let isShowingNextFullScreen = false;
 
 let previousVideoWrapper = null;
 
-export async function initialize(id = null, albumInfo = null) {
+export async function initialize(id = null, albumInfo = null, extra) {
     if (id) albumId = id;
     else {
         const queryString = window.location.search;
@@ -49,7 +50,7 @@ export async function initialize(id = null, albumInfo = null) {
 
     albumResUrlMap.clear();
     albumUrlPageMap.clear();
-    currentAlbumResolution = Object.keys(RESOLUTION)[3];
+    currentAlbumResolution = getResolutionSetting() ? Object.keys(RESOLUTION)[0] : Object.keys(RESOLUTION)[3];
 
     currentFullScreen = null;
     isShowingNextFullScreen = false;
@@ -67,7 +68,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
 async function displayAlbumInfo(albumId, albumInfo = null) {
     if (!albumInfo) {
-        const response = await apiRequest(`/api/media/content/${albumId}`);
+        const response = await apiRequest(`/api/media/content/${albumId}`, {
+            headers: getResolutionSettingAsHeader()
+        });
         if (!response.ok) {
             alert("Failed to fetch album info");
             return;

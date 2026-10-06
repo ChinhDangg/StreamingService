@@ -2,6 +2,7 @@ import { initializeHeader } from "/static/js/header.js";
 import { displayContentInfo, helperCloneAndUnHideNode} from "/static/js/metadata-display.js";
 import { quickViewContentInOverlay } from "/static/js/overlay.js";
 import {apiRequest, setMediaId} from "/static/js/common.js";
+import {getResolutionSettingAsHeader} from "/static/js/setting/get-setting.js";
 
 async function initialize() {
     const queryString = window.location.search;
@@ -25,7 +26,9 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 async function displayAlbumGrouperInfo(albumGrouperId) {
-    const response = await apiRequest(`/api/media/content/${albumGrouperId}`);
+    const response = await apiRequest(`/api/media/content/${albumGrouperId}`, {
+        headers: getResolutionSettingAsHeader()
+    });
     if (!response.ok) {
         alert("Failed to fetch album grouper info");
         return;

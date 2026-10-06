@@ -3,13 +3,14 @@ import {
     setVideoResolution,
     requestVideoPartial
 } from "/static/js/set-video-url.js";
-import { displayContentInfo } from "/static/js/metadata-display.js";
+import {displayContentInfo} from "/static/js/metadata-display.js";
 import {apiRequest, setMediaId, setMediaLength} from "/static/js/common.js";
+import {getResolutionSetting, getResolutionSettingAsHeader} from "/static/js/setting/get-setting.js";
 
 const container = document.querySelector('[data-player="videoPlayerContainer"]');
 container.dataset.player = 'videoPagePlayerContainer';
 
-export async function initialize(videoId = null, videoInfo = null) {
+export async function initialize(videoId = null, videoInfo = null, startPlaying = false) {
     if (!videoId) {
         const queryString = window.location.search;
         const urlParams = new URLSearchParams(queryString);
@@ -24,7 +25,7 @@ export async function initialize(videoId = null, videoInfo = null) {
     setMediaId(Number.parseInt(videoId));
 
     await Promise.all([
-        displayVideoInfo(videoId, videoInfo),
+        displayVideoInfo(videoId, videoInfo, true, startPlaying),
     ]);
 }
 
@@ -33,9 +34,11 @@ window.addEventListener('DOMContentLoaded', () => {
     initialize();
 });
 
-async function displayVideoInfo(videoId, videoInfo = null) {
+async function displayVideoInfo(videoId, videoInfo = null, restart = true, startPlaying = false) {
     if (!videoInfo) {
-        const response = await apiRequest(`/api/media/content/${videoId}`);
+        const response = await apiRequest(`/api/media/content/${videoId}`, {
+            headers: getResolutionSettingAsHeader()
+        });
         if (!response.ok) {
             alert("Failed to fetch video info");
             return;
@@ -76,18 +79,21 @@ async function displayVideoInfo(videoId, videoInfo = null) {
     const videoMainContainer = document.getElementById('main-video-container');
     displayContentInfo(videoInfo, videoMainContainer);
     const originalRes = videoInfo.width > videoInfo.height ? videoInfo.height : videoInfo.width;
-    await getVideoUrl(videoId, originalRes);
+    await getVideoUrl(videoId, originalRes, restart, startPlaying);
 }
 
-async function getVideoUrl(videoId, originalRes) {
+async function getVideoUrl(videoId, originalRes, restart, startPlaying) {
     const baseUrl = `/api/videos/partial/${videoId}`;
     let defaultRes = 'p' + (originalRes > 480 ? 480 : originalRes);
-    const fetchUrl = baseUrl + "/" + defaultRes;
+    let fetchUrl = baseUrl + "/" + defaultRes;
+    const isOriginalSetting = getResolutionSetting();
+    if (isOriginalSetting)
+        fetchUrl = `/api/videos/original/${videoId}`;
     const container = document.querySelector('[data-player="videoPagePlayerContainer"]');
-    const requestMessage = await requestVideoPartial(fetchUrl, container);
+    const requestMessage = await requestVideoPartial(fetchUrl, container, restart, startPlaying);
     if (requestMessage !== null) {
         setAlertStatus(requestMessage);
         return;
     }
-    setVideoResolution(container, baseUrl, originalRes, defaultRes);
+    setVideoResolution(container, baseUrl, originalRes, isOriginalSetting ? originalRes : defaultRes);
 }

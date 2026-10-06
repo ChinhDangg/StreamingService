@@ -24,28 +24,26 @@ public class NameEntityService {
     private final MinIOService minIOService;
     private final OpenSearchSearchService searchService;
     private final ObjectMapper objectMapper;
-
-    @Value("${always-show-original-resolution}")
-    private String alwaysShowOriginalResolution;
     private final int pageSize = 20;
 
-    public Page<NameEntityDTO> findAllAuthors(String userId, int page, SortBy sortBy, SortOrder sortOrder) {
-        return mapInfo(userId, page, searchMatchAll(ContentMetaData.AUTHORS, userId, page, sortBy, sortOrder), false);
+    public Page<NameEntityDTO> findAllAuthors(String userId, int page, SortBy sortBy, SortOrder sortOrder, boolean originalResolution) {
+        return mapInfo(userId, page, searchMatchAll(ContentMetaData.AUTHORS, userId, page, sortBy, sortOrder), false, originalResolution);
     }
 
-    public Page<NameEntityDTO> findAllCharacters(String userId, int page, SortBy sortBy, SortOrder sortOrder) {
-        return mapInfo(userId, page, searchMatchAll(ContentMetaData.CHARACTERS, userId, page, sortBy, sortOrder), true);
+    public Page<NameEntityDTO> findAllCharacters(String userId, int page, SortBy sortBy, SortOrder sortOrder, boolean originalResolution) {
+        return mapInfo(userId, page, searchMatchAll(ContentMetaData.CHARACTERS, userId, page, sortBy, sortOrder), true, originalResolution);
     }
 
-    public Page<NameEntityDTO> findAllUniverses(String userId, int page, SortBy sortBy, SortOrder sortOrder) {
-        return mapInfo(userId, page, searchMatchAll(ContentMetaData.UNIVERSES, userId, page, sortBy, sortOrder), true);
+    public Page<NameEntityDTO> findAllUniverses(String userId, int page, SortBy sortBy, SortOrder sortOrder, boolean originalResolution) {
+        return mapInfo(userId, page, searchMatchAll(ContentMetaData.UNIVERSES, userId, page, sortBy, sortOrder), true, originalResolution);
     }
 
-    public Page<NameEntityDTO> findAllTags(String userId, int page, SortBy sortBy, SortOrder sortOrder) {
-        return mapInfo(userId, page, searchMatchAll(ContentMetaData.TAGS, userId, page, sortBy, sortOrder), false);
+    public Page<NameEntityDTO> findAllTags(String userId, int page, SortBy sortBy, SortOrder sortOrder, boolean originalResolution) {
+        return mapInfo(userId, page, searchMatchAll(ContentMetaData.TAGS, userId, page, sortBy, sortOrder), false, originalResolution);
     }
 
-    private Page<NameEntityDTO> mapInfo(String userId, int page, SearchResponse<Object> searchResponse, boolean hasThumbnail) {
+    private Page<NameEntityDTO> mapInfo(String userId, int page, SearchResponse<Object> searchResponse,
+                                        boolean hasThumbnail, boolean originalResolution) {
         int size = searchResponse.hits().hits().size();
         if (size == 0)
             return new PageImpl<>(new ArrayList<>(), PageRequest.of(page, pageSize), 0);
@@ -56,7 +54,7 @@ public class NameEntityService {
             nameEntries.add(nameEntry);
         }
         if (hasThumbnail) {
-            if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
+            if (originalResolution) {
                 nameEntries.forEach(nameEntry -> {
                     try {
                         nameEntry.setThumbnail(minIOService.getObjectUrl(ContentMetaData.THUMBNAIL_BUCKET, ContentMetaData.removeUserIdDirFromObjectKey(userId, nameEntry.getThumbnail())));

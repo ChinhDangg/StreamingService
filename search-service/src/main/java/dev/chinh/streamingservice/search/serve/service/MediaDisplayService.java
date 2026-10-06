@@ -15,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import org.opensearch.client.opensearch.core.SearchResponse;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.*;
 import org.springframework.data.redis.core.*;
 import org.springframework.http.HttpHeaders;
@@ -46,9 +45,6 @@ public class MediaDisplayService {
     private final GrouperMetadataRepository grouperMetadataRepository;
     private final MediaGroupInfoRepository mediaGroupInfoRepository;
 
-    @Value("${always-show-original-resolution}")
-    private String alwaysShowOriginalResolution;
-
     public record GroupSlice(
             List<Long> content,
             int page,
@@ -56,12 +52,12 @@ public class MediaDisplayService {
             boolean hasNext
     ) {}
 
-    public MediaDisplayContent getMediaContentInfo(String userId, long mediaId) throws Exception {
+    public MediaDisplayContent getMediaContentInfo(String userId, long mediaId, boolean originalResolution) throws Exception {
         MediaSearchItem mediaItem = getMediaSearchItem(userId, mediaId);
 
         MediaDisplayContent mediaDisplayContent = mediaMapper.mapDescription(mediaItem);
         if (mediaItem.hasThumbnail()) {
-            if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
+            if (originalResolution) {
                 String thumbnailBucket = mediaItem.getMediaType() == MediaType.ALBUM ? mediaItem.getBucket() : ContentMetaData.THUMBNAIL_BUCKET;
                 mediaDisplayContent.setThumbnail(minIOService.getObjectUrl(thumbnailBucket, ContentMetaData.removeUserIdDirFromObjectKey(userId, mediaItem.getThumbnail())));
             } else {
@@ -73,11 +69,7 @@ public class MediaDisplayService {
         if (mediaItem.isGrouper()) {
             GroupSlice mediaIds = getNextGroupOfMedia(userId, mediaId, 0, Sort.Direction.DESC);
             mediaDisplayContent.setChildMediaIds(mediaIds);
-//            mediaDisplayContent.setMediaType(MediaType.GROUPER);
         }
-//        else {
-//            mediaDisplayContent.setMediaType(mediaItem.getMediaType());
-//        }
         return mediaDisplayContent;
     }
 

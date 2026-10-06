@@ -15,7 +15,7 @@ services: # docker compose -f compose.mac.dev.yml --env-file .env.dev -p ss-dev 
     command: server /data --console-address ":9001"
 
   minio-init:
-    image: minio/mc
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
     container_name: ${PREFIX_NAME}-minio-init
     depends_on:
       - minio
@@ -74,7 +74,7 @@ services: # docker compose -f compose.mac.dev.yml --env-file .env.dev -p ss-dev 
 
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:3.3.0
-    container_name: opensearch-dashboards
+    container_name: ${PREFIX_NAME}-opensearch-dashboards
     ports:
       - "127.0.0.1:5601:5601"
     environment:

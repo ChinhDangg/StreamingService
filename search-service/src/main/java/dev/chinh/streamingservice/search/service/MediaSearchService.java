@@ -11,7 +11,6 @@ import org.apache.coyote.BadRequestException;
 import org.opensearch.client.opensearch._types.SortOrder;
 import org.opensearch.client.opensearch.core.SearchResponse;
 import org.opensearch.client.opensearch.core.search.Hit;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -29,11 +28,9 @@ public class MediaSearchService {
     public static final String MEDIA_INDEX_NAME = "media";
     private final MinIOService minIOService;
 
-    @Value("${always-show-original-resolution}")
-    private String alwaysShowOriginalResolution;
-
     public MediaSearchResult advanceSearch(String userId, MediaSearchRequest request, int page, int size,
-                                           SortBy sortBy, SortOrder sortOrder) throws Exception {
+                                           SortBy sortBy, SortOrder sortOrder,
+                                           boolean originalResolution) throws Exception {
         checkMaxPage(page);
         boolean hasAnyField = request.hasAny();
         if (!hasAnyField) {
@@ -53,9 +50,9 @@ public class MediaSearchService {
 
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 userId, searchService.advanceSearch(Long.parseLong(userId), MEDIA_INDEX_NAME, includes, excludes, request.getRangeFields(), page, size, sortBy, sortOrder),
-                page, size);
+                page, size, originalResolution);
 
-        if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
+        if (!originalResolution)
             thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
         mediaSearchCacheService.cacheMediaSearchItems(userId, mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
@@ -79,16 +76,17 @@ public class MediaSearchService {
     }
 
     public MediaSearchResult search(String userId, String searchString, int page, int size, SortBy sortBy,
-                                    SortOrder sortOrder) throws Exception {
+                                    SortOrder sortOrder,
+                                    boolean originalResolution) throws Exception {
         checkMaxPage(page);
         if (!MediaSearchField.validateSearchString(searchString)) {
             throw new IllegalArgumentException("Invalid search string");
         }
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 userId, searchService.search(Long.parseLong(userId), MEDIA_INDEX_NAME, searchString, page, size, sortBy, sortOrder),
-                page, size);
+                page, size, originalResolution);
 
-        if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
+        if (!originalResolution)
             thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
 
         mediaSearchCacheService.cacheMediaSearchItems(userId, mapSearchResult.searchItems);
@@ -96,26 +94,29 @@ public class MediaSearchService {
     }
 
     public MediaSearchResult searchByKeywords(String userId, String field, List<Object> keywords, boolean matchAll, int page, int size,
-                                              SortBy sortBy, SortOrder sortOrder) throws Exception {
+                                              SortBy sortBy, SortOrder sortOrder,
+                                              boolean originalResolution) throws Exception {
         checkMaxPage(page);
         ContentMetaData.validateSearchFieldName(field);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
                 userId, searchService.searchTermByOneField(Long.parseLong(userId), MEDIA_INDEX_NAME, field + "." + ContentMetaData.ID, keywords, matchAll, page, size, sortBy, sortOrder),
-                page, size);
+                page, size, originalResolution);
 
-        if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
+        if (!originalResolution)
             thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
 
         mediaSearchCacheService.cacheMediaSearchItems(userId, mapSearchResult.searchItems);
         return mapSearchResult.searchResult;
     }
 
-    public MediaSearchResult searchMatchAll(String userId, int page, int size, SortBy sortBy, SortOrder sortOrder) throws Exception {
+    public MediaSearchResult searchMatchAll(String userId, int page, int size, SortBy sortBy, SortOrder sortOrder,
+                                            boolean originalResolution) throws Exception {
         checkMaxPage(page);
         MapSearchResult mapSearchResult = mapResponseToMediaSearchResult(
-                userId, searchService.searchMatchAll(MEDIA_INDEX_NAME, Long.parseLong(userId), page, size, sortBy, sortOrder), page, size);
+                userId, searchService.searchMatchAll(MEDIA_INDEX_NAME, Long.parseLong(userId), page, size, sortBy, sortOrder),
+                page, size, originalResolution);
 
-        if (!Boolean.parseBoolean(alwaysShowOriginalResolution))
+        if (!originalResolution)
             thumbnailService.processThumbnails(userId, mapSearchResult.searchItems);
 
         mediaSearchCacheService.cacheMediaSearchItems(userId, mapSearchResult.searchItems);
@@ -132,14 +133,15 @@ public class MediaSearchService {
             Collection<MediaSearchItem> searchItems
     ) {}
 
-    private MapSearchResult mapResponseToMediaSearchResult(String userId, SearchResponse<Object> response, int page, int size) {
+    private MapSearchResult mapResponseToMediaSearchResult(String userId, SearchResponse<Object> response, int page, int size,
+                                                           boolean originalResolution) {
         List<MediaSearchItem> items = new ArrayList<>();
         List<MediaSearchItemResponse> itemResponses = new ArrayList<>();
         for (Hit<Object> hit : response.hits().hits()) {
             MediaSearchItem searchItem = mapper.convertValue(hit.source(), MediaSearchItem.class);
             items.add(searchItem);
             MediaSearchItemResponse itemResponse = mediaMapper.map(searchItem);
-            if (Boolean.parseBoolean(alwaysShowOriginalResolution)) {
+            if (originalResolution) {
                 itemResponse.setThumbnail(searchItem.hasThumbnail()
                         ? minIOService.getObjectUrl(ContentMetaData.THUMBNAIL_BUCKET, ContentMetaData.removeUserIdDirFromObjectKey(userId, searchItem.getThumbnail()))
                         : null);

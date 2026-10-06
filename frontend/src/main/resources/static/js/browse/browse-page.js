@@ -1,6 +1,7 @@
-import { initializeHeader, helperCloneAndUnHideNode} from "/static/js/header.js";
-import { displayPagination } from "/static/js/pagination.js";
+import {initializeHeader, helperCloneAndUnHideNode} from "/static/js/header.js";
+import {displayPagination} from "/static/js/pagination.js";
 import {apiRequest} from "/static/js/common.js";
+import {getResolutionSettingAsHeader} from "/static/js/setting/get-setting.js";
 
 const NameEntry = Object.freeze({
     Characters: 'characters',
@@ -124,7 +125,9 @@ function getSortOrderText(order) {
 async function fetchNameItems(nameEntry, p, by, order, pushtoHistory = true, nameItems = null) {
     if (!nameItems) {
         const urlParams = new URLSearchParams({p, by, order});
-        const response = await apiRequest(`/api/search/name/${nameEntry}?${urlParams}`);
+        const response = await apiRequest(`/api/search/name/${nameEntry}?${urlParams}`, {
+            headers: getResolutionSettingAsHeader()
+        });
         if (!response.ok) {
             alert("Failed to fetch name items");
             return false;

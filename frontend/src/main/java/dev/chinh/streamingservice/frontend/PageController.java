@@ -47,6 +47,11 @@ public class PageController {
     }
 
 
+    @GetMapping("/setting")
+    public String settingPage() {
+        return "setting/setting-page";
+    }
+
     @GetMapping("/modify/name")
     public String modifyNamePage() {
         return "upload/modify-name-page";

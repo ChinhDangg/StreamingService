@@ -8,6 +8,7 @@ import {
 } from "/static/js/header.js";
 import {closeOverlay, quickViewContentInOverlay} from "/static/js/overlay.js";
 import {apiRequest} from "/static/js/common.js";
+import {getResolutionSettingAsHeader} from "/static/js/setting/get-setting.js";
 
 const SORT_BY = Object.freeze({
     Upload: 'UPLOAD_DATE',
@@ -620,7 +621,8 @@ async function sendSearchRequest(searchType, page, sortBy, sortOrder,
 
 async function requestMatchAllSearch(page, sortBy, sortOrder) {
     const response = await apiRequest(getMatchAllSearchUrl(page, sortBy, sortOrder), {
-        method: 'POST'
+        method: 'POST',
+        headers: getResolutionSettingAsHeader()
     });
     if (!response.ok) {
         setAlertStatus('Search Match All Failed', await response.text());
@@ -632,7 +634,8 @@ async function requestMatchAllSearch(page, sortBy, sortOrder) {
 
 async function requestSearch(searchString, page, sortBy, sortOrder) {
     const response = await apiRequest(getSearchUrl(SEARCH_TYPES.BASIC, page, sortBy, sortOrder, searchString), {
-        method: 'POST'
+        method: 'POST',
+        headers: getResolutionSettingAsHeader()
     });
     if (!response.ok) {
         setAlertStatus('Search Failed', await response.text());
@@ -644,7 +647,8 @@ async function requestSearch(searchString, page, sortBy, sortOrder) {
 
 async function requestKeywordSearch(field, valueList, keywordMatchAll, page, sortBy, sortOrder) {
     const response = await apiRequest(getSearchUrl(SEARCH_TYPES.KEYWORD, page, sortBy, sortOrder, null, field, valueList, keywordMatchAll), {
-        method: 'POST'
+        method: 'POST',
+        headers: getResolutionSettingAsHeader()
     });
     if (!response.ok) {
         setAlertStatus('Search Keyword Failed', await response.text());
@@ -664,7 +668,8 @@ async function requestAdvanceSearch(advanceRequestBody, page, sortBy, sortOrder)
     const response = await apiRequest(advanceSearchUrl, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            ...getResolutionSettingAsHeader()
         },
         body: JSON.stringify(advanceRequestBody)
     });

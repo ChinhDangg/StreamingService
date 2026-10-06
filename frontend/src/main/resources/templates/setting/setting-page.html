@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings & Preferences</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar styling for slick dark theme */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+    </style>
+</head>
+<body class="h-full text-gray-200 antialiased bg-gray-900 flex flex-col min-h-screen">
+
+<div class="min-h-screen flex flex-col md:flex-row">
+    <!-- Sidebar Navigation -->
+    <aside class="w-full md:w-64 bg-gray-950/70 border-b md:border-b-0 md:border-r border-gray-800/80 p-5 flex flex-col justify-between shrink-0 backdrop-blur-md">
+        <div>
+            <!-- Logo / Brand Header -->
+            <div class="flex items-center gap-3 px-2 py-3 mb-6">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="font-bold text-white tracking-tight text-base leading-tight">Control Center</h1>
+                    <p class="text-xs text-gray-400">Workspace Settings</p>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <nav class="space-y-1">
+                <a href="#security" class="sidebar-link active flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-white bg-gray-800/90 shadow-sm border border-gray-700/40">
+                    <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    Account
+                </a>
+            </nav>
+        </div>
+
+        <!-- Quick Reset & Action Footer -->
+        <div class="mt-8 pt-4 border-t border-gray-800/60">
+            <button id="resetAllBtn" class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-red-400 bg-gray-900 hover:bg-gray-800/80 border border-gray-800 transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Reset All Defaults
+            </button>
+        </div>
+    </aside>
+
+    <main class="flex-1 p-4 sm:p-6 md:p-10 max-w-5xl mx-auto w-full space-y-8">
+        <!-- Top Overview Bar -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-gray-800">
+            <div>
+                <h2 class="text-2xl font-bold text-white tracking-tight">System Settings</h2>
+            </div>
+
+            <!-- Global Feedback Toast Notification -->
+            <div id="toast" class="opacity-0 pointer-events-none transition-all duration-300 flex items-center gap-2 text-xs font-medium px-3.5 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span id="toastMsg">Preferences saved</span>
+            </div>
+        </div>
+
+        <section id="security" class="space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                        Account
+                    </h3>
+                    <p class="text-xs text-gray-400 mt-0.5">Account Preferences</p>
+                </div>
+                <span class="text-xs font-mono text-gray-500" data-category-count="security">1 switches</span>
+            </div>
+
+            <div class="bg-gray-800/50 border border-gray-800 rounded-xl divide-y divide-gray-800/80 shadow-sm overflow-hidden backdrop-blur-sm">
+                <!-- Item 1: Two Factor Authentication -->
+                <div class="p-4 sm:p-5 flex items-center justify-between gap-4 hover:bg-gray-800/70 transition-colors">
+                    <div class="space-y-1 pr-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-semibold text-gray-200">Enable Original Resolution</span>
+                            <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">Recommended</span>
+                        </div>
+                        <p class="text-xs text-gray-400">Original resolution of the media or using default.</p>
+                    </div>
+                    <button type="button" role="switch" aria-checked="true" data-setting-id="original_resolution" class="toggle-btn relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 bg-indigo-600">
+                        <span class="sr-only">Toggle Two-Factor Authentication</span>
+                        <span aria-hidden="true" class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-5"></span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Status Bar -->
+        <footer class="pt-6 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between text-xs text-gray-500 gap-4">
+            <p>All settings are automatically saved.</p>
+            <div class="flex items-center gap-2">
+                <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>System status: Normal</span>
+            </div>
+        </footer>
+    </main>
+</div>
+
+<script type="module" th:src="@{/static/js/setting/setting-page.js}" src="/static/js/setting/setting-page.js"></script>
+</body>
+</html>

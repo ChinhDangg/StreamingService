@@ -76,7 +76,7 @@ const RESOLUTION = Object.freeze({
 
 export function setVideoResolution(videoContainerNode, videoBaseUrlRequest, originalResolution, defaultRes) {
     const mainResButton = videoContainerNode.querySelector('.res-button');
-    mainResButton.textContent = RESOLUTION[defaultRes];
+    mainResButton.textContent = originalResolution === defaultRes ? 'Original' : RESOLUTION[defaultRes];
     const resMenu = videoContainerNode.querySelector('.res-menu');
     const resButtonTem = resMenu.querySelector('button');
     if (resButtonTem) resMenu.replaceChildren(resButtonTem);

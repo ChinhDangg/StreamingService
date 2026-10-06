@@ -171,8 +171,6 @@ services:
       - JPA_SHOW_SQL=${JPA_SHOW_SQL}
 
       - KAFKA_BOOTSTRAP_SERVER=${KAFKA_BOOTSTRAP_SERVER}
-
-      - ALWAYS_SHOW_ORIGINAL_RESOLUTION=${ALWAYS_SHOW_ORIGINAL_RESOLUTION}
     depends_on:
       opensearch:
         condition: service_healthy

@@ -4,7 +4,7 @@ import {
     currentMainFileItems,
     displayFileItem,
     getCurrentPath,
-    observeSentinel, setObserver, setObserverToFetchMore, unobserveSentinel, disconnectObserver
+    setObserverToFetchMore, unobserveSentinel, setPageObserver, setCurrentViewState, ViewState
 } from "/static/js/file-manager/file-manager-page.js";
 
 const searchForm = document.getElementById('search-form');
@@ -30,14 +30,6 @@ export function setIsInDeepSearch(deepSearch) {
     isInDeepSearch = deepSearch;
 }
 
-let isSearching = false;
-export function getIsSearching() {
-    return isSearching;
-}
-export function setIsSearching(searching) {
-    isSearching = searching;
-}
-
 async function searchFiles(searchTerm) {
     if (!searchTerm || searchTerm.length === 0) {
         clearSearch();
@@ -46,7 +38,7 @@ async function searchFiles(searchTerm) {
         isInDeepSearch = false;
         return;
     }
-    isSearching = true;
+    setCurrentViewState(ViewState.SEARCH);
     clearSearchButton.classList.remove('hidden');
     if (currentMainFileItems.getCurrentFilePage() === null && !recursiveToggle.checked) {
         console.log('searching locally');
@@ -57,10 +49,10 @@ async function searchFiles(searchTerm) {
         if (recursiveToggle.checked)
             isInDeepSearch = true;
         displayFileItem([], currentSearchFileItems,true, true, false);
-        unobserveSentinel();
-        setObserverToSearch(searchTerm);
+        // unobserveSentinel();
         await fetchSearchFiles(searchTerm, null);
-        observeSentinel();
+        setObserverToSearch(searchTerm);
+        // observeSentinel();
     }
 }
 
@@ -98,16 +90,15 @@ clearSearchButton.addEventListener("click", async function () {
 });
 
 export function clearSearch() {
-    isSearching = false;
     searchInput.value = '';
     clearSearchButton.classList.add('hidden');
+    setCurrentViewState(ViewState.NORMAL);
     setObserverToFetchMore();
     displayFileItem([], currentMainFileItems, true, false, false, true);
 }
 
 function setObserverToSearch(searchString) {
-    disconnectObserver();
-    const searchObserver = new IntersectionObserver(async (entries) => {
+    const entriesCallback = async (entries) => {
         if (entries[0].isIntersecting) {
             console.log('Intersecting in search');
             if (currentSearchFileItems.getCurrentFilePage() === null) {
@@ -116,6 +107,6 @@ function setObserverToSearch(searchString) {
             }
             await fetchSearchFiles(searchString, currentSearchFileItems.getCurrentFilePage());
         }
-    }, { rootMargin: '500px' });
-    setObserver(searchObserver);
+    }
+    setPageObserver(entriesCallback);
 }
