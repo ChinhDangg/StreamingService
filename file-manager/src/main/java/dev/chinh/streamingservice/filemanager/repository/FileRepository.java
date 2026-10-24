@@ -13,10 +13,10 @@ import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
-import org.springframework.data.mongodb.core.aggregation.AggregationUpdate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.data.mongodb.core.query.UpdateDefinition;
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
@@ -73,7 +73,7 @@ public class FileRepository {
 
 
     /// ----------- UPDATE
-    public UpdateResult updateFirstByIdAndUserId(String userId, String fileId, Update update) {
+    public UpdateResult updateFirstByIdAndUserId(String userId, String fileId, UpdateDefinition update) {
         Query query = new Query(Criteria
                 .where("id").is(fileId)
                 .and(FileItemField.USER_ID).is(Long.parseLong(userId)));
@@ -82,21 +82,21 @@ public class FileRepository {
         return result;
     }
 
-    public FileSystemItem findAndModifyById(String fileId, Update update) {
+    public FileSystemItem findAndModifyById(String fileId, UpdateDefinition update) {
         Query query = new Query(Criteria.where("id").is(fileId));
         var item = mongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), FileSystemItem.class);
         fileCacheService.invalidateFileCache(fileId);
         return item;
     }
 
-    public FileSystemItem findAndModify(Query query, FindAndModifyOptions options, Update update) {
+    public FileSystemItem findAndModify(Query query, FindAndModifyOptions options, UpdateDefinition update) {
         var item = mongoTemplate.findAndModify(query, update, options, FileSystemItem.class);
         if (item == null) return null;
         fileCacheService.invalidateFileCache(item.getId());
         return item;
     }
 
-    public void updateMulti(Collection<String> affectedIds, Query query, AggregationUpdate update) {
+    public void updateMulti(Collection<String> affectedIds, Query query, UpdateDefinition update) {
         mongoTemplate.updateMulti(query, update, FileSystemItem.class);
         fileCacheService.invalidateFileCache(affectedIds);
     }

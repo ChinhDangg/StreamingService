@@ -83,6 +83,24 @@ public class FileEventConsumer {
         }
     }
 
+    private void onMoveFilesToTrash(MediaUpdateEvent.FilesMovedToTrash event) {
+        log.info("Received files moved to trash event: {}", event.fileIds());
+        try {
+            fileEventConsumerService.handleMoveToTrash(event);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to move files to trash", e);
+        }
+    }
+
+    private void onMoveFilesOutOfTrash(MediaUpdateEvent.FilesMovedOutOfTrash event) {
+        log.info("Received files moved out of trash event: {}", event.fileIds());
+        try {
+            fileEventConsumerService.handleMoveOutOfTrash(event);
+        } catch (Exception e) {
+            throw  new RuntimeException("Failed to move files out of trash", e);
+        }
+    }
+
     private void onDeleteFile(MediaUpdateEvent.FileDeleted event) {
         log.info("Received file delete event: {}", event.fileId());
         try {
@@ -106,6 +124,8 @@ public class FileEventConsumer {
         try {
             switch (event) {
                 case MediaUpdateEvent.FileCreated e -> onCreateFile(e);
+                case MediaUpdateEvent.FilesMovedToTrash e -> onMoveFilesToTrash(e);
+                case MediaUpdateEvent.FilesMovedOutOfTrash e -> onMoveFilesOutOfTrash(e);
                 case MediaUpdateEvent.FileDeleted e -> onDeleteFile(e);
                 case MediaUpdateEvent.DirectoryToAlbumMediaInitiated e -> onDirectoryToAlbumMedia(e);
                 case MediaUpdateEvent.NestedDirectoryToGrouperMediaInitiated e -> onNestedDirectoryToGrouperMedia(e);
@@ -157,6 +177,10 @@ public class FileEventConsumer {
         switch (event) {
             case MediaUpdateEvent.FileCreated e ->
                     log.info("File DLQ: Received create file event: {}", e.objectName());
+            case MediaUpdateEvent.FilesMovedToTrash e ->
+                    log.info("File DLQ: Received files moved to trash event: {}", e.fileIds());
+            case MediaUpdateEvent.FilesMovedOutOfTrash e ->
+                    log.info("File DQL: Received files moved out of trash event: {}", e.fileIds());
             case MediaUpdateEvent.FileDeleted e ->
                     log.info("File DLQ: Received file delete event: {}", e.fileId());
             case MediaUpdateEvent.NestedDirectoryToGrouperMediaInitiated e ->

@@ -45,6 +45,17 @@ public class FileLockService {
 
     public FolderLocks checkIfFileItemInLock(Set<String> fileIds, Map<String, Set<FileStatus>> ignoredStatusMap) {
         if (fileIds.isEmpty()) return null;
+        Criteria criteria = getCheckIfFileItemInLockCriteriaHelper(fileIds, ignoredStatusMap);
+        return safeWriteMongoTemplate.findOne(new Query(criteria), FolderLocks.class);
+    }
+
+    public List<FolderLocks> checkIfFileItemsInLock(Set<String> fileIds, Map<String, Set<FileStatus>> ignoredStatusMap) {
+        if (fileIds.isEmpty()) return null;
+        Criteria criteria = getCheckIfFileItemInLockCriteriaHelper(fileIds, ignoredStatusMap);
+        return safeWriteMongoTemplate.find(new Query(criteria), FolderLocks.class);
+    }
+
+    public Criteria getCheckIfFileItemInLockCriteriaHelper(Set<String> fileIds, Map<String, Set<FileStatus>> ignoredStatusMap) {
         Criteria criteria = Criteria.where("id").in(fileIds);
         if (ignoredStatusMap != null && !ignoredStatusMap.isEmpty()) {
             List<Criteria> excludeCriteria = new ArrayList<>();
@@ -54,6 +65,6 @@ public class FileLockService {
             // "nor" ensures that none of these specific ID+Status pairs are returned
             criteria.norOperator(excludeCriteria.toArray(new Criteria[0]));
         }
-        return safeWriteMongoTemplate.findOne(new Query(criteria), FolderLocks.class);
+        return criteria;
     }
 }

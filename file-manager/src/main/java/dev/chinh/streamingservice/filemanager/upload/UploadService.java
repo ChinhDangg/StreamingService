@@ -8,7 +8,7 @@ import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.common.validation.FileSystemValidator;
 import dev.chinh.streamingservice.filemanager.event.FileEventProducer;
 import dev.chinh.streamingservice.filemanager.service.DirectoryCacheService;
-import dev.chinh.streamingservice.filemanager.service.FileService;
+import dev.chinh.streamingservice.filemanager.service.FileUtilService;
 import dev.chinh.streamingservice.filemanager.service.MinIOService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Size;
@@ -28,7 +28,7 @@ public class UploadService {
     private final StringRedisTemplate redisTemplate;
     private final ApplicationEventPublisher publisher;
 
-    private final FileService fileService;
+    private final FileUtilService fileUtilService;
     private final DirectoryCacheService directoryCacheService;
 
     private final ObjectUploadService objectUploadService;
@@ -53,7 +53,7 @@ public class UploadService {
         String validatedPath = validatedFile.validatedPath();
         String[] pathParts = validatedPath.split("/");
         int partLength = pathParts.length;
-        String parentId = fileService.getROOT_FOLDER_ID();
+        String parentId = fileUtilService.getROOT_FOLDER_ID();
         for (int i = 0; i < partLength-1; i++) {
             String dirId = directoryCacheService.getCachedElseDbDirectoryId(parentId, pathParts[i], userId, true);
             if (dirId == null) {
@@ -62,7 +62,7 @@ public class UploadService {
             parentId = dirId;
         }
 
-        boolean exists = fileService.itemWithNameExists(userId, parentId, pathParts[partLength-1]);
+        boolean exists = fileUtilService.itemWithNameExists(userId, parentId, pathParts[partLength-1]);
         if (exists) throw new IllegalArgumentException("File already exists: " + validatedPath);
         return initiateMultipartUploadRequest(userId, validatedPath);
     }

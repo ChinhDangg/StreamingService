@@ -9,6 +9,7 @@ import dev.chinh.streamingservice.common.data.ContentMetaData;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public interface MediaUpdateEvent {
 
@@ -256,8 +257,24 @@ public interface MediaUpdateEvent {
             String fileType
     ) implements MediaUpdateEvent {}
 
+    record FilesMovedToTrash(
+            String userId,
+            Set<String> fileIds
+    ) implements MediaUpdateEvent {}
+
+    record FilesMovedOutOfTrash(
+            String userId,
+            Set<String> fileIds
+    ) implements MediaUpdateEvent {}
+
+    record FilesMoved(
+            String userId,
+            List<FileMoved> fileMoves
+    ) implements MediaUpdateEvent {}
+
     record FileMoved(
             String fileId,
+            String newParentId,
             String oldPath,
             String newPath
     ) implements MediaUpdateEvent {}

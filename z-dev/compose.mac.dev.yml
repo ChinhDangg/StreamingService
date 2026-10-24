@@ -161,7 +161,7 @@ services: # docker compose -f compose.mac.dev.yml --env-file .env.dev -p ss-dev 
       MONGODB_AUTH_SOURCE: ${MONGODB_AUTH_SOURCE}
     volumes:
       - ${MONGODB_VOLUME}:/data/db
-      - atlas_config:/data/configdb
+      - /Volumes/RAMDISK/dev/atlas_config:/data/configdb
 
 
 #  # Metrics Storage (Prometheus)
@@ -229,7 +229,3 @@ services: # docker compose -f compose.mac.dev.yml --env-file .env.dev -p ss-dev 
 #      - GF_SMTP_PASSWORD=${GF_SMTP_PASSWORD}
 #      - GF_SMTP_FROM_ADDRESS=${GF_SMTP_USER}
 #      - GF_SMTP_FROM_NAME=Grafana Alerts
-
-
-volumes:
-  atlas_config:

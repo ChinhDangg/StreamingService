@@ -2,6 +2,8 @@ package dev.chinh.streamingservice.filemanager.constant;
 
 import dev.chinh.streamingservice.common.constant.MediaType;
 
+import java.util.List;
+
 public enum FileType {
     DIR, FILE, VIDEO, IMAGE, ALBUM, GROUPER;
 
@@ -25,5 +27,13 @@ public enum FileType {
 
     public static boolean isNotDir(FileType fileType) {
         return fileType != DIR && fileType != ALBUM && fileType != GROUPER;
+    }
+
+    public static List<FileType> getDirTypes() {
+        return List.of(DIR, ALBUM, GROUPER);
+    }
+
+    public static List<FileType> getFileTypes() {
+        return List.of(VIDEO, IMAGE, FILE);
     }
 }

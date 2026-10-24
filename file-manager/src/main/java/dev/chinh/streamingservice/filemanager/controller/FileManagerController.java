@@ -3,6 +3,7 @@ package dev.chinh.streamingservice.filemanager.controller;
 import dev.chinh.streamingservice.filemanager.service.FileFindService;
 import dev.chinh.streamingservice.filemanager.service.FileService;
 import dev.chinh.streamingservice.filemanager.constant.SortBy;
+import dev.chinh.streamingservice.filemanager.service.FileTrashService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -13,6 +14,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/file")
@@ -20,6 +23,7 @@ public class FileManagerController {
 
     private final FileService fileService;
     private final FileFindService fileFindService;
+    private final FileTrashService fileTrashService;
 
     @GetMapping("/root")
     public ResponseEntity<?> getRootDirectory(@RequestParam(required = false, name = "p") String pageCursor,
@@ -71,16 +75,33 @@ public class FileManagerController {
         return ResponseEntity.ok(fileService.addDirectoryAsGrouperMedia(jwt.getSubject(), fileId));
     }
 
+    @GetMapping("/trash")
+    public ResponseEntity<?> getTrash(@RequestParam(required = false, name = "p") String pageCursor,
+                                      @RequestParam(required = false, name = "by") SortBy sortBy,
+                                      @RequestParam(required = false, name = "order") Sort.Direction sortOrder,
+                                      @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(fileFindService.findFilesInTrash(jwt.getSubject(), pageCursor, sortBy, sortOrder));
+    }
+
+    @PostMapping("/trash")
+    public ResponseEntity<?> moveFilesToTrash(@RequestBody List<String> fileIds, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(fileTrashService.moveToTrash(jwt.getSubject(), fileIds));
+    }
+
+    @PostMapping("/restore")
+    public ResponseEntity<?> moveFilesOutOfTrash(@RequestBody List<String> fileIds, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(fileTrashService.moveOutOfTrash(jwt.getSubject(), fileIds));
+    }
 
     @DeleteMapping("/{fileId}")
     public ResponseEntity<?> deleteFile(@PathVariable String fileId, @AuthenticationPrincipal Jwt jwt) {
-        fileService.initiateDeleteFile(jwt.getSubject(), fileId);
+        fileTrashService.initiateDeleteFile(jwt.getSubject(), fileId);
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/media/{mediaId}")
     public ResponseEntity<?> deleteMedia(@PathVariable long mediaId, @AuthenticationPrincipal Jwt jwt) {
-        fileService.initiateDeleteMediaFile(jwt.getSubject(), mediaId);
+        fileTrashService.initiateDeleteMediaFile(jwt.getSubject(), mediaId);
         return ResponseEntity.ok().build();
     }
 

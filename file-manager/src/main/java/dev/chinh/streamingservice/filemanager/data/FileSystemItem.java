@@ -109,6 +109,9 @@ public class FileSystemItem {
     @Field("pageToken")
     private String pageToken;
 
+    @Field(FileItemField.OLD_PARENT_ID)
+    private String oldParentId; // for trash operation to keep track of the old parent for restoring
+
     public void setResolution(int w, int h) {
         this.resolution = new ResolutionInfo(w, h);
     }

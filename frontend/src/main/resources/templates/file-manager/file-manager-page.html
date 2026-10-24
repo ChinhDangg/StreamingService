@@ -232,7 +232,7 @@
             </svg>
         </button>
         <button id="upload-toggle-btn"
-                class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-2 rounded-md transition duration-200">
+                class="flex items-center gap-2 cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-2 rounded-md transition duration-200">
             <!-- Upload Icon (Heroicon SVG) -->
             <svg xmlns="http://www.w3.org/2000/svg"
                  class="h-5 w-5"
@@ -245,6 +245,15 @@
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4" />
             </svg>
             <span>Upload</span>
+        </button>
+        <button id="trash-btn" class="inline-flex items-center justify-center p-2 rounded-md cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white transition duration-200" aria-label="Delete">
+            <svg class="h-6 w-6"
+                 viewBox="14 16 28 25"
+                 fill="currentColor"
+                 xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd"
+                      d="M36 26v10.997c0 1.659-1.337 3.003-3.009 3.003h-9.981c-1.662 0-3.009-1.342-3.009-3.003v-10.997h16zm-2 0v10.998c0 .554-.456 1.002-1.002 1.002h-9.995c-.554 0-1.002-.456-1.002-1.002v-10.998h12zm-9-5c0-.552.451-1 .991-1h4.018c.547 0 .991.444.991 1 0 .552-.451 1-.991 1h-4.018c-.547 0-.991-.444-.991-1zm0 6.997c0-.551.444-.997 1-.997.552 0 1 .453 1 .997v6.006c0 .551-.444.997-1 .997-.552 0-1-.453-1-.997v-6.006zm4 0c0-.551.444-.997 1-.997.552 0 1 .453 1 .997v6.006c0 .551-.444.997-1 .997-.552 0-1-.453-1-.997v-6.006zm-6-5.997h-4.008c-.536 0-.992.448-.992 1 0 .556.444 1 .992 1h18.016c.536 0 .992-.448.992-1 0-.556-.444-1-.992-1h-4.008v-1c0-1.653-1.343-3-3-3h-3.999c-1.652 0-3 1.343-3 3v1z"/>
+            </svg>
         </button>
         <div class="px-2 py-2 w-fit text-sm text-gray-300 border-b border-gray-700">
             In: <span id="current-path">root</span>
@@ -616,6 +625,16 @@
         </li>
         <li class="my-1 border-t border-gray-700"></li>
         <li>
+            <button class="trash-file-btn flex w-full items-center px-4 py-2 text-red-400 transition hover:bg-red-500/10 hover:text-red-300">
+                Move to Trash
+            </button>
+        </li>
+        <li>
+            <button class="restore-file-btn flex w-full items-center px-4 py-2 text-red-400 transition hover:bg-red-500/10 hover:text-red-300">
+                Restore
+            </button>
+        </li>
+        <li>
             <button class="delete-file-btn flex w-full items-center px-4 py-2 text-red-400 transition hover:bg-red-500/10 hover:text-red-300">
                 Delete
             </button>
@@ -735,24 +754,3 @@
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

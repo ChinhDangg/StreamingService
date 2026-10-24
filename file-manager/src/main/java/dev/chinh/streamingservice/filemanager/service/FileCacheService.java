@@ -50,11 +50,15 @@ public class FileCacheService {
         // get, else compute, save, and return the result.
         if (getCachedFirst) {
             var item = fileCache.get(id, fetcher);
+            if (item == null)
+                return null;
             if (item.getUserId() == null || item.getUserId().toString().equals(userId))
                 return item;
             return null;
         }
         var item = fetcher.apply(id);
+        if (item == null)
+            return null;
         putFileCache(item);
         return item;
     }

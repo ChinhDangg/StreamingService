@@ -7,12 +7,11 @@ import dev.chinh.streamingservice.common.proto.FileServiceGrpc;
 import dev.chinh.streamingservice.filemanager.constant.SortBy;
 import dev.chinh.streamingservice.filemanager.data.FileSystemItem;
 import dev.chinh.streamingservice.filemanager.service.FileFindService;
-import dev.chinh.streamingservice.filemanager.service.FileService;
+import dev.chinh.streamingservice.filemanager.service.FileUtilService;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
 import net.devh.boot.grpc.server.service.GrpcService;
-import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
 
 import java.util.List;
@@ -21,12 +20,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FileGrpcService extends FileServiceGrpc.FileServiceImplBase {
 
-    private final FileService fileService;
     private final FileFindService fileFindService;
+    private final FileUtilService fileUtilService;
 
     @Override
     public void findFileByMId(FileRequest request, StreamObserver<FileResponse> responseObserver) {
-        FileSystemItem fileItem = fileService.findByMId(request.getUserId(), Long.parseLong(request.getId()));
+        FileSystemItem fileItem = fileUtilService.findByMId(request.getUserId(), Long.parseLong(request.getId()));
         if (fileItem == null) {
             responseObserver.onError(Status.NOT_FOUND
                             .withDescription("File was not found with mID: " + request.getId())

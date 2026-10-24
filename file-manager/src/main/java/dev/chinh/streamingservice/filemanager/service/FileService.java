@@ -1,7 +1,6 @@
 package dev.chinh.streamingservice.filemanager.service;
 
 import com.mongodb.client.result.UpdateResult;
-import dev.chinh.streamingservice.common.OSUtil;
 import dev.chinh.streamingservice.common.constant.MediaType;
 import dev.chinh.streamingservice.common.data.ContentMetaData;
 import dev.chinh.streamingservice.common.event.EventTopics;
@@ -31,8 +30,6 @@ import org.springframework.web.util.UriUtils;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
-import java.util.function.Predicate;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -43,17 +40,17 @@ public class FileService {
     private final FileRepository fileRepository;
     private final ApplicationEventPublisher publisher;
 
+    private final FileUtilService fileUtilService;
     private final FileCacheService fileCacheService;
     private final FileLockService fileLockService;
 
+    private final FileTrashService fileTrashService;
 
     public static final String MEDIA_PATH = ContentMetaData.MEDIA_BUCKET;
-    private static String ROOT_PATH = null;
-    private static String ROOT_FOLDER_ID = null;
 
 
     public String getFileObjectUrl(String userId, String fileId) {
-        var item = getFileSystemItem(userId, fileId, true);
+        var item = fileUtilService.getFileSystemItem(userId, fileId, true);
         if (!FileType.isNotDir(item.getFileType())) {
             throw new IllegalArgumentException("File is a directory");
         }
@@ -69,18 +66,18 @@ public class FileService {
     )
     @Transactional
     public String addFileAsVideoMedia(String userId, String fileId, String nameUpdateListAsJson) {
-        FileSystemItem item = getFileSystemItem(userId, fileId, true);
+        FileSystemItem item = fileUtilService.getFileSystemItem(userId, fileId, true);
         if (item.getFileType() != FileType.VIDEO) {
             throw new IllegalArgumentException("File is not a video");
         }
         if (item.getMId() != null && item.getMId() != 0) {
             throw new IllegalArgumentException("Item is already marked as video");
         }
-        Map<String, Set<FileStatus>> parentIgnoreStatus = getCommonIds(item.getPath()).stream()
+        Map<String, Set<FileStatus>> parentIgnoreStatus = fileUtilService.getCommonIds(item.getPath()).stream()
                 .collect(Collectors.toMap(key -> key, _ -> Set.of(FileStatus.BEING_MOVED_INTO)));
-        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
+        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(fileUtilService.getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
         if (folderIsLocked != null) {
-            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
+            throw new IllegalArgumentException(fileUtilService.getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
         }
 
         fileLockService.lockFileItem(userId, Set.of(item.getId()), Collections.emptyMap());
@@ -107,7 +104,7 @@ public class FileService {
     )
     @Transactional
     public String addDirectoryAsAlbumMedia(String userId, String fileId) {
-        FileSystemItem item = getFileSystemItem(userId, fileId, false);
+        FileSystemItem item = fileUtilService.getFileSystemItem(userId, fileId, false);
         if (item.getFileType() == FileType.ALBUM) {
             throw new IllegalArgumentException("Item is already an album");
         }
@@ -117,15 +114,15 @@ public class FileService {
         if (item.getMId() != null && item.getMId() != 0) {
             throw new IllegalArgumentException("Item is already marked as media");
         }
-        Map<String, Set<FileStatus>> parentIgnoreStatus = getCommonIds(item.getPath()).stream()
+        Map<String, Set<FileStatus>> parentIgnoreStatus = fileUtilService.getCommonIds(item.getPath()).stream()
                 .collect(Collectors.toMap(key -> key, _ -> Set.of(FileStatus.BEING_MOVED_INTO)));
-        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
+        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(fileUtilService.getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
         if (folderIsLocked != null) {
-            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
+            throw new IllegalArgumentException(fileUtilService.getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
         }
 
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
-        List<FileSystemItem> items = getItemInIds(getCommonIds(item.getPath()), true, criteria, f -> f.getFileType() == FileType.ALBUM);
+        List<FileSystemItem> items = fileUtilService.getItemInIds(fileUtilService.getCommonIds(item.getPath()), true, criteria, f -> f.getFileType() == FileType.ALBUM);
         if (!items.isEmpty()) {
             throw new IllegalArgumentException("Has parent as album - cannot have album in an album");
         }
@@ -133,7 +130,7 @@ public class FileService {
         fileLockService.lockFileItem(userId, Set.of(item.getId()), Collections.emptyMap());
         fileCacheService.invalidateFileCache(item.getId());
 
-        FileSystemItem parent = getFileSystemItem(userId, item.getParentId(), true);
+        FileSystemItem parent = fileUtilService.getFileSystemItem(userId, item.getParentId(), true);
         boolean parentIsGrouper = parent.getFileType() == FileType.GROUPER;
 
         publisher.publishEvent(new FileEventProducer.EventWrapper(
@@ -161,7 +158,7 @@ public class FileService {
     )
     @Transactional
     public String addDirectoryAsGrouperMedia(String userId, String fileId) {
-        FileSystemItem item = getFileSystemItem(userId, fileId, false);
+        FileSystemItem item = fileUtilService.getFileSystemItem(userId, fileId, false);
         if (item.getFileType() == FileType.GROUPER) {
             throw new IllegalArgumentException("Item is already a grouper");
         }
@@ -171,15 +168,15 @@ public class FileService {
         if (item.getMId() != null && item.getMId() != 0) {
             throw new IllegalArgumentException("Item is already marked as media");
         }
-        Map<String, Set<FileStatus>> parentIgnoreStatus = getCommonIds(item.getPath()).stream()
+        Map<String, Set<FileStatus>> parentIgnoreStatus = fileUtilService.getCommonIds(item.getPath()).stream()
                 .collect(Collectors.toMap(key -> key, _ -> Set.of(FileStatus.BEING_MOVED_INTO)));
-        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
+        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(fileUtilService.getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
         if (folderIsLocked != null) {
-            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
+            throw new IllegalArgumentException(fileUtilService.getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
         }
 
         Criteria criteria = Criteria.where(FileItemField.FILE_TYPE).is(FileType.ALBUM);
-        List<FileSystemItem> items = getItemInIds(getCommonIds(item.getPath()), true, criteria, f -> f.getFileType() == FileType.ALBUM);
+        List<FileSystemItem> items = fileUtilService.getItemInIds(fileUtilService.getCommonIds(item.getPath()), true, criteria, f -> f.getFileType() == FileType.ALBUM);
         if (!items.isEmpty()) {
             throw new IllegalArgumentException("Has parent as album - cannot have grouper in an album");
         }
@@ -222,16 +219,16 @@ public class FileService {
         String error = FileSystemValidator.isValidName(newFolderName);
         if (error != null)
             throw new IllegalArgumentException(error);
-        FileSystemItem parent = findById(userId, parentId, false);
+        FileSystemItem parent = fileUtilService.findById(userId, parentId, false);
         if (parent == null)
             throw new IllegalArgumentException("Parent folder not found: " + parentId);
         if (FileType.isNotDir(parent.getFileType()))
             throw new IllegalArgumentException("Parent folder is not a directory: " + parentId);
-        if (itemWithNameExists(userId, parentId, newFolderName))
+        if (fileUtilService.itemWithNameExists(userId, parentId, newFolderName))
             throw new IllegalArgumentException("Folder already exists: " + newFolderName);
-        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(getCommonIds(parent.getPath() + parent.getId()), null);
+        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(fileUtilService.getCommonIds(parent.getPath() + parent.getId()), null);
         if (folderIsLocked != null) {
-            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
+            throw new IllegalArgumentException(fileUtilService.getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
         }
 
         FileSystemItem item = FileSystemItem.builder()
@@ -248,7 +245,7 @@ public class FileService {
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_BACKUP_TOPIC,
                 userId,
-                new MediaUpdateEvent.DirectoryCreated(saved.getId(), addUserIdToPath(userId, getFullPathInName(saved, true)))
+                new MediaUpdateEvent.DirectoryCreated(saved.getId(), fileUtilService.addUserIdToPathStart(userId, fileUtilService.getFullPathInName(saved, true)))
         ));
         log.info("Created new directory: {} {}", saved.getId(), saved.getName());
 
@@ -257,7 +254,7 @@ public class FileService {
 
     @Transactional
     public String renameFileItem(String userId, String fileId, String newName) {
-        FileSystemItem item = getFileSystemItem(userId, fileId, true);
+        FileSystemItem item = fileUtilService.getFileSystemItem(userId, fileId, true);
         String error = FileSystemValidator.isValidName(newName);
         if (error != null) {
             throw new IllegalArgumentException(error);
@@ -265,14 +262,14 @@ public class FileService {
         if (item.getName().equals(newName)) {
             return newName;
         }
-        if (itemWithNameExists(userId, item.getParentId(), newName)) {
+        if (fileUtilService.itemWithNameExists(userId, item.getParentId(), newName)) {
             throw new IllegalArgumentException("File already exists with name: " + newName);
         }
-        Map<String, Set<FileStatus>> parentIgnoreStatus = getCommonIds(item.getPath()).stream()
+        Map<String, Set<FileStatus>> parentIgnoreStatus = fileUtilService.getCommonIds(item.getPath()).stream()
                 .collect(Collectors.toMap(key -> key, _ -> Set.of(FileStatus.BEING_MOVED_INTO, FileStatus.BEING_MOVED, FileStatus.IN_USE, FileStatus.PROCESSING)));
-        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
+        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(fileUtilService.getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
         if (folderIsLocked != null) {
-            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
+            throw new IllegalArgumentException(fileUtilService.getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
         }
 
         Update update = new Update().set(FileItemField.NAME, newName);
@@ -281,7 +278,7 @@ public class FileService {
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_BACKUP_TOPIC,
                 userId,
-                new MediaUpdateEvent.FileRenamed(item.getId(), addUserIdToPath(userId, getFullPathInName(item, true)), newName)
+                new MediaUpdateEvent.FileRenamed(item.getId(), fileUtilService.addUserIdToPathStart(userId, fileUtilService.getFullPathInName(item, true)), newName)
         ));
         log.info("Renamed file: {}", fileId);
 
@@ -289,84 +286,12 @@ public class FileService {
     }
 
     @Transactional
-    public void initiateDeleteFile(String userId, String fileId) {
-        FileSystemItem item = getFileSystemItem(userId, fileId, false);
-        if (!FileType.isNotDir(item.getFileType())) { // if a directory
-            boolean anyChildMedia = anyChildMedia(userId, getPathForFileItem(item.getPath(), item.getId()));
-            if (anyChildMedia) {
-                throw new IllegalArgumentException("Directory is not empty - include media item");
-            }
-        }
-        Map<String, Set<FileStatus>> parentIgnoreStatus = getCommonIds(item.getPath()).stream()
-                .collect(Collectors.toMap(key -> key, _ -> Set.of(FileStatus.BEING_MOVED_INTO)));
-        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
-        if (folderIsLocked != null) {
-            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
-        }
-
-        fileLockService.lockFileItem(userId, Set.of(item.getId()), Map.of(item.getId(), FileStatus.DELETING));
-        fileCacheService.invalidateFileCache(item.getId());
-
-        if (item.getMId() != null && item.getMId() > 0) {
-            throw new IllegalArgumentException("File is already marked as media - delete through media file item instead: " + item.getMId());
-        }
-
-        publisher.publishEvent(new FileEventProducer.EventWrapper(
-                EventTopics.MEDIA_FILE_AND_BACKUP_TOPIC,
-                userId,
-                new MediaUpdateEvent.FileDeleted(userId,
-                        item.getId(),
-                        addUserIdToPath(userId, getFullPathInName(item, true)),
-                        FileType.isNotDir(item.getFileType()),
-                        FileType.convertFileTypeToMediaType(item.getFileType()),
-                        null
-                )
-        ));
-    }
-
-    @Transactional
-    public void initiateDeleteMediaFile(String userId, long mediaId) {
-        FileSystemItem item = findByMId(userId, mediaId);
-        if (item == null) {
-            throw new IllegalArgumentException("Media file not found: " + mediaId);
-        }
-        if (!FileType.isNotDir(item.getFileType())) { // if a directory
-            boolean anyChildMedia = anyChildMedia(userId, getPathForFileItem(item.getPath(), item.getId()));
-            if (anyChildMedia) {
-                throw new IllegalArgumentException("Media is not empty - include nested media item");
-            }
-        }
-        Map<String, Set<FileStatus>> parentIgnoreStatus = getCommonIds(item.getPath()).stream()
-                .collect(Collectors.toMap(key -> key, _ -> Set.of(FileStatus.BEING_MOVED_INTO)));
-        FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(getCommonIds(item.getPath() + item.getId()), parentIgnoreStatus);
-        if (folderIsLocked != null) {
-            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
-        }
-
-        fileLockService.lockFileItem(userId, Set.of(item.getId()), Map.of(item.getId(), FileStatus.DELETING));
-        fileCacheService.invalidateFileCache(item.getId());
-
-        publisher.publishEvent(new FileEventProducer.EventWrapper(
-                EventTopics.MEDIA_FILE_HANDLER_SEARCH_AND_BACKUP_TOPIC,
-                userId,
-                new MediaUpdateEvent.FileDeleted(
-                        userId,
-                        item.getId(),
-                        addUserIdToPath(userId, getFullPathInName(item, true)),
-                        FileType.isNotDir(item.getFileType()),
-                        FileType.convertFileTypeToMediaType(item.getFileType()),
-                        item.getMId()
-                )
-        ));
-    }
-
-    @Transactional
     public FileSystemItem initiateMoveFileItem(String userId, String fileId, String newParentId) {
-        FileSystemItem item = getFileSystemItem(userId, fileId, false);
+        FileSystemItem item = fileUtilService.getFileSystemItem(userId, fileId, false);
         if (item.getParentId().equals(newParentId)) {
-            throw new IllegalArgumentException("Cannot move item to same parent");
+            throw new IllegalArgumentException("Item is already in parent directory: " + newParentId);
         }
-        FileSystemItem newParent = findById(userId, newParentId, false);
+        FileSystemItem newParent = fileUtilService.findById(userId, newParentId, false);
         if (newParent == null) {
             throw new IllegalArgumentException("Parent folder not found: " + newParentId);
         }
@@ -379,16 +304,20 @@ public class FileService {
         if (newParent.getPath().contains(item.getId())) {
             throw new IllegalArgumentException("Cannot move item to a child of itself");
         }
-        Set<String> parentIds = getCommonIds(newParent.getPath() + newParent.getId());
+        if (newParentId.equals(fileTrashService.getTRASH_FOLDER_ID())) {
+            fileTrashService.moveToTrash(userId, List.of(fileId));
+            return null;
+        }
+        Set<String> parentIds = fileUtilService.getCommonIds(newParent.getPath() + newParent.getId());
         Map<String, Set<FileStatus>> parentStatusMap = parentIds.stream()
                 .collect(Collectors.toMap(id -> id, _ -> Set.of(FileStatus.BEING_MOVED_INTO)));
 
-        Set<String> commonIds = getCommonIds(item.getPath() + item.getId() + newParent.getPath() + newParent.getId());
+        Set<String> commonIds = fileUtilService.getCommonIds(item.getPath() + item.getId() + newParent.getPath() + newParent.getId());
         FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(commonIds, parentStatusMap);
         if (folderIsLocked != null) {
-            throw new IllegalArgumentException(getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
+            throw new IllegalArgumentException(fileUtilService.getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
         }
-        if (itemWithNameExists(userId, newParentId, item.getName())) {
+        if (fileUtilService.itemWithNameExists(userId, newParentId, item.getName())) {
             throw new IllegalArgumentException("File already exists with name: " + item.getName());
         }
 
@@ -406,14 +335,14 @@ public class FileService {
                     new MediaUpdateEvent.DirectoryMoved(
                             userId, fileId, newParentId,
                             item.getParentId(), item.getPath(), // old parent id, and old path
-                            addUserIdToPath(userId, getFullPathInName(item, true)),
-                            addUserIdToPath(userId, getFullPathInName(newParent, true)),
+                            fileUtilService.addUserIdToPathStart(userId, fileUtilService.getFullPathInName(item, true)),
+                            fileUtilService.addUserIdToPathStart(userId, fileUtilService.getFullPathInName(newParent, true)),
                             item.getFileType().name()
                     )
             ));
 
             if (item.getFileType() == FileType.ALBUM) {
-                FileSystemItem oldParent = findById(userId, item.getParentId(), true);
+                FileSystemItem oldParent = fileUtilService.findById(userId, item.getParentId(), true);
                 boolean newParentIsGrouper = newParent.getFileType() == FileType.GROUPER;
                 boolean oldParentIsGrouper = oldParent.getFileType() == FileType.GROUPER;
                 if (oldParentIsGrouper || newParentIsGrouper) {
@@ -436,7 +365,7 @@ public class FileService {
                     EventTopics.MEDIA_BACKUP_TOPIC,
                     userId,
                     new MediaUpdateEvent.FileMoved(
-                            fileId, addUserIdToPath(userId, getFullPathInName(item, true)), addUserIdToPath(userId, getFullPathInName(newParent, true))
+                            fileId, newParent.getId(), fileUtilService.addUserIdToPathStart(userId, fileUtilService.getFullPathInName(item, true)), fileUtilService.addUserIdToPathStart(userId, fileUtilService.getFullPathInName(newParent, true))
                     )
             ));
         }
@@ -453,39 +382,6 @@ public class FileService {
         }
 
         return moved;
-    }
-
-    public Set<String> getCommonIds(String idPath) {
-        String[] idList = idPath.split("/");
-        Set<String> commonIds = new HashSet<>(Arrays.asList(idList));
-        commonIds.remove("");
-        commonIds.remove(getROOT_FOLDER_ID());
-        return commonIds;
-    }
-
-    private String getLockedInfoString(String userId, String fileId, FileStatus status) {
-        return "File " + findById(userId, fileId, true).getName() + " is " + status;
-    }
-
-
-    public boolean itemWithNameExists(String userId, String parentId, String name) {
-        return fileRepository.checkExistWithUserId(userId, Criteria
-                .where(FileItemField.PARENT_ID).is(parentId)
-                .and(FileItemField.NAME).is(name));
-    }
-
-    private boolean anyChildMedia(String userId, String parentPath) {
-        String quotedParentPath = Pattern.quote(parentPath);
-        return fileRepository.checkExistWithUserId(userId, Criteria
-                .where(FileItemField.PATH).regex("^" + quotedParentPath)
-                .and(FileItemField.MEDIA_ID).nin(null, 0));
-    }
-
-
-    private String addUserIdToPath(String userId, String path) {
-        if (path.startsWith(userId + "/")) return path;
-        if (path.isBlank()) return userId;
-        return userId + "/" + path;
     }
 
     @Retryable(
@@ -507,107 +403,6 @@ public class FileService {
         return fileRepository.updateFirstByIdAndUserId(userId, fileId, update);
     }
 
-    public String getFullPathInName(FileSystemItem item, boolean omitRoot) {
-        String pathInId = item.getPath();
-        List<String> pathIds = Arrays.stream(pathInId.split("/"))
-                .filter(s -> !s.isEmpty() && (!omitRoot || !s.equals(getROOT_FOLDER_ID())))
-                .toList();
-
-        if (pathIds.isEmpty()) {
-            if (omitRoot && item.getId().equals(getROOT_FOLDER_ID()))
-                return "";
-            return item.getName();
-        }
-
-        List<FileSystemItem> parents = getItemInIds(pathIds, true, null, null);
-
-        Map<String, String> nameMap = parents.stream().collect(Collectors.toMap(FileSystemItem::getId, FileSystemItem::getName));
-
-        return pathIds.stream()
-                .map(id -> nameMap.getOrDefault(id, "Unknown"))
-                .collect(Collectors.joining("/")) + "/" + item.getName();
-    }
-
-    /**
-     *  need the returning path to start and end with "/"
-     */
-    public String getPathForFileItem(String parentPath, String currentPath) {
-        String path = OSUtil.normalizePath(parentPath, currentPath + "/");
-        if (path.startsWith(getROOT_PATH()))
-            return path;
-        return getROOT_PATH() + path;
-    }
-
-
-    public FileSystemItem findByMId(String userId, long mId) {
-        Query query = new Query(Criteria
-                .where(FileItemField.USER_ID).is(Long.parseLong(userId))
-                .and(FileItemField.MEDIA_ID).is(mId)
-        );
-        return fileRepository.findOne(query);
-    }
-
-    public FileSystemItem getFileSystemItem(String userId, String id, boolean getCachedFirst) {
-        FileSystemItem item = findById(userId, id, getCachedFirst);
-        if (item == null)
-            throw new IllegalArgumentException("File not found with id: " + id);
-        return item;
-    }
-
-    public FileSystemItem findById(String userId, String id, boolean getCachedFirst) {
-        if (id.equals(getROOT_FOLDER_ID()))
-            return getRootDirectoryItem();
-        return fileCacheService.getCachedFileElse(userId, id, getCachedFirst, fileId -> {
-            Query query = new Query(Criteria
-                    .where(FileItemField.USER_ID).is(Long.parseLong(userId))
-                    .and("id").is(fileId)
-            );
-            return fileRepository.findOne(query);
-        });
-    }
-
-    // this does not check the items belong to a userId or not, use only after checking all ids belong to the userId
-    public List<FileSystemItem> getItemInIds(Collection<String> ids, boolean getCachedFirst, Criteria criteria, Predicate<FileSystemItem> filter) {
-        if (getCachedFirst)
-            return fileCacheService.getCachedFilesElse(ids, filter, keysToFetch -> {
-                Query query = new Query(Criteria.where("id").in(keysToFetch));
-                if (criteria != null) query.addCriteria(criteria);
-                return fileRepository.find(query);
-            });
-        Query query = new Query(Criteria.where("id").in(ids));
-        if (criteria != null) query.addCriteria(criteria);
-        return fileRepository.find(query);
-    }
-
-    public FileSystemItem getRootDirectoryItem() {
-        return fileCacheService.getFileCache(getROOT_FOLDER_ID(), (rootId) -> {
-            Query query = new Query(Criteria
-                    .where("id").is(rootId)
-            );
-            return fileRepository.findOne(query);
-        });
-    }
-
-    public String getROOT_FOLDER_ID() {
-        if (ROOT_FOLDER_ID != null) return ROOT_FOLDER_ID;
-        Query query = new Query(Criteria
-                .where(FileItemField.NAME).is(MEDIA_PATH)
-                .and(FileItemField.PATH).is("/")
-                .and(FileItemField.FILE_TYPE).is(FileType.DIR)
-        );
-        FileSystemItem item = fileRepository.findOne(query);
-
-        if (item == null) throw new RuntimeException("Failed to find root folder");
-
-        ROOT_FOLDER_ID = item.getId();
-        return ROOT_FOLDER_ID;
-    }
-
-    private String getROOT_PATH() {
-        if (ROOT_PATH != null) return ROOT_PATH;
-        ROOT_PATH = "/" + getROOT_FOLDER_ID() + "/";
-        return ROOT_PATH;
-    }
 
     public void createRootFolder() {
         Query query = new Query(Criteria

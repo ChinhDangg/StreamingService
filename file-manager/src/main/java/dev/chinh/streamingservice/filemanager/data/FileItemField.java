@@ -20,4 +20,5 @@ public class FileItemField {
     public static final String AREA = "a";
     public static final String UPLOAD_DATE = "up";
     public static final String STATUS_CODE = "sc";
+    public static final String OLD_PARENT_ID = "opI";
 }

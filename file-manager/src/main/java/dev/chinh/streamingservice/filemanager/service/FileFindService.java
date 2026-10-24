@@ -23,7 +23,9 @@ import java.util.regex.Pattern;
 public class FileFindService {
 
     private final FileRepository fileRepository;
-    private final FileService fileService;
+
+    private final FileTrashService fileTrashService;
+    private final FileUtilService fileUtilService;
     private final ThumbnailService thumbnailService;
     private final ObjectMapper objectMapper;
 
@@ -33,7 +35,7 @@ public class FileFindService {
     public FileSearchResult findFilesAtRoot(String userId, String cursorStr, SortBy sortBy, Sort.Direction sortOrder) {
         Window<FileSystemItem> window = fileRepository.findByUserIdAndParentId(
                 userId,
-                fileService.getROOT_FOLDER_ID(),
+                fileUtilService.getROOT_FOLDER_ID(),
                 getSort(sortBy, sortOrder),
                 searchResultLimit,
                 getFindingCursor(cursorStr)
@@ -42,9 +44,27 @@ public class FileFindService {
         List<FileSystemItem> itemInRoot = getUpdatedThumbnailUrl(userId, window.getContent());
 
         return new FileSearchResult(
-                fileService.getROOT_FOLDER_ID(),
+                fileUtilService.getROOT_FOLDER_ID(),
                 FileService.MEDIA_PATH,
                 itemInRoot,
+                encodeCursor(getNextCursor(window)),
+                window.hasNext());
+    }
+
+    public FileSearchResult findFilesInTrash(String userId, String cursorStr, SortBy sortBy, Sort.Direction sortOrder) {
+        Window<FileSystemItem> window = fileRepository.findByUserIdAndParentId(
+                userId,
+                fileTrashService.getTRASH_FOLDER_ID(),
+                getSort(sortBy, sortOrder),
+                searchResultLimit,
+                getFindingCursor(cursorStr)
+        );
+        List<FileSystemItem> itemInTrash = getUpdatedThumbnailUrl(userId, window.getContent());
+
+        return new FileSearchResult(
+                fileTrashService.getTRASH_FOLDER_ID(),
+                FileTrashService.TRASH_NAME,
+                itemInTrash,
                 encodeCursor(getNextCursor(window)),
                 window.hasNext());
     }
@@ -63,7 +83,7 @@ public class FileFindService {
             FileSystemItem parentCraft = new FileSystemItem();
             String pathInId;
             if (itemInDir.isEmpty()) {
-                FileSystemItem parent = fileService.getFileSystemItem(userId, parentId, true);
+                FileSystemItem parent = fileUtilService.getFileSystemItem(userId, parentId, true);
                 pathInId = parent.getPath() + parent.getId() + "/";
                 parentCraft.setName(parent.getName());
             } else {
@@ -71,7 +91,7 @@ public class FileFindService {
                 parentCraft.setName("unknown");
             }
             parentCraft.setPath(pathInId);
-            String pathInName = fileService.getFullPathInName(parentCraft, false);
+            String pathInName = fileUtilService.getFullPathInName(parentCraft, false);
             return new FileSearchResult(pathInId, pathInName, itemInDir, encodeCursor(getNextCursor(window)), window.hasNext());
         }
 
@@ -79,7 +99,7 @@ public class FileFindService {
     }
 
     public FileSearchResult findFilesInDirectory(String userId, String parentId, String cursorStr, SortBy sortBy, Sort.Direction sortOrder) {
-        FileSystemItem parent = fileService.getFileSystemItem(userId, parentId, true);
+        FileSystemItem parent = fileUtilService.getFileSystemItem(userId, parentId, true);
         String regexPath = "^" + Pattern.quote(parent.getPath() + parent.getId() + "/");
 
         Window<FileSystemItem> window = fileRepository.findByUserIdAndPathRecursive(
@@ -94,7 +114,7 @@ public class FileFindService {
     }
 
     public FileSearchResult searchFileByName(String userId, String parentId, String fileName, boolean isRecursive, String searchAfterToken) {
-        FileSystemItem parent = fileService.getFileSystemItem(userId, parentId, true);
+        FileSystemItem parent = fileUtilService.getFileSystemItem(userId, parentId, true);
 
         List<AggregationOperation> stages = new ArrayList<>();
         String indexName = "fileNameSearchIndex";
