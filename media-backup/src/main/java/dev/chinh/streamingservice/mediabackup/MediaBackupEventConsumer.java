@@ -6,6 +6,7 @@ import dev.chinh.streamingservice.common.event.EventTopics;
 import dev.chinh.streamingservice.common.event.MediaUpdateEvent;
 import dev.chinh.streamingservice.mediabackup.config.KafkaRedPandaConfig;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -20,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MediaBackupEventConsumer {
@@ -33,12 +35,12 @@ public class MediaBackupEventConsumer {
     private String backupEnabled;
 
     private void onCreateFile(MediaUpdateEvent.FileCreated event) throws Exception {
-        System.out.println("Received create backup file event: " + event.fileName());
+        log.info("Received create backup file event: {}", event.fileName());
         try {
             String target = addBackupLocationToPath(addRootToPath(event.userId() + "/" + event.fileName()));
             Path targetPath = Paths.get(target);
             if (Files.exists(targetPath)) {
-                System.err.println("File already exists: " + target);
+                log.error("File already exists: {}", target);
                 return;
             }
             try (InputStream inputStream = minIOService.getFile(event.bucket(), event.objectName())) {
@@ -48,17 +50,17 @@ public class MediaBackupEventConsumer {
 
                 Files.copy(inputStream, targetPath);
             } catch (FileAlreadyExistsException e) {
-                System.err.println("File already exists: " + event.fileName());
+                log.error("File already exists: {}", event.fileName());
                 // do nothing - just log
             }
         } catch (Exception e) {
-            System.err.println("Failed to create backup file: " + event.fileName());
+            log.error("Failed to create backup file: {}", event.fileName());
             throw e;
         }
     }
 
     private void onDeleteFile(MediaUpdateEvent.FileDeleted event) throws IOException {
-        System.out.println("Received delete backup file: " + event.fileName());
+        log.info("Received delete backup file: {}", event.fileName());
         try {
             Path path = Path.of(addBackupLocationToPath(addRootToPath(event.fileName())));
             if (event.isNotDirectory()) {
@@ -67,15 +69,15 @@ public class MediaBackupEventConsumer {
                 FileUtils.deleteDirectory(new File(path.toString()));
             }
         } catch (Exception e) {
-            System.err.println("Failed to delete backup file: " + event.fileName());
+            log.error("Failed to delete backup file: {}", event.fileName());
             throw e;
         }
     }
 
     private void onCreatedMedia(MediaUpdateEvent.MediaCreatedReady event) throws Exception {
-        System.out.println("Received media created ready event to backup thumbnail: " + event.mediaId() + ", thumbnail: " + event.thumbnail());
+        log.info("Received media created ready event to backup thumbnail: {}, thumbnail: {}", event.mediaId(), event.thumbnail());
         if (event.thumbnail() == null) {
-            System.out.println("Thumbnail is null, skipping thumbnail backup for media: " + event.mediaId());
+            log.info("Thumbnail is null, skipping thumbnail backup for media: {}", event.mediaId());
             return;
         }
         createThumbnailBackup(event.thumbnail());
@@ -94,7 +96,7 @@ public class MediaBackupEventConsumer {
 
 
     private void onNameEntityCreated(MediaUpdateEvent.NameEntityCreated event) throws Exception {
-        System.out.println("Received name entity create backup event: " + event.nameEntityId());
+        log.info("Received name entity create backup event: {}", event.nameEntityId());
         if (event.thumbnailPath() != null)
             createThumbnailBackup(event.thumbnailPath());
     }
@@ -105,13 +107,13 @@ public class MediaBackupEventConsumer {
     }
 
     private void onNameEntityDeleted(MediaUpdateEvent.NameEntityDeleted event) throws IOException {
-        System.out.println("Received name entity delete backup event: " + event.nameEntityId());
+        log.info("Received name entity delete backup event: {}", event.nameEntityId());
         if (event.thumbnailPath() != null)
             deleteThumbnailBackup(event.thumbnailPath());
     }
 
     private void updateThumbnail(long id, String oldThumbnail, String newThumbnail) throws Exception {
-        System.out.println("Received thumbnail update backup event: " + id + ", old: " + oldThumbnail + ", new: " + newThumbnail);
+        log.info("Received thumbnail update backup event: {}, old: {}, new: {}", id, oldThumbnail, newThumbnail);
         if (newThumbnail != null) {
             createThumbnailBackup(newThumbnail);
         }
@@ -122,7 +124,7 @@ public class MediaBackupEventConsumer {
 
 
     private void createThumbnailBackup(String newThumbnail) throws Exception {
-        System.out.println("Received thumbnail create backup event: " + newThumbnail);
+        log.info("Received thumbnail create backup event: {}", newThumbnail);
         String thumbnail = addBackupLocationToPath(ContentMetaData.THUMBNAIL_BUCKET + "/" + newThumbnail);
         Path thumbnailPath = Paths.get(thumbnail);
 
@@ -133,24 +135,24 @@ public class MediaBackupEventConsumer {
 
             Files.copy(inputStream, thumbnailPath, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception e) {
-            System.err.println("Failed to back up thumbnail: " + newThumbnail);
+            log.error("Failed to back up thumbnail: {}", newThumbnail);
             throw e;
         }
     }
 
     private void deleteThumbnailBackup(String oldThumbnail) throws IOException {
-        System.out.println("Received thumbnail delete backup event, old: " + oldThumbnail);
+        log.info("Received thumbnail delete backup event, old: {}", oldThumbnail);
         try {
             Path path = Paths.get(addBackupLocationToPath(ContentMetaData.THUMBNAIL_BUCKET + "/" + oldThumbnail));
-            System.out.println("Deleted: " + Files.deleteIfExists(path));
+            log.info("Deleted: {}", Files.deleteIfExists(path));
         } catch (IOException e) {
-            System.err.println("Failed to delete thumbnail file: " + oldThumbnail);
+            log.error("Failed to delete thumbnail file: {}", oldThumbnail);
             throw e;
         }
     }
 
     private void onCreateDirectory(MediaUpdateEvent.DirectoryCreated event) throws IOException {
-        System.out.println("Received create directory: " + event.fileId() + " " + event.dirPath());
+        log.info("Received create directory: {} {}", event.fileId(), event.dirPath());
         try {
             String dirPath = addRootToPath(event.dirPath());
             Path targetParent = Paths.get(addBackupLocationToPath(dirPath));
@@ -158,13 +160,13 @@ public class MediaBackupEventConsumer {
                 Files.createDirectories(targetParent);
             }
         } catch (Exception e) {
-            System.err.println("Failed to create directory: " + event.fileId() + " : " + e.getMessage());
+            log.error("Failed to create directory: {} : {}", event.fileId(), e.getMessage());
             throw e;
         }
     }
 
     private void onRenameFile(MediaUpdateEvent.FileRenamed event) throws Exception {
-        System.out.println("Received rename file: " + event.fileId());
+        log.info("Received rename file: {}", event.fileId());
         try {
             String basePath = addRootToPath(event.filePath());
             int lastSlash = basePath.lastIndexOf("/");
@@ -174,27 +176,27 @@ public class MediaBackupEventConsumer {
             ));
             Files.move(source, target);
         } catch (Exception e) {
-            System.err.println("Failed to rename file: " + event.fileId() + " : " + e.getMessage());
+            log.error("Failed to rename file: {} : {}", event.fileId(), e.getMessage());
             throw e;
         }
     }
 
     private void onMoveDirectory(MediaUpdateEvent.DirectoryMoved event) throws Exception {
-        System.out.println("Received move directory: " + event.fileId() + ", old: " + event.oldPath() + ", new: " + event.newPath());
+        log.info("Received move directory: {}, old: {}, new: {}", event.fileId(), event.oldPath(), event.newPath());
         try {
             moveFile(event.oldPath(), event.newPath());
         } catch (Exception e) {
-            System.err.println("Failed to move directory: " + event.fileId() + " : " + e.getMessage());
+            log.error("Failed to move directory: {} : {}", event.fileId(), e.getMessage());
             throw e;
         }
     }
 
     private void onMoveFile(MediaUpdateEvent.FileMoved event) throws Exception {
-        System.out.println("Received move file: " + event.fileId() + ", old: " + event.oldPath() + ", new: " + event.newPath());
+        log.info("Received move file: {}, old: {}, new: {}", event.fileId(), event.oldPath(), event.newPath());
         try {
             moveFile(event.oldPath(), event.newPath());
         } catch (Exception e) {
-            System.err.println("Failed to move file: " + event.fileId() + " : " + e.getMessage());
+            log.error("Failed to move file: {} : {}", event.fileId(), e.getMessage());
             throw e;
         }
     }
@@ -204,7 +206,7 @@ public class MediaBackupEventConsumer {
         newPath = addRootToPath(newPath);
         Path source = Paths.get(addBackupLocationToPath(oldPath));
         Path target = Paths.get(addBackupLocationToPath(newPath));
-        System.out.println(source + " -> " + target);
+        log.info("{} -> {}", source, target);
         Files.move(source, target.resolve(source.getFileName()));
     }
 
@@ -231,7 +233,7 @@ public class MediaBackupEventConsumer {
     public void handle(@Payload MediaUpdateEvent event, Acknowledgment ack) throws Exception {
         try {
             if (!Boolean.parseBoolean(backupEnabled)) {
-                System.out.println("Backup is disabled -- Skipping " + event.getClass().getSimpleName());
+                log.info("Backup is disabled -- Skipping {}", event.getClass().getSimpleName());
                 ack.acknowledge();
                 return;
             }
@@ -253,11 +255,11 @@ public class MediaBackupEventConsumer {
                 case MediaUpdateEvent.FileMoved e -> onMoveFile(e);
                 default ->
                     // unknown event type → log and skip
-                        System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+                        log.error("Unknown MediaUpdateEvent type: {}", event.getClass());
             }
             ack.acknowledge();
         } catch (Exception e) {
-            System.err.println("Failed to handle media backup event: " + event + " " + e.getMessage());
+            log.error("Failed to handle media backup event: {} {}", event, e.getMessage());
             e.printStackTrace();
             throw e;
         }
@@ -274,44 +276,44 @@ public class MediaBackupEventConsumer {
     public void handleDlq(@Payload MediaUpdateEvent event,
                           Acknowledgment ack,
                           @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) byte[] errorMessage) throws Exception {
-        System.out.println("======= DLQ EVENT DETECTED =======");
+        log.info("======= DLQ EVENT DETECTED =======");
         System.out.printf("Error Message: %s\n", errorMessage == null ? "No error message found" : new String(errorMessage));
 
         // Accessing the POJO data directly
         switch (event) {
-            case MediaUpdateEvent.FileCreated e ->
-                    System.out.println("Received create backup file event: " + e.fileName());
-            case MediaUpdateEvent.FileDeleted e ->
-                    System.out.println("Received delete backup file: " + e.fileName());
+            case MediaUpdateEvent.FileCreated e -> 
+                    log.info("Backup DLQ: Received create backup file event: {}", e.fileName());
+            case MediaUpdateEvent.FileDeleted e -> 
+                    log.info("Backup DLQ: Received delete backup file: {}", e.fileName());
             case MediaUpdateEvent.MediaCreatedReady e ->
-                    System.out.println("Received media created ready event to backup thumbnail: " + e.mediaId() + ", thumbnail: " + e.thumbnail());
+                    log.info("Backup DLQ: Received media created ready event to backup thumbnail: {}, thumbnail: {}", e.mediaId(), e.thumbnail());
             case MediaUpdateEvent.MediaThumbnailUpdatedReady e ->
-                    System.out.println("Received media thumbnail updated backup event: " + e.mediaId() +  " new: " + e.newThumbnail());
+                    log.info("Backup DLQ: Received media thumbnail updated backup event: {} new: {}", e.mediaId(), e.newThumbnail());
 
             case MediaUpdateEvent.ThumbnailDeleted e ->
-                    System.out.println("Received thumbnail delete backup event: " + e.objectName());
+                    log.info("Backup DLQ: Received thumbnail delete backup event: {}", e.objectName());
 
             case MediaUpdateEvent.NameEntityCreated e ->
-                    System.out.println("Received name entity create backup event: " + e.nameEntityId() + " thumbnail: " + e.thumbnailPath());
+                    log.info("Backup DLQ: Received name entity create backup event: {} thumbnail: {}", e.nameEntityId(), e.thumbnailPath());
             case MediaUpdateEvent.NameEntityDeleted e ->
-                    System.out.println("Received name entity delete backup event: " + e.nameEntityId() + " thumbnail: " + e.thumbnailPath());
+                    log.info("Backup DLQ: Received name entity delete backup event: {} thumbnail: {}", e.nameEntityId(), e.thumbnailPath());
             case MediaUpdateEvent.NameEntityUpdated e ->
-                    System.out.println("Received name entity thumbnail updated backup event: " + e.nameEntityId() + " old: " + e.oldThumbnail() + " new: " + e.newThumbnail());
+                    log.info("Backup DLQ: Received name entity thumbnail updated backup event: {} old: {} new: {}", e.nameEntityId(), e.oldThumbnail(), e.newThumbnail());
 
-            case MediaUpdateEvent.DirectoryCreated e ->
-                    System.out.println("Received create directory: " + e.fileId());
-            case MediaUpdateEvent.FileRenamed e ->
-                    System.out.println("Received rename file: " + e.fileId());
+            case MediaUpdateEvent.DirectoryCreated e -> 
+                    log.info("Backup DLQ: Received create directory: {}", e.fileId());
+            case MediaUpdateEvent.FileRenamed e -> 
+                    log.info("Backup DLQ: Received rename file: {}", e.fileId());
             case MediaUpdateEvent.DirectoryMoved e ->
-                    System.out.println("Received move directory: " + e.fileId() + ", old: " + e.oldPath() + ", new: " + e.newPath());
+                    log.info("Backup DLQ: Received move directory: {}, old: {}, new: {}", e.fileId(), e.oldPath(), e.newPath());
             case MediaUpdateEvent.FileMoved e ->
-                    System.out.println("Received move file: " + e.fileId() + ", old: " + e.oldPath() + ", new: " + e.newPath());
+                    log.info("Backup DLQ: Received move file: {}, old: {}, new: {}", e.fileId(), e.oldPath(), e.newPath());
             default -> {
-                    System.err.println("Unknown MediaUpdateEvent type: " + event.getClass());
+                log.error("Backup DLQ: Unknown MediaUpdateEvent type: {}", event.getClass());
                     //ack.acknowledge(); // ack on poison event to skip it
             }
         }
-        System.out.println("======= =======");
+        log.info("======= =======");
         // ack or it will be re-read from the DLQ on restart or rehandle it manually.
         //ack.acknowledge();
     }
