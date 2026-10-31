@@ -1,10 +1,10 @@
 import {apiRequest} from "/static/js/common.js";
 import {FileManager} from "/static/js/file-manager/FileManager.js";
 import {
-    currentSearchFileItems,
     clearSearch,
-    getIsSearching,
-    setIsSearching, getIsInDeepSearch, setIsInDeepSearch
+    currentSearchFileItems,
+    getIsInDeepSearch,
+    setIsInDeepSearch
 } from "/static/js/file-manager/search-file.js";
 import {getNameEntityForMediaUpload} from "/static/js/file-manager/manage-upload-file.js";
 
@@ -252,6 +252,64 @@ button.addEventListener('click', () => {
     }
 });
 
+export const ViewState = {
+    NORMAL: 'NORMAL',
+    SEARCH: 'SEARCH',
+    TRASH: 'TRASH'
+}
+
+let previousViewState = null;
+let currentViewState = null;
+export function setCurrentViewState(ViewState) {
+    previousViewState = currentViewState;
+    currentViewState = ViewState;
+}
+function getCurrentViewState() {
+    return currentViewState;
+}
+export function getPreviousViewState() {
+    return previousViewState;
+}
+
+const trashButton = document.getElementById("trash-btn");
+trashButton.addEventListener("click", async () => {
+    setCurrentViewState(ViewState.TRASH);
+    const trashFiles = await fetchTrashFiles();
+    if (!trashFiles) return;
+    clearPathStack();
+    addToCurrentPath(trashFiles.parentId, trashFiles.parentName);
+    displayFileItem(trashFiles.content, currentMainFileItems);
+
+    if (!isMovingFile)
+        selectFileBannerCancelBtn.click();
+});
+
+async function fetchTrashFiles(page = null) {
+    if (isProcessing) return false;
+    isProcessing = true;
+    const params = new URLSearchParams();
+    const sortSelectValue = getSortSelectValue();
+    if (page)
+        params.append('p', page.toString());
+    params.append('by', sortSelectValue.by);
+    params.append('order', sortSelectValue.order);
+    const url = '/api/file/trash' + '?' + params.toString();
+    const response = await apiRequest(url);
+    if (!response.ok) {
+        alert('Failed to fetch trash files');
+        isProcessing = false;
+        return null;
+    }
+    const subFiles = await response.json();
+    if (subFiles.hasNext)
+        currentMainFileItems.setCurrentFilePage(subFiles.nextCursor);
+    else
+        currentMainFileItems.setCurrentFilePage(null);
+    isProcessing = false;
+    return subFiles;
+}
+
+
 const fileViewWrapper = document.getElementById('file-view-wrapper');
 const sortSelect = document.getElementById('file-sort-by-select');
 const sentinel = document.createElement("div");
@@ -260,22 +318,57 @@ export function unobserveSentinel() {
     if (observer)
         observer.unobserve(sentinel);
 }
-export function observeSentinel() {
+function observeSentinel() {
     if (observer)
         observer.observe(sentinel);
 }
-export function disconnectObserver() {
+function disconnectObserver() {
     if (observer)
         observer.disconnect();
 }
-export function setObserver(newObserver) {
-    observer = newObserver;
+export function setPageObserver(entriesCallback, rootMargin = '500px') {
+    disconnectObserver();
+    observer = new IntersectionObserver(entriesCallback, { rootMargin: rootMargin });
+    observeSentinel();
 }
+
+function initializeObserveFileViewContainer() {
+    fileViewWrapper.appendChild(sentinel);
+    setObserverToFetchMore();
+    observer.observe(sentinel);
+}
+
+export function setObserverToFetchMore() {
+    const entriesCallback = async (entries) => {
+        if (entries[0].isIntersecting) {
+            console.log('Intersecting');
+            if (currentMainFileItems.getCurrentFilePage() === null) {
+                observer.unobserve(sentinel);
+                return;
+            }
+            const currentPath = getCurrentPath();
+            if (currentPath == null) {
+                observer.unobserve(sentinel);
+                return;
+            }
+            const subId = currentPathStack.length === 1 ? null : currentPath.id;
+            const subFiles = await fetchMoreFiles(subId, currentMainFileItems.getCurrentFilePage());
+            if (subFiles === false)
+                return;
+            if (subFiles == null) {
+                observer.unobserve(sentinel);
+                return;
+            }
+            displayFileItem(subFiles, currentMainFileItems,false, false, true);
+        }
+    }
+    setPageObserver(entriesCallback);
+}
+
 
 async function fetchMoreFiles(subId, page = null, getParentInfo = false) {
     if (isProcessing) return false;
     isProcessing = true;
-    setIsSearching(false);
     const params = new URLSearchParams();
     if (subId) params.append('id', subId);
     const sortSelectValue = getSortSelectValue();
@@ -372,42 +465,11 @@ function setCurrentUri(subId) {
     }
 }
 
-function initializeObserveFileViewContainer() {
-    fileViewWrapper.appendChild(sentinel);
-    setObserverToFetchMore();
-    observer.observe(sentinel);
-}
-
-export function setObserverToFetchMore() {
-    if (observer)
-        observer.disconnect();
-    observer = new IntersectionObserver(async (entries) => {
-        if (entries[0].isIntersecting) {
-            console.log('Intersecting');
-            if (currentMainFileItems.getCurrentFilePage() === null) {
-                observer.unobserve(sentinel);
-                return;
-            }
-            const currentPath = getCurrentPath();
-            if (currentPath == null) {
-                observer.unobserve(sentinel);
-                return;
-            }
-            const subId = currentPathStack.length === 1 ? null : currentPath.id;
-            const subFiles = await fetchMoreFiles(subId, currentMainFileItems.getCurrentFilePage());
-            if (subFiles === false)
-                return;
-            if (subFiles == null) {
-                observer.unobserve(sentinel);
-                return;
-            }
-            displayFileItem(subFiles, currentMainFileItems,false, false, true);
-        }
-    }, { rootMargin: '500px' });
-}
-
 
 const currentPathStack = [];
+function addToCurrentPathStack(fileId, fileName) {
+    currentPathStack.push({id: fileId, name: fileName});
+}
 
 const pathBar = document.getElementById('path-bar');
 const pathNodeTem = pathBar.querySelector('.path-node');
@@ -420,10 +482,11 @@ function addToCurrentPath(id, name, isRoot = false) {
     span.innerText = '/';
     pathBar.appendChild(span);
     currentPathText.innerText = name;
-    currentPathStack.push({id: id, name: name});
+    addToCurrentPathStack(id, name);
     const thisIndex = currentPathStack.length - 1;
     pathNode.addEventListener('click', async function () {
         if (isProcessing) return;
+        setCurrentViewState(ViewState.NORMAL);
         const end = currentPathStack.length;
         for (let i = thisIndex + 1; i < end; i++) {
             console.log('removing : ' + i);
@@ -432,7 +495,7 @@ function addToCurrentPath(id, name, isRoot = false) {
         currentPathText.innerText = currentPathStack[thisIndex].name;
         setCurrentUri(isRoot ? null : currentPathStack[thisIndex].id);
         const subFiles = isRoot
-            ? await fetchMoreFiles(null)
+            ? (await getRootDir())?.content
             : await fetchMoreFiles(currentPathStack[thisIndex].id);
         if (!subFiles) return;
         displayFileItem(subFiles, currentMainFileItems);
@@ -458,6 +521,7 @@ function clearPathStack() {
 const pathBackBtn = document.getElementById('path-back-btn');
 pathBackBtn.addEventListener('click', async function () {
     if (isProcessing) return;
+    setCurrentViewState(ViewState.NORMAL);
     if (currentPathStack.length <= 1) return;
     removeLastPathStack();
     const lastPath = getCurrentPath();
@@ -521,6 +585,7 @@ window.addEventListener('DOMContentLoaded', async function () {
 const homeButton = document.getElementById('home-btn');
 homeButton.addEventListener('click', async function () {
     if (isProcessing) return;
+    setCurrentViewState(ViewState.NORMAL);
     const end = currentPathStack.length;
     for (let i = 0; i < end; i++) {
         removeLastPathStack();
@@ -530,7 +595,6 @@ homeButton.addEventListener('click', async function () {
 
     const rootInfo = await getRootDir();
     if (!rootInfo) return;
-    setIsSearching(false);
     addToCurrentPath(rootInfo.parentId, rootInfo.parentName, true);
     displayFileItem(rootInfo.content, currentMainFileItems);
     if (!isMovingFile)
@@ -704,6 +768,8 @@ const addAsGrouperButton = customRightMenu.querySelector('.add-as-grouper-btn');
 const openMediaButton = customRightMenu.querySelector('.open-media-btn');
 const addNameEntityButton = customRightMenu.querySelector('.add-name-entity-btn');
 const moveButton = customRightMenu.querySelector('.move-btn');
+const moveToTrashButton = customRightMenu.querySelector('.move-to-trash-btn');
+const restoreFileButton = customRightMenu.querySelector('.restore-file-btn');
 const deleteFileButton = customRightMenu.querySelector('.delete-file-btn');
 
 const currentTargetNode = {
@@ -735,18 +801,29 @@ fileDropZone.addEventListener('contextmenu', (event) => {
     addNameEntityButton.disabled = true;
     renameButton.disabled = true;
     moveButton.disabled = true;
+    moveToTrashButton.disabled = true;
+    restoreFileButton.disabled = true;
     deleteFileButton.disabled = true;
-    addAsVideoButton.classList.add('invisible');
-    addAsAlbumButton.classList.add('invisible');
-    addAsGrouperButton.classList.add('invisible');
-    openMediaButton.classList.add('invisible');
-    addNameEntityButton.classList.add('invisible');
-    renameButton.classList.add('invisible');
+    addAsVideoButton.classList.add('hidden');
+    addAsAlbumButton.classList.add('hidden');
+    addAsGrouperButton.classList.add('hidden');
+    openMediaButton.classList.add('hidden');
+    addNameEntityButton.classList.add('hidden');
+    renameButton.classList.add('hidden');
     moveButton.classList.add('invisible');
-    deleteFileButton.classList.add('invisible');
+    moveToTrashButton.classList.add('hidden');
+    restoreFileButton.classList.add('hidden');
+    deleteFileButton.classList.add('hidden');
+
+    newFolderButton.disabled = false;
+    newFolderButton.classList.remove("hidden");
 
     if (!targetNode) {
         showCustomRightMenu(event.clientX, event.clientY);
+        if (getCurrentViewState() === ViewState.TRASH) {
+            newFolderButton.disabled = true;
+            newFolderButton.classList.add('hidden');
+        }
         return;
     }
 
@@ -760,27 +837,47 @@ fileDropZone.addEventListener('contextmenu', (event) => {
 
     if (currentTargetNode.mId) {
         openMediaButton.disabled = false;
-        openMediaButton.classList.remove('invisible');
+        openMediaButton.classList.remove('hidden');
         addNameEntityButton.disabled = false;
-        addNameEntityButton.classList.remove('invisible');
+        addNameEntityButton.classList.remove('hidden');
     } else {
         if (currentTargetNode.type === 'VIDEO') {
             addAsVideoButton.disabled = false;
-            addAsVideoButton.classList.remove('invisible');
+            addAsVideoButton.classList.remove('hidden');
         } else if (currentTargetNode.type === 'DIR') {
             addAsAlbumButton.disabled = false;
-            addAsAlbumButton.classList.remove('invisible');
+            addAsAlbumButton.classList.remove('hidden');
             addAsGrouperButton.disabled = false;
-            addAsGrouperButton.classList.remove('invisible');
+            addAsGrouperButton.classList.remove('hidden');
         }
     }
     if (selectedFiles.size > 0) {
         renameButton.disabled = false;
-        renameButton.classList.remove('invisible');
+        renameButton.classList.remove('hidden');
         moveButton.disabled = false;
         moveButton.classList.remove('invisible');
-        deleteFileButton.disabled = false;
-        deleteFileButton.classList.remove('invisible');
+        moveToTrashButton.disabled = false;
+        moveToTrashButton.classList.remove('hidden');
+    }
+    if (getCurrentViewState() === ViewState.TRASH) {
+        renameButton.disabled = true;
+        renameButton.classList.add('hidden');
+        newFolderButton.disabled = true;
+        newFolderButton.classList.add('hidden');
+        moveToTrashButton.disabled = true;
+        moveToTrashButton.classList.add('hidden');
+        addAsVideoButton.disabled = true;
+        addAsVideoButton.classList.add('hidden');
+        addAsAlbumButton.disabled = true;
+        addAsAlbumButton.classList.add('hidden');
+        addAsGrouperButton.disabled = true;
+        addAsGrouperButton.classList.add('hidden');
+        if (selectedFiles.size > 0) {
+            restoreFileButton.disabled = false;
+            restoreFileButton.classList.remove('hidden');
+            deleteFileButton.disabled = false;
+            deleteFileButton.classList.remove('hidden');
+        }
     }
 
     showCustomRightMenu(event.clientX, event.clientY);
@@ -1014,16 +1111,85 @@ deleteFileButton.addEventListener('click', async function () {
         idsToDelete.push(fileId);
         removeSelectedFile(fileId);
         fileInfo.fileNode.remove();
-        if (getIsSearching())
+        if (getCurrentViewState() === ViewState.SEARCH)
             currentSearchFileItems.removeFileItemInMapOnly(fileId);
         currentMainFileItems.removeFileItemInMapOnly(fileId);
     }
     const toDeleteSet = new Set(idsToDelete);
-    if (getIsSearching())
+    if (getCurrentViewState() === ViewState.SEARCH)
         currentSearchFileItems.removeFileItemsInIdListOnly(toDeleteSet);
     currentMainFileItems.removeFileItemsInIdListOnly(toDeleteSet);
     if (toDeleteSet.size > 1)
         displayInfoMessage(`Processing to delete: ${deleteText}`);
+});
+
+moveToTrashButton.addEventListener('click', async function () {
+    if (selectedFiles.size === 0) {
+        console.log('No file selected');
+        return;
+    }
+    const trashText = selectedFiles.size === 1 ? `file ${currentTargetNode.name}` : `${selectedFiles.size} files`;
+    const confirmTrash = confirm(`Are you sure to move ${trashText} to trash?`);
+    if (!confirmTrash) return;
+    const idsToTrash = Array.from(selectedFiles.keys());
+    const response = await apiRequest('/api/file/trash', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(idsToTrash)
+    });
+    let responseMessage;
+    try {
+        responseMessage = await response.json();
+    } catch {
+        responseMessage = await response.text().catch(() => 'Unknown error occurred.');
+    }
+    if (!response.ok) {
+        displayInfoMessage('Failed to move to trash: ' + responseMessage, false);
+        return;
+    }
+    for (const fileId of idsToTrash) {
+        removeSelectedFile(fileId);
+    }
+    const toTrashSet = new Set(idsToTrash);
+    if (getCurrentViewState() === ViewState.SEARCH)
+        currentSearchFileItems.removeFileItemsInIdListOnly(toTrashSet);
+    currentMainFileItems.removeFileItemsInIdListOnly(toTrashSet);
+    displayInfoMessage(responseMessage);
+});
+
+restoreFileButton.addEventListener('click', async function () {
+    if (selectedFiles.size === 0) {
+        console.log('No file selected');
+        return;
+    }
+    const idsToRestore = Array.from(selectedFiles.keys());
+    const response = await apiRequest('/api/file/restore', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(idsToRestore)
+    });
+    let responseMessage;
+    try {
+        responseMessage = await response.json();
+    } catch {
+        responseMessage = await response.text().catch(() => 'Unknown error occurred.');
+    }
+    if (!response.ok) {
+        displayInfoMessage('Failed to move to restore: ' + responseMessage, false);
+        return;
+    }
+    for (const fileId of idsToRestore) {
+        removeSelectedFile(fileId);
+    }
+    const toRestoreSet = new Set(idsToRestore);
+    if (getCurrentViewState() === ViewState.SEARCH)
+        currentSearchFileItems.removeFileItemsInIdListOnly(toRestoreSet);
+    currentMainFileItems.removeFileItemsInIdListOnly(toRestoreSet);
+    displayInfoMessage(responseMessage);
 });
 
 function hasSameNameItem(name) {
@@ -1079,7 +1245,7 @@ newFolderButton.addEventListener('click', async function () {
 });
 
 function getCurrentFileItemById(id) {
-    if (getIsSearching())
+    if (getCurrentViewState() === ViewState.SEARCH)
         return currentSearchFileItems.getFileItemById(id);
     return currentMainFileItems.getFileItemById(id);
 }
@@ -1284,7 +1450,9 @@ async function processQueue() {
 
     const currentItem = messageQueue.shift();
 
-    messageText.textContent = currentItem.message;
+    messageText.textContent = Array.isArray(currentItem.message)
+        ? currentItem.message.join('\n')
+        : currentItem.message;
     infoMessageContainer.classList.remove('hidden');
 
     currentStartTime = Date.now();

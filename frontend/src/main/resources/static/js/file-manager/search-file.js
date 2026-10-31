@@ -4,7 +4,7 @@ import {
     currentMainFileItems,
     displayFileItem,
     getCurrentPath,
-    setObserverToFetchMore, unobserveSentinel, setPageObserver, setCurrentViewState, ViewState
+    setObserverToFetchMore, unobserveSentinel, setPageObserver, setCurrentViewState, ViewState, getPreviousViewState
 } from "/static/js/file-manager/file-manager-page.js";
 
 const searchForm = document.getElementById('search-form');
@@ -92,7 +92,7 @@ clearSearchButton.addEventListener("click", async function () {
 export function clearSearch() {
     searchInput.value = '';
     clearSearchButton.classList.add('hidden');
-    setCurrentViewState(ViewState.NORMAL);
+    setCurrentViewState(getPreviousViewState());
     setObserverToFetchMore();
     displayFileItem([], currentMainFileItems, true, false, false, true);
 }
