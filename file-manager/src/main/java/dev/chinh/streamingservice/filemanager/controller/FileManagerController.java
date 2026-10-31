@@ -15,6 +15,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 
 @RequiredArgsConstructor
 @RestController
@@ -90,7 +91,7 @@ public class FileManagerController {
 
     @PostMapping("/restore")
     public ResponseEntity<?> moveFilesOutOfTrash(@RequestBody List<String> fileIds, @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(fileTrashService.moveOutOfTrash(jwt.getSubject(), fileIds));
+        return ResponseEntity.ok(fileTrashService.moveOutOfTrash(jwt.getSubject(), fileIds, Optional.empty()));
     }
 
     @DeleteMapping("/{fileId}")

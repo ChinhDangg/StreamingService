@@ -546,6 +546,9 @@ public class FileEventConsumerService {
         List<String> dirItemIds = new ArrayList<>();
         Map<String, FileSystemItem> fileItemMap = new HashMap<>();
         for (FileSystemItem item : items) {
+            if (event.targetParent().isPresent()) {
+                item.setOldParentId(event.targetParent().get());
+            }
             if (FileType.isNotDir(item.getFileType())) {
                 fileItemIds.add(item.getId());
             } else {
@@ -660,7 +663,7 @@ public class FileEventConsumerService {
             return;
         }
         if (FileType.isNotDir(item.getFileType())) {
-            log.warn("File is not a directory. Moving single file is handled at initiation already. Skipping... {}", event.fileId());
+            log.warn("File is not a directory. Skipping... {}", event.fileId());
             return;
         }
         FileSystemItem newParent = event.newParentId().equals(fileTrashService.getTRASH_FOLDER_ID())
@@ -720,8 +723,6 @@ public class FileEventConsumerService {
         }
 
         Set<String> commonIds = fileUtilService.getCommonIds(event.oldIdPath() + item.getId() + newParent.getPath() + newParent.getId());
-        System.out.println("common ids: ");
-        System.out.println(commonIds);
         fileLockService.releaseLockedFileItem(commonIds);
         log.info("Moved directory: {} to parent: {}", item.getId(), newParent.getId());
     }

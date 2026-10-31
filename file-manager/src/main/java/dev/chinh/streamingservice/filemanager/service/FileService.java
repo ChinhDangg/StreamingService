@@ -259,6 +259,9 @@ public class FileService {
         if (error != null) {
             throw new IllegalArgumentException(error);
         }
+        if (item.getParentId().equals(fileTrashService.getTRASH_FOLDER_ID())) {
+            throw new IllegalArgumentException("Cannot rename item in trash");
+        }
         if (item.getName().equals(newName)) {
             return newName;
         }
@@ -291,6 +294,10 @@ public class FileService {
         if (item.getParentId().equals(newParentId)) {
             throw new IllegalArgumentException("Item is already in parent directory: " + newParentId);
         }
+        if (newParentId.equals(fileTrashService.getTRASH_FOLDER_ID())) {
+            fileTrashService.moveToTrash(userId, List.of(fileId));
+            return item;
+        }
         FileSystemItem newParent = fileUtilService.findById(userId, newParentId, false);
         if (newParent == null) {
             throw new IllegalArgumentException("Parent folder not found: " + newParentId);
@@ -304,9 +311,9 @@ public class FileService {
         if (newParent.getPath().contains(item.getId())) {
             throw new IllegalArgumentException("Cannot move item to a child of itself");
         }
-        if (newParentId.equals(fileTrashService.getTRASH_FOLDER_ID())) {
-            fileTrashService.moveToTrash(userId, List.of(fileId));
-            return null;
+        if (item.getParentId().equals(fileTrashService.getTRASH_FOLDER_ID())) {
+            fileTrashService.moveOutOfTrash(userId, List.of(fileId), Optional.of(newParent.getId()));
+            return item;
         }
         Set<String> parentIds = fileUtilService.getCommonIds(newParent.getPath() + newParent.getId());
         Map<String, Set<FileStatus>> parentStatusMap = parentIds.stream()

@@ -43,7 +43,7 @@ public class FileTrashService {
     private final FileCacheService fileCacheService;
 
     @Transactional
-    public String moveToTrash(String userId, List<String> fileIds) {
+    public List<String> moveToTrash(String userId, List<String> fileIds) {
         Set<String> notCheckedIds = new HashSet<>(fileIds);
 
         Query query = new Query(Criteria
@@ -69,7 +69,7 @@ public class FileTrashService {
         }
 
         if (notInTrash.isEmpty())
-            return "All files are already in trash";
+            return List.of("All files are already in trash");
 
         Set<String> allParentIdsInPaths = fileUtilService.getCommonIds(allNotInTrashParentItemPaths.toString());
         Map<String, Set<FileStatus>> parentIgnoreStatus = allParentIdsInPaths.stream()
@@ -109,25 +109,26 @@ public class FileTrashService {
             ));
         }
 
-        String message = "Moving " + notInTrash.size() + " files to trash\n";
+        List<String> message = new ArrayList<>(List.of("Moving " + notInTrash.size() + " files to trash"));
         if (!alreadyInTrash.isEmpty())
-            message += alreadyInTrash.size() + " files are already in trash\n";
+            message.add(alreadyInTrash.size() + " files are already in trash");
         if (!notCheckedIds.isEmpty())
-            message += notCheckedIds.size() + " files not found";
+            message.add(notCheckedIds.size() + " files not found");
         if (!lockedFileMessage.isEmpty())
-            message += String.join("\n", lockedFileMessage);
+            message.addAll(lockedFileMessage);
         return message;
     }
 
+    // file can be restored to the target parent if present else back to its old saved directory
     @Transactional
-    public String moveOutOfTrash(String userId, List<String> fileIds) {
+    public List<String> moveOutOfTrash(String userId, List<String> fileIds, Optional<String> targetParent) {
         Set<String> notCheckedIds = new HashSet<>(fileIds);
 
         Query query = new Query(Criteria
                 .where(FileItemField.ID).in(notCheckedIds)
                 .and(FileItemField.USER_ID).is(Long.parseLong(userId))
         );
-        query.fields().include(FileItemField.ID, FileItemField.PARENT_ID, FileItemField.NAME, FileItemField.PATH);
+        query.fields().include(FileItemField.ID, FileItemField.PARENT_ID, FileItemField.NAME, FileItemField.PATH, FileItemField.OLD_PARENT_ID);
         List<FileSystemItem> items = fileRepository.find(query);
 
         StringBuilder allInTrashParentItemPaths = new StringBuilder();
@@ -146,7 +147,7 @@ public class FileTrashService {
         }
 
         if (alreadyInTrash.isEmpty())
-            return "No files are in trash";
+            return List.of("No files are in trash");
 
         Set<String> allParentIdsInPaths = fileUtilService.getCommonIds(allInTrashParentItemPaths.toString());
         Map<String, Set<FileStatus>> parentIgnoreStatus = allParentIdsInPaths.stream()
@@ -175,6 +176,22 @@ public class FileTrashService {
             }
         }
 
+        List<String> destinationNameConflictMessage = new ArrayList<>();
+        var targetParentFileItem = targetParent.map(s -> fileUtilService.findById(userId, s, true)).orElse(null);
+        for (String id : alreadyInTrash) {
+            String currentTrashName = itemsMap.get(id).getName();
+            String originalName = currentTrashName.substring(0, (currentTrashName.length() - TRASH_START_POSTFIX.length() - id.length()));
+            boolean sameNameExisted = fileUtilService.itemWithNameExists(
+                    userId,
+                    targetParentFileItem == null ? itemsMap.get(id).getOldParentId() : targetParentFileItem.getId(),
+                    originalName
+            );
+            if (sameNameExisted) {
+                destinationNameConflictMessage.add("Destination directory already has same name item: " + originalName);
+                alreadyInTrash.remove(id);
+            }
+        }
+
         if (!alreadyInTrash.isEmpty()) {
             fileLockService.lockFileItem(userId, alreadyInTrash, Collections.emptyMap());
             fileCacheService.invalidateFileCache(alreadyInTrash);
@@ -182,17 +199,19 @@ public class FileTrashService {
             publisher.publishEvent(new FileEventProducer.EventWrapper(
                     EventTopics.MEDIA_FILE_TOPIC,
                     userId,
-                    new MediaUpdateEvent.FilesMovedOutOfTrash(userId, alreadyInTrash)
+                    new MediaUpdateEvent.FilesMovedOutOfTrash(userId, alreadyInTrash, targetParent)
             ));
         }
 
-        String message = "Moving " + alreadyInTrash.size() + " files out of trash\n";
+        List<String> message = new ArrayList<>(List.of("Moving " + alreadyInTrash.size() + " files out of trash"));
         if (!notInTrash.isEmpty())
-            message += notInTrash.size() + " files are not in trash\n";
+            message.add(notInTrash.size() + " files are not in trash");
         if (!notCheckedIds.isEmpty())
-            message += notCheckedIds.size() + " files not found";
+            message.add(notCheckedIds.size() + " files not found");
         if (!lockedFileMessage.isEmpty())
-            message += String.join("\n", lockedFileMessage);
+            message.addAll(lockedFileMessage);
+        if (!destinationNameConflictMessage.isEmpty())
+            message.addAll(destinationNameConflictMessage);
         return message;
     }
 
