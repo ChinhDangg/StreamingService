@@ -1,6 +1,7 @@
-import {displayInfoMessage, getCurrentPath, getFullCurrentPath} from "/static/js/file-manager/file-manager-page.js";
+import {apiRequest, handleResponse} from "/static/js/common.js";
+import {displayInfoMessage, displayErrorMessage} from "/static/js/file-manager/file-notification.js";
+import {getCurrentPath, getFullCurrentPath} from "/static/js/file-manager/file-manager-page.js";
 import {endFileSession, endVideoUploadSession, uploadFile} from "/static/js/file-manager/upload-file.js";
-import {apiRequest} from "/static/js/common.js";
 
 window.addEventListener('DOMContentLoaded', async function () {
     initializeAddNameEntity();
@@ -284,11 +285,11 @@ function addUploadingFileText(name) {
 
 function validateAllowUpload(fileList) {
     if (fileList.length === 0) {
-        alert('No file selected');
+        displayErrorMessage('No file is selected');
         return false;
     }
     if (!getCurrentPath()) {
-        alert('No target folder selected');
+        displayErrorMessage('No target folder is selected');
         return false;
     }
     return true;
@@ -515,11 +516,12 @@ function initializeEditArea() {
 
     const searchName = async (nameString) => {
         const response = await apiRequest(`/api/search/name/${currentNameEntity}?s=${nameString}`);
-        if (!response.ok) {
-            alert('Failed to fetch name info: ' + await response.text());
+        const { success, data, message } = await handleResponse(response);
+        if (!success) {
+            displayErrorMessage(`Failed to fetch name info: ${message}`);
             return;
         }
-        const nameEntityInfo = await response.json();
+        const nameEntityInfo = data;
         // const nameEntityInfo = [
         //     {id: 1, name: 'name1', thumbnail: 'thumbnail1'},
         //     {id: 2, name: 'name2', thumbnail: 'thumbnail1'},

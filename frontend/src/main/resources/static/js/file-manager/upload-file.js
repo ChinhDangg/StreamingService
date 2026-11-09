@@ -1,4 +1,4 @@
-import {apiRequest} from "/static/js/common.js";
+import {apiRequest, handleResponse} from "/static/js/common.js";
 import SparkMD5 from '/static/js/file-manager/spark-md5.js';
 
 export async function endVideoUploadSession(uploadId, uploadedParts, basicInfo, nameUpdateList, isLast = false) {
@@ -16,10 +16,11 @@ export async function endVideoUploadSession(uploadId, uploadedParts, basicInfo, 
             nameUpdateListAsJson: nameUpdateListJson,
         })
     });
-    if (!response.ok) {
-        return 'Error: Failed to finalize video upload: ' + await response.text();
+    const { success, data, message } = await handleResponse(response);
+    if (!success) {
+        return `Error: Failed to finalize video upload: ${message}`;
     }
-    return response.text();
+    return data;
 }
 
 export async function endFileSession(uploadId, uploadedParts, isLast = false){
@@ -34,10 +35,11 @@ export async function endFileSession(uploadId, uploadedParts, isLast = false){
             isLast: isLast
         })
     });
-    if (!response.ok) {
-        return 'Error: Failed to finalize file upload: ' + await response.text();
+    const { success, data, message } = await handleResponse(response);
+    if (!success) {
+        return `Error: Failed to finalize file upload: ${message}`;
     }
-    return response.text();
+    return data;
 }
 
 export async function uploadFile(file, fileName,
@@ -66,12 +68,13 @@ export async function uploadFile(file, fileName,
                 filePath: filePath
             })
         });
-        if (!response.ok) {
+        const { success, data, message } = await handleResponse(response);
+        if (!success) {
             if (currentFailTexts)
-                currentFailTexts.push('Init: ' + await response.text());
+                currentFailTexts.push(`Init: ${message}`);
             return false;
         }
-        return await response.text();
+        return data;
     }
 
     uploadId = uploadId == null ? await initiateUpload(fileName) : uploadId;
@@ -82,6 +85,21 @@ export async function uploadFile(file, fileName,
     if (uploadingFiles)
         uploadingFiles.get(fileName).uploadId = uploadId;
 
+    const getPresignUrl = async(uploadId, partNumber) => {
+        const urlResponse = await apiRequest('/api/upload/presign-part-url', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                uploadId: uploadId,
+                partNumber: partNumber
+            })
+        });
+        const { success, data, message } = await handleResponse(urlResponse);
+        if (!success) throw new Error(`Presign: ${message}`);
+        return data;
+    }
 
     const startIdx = chunks.partNumber ? chunks.partNumber : 0;
     const CONCURRENCY_LIMIT = 4; // 4 parallel uploads
@@ -94,19 +112,7 @@ export async function uploadFile(file, fileName,
             const c = tasks.shift();
 
             try {
-                const urlResponse = await apiRequest('/api/upload/presign-part-url', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        uploadId: uploadId,
-                        partNumber: c.partNumber
-                    })
-                });
-                if (!urlResponse.ok) throw new Error('Presign: ' + await urlResponse.text());
-                const urlRes = await urlResponse.text();
-
+                const urlRes = await getPresignUrl(uploadId, c.partNumber);
 
                 const calculatedMd5 = await calculateChunkMd5(c.blob);
                 const res = await apiRequest(urlRes, {

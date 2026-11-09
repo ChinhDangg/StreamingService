@@ -1,4 +1,5 @@
-import {apiRequest} from "/static/js/common.js";
+import {apiRequest, handleResponse} from "/static/js/common.js";
+import {displayInfoMessage, displayErrorMessage} from "/static/js/file-manager/file-notification.js";
 import {FileManager} from "/static/js/file-manager/FileManager.js";
 import {
     clearSearch,
@@ -31,31 +32,18 @@ listBtn.addEventListener("click", function () {
 });
 
 async function getRootDir() {
-    const rootDir = await apiRequest('/api/file/root');
-    if (!rootDir.ok) {
-        alert('Failed to get root directory');
+    const response = await apiRequest('/api/file/root');
+    const { success, data, message } = await handleResponse(response);
+    if (!success) {
+        displayErrorMessage(`Failed to get root directory: ${message}`);
         return null;
     }
-    const subFiles = await rootDir.json();
+    const subFiles = data;
     if (subFiles.hasNext)
         currentMainFileItems.setCurrentFilePage(subFiles.nextCursor);
     else
         currentMainFileItems.setCurrentFilePage(null);
     return subFiles;
-    // return [
-    //     {
-    //         id: 1,
-    //         path: "media",
-    //         name: "vid",
-    //         fileType: "DIR",
-    //     },
-    //     {
-    //         id: 2,
-    //         path: "media",
-    //         name: "file.txt",
-    //         fileType: "FILE",
-    //     }
-    // ]
 }
 
 const fileViewContainer = document.getElementById('file-view-container');
@@ -295,12 +283,13 @@ async function fetchTrashFiles(page = null) {
     params.append('order', sortSelectValue.order);
     const url = '/api/file/trash' + '?' + params.toString();
     const response = await apiRequest(url);
-    if (!response.ok) {
-        alert('Failed to fetch trash files');
+    const { success, data, message } = await handleResponse(response);
+    if (!success) {
+        displayErrorMessage(`Failed to fetch trash files: ${message}`);
         isProcessing = false;
         return null;
     }
-    const subFiles = await response.json();
+    const subFiles = data;
     if (subFiles.hasNext)
         currentMainFileItems.setCurrentFilePage(subFiles.nextCursor);
     else
@@ -380,12 +369,13 @@ async function fetchMoreFiles(subId, page = null, getParentInfo = false) {
 
     const url = subId ? '/api/file/dir' : '/api/file/root';
     const response = await apiRequest(url + '?' + params.toString());
-    if (!response.ok) {
-        alert('Failed to fetch more files');
+    const { success, data, message } = await handleResponse(response);
+    if (!success) {
+        displayErrorMessage(`Failed to fetch more files: ${message}`);
         isProcessing = false;
         return null;
     }
-    const subFiles = await response.json();
+    const subFiles = data;
     if (subFiles.hasNext)
         currentMainFileItems.setCurrentFilePage(subFiles.nextCursor);
     else
@@ -908,7 +898,7 @@ fileDropZone.addEventListener('click', async (event) => {
         else {
             const parentId = currentSearchFileItems.getFileItemById(fileId)?.parentId;
             if (!parentId) {
-                alert('Failed to get parent id.');
+                displayErrorMessage('Failed to get parent id.');
                 return;
             }
             await fetchMoreFilesAndMove(parentId, null);
@@ -967,11 +957,12 @@ addAsVideoButton.addEventListener('click', async function () {
         const response = await apiRequest(`/api/file/vid/${fileId}`, {
             method: 'POST'
         });
-        if (!response.ok) {
-            displayInfoMessage('Failed to add as video: ' + await response.text(), false);
+        const { success, data, message } = await handleResponse(response);
+        if (!success) {
+            displayErrorMessage(`Failed to add as video: ${message}`);
             return;
         }
-        displayInfoMessage(await response.text());
+        displayInfoMessage(data);
     }
     displayInfoMessage(`Processing ${selectedFiles.size} file(s) as video(s).`);
 });
@@ -993,11 +984,12 @@ addAsAlbumButton.addEventListener('click', async function () {
         const response = await apiRequest(`/api/file/album/${fileId}`, {
             method: 'POST'
         });
-        if (!response.ok) {
-            displayInfoMessage('Failed to add as album: ' + await response.text(), false);
-            return
+        const { success, data, message } = await handleResponse(response);
+        if (!success) {
+            displayErrorMessage(`Failed to add as album: ${message}`);
+            return;
         }
-        displayInfoMessage(await response.text());
+        displayInfoMessage(data);
     }
     displayInfoMessage(`Processing ${selectedFiles.size} dir(s) as album(s).`);
 });
@@ -1019,11 +1011,12 @@ addAsGrouperButton.addEventListener('click', async function () {
         const response = await apiRequest(`/api/file/grouper/${fileId}`, {
             method: 'POST'
         });
-        if (!response.ok) {
-            displayInfoMessage('Failed to add as grouper: ' + await response.text(), false);
+        const { success, data, message } = await handleResponse(response);
+        if (!success) {
+            displayErrorMessage(`Failed to add as grouper: ${message}`);
             return;
         }
-        displayInfoMessage(await response.text());
+        displayInfoMessage(data);
     }
     displayInfoMessage(`Processing ${selectedFiles.size} dir(s) as grouper(s).`);
 });
@@ -1031,7 +1024,7 @@ addAsGrouperButton.addEventListener('click', async function () {
 addNameEntityButton.addEventListener('click', async function () {
     const body = getNameEntityForMediaUpload();
     if (body === null) {
-        displayInfoMessage('Failed to get any name entity for media upload.', false);
+        displayErrorMessage('Failed to get any name entity for media upload.');
         return;
     }
 
@@ -1050,13 +1043,14 @@ addNameEntityButton.addEventListener('click', async function () {
                 'Content-Type': 'application/json'
             }
         });
-        if (!response.ok) {
-            displayInfoMessage(`Failed to add name entity for media ${fileInfo.mediaId} with name ${fileInfo.fileName}: ` + await response.text(), false);
+        const { success, message } = await handleResponse(response);
+        if (!success) {
+            displayErrorMessage(`Failed to add name entity for media ${fileInfo.mediaId} with name ${fileInfo.fileName}: ${message}`);
         } else
             displayInfoMessage(`Added name entity for media ${fileInfo.mediaId} with name ${fileInfo.fileName}.`);
     }
     if (count === 0)
-        displayInfoMessage('No file as media selected', false);
+        displayErrorMessage('No file as media selected');
 });
 
 openMediaButton.addEventListener('click', async function () {
@@ -1093,20 +1087,22 @@ deleteFileButton.addEventListener('click', async function () {
             const response = await apiRequest(`/api/file/media/${fileInfo.mediaId}`, {
                 method: 'DELETE'
             });
-            if (!response.ok) {
-                displayInfoMessage('Failed to delete media: ' + await response.text(), false);
+            const { success, message } = await handleResponse(response);
+            if (!success) {
+                displayErrorMessage(`Failed to delete media: ${message}`);
                 return;
             }
-            displayInfoMessage("Processing to delete media: " + fileInfo.mediaId);
+            displayInfoMessage(`Processing to delete media: ${fileInfo.mediaId}`);
         } else {
             const response = await apiRequest(`/api/file/${fileId}`, {
                 method: 'DELETE'
             });
-            if (!response.ok) {
-                displayInfoMessage('Failed to delete file: ' + await response.text(), false);
+            const { success, message } = await handleResponse(response);
+            if (!success) {
+                displayErrorMessage(`Failed to delete file: ${message}`);
                 return;
             }
-            displayInfoMessage("Processing to delete file: " + fileInfo.fileName);
+            displayInfoMessage(`Processing to delete file: ${fileInfo.fileName}`);
         }
         idsToDelete.push(fileId);
         removeSelectedFile(fileId);
@@ -1139,14 +1135,9 @@ moveToTrashButton.addEventListener('click', async function () {
         },
         body: JSON.stringify(idsToTrash)
     });
-    let responseMessage;
-    try {
-        responseMessage = await response.json();
-    } catch {
-        responseMessage = await response.text().catch(() => 'Unknown error occurred.');
-    }
-    if (!response.ok) {
-        displayInfoMessage('Failed to move to trash: ' + responseMessage, false);
+    const { success, data, message } = await handleResponse(response);
+    if (!success) {
+        displayErrorMessage(`Failed to move to trash: ${message}`);
         return;
     }
     for (const fileId of idsToTrash) {
@@ -1156,7 +1147,7 @@ moveToTrashButton.addEventListener('click', async function () {
     if (getCurrentViewState() === ViewState.SEARCH)
         currentSearchFileItems.removeFileItemsInIdListOnly(toTrashSet);
     currentMainFileItems.removeFileItemsInIdListOnly(toTrashSet);
-    displayInfoMessage(responseMessage);
+    displayInfoMessage(data);
 });
 
 restoreFileButton.addEventListener('click', async function () {
@@ -1172,14 +1163,9 @@ restoreFileButton.addEventListener('click', async function () {
         },
         body: JSON.stringify(idsToRestore)
     });
-    let responseMessage;
-    try {
-        responseMessage = await response.json();
-    } catch {
-        responseMessage = await response.text().catch(() => 'Unknown error occurred.');
-    }
-    if (!response.ok) {
-        displayInfoMessage('Failed to move to restore: ' + responseMessage, false);
+    const { success, data, message } = await handleResponse(response);
+    if (!success) {
+        displayErrorMessage(`Failed to move to restore: ${message}`);
         return;
     }
     for (const fileId of idsToRestore) {
@@ -1189,7 +1175,7 @@ restoreFileButton.addEventListener('click', async function () {
     if (getCurrentViewState() === ViewState.SEARCH)
         currentSearchFileItems.removeFileItemsInIdListOnly(toRestoreSet);
     currentMainFileItems.removeFileItemsInIdListOnly(toRestoreSet);
-    displayInfoMessage(responseMessage);
+    displayInfoMessage(data);
 });
 
 function hasSameNameItem(name) {
@@ -1201,26 +1187,26 @@ newFolderButton.addEventListener('click', async function () {
     const sendCreateNewFolderRequest = async (name) => {
         const currentPath = getCurrentPath();
         if (!currentPath) {
-            alert('Failed to get current path');
+            displayErrorMessage('Failed to get current path');
             return;
         }
         const currentFolderId = currentPath.id;
         if (currentFolderId === null) {
-            alert('Failed to get current folder id');
+            displayErrorMessage('Failed to get current folder id');
             return;
         }
         if (name.length === 0) {
-            alert('Folder name cannot be empty');
+            displayErrorMessage('Folder name cannot be empty');
             return;
         }
         const newFolderName = name.trim();
         if (newFolderName.length === 0) {
-            alert('Folder name cannot be empty');
+            displayErrorMessage('Folder name cannot be empty');
             return;
         }
         const sameNameItem = hasSameNameItem(newFolderName);
         if (sameNameItem) {
-            alert('Folder name already exists');
+            displayErrorMessage('Folder name already exists');
             return;
         }
         const response = await apiRequest(`/api/file/folder`, {
@@ -1233,12 +1219,12 @@ newFolderButton.addEventListener('click', async function () {
                 name: newFolderName
             })
         });
-        if (!response.ok) {
-            alert('Failed to create folder: ' + await response.text());
+        const { success, data, message } = await handleResponse(response);
+        if (!success) {
+            displayErrorMessage(`Failed to create folder: ${message}`);
             return;
         }
-        const fileInfo = await response.json();
-        displayFileItem([fileInfo], currentMainFileItems,false, false, true);
+        displayFileItem([data], currentMainFileItems,false, false, true);
         displayInfoMessage(`Created folder: ${name}`, true, 30000);
     }
     openOverlayTextPrompt('New Folder', 'Untitled Folder', sendCreateNewFolderRequest);
@@ -1253,7 +1239,7 @@ function getCurrentFileItemById(id) {
 renameButton.addEventListener('click', async function () {
     const currentFileItem = getCurrentFileItemById(currentTargetNode.id);
     if (!currentFileItem) {
-        alert('No current file item');
+        displayErrorMessage('No current file item');
         return;
     }
     const sendRenameRequest = async (newName) => {
@@ -1263,12 +1249,12 @@ renameButton.addEventListener('click', async function () {
         }
         newName = newName.trim();
         if (newName.length === 0) {
-            alert('New name cannot be empty');
+            displayErrorMessage('New name cannot be empty');
             return;
         }
         const sameNameItem = hasSameNameItem(newName);
         if (sameNameItem) {
-            alert('An item the same name already exists');
+            displayErrorMessage('An item the same name already exists');
             return;
         }
         const response = await apiRequest(`/api/file/rename`, {
@@ -1281,11 +1267,12 @@ renameButton.addEventListener('click', async function () {
                 name: newName
             })
         });
-        if (!response.ok) {
-            alert('Failed to rename file: ' + await response.text());
+        const { success, data, message } = await handleResponse(response);
+        if (!success) {
+            displayErrorMessage(`Failed to rename file: ${message}`)
             return;
         }
-        const respondedName = await response.text();
+        const respondedName = data;
         currentFileItem.name = respondedName;
         currentTargetNode.node.querySelector('.name').textContent = respondedName;
         currentTargetNode.node.dataset.name = respondedName;
@@ -1298,11 +1285,11 @@ const movingFileBanner = document.getElementById('moving-file-banner');
 const movingFileBannerCancelBtn = movingFileBanner.querySelector('.cancel-btn');
 moveButton.addEventListener('click', async function () {
     if (!currentTargetNode.id) {
-        alert('No target selected');
+        displayErrorMessage('No target selected');
         return;
     }
     if (selectedFiles.size === 0) {
-        alert('No file selected');
+        displayErrorMessage('No file selected');
         return;
     }
     const moveFile = async (movingFileId, currentParentId, currentFileName) => {
@@ -1328,7 +1315,7 @@ moveButton.addEventListener('click', async function () {
         }
         const sameNameItem = hasSameNameItem(currentFileName);
         if (sameNameItem) {
-            alert('Cannot move item to a folder with item that has the same name');
+            displayErrorMessage('Cannot move item to a folder with item that has the same name');
             return null;
         }
         const response = await apiRequest(`/api/file/move`, {
@@ -1341,10 +1328,15 @@ moveButton.addEventListener('click', async function () {
                 parentId: currentFolderId
             })
         });
-        if (!response.ok) {
-            return 'Failed to move file: ' + await response.text();
+        const { success, data, message } = await handleResponse(response);
+        if (!success) {
+            return `Failed to move file: ${message}`;
         }
-        const fileInfo = await response.json();
+        if (!data) { // move event could be move to trash event and does not have fileInfo returned, only message
+            displayInfoMessage(message, false);
+            return;
+        }
+        const fileInfo = data;
         displayFileItem([fileInfo], currentMainFileItems,false,false,true);
         displayInfoMessage(`Moved: ${fileInfo.name}`, true, 30000);
     }
@@ -1358,8 +1350,7 @@ moveButton.addEventListener('click', async function () {
         for (const movingFile of movingFiles) {
             const failedText = await moveFile(movingFile.id, movingFile.parentId, movingFile.name);
             if (failedText) {
-                alert(failedText);
-                return;
+                displayErrorMessage(failedText);
             }
         }
         movingFileBannerCancelBtn.click();
@@ -1399,103 +1390,6 @@ document.addEventListener('click', () => {
 });
 
 
-const infoMessageContainer = document.getElementById('info-message-container');
-const messageText = infoMessageContainer.querySelector('.info-message');
-
-let messageQueue = [];
-let isProcessingMessage = false;
-const MAX_QUEUE = 20;
-
-let currentController = null;
-let currentStartTime = 0;
-
-export function displayInfoMessage(message, hasTimeout = true, timeoutTime = 5000) {
-    if (messageQueue.length >= MAX_QUEUE) {
-        messageQueue.shift();
-    }
-
-    messageQueue.push({ message, hasTimeout, timeoutTime });
-
-    // If a message is currently showing → try to interrupt it
-    if (isProcessingMessage && currentController) {
-        const elapsed = Date.now() - currentStartTime;
-
-        if (elapsed >= 500) {
-            currentController.abort(); // cancel immediately
-        } else {
-            // wait until 500ms is reached, then cancel
-            setTimeout(() => {
-                if (currentController) currentController.abort();
-            }, 500 - elapsed);
-        }
-    }
-
-    if (!isProcessingMessage) {
-        processQueue();
-    }
-}
-
-infoMessageContainer.querySelector('.close-info-message-button').addEventListener('click', () => {
-    infoMessageContainer.classList.add('hidden');
-});
-
-async function processQueue() {
-    if (messageQueue.length === 0) {
-        isProcessingMessage = false;
-        infoMessageContainer.classList.add('hidden');
-        return;
-    }
-
-    isProcessingMessage = true;
-
-    const currentItem = messageQueue.shift();
-
-    messageText.textContent = Array.isArray(currentItem.message)
-        ? currentItem.message.join('\n')
-        : currentItem.message;
-    infoMessageContainer.classList.remove('hidden');
-
-    currentStartTime = Date.now();
-    currentController = new AbortController();
-
-    try {
-        let delay;
-        if (messageQueue.length === 0) {
-            // Only message
-            if (!currentItem.hasTimeout) {
-                // wait forever until aborted
-                await new Promise((_, reject) => {
-                    currentController.signal.addEventListener('abort', reject);
-                });
-                return;
-            } else {
-                delay = currentItem.timeoutTime;
-            }
-        } else {
-            // Multiple messages -> max 700ms
-            delay = 700;
-        }
-
-        await cancellableDelay(delay, currentController.signal);
-    } catch (e) {
-        // Aborted → just move on
-    }
-``
-    currentController = null;
-
-    processQueue();
-}
-
-function cancellableDelay(ms, signal) {
-    return new Promise((resolve, reject) => {
-        const id = setTimeout(resolve, ms);
-
-        signal.addEventListener('abort', () => {
-            clearTimeout(id);
-            reject(new Error('aborted'));
-        });
-    });
-}
 
 const overlayTextPrompt = document.getElementById('overlay-text-prompt');
 overlayTextPrompt.querySelector('.cancel-btn').addEventListener('click', () => {
@@ -1535,11 +1429,12 @@ async function openPreview(type, fileId) {
     videoPreview.src = "";
 
     const srcResponse = await apiRequest(`/api/file/download/${fileId}`);
-    if (!srcResponse.ok) {
-        alert('Failed to get preview: ' + await srcResponse.text());
+    const { success, data, message } = await handleResponse(srcResponse);
+    if (!success) {
+        displayErrorMessage(`Failed to get preview: ${message}`);
         return;
     }
-    const src = await srcResponse.text();
+    const src = data;
 
     if (type === 'IMAGE') {
         imgPreview.src = src;

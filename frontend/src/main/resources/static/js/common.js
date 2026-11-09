@@ -59,6 +59,41 @@ function getCsrfToken() {
     return null;
 }
 
+export async function handleResponse(response) {
+    if (!response) {
+        alert('Response is not usable, bad passing');
+        return { success: false, data: null, message: 'Response is not usable' };
+    }
+
+    const hasBody = response.status !== 204 &&
+        response.status !== 205 &&
+        response.headers?.get('content-length') !== '0';
+
+    let rep = null;
+    if (hasBody) {
+        try {
+            rep = await response.json();
+        } catch (err) {
+            // Body was not valid JSON (e.g. raw HTML error page from a proxy/gateway)
+            rep = null;
+        }
+    }
+
+    if (!response.ok) {
+        return {
+            success: false,
+            data: rep?.data ?? null,
+            message: rep?.message || `Request failed with status ${response.status}: ${response.statusText || 'Error'}`
+        };
+    }
+
+    return {
+        success: rep?.success ?? true,
+        data: rep?.data ?? null,
+        message: rep?.message || 'Success'
+    };
+}
+
 function redirectToLogin() {
     const current = window.location.pathname + window.location.search;
     const loginPage = "/page/login";

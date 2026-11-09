@@ -1,11 +1,12 @@
 import {FileManager} from "/static/js/file-manager/FileManager.js";
-import {apiRequest} from "/static/js/common.js";
+import {apiRequest, handleResponse} from "/static/js/common.js";
 import {
     currentMainFileItems,
     displayFileItem,
     getCurrentPath,
     setObserverToFetchMore, unobserveSentinel, setPageObserver, setCurrentViewState, ViewState, getPreviousViewState
 } from "/static/js/file-manager/file-manager-page.js";
+import {displayErrorMessage, displayInfoMessage} from "/static/js/file-manager/file-notification.js";
 
 const searchForm = document.getElementById('search-form');
 const searchInput = searchForm.querySelector('.search-input');
@@ -41,18 +42,19 @@ async function searchFiles(searchTerm) {
     setCurrentViewState(ViewState.SEARCH);
     clearSearchButton.classList.remove('hidden');
     if (currentMainFileItems.getCurrentFilePage() === null && !recursiveToggle.checked) {
-        console.log('searching locally');
+        displayInfoMessage('Searching locally');
         let filteredFileIds = currentMainFileItems.findFileItemsWithNameAndReturnTheirIds(searchTerm);
         filteredFileIds = filteredFileIds.length === 0 ? null : filteredFileIds;
         displayFileItem(filteredFileIds, currentMainFileItems, true, false, false, true);
     } else {
-        if (recursiveToggle.checked)
+        if (recursiveToggle.checked) {
+            displayInfoMessage('Searching recursively');
             isInDeepSearch = true;
+        } else
+            displayInfoMessage('Searching');
         displayFileItem([], currentSearchFileItems,true, true, false);
-        // unobserveSentinel();
         await fetchSearchFiles(searchTerm, null);
         setObserverToSearch(searchTerm);
-        // observeSentinel();
     }
 }
 
@@ -72,11 +74,12 @@ async function fetchSearchFiles(searchString, page) {
             pageCursor: page
         })
     });
-    if (!response.ok) {
-        alert('Failed to search files');
+    const { success, data, message } = await handleResponse(response);
+    if (!success) {
+        displayErrorMessage(`Failed to search files: ${message}`);
         return;
     }
-    const searchResult = await response.json();
+    const searchResult = data;
     if (searchResult.hasNext)
         currentSearchFileItems.setCurrentFilePage(searchResult.nextCursor);
     else
