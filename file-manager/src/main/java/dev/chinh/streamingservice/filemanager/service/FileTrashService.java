@@ -83,19 +83,20 @@ public class FileTrashService {
         List<FolderLocks> folderIsLocked = fileLockService.checkIfFileItemsInLock(all, parentIgnoreStatus);
 
         List<String> lockedFileMessage = new ArrayList<>();
-        if (folderIsLocked != null) {
+        if (!folderIsLocked.isEmpty()) {
             Map<String, FolderLocks> lockedIdsMap = folderIsLocked.stream().collect(Collectors.toMap(FolderLocks::getId, f -> f));
-            for (String id : notInTrash) {
+            notInTrash.removeIf(id -> {
                 Optional<String> firstMatchingId = fileUtilService.getCommonIds(itemsMap.get(id).getPath() + id)
                         .stream()
                         .filter(lockedIdsMap::containsKey)
                         .findFirst();
                 if (firstMatchingId.isPresent()) {
                     String lockedFileId = firstMatchingId.get();
-                    lockedFileMessage.add("Unable to trash file " + itemsMap.get(id).getName() + " as " + itemsMap.get(lockedFileId).getName() + " in path is " + lockedIdsMap.get(lockedFileId).getStatusCode());
-                    notInTrash.remove(id);
+                    lockedFileMessage.add("Unable to trash file " + itemsMap.get(id).getName() + " as " + lockedFileId + " in path is " + lockedIdsMap.get(lockedFileId).getStatusCode());
+                    return true;
                 }
-            }
+                return false;
+            });
         }
 
         if (!notInTrash.isEmpty()) {
@@ -161,24 +162,25 @@ public class FileTrashService {
         List<FolderLocks> folderIsLocked = fileLockService.checkIfFileItemsInLock(all, parentIgnoreStatus);
 
         List<String> lockedFileMessage = new ArrayList<>();
-        if (folderIsLocked != null) {
+        if (!folderIsLocked.isEmpty()) {
             Map<String, FolderLocks> lockedIdsMap = folderIsLocked.stream().collect(Collectors.toMap(FolderLocks::getId, f -> f));
-            for (String id : alreadyInTrash) {
+            alreadyInTrash.removeIf(id -> {
                 Optional<String> firstMatchingId = fileUtilService.getCommonIds(itemsMap.get(id).getPath() + id)
                         .stream()
                         .filter(lockedIdsMap::containsKey)
                         .findFirst();
                 if (firstMatchingId.isPresent()) {
                     String lockedFileId = firstMatchingId.get();
-                    lockedFileMessage.add("Unable to move file out of trash: " + itemsMap.get(id).getName() + " as " + itemsMap.get(lockedFileId).getName() + " in path is " + lockedIdsMap.get(lockedFileId).getStatusCode());
-                    alreadyInTrash.remove(id);
+                    lockedFileMessage.add("Unable to move file out of trash: " + itemsMap.get(id).getName() + " as " + lockedFileId + " in path is " + lockedIdsMap.get(lockedFileId).getStatusCode());
+                    return true;
                 }
-            }
+                return false;
+            });
         }
 
         List<String> destinationNameConflictMessage = new ArrayList<>();
         var targetParentFileItem = targetParent.map(s -> fileUtilService.findById(userId, s, true)).orElse(null);
-        for (String id : alreadyInTrash) {
+        alreadyInTrash.removeIf(id -> {
             String currentTrashName = itemsMap.get(id).getName();
             String originalName = currentTrashName.substring(0, (currentTrashName.length() - TRASH_START_POSTFIX.length() - id.length()));
             boolean sameNameExisted = fileUtilService.itemWithNameExists(
@@ -188,9 +190,10 @@ public class FileTrashService {
             );
             if (sameNameExisted) {
                 destinationNameConflictMessage.add("Destination directory already has same name item: " + originalName);
-                alreadyInTrash.remove(id);
+                return true;
             }
-        }
+            return false;
+        });
 
         if (!alreadyInTrash.isEmpty()) {
             fileLockService.lockFileItem(userId, alreadyInTrash, Collections.emptyMap());
@@ -301,6 +304,10 @@ public class FileTrashService {
         return fileRepository.checkExistWithUserId(userId, Criteria
                 .where(FileItemField.PATH).regex("^" + quotedParentPath)
                 .and(FileItemField.MEDIA_ID).nin(null, 0));
+    }
+
+    public boolean itemIsInTrash(String itemPath) {
+        return FileUtilService.containsInPath(itemPath, getTRASH_FOLDER_ID());
     }
 
     public void createTrashFolder() {
