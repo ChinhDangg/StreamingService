@@ -1,5 +1,6 @@
 package dev.chinh.streamingservice.filemanager.upload;
 
+import dev.chinh.streamingservice.filemanager.model.FileResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
@@ -25,8 +26,8 @@ public class UploadController {
     public record InitiateMultipartUploadRequest(@NotBlank @Size(max = 1000) String filePath) {}
 
     @PostMapping("/initiate")
-    public String initiateUpload(@RequestBody InitiateMultipartUploadRequest request, @AuthenticationPrincipal Jwt jwt) {
-        return uploadService.initiateUploadRequest(jwt.getSubject(), request.filePath);
+    public ResponseEntity<FileResponse<?>> initiateUpload(@RequestBody InitiateMultipartUploadRequest request, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().body(FileResponse.ok(uploadService.initiateUploadRequest(jwt.getSubject(), request.filePath)));
     }
 
     public record PresignUploadRequest(
@@ -36,8 +37,8 @@ public class UploadController {
             int partNumber) {}
 
     @PostMapping("/presign-part-url")
-    public String getPresignPartUrl(@RequestBody @Valid PresignUploadRequest request, @AuthenticationPrincipal Jwt jwt) {
-        return uploadService.generatePresignedPartUrl(jwt.getSubject(), request.uploadId, request.partNumber);
+    public ResponseEntity<FileResponse<?>> getPresignPartUrl(@RequestBody @Valid PresignUploadRequest request, @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok().body(FileResponse.ok(uploadService.generatePresignedPartUrl(jwt.getSubject(), request.uploadId, request.partNumber)));
     }
 
     public record EndSessionRequest(

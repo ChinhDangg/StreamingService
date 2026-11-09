@@ -141,6 +141,30 @@ public class FileUtilService {
         return fileRepository.find(query);
     }
 
+    public static boolean containsInPath(String path, String target) {
+        if (path == null || target == null || target.isEmpty()) {
+            return false;
+        }
+        int targetLen = target.length();
+        int pathLen = path.length();
+        int idx = path.indexOf(target);
+        while (idx != -1) {
+            // Check boundary before the matched substring
+            boolean validStart = (idx == 0 || path.charAt(idx - 1) == '/');
+
+            // Check boundary after the matched substring
+            int endIdx = idx + targetLen;
+            boolean validEnd = (endIdx == pathLen || path.charAt(endIdx) == '/');
+
+            if (validStart && validEnd) {
+                return true;
+            }
+            // Move past the current occurrence to check subsequent matches
+            idx = path.indexOf(target, idx + 1);
+        }
+        return false;
+    }
+
     public FileSystemItem getRootDirectoryItem() {
         return fileCacheService.getFileCache(getROOT_FOLDER_ID(), (rootId) -> {
             Query query = new Query(Criteria

@@ -21,6 +21,7 @@ import org.springframework.data.mongodb.MongoTransactionException;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.data.util.Pair;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
@@ -67,6 +68,9 @@ public class FileService {
     @Transactional
     public String addFileAsVideoMedia(String userId, String fileId, String nameUpdateListAsJson) {
         FileSystemItem item = fileUtilService.getFileSystemItem(userId, fileId, true);
+        if (fileTrashService.itemIsInTrash(item.getPath())) {
+            throw new IllegalArgumentException("Item is in trash");
+        }
         if (item.getFileType() != FileType.VIDEO) {
             throw new IllegalArgumentException("File is not a video");
         }
@@ -105,6 +109,9 @@ public class FileService {
     @Transactional
     public String addDirectoryAsAlbumMedia(String userId, String fileId) {
         FileSystemItem item = fileUtilService.getFileSystemItem(userId, fileId, false);
+        if (fileTrashService.itemIsInTrash(item.getPath())) {
+            throw new IllegalArgumentException("Item is in trash");
+        }
         if (item.getFileType() == FileType.ALBUM) {
             throw new IllegalArgumentException("Item is already an album");
         }
@@ -159,6 +166,9 @@ public class FileService {
     @Transactional
     public String addDirectoryAsGrouperMedia(String userId, String fileId) {
         FileSystemItem item = fileUtilService.getFileSystemItem(userId, fileId, false);
+        if (fileTrashService.itemIsInTrash(item.getPath())) {
+            throw new IllegalArgumentException("Item is in trash");
+        }
         if (item.getFileType() == FileType.GROUPER) {
             throw new IllegalArgumentException("Item is already a grouper");
         }
@@ -191,7 +201,6 @@ public class FileService {
         fileLockService.lockFileItem(userId, Set.of(item.getId()), Collections.emptyMap());
         fileCacheService.invalidateFileCache(item.getId());
 
-//        FileSystemItem first = findFirstImageOrVideo(userId, getPathForFileItem(item.getPath(), item.getId()));
         publisher.publishEvent(new FileEventProducer.EventWrapper(
                 EventTopics.MEDIA_HANDLER_TOPIC, // send to media_handler first to get grouper/parent media id
                 userId,
@@ -222,14 +231,15 @@ public class FileService {
         FileSystemItem parent = fileUtilService.findById(userId, parentId, false);
         if (parent == null)
             throw new IllegalArgumentException("Parent folder not found: " + parentId);
+        if (fileTrashService.itemIsInTrash(parent.getPath()))
+            throw new IllegalArgumentException("Item's Parent is in trash");
         if (FileType.isNotDir(parent.getFileType()))
             throw new IllegalArgumentException("Parent folder is not a directory: " + parentId);
         if (fileUtilService.itemWithNameExists(userId, parentId, newFolderName))
             throw new IllegalArgumentException("Folder already exists: " + newFolderName);
         FolderLocks folderIsLocked = fileLockService.checkIfFileItemInLock(fileUtilService.getCommonIds(parent.getPath() + parent.getId()), null);
-        if (folderIsLocked != null) {
+        if (folderIsLocked != null)
             throw new IllegalArgumentException(fileUtilService.getLockedInfoString(userId, folderIsLocked.getId(), folderIsLocked.getStatusCode()));
-        }
 
         FileSystemItem item = FileSystemItem.builder()
                 .userId(Long.parseLong(userId))
@@ -259,7 +269,7 @@ public class FileService {
         if (error != null) {
             throw new IllegalArgumentException(error);
         }
-        if (item.getParentId().equals(fileTrashService.getTRASH_FOLDER_ID())) {
+        if (fileTrashService.itemIsInTrash(item.getPath())) {
             throw new IllegalArgumentException("Cannot rename item in trash");
         }
         if (item.getName().equals(newName)) {
@@ -289,14 +299,13 @@ public class FileService {
     }
 
     @Transactional
-    public FileSystemItem initiateMoveFileItem(String userId, String fileId, String newParentId) {
+    public Pair<Optional<FileSystemItem>, List<String>> initiateMoveFileItem(String userId, String fileId, String newParentId) {
         FileSystemItem item = fileUtilService.getFileSystemItem(userId, fileId, false);
         if (item.getParentId().equals(newParentId)) {
             throw new IllegalArgumentException("Item is already in parent directory: " + newParentId);
         }
         if (newParentId.equals(fileTrashService.getTRASH_FOLDER_ID())) {
-            fileTrashService.moveToTrash(userId, List.of(fileId));
-            return item;
+            return Pair.of(Optional.empty(), fileTrashService.moveToTrash(userId, List.of(fileId)));
         }
         FileSystemItem newParent = fileUtilService.findById(userId, newParentId, false);
         if (newParent == null) {
@@ -312,8 +321,7 @@ public class FileService {
             throw new IllegalArgumentException("Cannot move item to a child of itself");
         }
         if (item.getParentId().equals(fileTrashService.getTRASH_FOLDER_ID())) {
-            fileTrashService.moveOutOfTrash(userId, List.of(fileId), Optional.of(newParent.getId()));
-            return item;
+            return Pair.of(Optional.empty(), fileTrashService.moveOutOfTrash(userId, List.of(fileId), Optional.of(newParent.getId())));
         }
         Set<String> parentIds = fileUtilService.getCommonIds(newParent.getPath() + newParent.getId());
         Map<String, Set<FileStatus>> parentStatusMap = parentIds.stream()
@@ -388,7 +396,7 @@ public class FileService {
             moved.setThumbnail(thumbnailPath);
         }
 
-        return moved;
+        return Pair.of(Optional.ofNullable(moved), List.of());
     }
 
     @Retryable(

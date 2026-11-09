@@ -50,7 +50,7 @@ public class FileLockService {
     }
 
     public List<FolderLocks> checkIfFileItemsInLock(Set<String> fileIds, Map<String, Set<FileStatus>> ignoredStatusMap) {
-        if (fileIds.isEmpty()) return null;
+        if (fileIds.isEmpty()) return new ArrayList<>();
         Criteria criteria = getCheckIfFileItemInLockCriteriaHelper(fileIds, ignoredStatusMap);
         return safeWriteMongoTemplate.find(new Query(criteria), FolderLocks.class);
     }
